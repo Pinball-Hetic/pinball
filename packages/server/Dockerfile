@@ -2,6 +2,9 @@ FROM oven/bun:1.2-alpine AS base
 
 WORKDIR /app
 
+# Aligné sur l'image app : certains outils attendent la CLI npm pendant install/build
+RUN apk add --no-cache npm
+
 # On copie TOUT le monorepo (sauf node_modules via .dockerignore) 
 # pour garantir que les Workspaces Bun sont reconnus
 COPY . .
