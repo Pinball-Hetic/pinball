@@ -1,0 +1,67 @@
+version: '3'
+
+tasks:
+  # --- Local Development ---
+  install:
+    desc: Install dependencies locally
+    cmds:
+      - npm install --ignore-engines
+
+  dev:
+    desc: Run local development (Hot-reload)
+    cmds:
+      - npm run dev
+
+  build:
+    desc: Build all packages
+    cmds:
+      - npm run build
+
+  lint:
+    desc: Lint all packages
+    cmds:
+      - npm run lint
+
+  test:
+    desc: Run all tests
+    cmds:
+      - npm run test
+
+  # --- Docker Development (Hot-Reload) ---
+  "docker:dev":
+    desc: Start all services in Docker (Dev mode with volumes)
+    cmds:
+      - docker-compose -f docker-compose.dev.yml up -d --build
+
+  "docker:dev:down":
+    desc: Stop Docker development services
+    cmds:
+      - docker-compose -f docker-compose.dev.yml down
+
+  # --- Docker Production-like Stack ---
+  "prod:up":
+    desc: Start all services in Docker (Production-like build)
+    cmds:
+      - docker-compose up -d --build
+
+  "prod:down":
+    desc: Stop all Docker services
+    cmds:
+      - docker-compose down
+
+  # --- Database Tools ---
+  "db:up":
+    desc: Start only the database container
+    cmds:
+      - docker-compose up -d db
+
+  "db:push":
+    desc: Push Prisma schema to the DB
+    cmds:
+      - npm run db:push -w @pinball/server
+
+  # --- Maintenance ---
+  clean:
+    desc: Remove all build artifacts and node_modules
+    cmds:
+      - rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/ .next

@@ -1,0 +1,19 @@
+{
+  "name": "@pinball/server",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/interface/index.ts",
+    "lint": "eslint src/**/*.ts"
+  },
+  "dependencies": {
+    "express": "latest",
+    "socket.io": "latest",
+    "@prisma/client": "^5.22.0"
+  },
+  "devDependencies": {
+    "@types/express": "latest",
+    "tsx": "latest",
+    "prisma": "^5.22.0"
+  }
+}

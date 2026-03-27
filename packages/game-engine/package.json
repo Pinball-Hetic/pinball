@@ -1,0 +1,18 @@
+{
+  "name": "@pinball/game-engine",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "lint": "eslint src/**/*.ts"
+  },
+  "dependencies": {
+    "three": "latest",
+    "cannon-es": "latest"
+  },
+  "devDependencies": {
+    "@types/three": "latest"
+  }
+}
