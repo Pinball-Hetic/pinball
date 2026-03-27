@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/interface/index.ts",
+    "dev": "bun --watch src/interface/index.ts",
     "lint": "eslint src/**/*.ts"
   },
   "dependencies": {

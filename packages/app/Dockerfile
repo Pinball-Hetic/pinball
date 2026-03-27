@@ -1,18 +1,17 @@
-FROM node:22-alpine
+FROM oven/bun:1.2-alpine AS base
 
 WORKDIR /app
 
-COPY package.json package-lock.json turbo.json ./
-COPY packages/app/package.json ./packages/app/
-COPY packages/game-engine ./packages/game-engine
-COPY packages/config-lint ./packages/config-lint
+# On copie TOUT le monorepo
+COPY . .
 
-RUN npm install --ignore-engines
+# Installation avec bun
+RUN bun install
 
-COPY packages/app ./packages/app
-
-RUN npm run build -w @pinball/app
+# Build de l'app Next.js
+RUN bun run --filter @pinball/app build
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start", "-w", "@pinball/app"]
+# Start via bun
+CMD ["bun", "run", "--filter", "@pinball/app", "start"]

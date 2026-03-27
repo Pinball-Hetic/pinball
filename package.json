@@ -1,22 +1,21 @@
 {
   "name": "pinball-monorepo",
   "private": true,
-  "packageManager": "npm@10.8.2",
+  "packageManager": "bun@1.2.4",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test"
+    "dev": "bun --filter \"*\" dev",
+    "build": "bun --filter \"*\" build",
+    "lint": "bun --filter \"*\" lint",
+    "test": "bun --filter \"*\" test"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
     "eslint": "^8.57.1",
     "prettier": "^3.5.3",
-    "turbo": "^2.4.4",
-    "typescript": "^6.0.2"
+    "typescript": "^5.9.3"
   }
 }

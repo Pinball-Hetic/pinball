@@ -26,7 +26,8 @@ services:
       - ./packages/server/src:/app/packages/server/src
     depends_on:
       - db
-    command: npm run dev -w @pinball/server
+    # Correction de la syntaxe Bun filter
+    command: bun run --filter @pinball/server dev
 
   app:
     build:
@@ -42,7 +43,8 @@ services:
       - ./packages/game-engine/src:/app/packages/game-engine/src
     depends_on:
       - server
-    command: npm run dev -w @pinball/app
+    # Correction de la syntaxe Bun filter
+    command: bun run --filter @pinball/app dev
 
 volumes:
   postgres_dev_data:

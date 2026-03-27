@@ -1,17 +1,18 @@
-FROM node:22-alpine
+FROM oven/bun:1.2-alpine AS base
 
 WORKDIR /app
 
-COPY package.json package-lock.json turbo.json ./
-COPY packages/server/package.json ./packages/server/
-COPY packages/config-lint ./packages/config-lint
+# On copie TOUT le monorepo (sauf node_modules via .dockerignore) 
+# pour garantir que les Workspaces Bun sont reconnus
+COPY . .
 
-RUN npm install --ignore-engines
+# Installation avec bun
+RUN bun install
 
-COPY packages/server ./packages/server
-
-RUN npm run build -w @pinball/server
+# Build du serveur
+RUN bun run --filter @pinball/server build
 
 EXPOSE 3001
 
-CMD ["node", "packages/server/dist/interface/index.js"]
+# Lancement direct avec bun
+CMD ["bun", "packages/server/src/interface/index.ts"]

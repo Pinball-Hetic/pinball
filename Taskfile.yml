@@ -3,29 +3,29 @@ version: '3'
 tasks:
   # --- Local Development ---
   install:
-    desc: Install dependencies locally
+    desc: Install dependencies locally with Bun
     cmds:
-      - npm install --ignore-engines
+      - bun install
 
   dev:
-    desc: Run local development (Hot-reload)
+    desc: Run local development (Hot-reload) with Bun
     cmds:
-      - npm run dev
+      - bun run dev
 
   build:
-    desc: Build all packages
+    desc: Build all packages with Bun
     cmds:
-      - npm run build
+      - bun run build
 
   lint:
-    desc: Lint all packages
+    desc: Lint all packages with Bun
     cmds:
-      - npm run lint
+      - bun run lint
 
   test:
-    desc: Run all tests
+    desc: Run all tests with Bun
     cmds:
-      - npm run test
+      - bun run test
 
   # --- Docker Development (Hot-Reload) ---
   "docker:dev":
@@ -58,10 +58,10 @@ tasks:
   "db:push":
     desc: Push Prisma schema to the DB
     cmds:
-      - npm run db:push -w @pinball/server
+      - bun run --filter @pinball/server db:push
 
   # --- Maintenance ---
   clean:
     desc: Remove all build artifacts and node_modules
     cmds:
-      - rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/ .next
+      - rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/ .next bun.lockb
