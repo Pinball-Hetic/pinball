@@ -8,13 +8,13 @@
     "lint": "eslint src --ext .ts,.tsx"
   },
   "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
+    "next": "^16.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "@pinball/game-engine": "*"
   },
   "devDependencies": {
-    "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4"
   }
 }

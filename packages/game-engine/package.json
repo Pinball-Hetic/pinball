@@ -9,10 +9,10 @@
     "lint": "eslint src/**/*.ts"
   },
   "dependencies": {
-    "three": "latest",
-    "cannon-es": "latest"
+    "three": "^0.183.2",
+    "cannon-es": "^0.20.0"
   },
   "devDependencies": {
-    "@types/three": "latest"
+    "@types/three": "^0.183.1"
   }
 }

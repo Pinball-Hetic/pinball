@@ -1,4 +1,4 @@
-name: Pinball Monorepo CI
+name: Pinball CI
 
 on:
   push:

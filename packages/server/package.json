@@ -7,13 +7,13 @@
     "lint": "eslint src/**/*.ts"
   },
   "dependencies": {
-    "express": "latest",
-    "socket.io": "latest",
-    "@prisma/client": "^5.22.0"
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "@prisma/client": "^6.19.2"
   },
   "devDependencies": {
-    "@types/express": "latest",
-    "tsx": "latest",
-    "prisma": "^5.22.0"
+    "@types/express": "^5.0.0",
+    "tsx": "^4.19.3",
+    "prisma": "^6.19.2"
   }
 }
