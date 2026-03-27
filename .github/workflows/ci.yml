@@ -10,27 +10,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [22.x]
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm install --ignore-engines
+        run: bun install
 
       - name: Lint all packages
-        run: npm run lint
+        run: bun run lint
 
       - name: Build all packages
-        run: npm run build
+        run: bun run build
 
       - name: Test all packages
-        run: npm run test || echo "No tests yet"
+        run: bun run test || echo "No tests yet"
