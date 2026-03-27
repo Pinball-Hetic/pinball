@@ -1,5 +1,4 @@
 import * as CANNON from 'cannon-es';
-import * as THREE from 'three';
 
 export class PhysicsWorld {
   public world: CANNON.World;
