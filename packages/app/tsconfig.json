@@ -1,6 +1,7 @@
 {
   "extends": "../config-lint/tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,

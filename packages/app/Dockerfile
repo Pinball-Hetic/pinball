@@ -2,6 +2,9 @@ FROM oven/bun:1.2-alpine AS base
 
 WORKDIR /app
 
+# Next.js peut appeler `npm` (ex. patch SWC) pendant le build ; l'image Bun Alpine ne l'inclut pas
+RUN apk add --no-cache npm
+
 # On copie TOUT le monorepo
 COPY . .
 
