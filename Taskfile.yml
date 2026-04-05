@@ -1,67 +1,27 @@
-version: '3'
+version: "3"
 
 tasks:
-  # --- Local Development ---
-  install:
-    desc: Install dependencies locally with Bun
-    cmds:
-      - bun install
-
-  dev:
-    desc: Run local development (Hot-reload) with Bun
-    cmds:
-      - bun run dev
-
-  build:
-    desc: Build all packages with Bun
-    cmds:
-      - bun run build
-
-  lint:
-    desc: Lint all packages with Bun
-    cmds:
-      - bun run lint
-
-  test:
-    desc: Run all tests with Bun
-    cmds:
-      - bun run test
-
-  # --- Docker Development (Hot-Reload) ---
-  "docker:dev":
-    desc: Start all services in Docker (Dev mode with volumes)
+  "docker:dev:up":
+    desc: Démarrer la stack Docker (mode dev, volumes)
     cmds:
       - docker-compose -f docker-compose.dev.yml up -d --build
 
   "docker:dev:down":
-    desc: Stop Docker development services
+    desc: Arrêter la stack Docker dev
     cmds:
       - docker-compose -f docker-compose.dev.yml down
 
-  # --- Docker Production-like Stack ---
-  "prod:up":
-    desc: Start all services in Docker (Production-like build)
+  "docker:prod:up":
+    desc: Démarrer la stack Docker (build type prod)
     cmds:
       - docker-compose up -d --build
 
-  "prod:down":
-    desc: Stop all Docker services
+  "docker:prod:down":
+    desc: Arrêter la stack Docker prod
     cmds:
       - docker-compose down
 
-  # --- Database Tools ---
-  "db:up":
-    desc: Start only the database container
-    cmds:
-      - docker-compose up -d db
-
-  "db:push":
-    desc: Push Prisma schema to the DB
-    cmds:
-      - bun run --filter @pinball/server db:push
-
-  # --- Maintenance ---
   clean:
-    desc: Remove all build artifacts and node_modules
+    desc: Supprimer artefacts de build et node_modules
     cmds:
       - rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/ .next bun.lockb
