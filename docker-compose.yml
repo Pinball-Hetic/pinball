@@ -20,7 +20,7 @@ services:
     environment:
       DATABASE_URL: "postgresql://user:password@db:5432/pinball?schema=public"
     ports:
-      - "3001:3001"
+      - "3334:3334"
     depends_on:
       - db
 
@@ -30,7 +30,7 @@ services:
       dockerfile: packages/app/Dockerfile
     container_name: pinball-app
     ports:
-      - "3000:3000"
+      - "3333:3333"
     depends_on:
       - server
 

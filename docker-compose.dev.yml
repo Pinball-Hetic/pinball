@@ -21,7 +21,7 @@ services:
       DATABASE_URL: "postgresql://dev_user:dev_password@db:5432/pinball_dev?schema=public"
       NODE_ENV: development
     ports:
-      - "3001:3001"
+      - "3334:3334"
     volumes:
       - ./packages/server/src:/app/packages/server/src
     depends_on:
@@ -37,7 +37,7 @@ services:
     environment:
       NODE_ENV: development
     ports:
-      - "3000:3000"
+      - "3333:3333"
     volumes:
       - ./packages/app/src:/app/packages/app/src
       - ./packages/game-engine/src:/app/packages/game-engine/src
