@@ -4,22 +4,22 @@ tasks:
   "docker:dev:up":
     desc: Démarrer la stack Docker (mode dev, volumes)
     cmds:
-      - docker-compose -f docker-compose.dev.yml up -d --build
+      - docker compose -f docker-compose.dev.yml up -d --build
 
   "docker:dev:down":
     desc: Arrêter la stack Docker dev
     cmds:
-      - docker-compose -f docker-compose.dev.yml down
+      - docker compose -f docker-compose.dev.yml down
 
   "docker:prod:up":
     desc: Démarrer la stack Docker (build type prod)
     cmds:
-      - docker-compose up -d --build
+      - docker compose up -d --build
 
   "docker:prod:down":
     desc: Arrêter la stack Docker prod
     cmds:
-      - docker-compose down
+      - docker compose down
 
   clean:
     desc: Supprimer artefacts de build et node_modules
