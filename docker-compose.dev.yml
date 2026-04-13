@@ -17,34 +17,36 @@ services:
       context: .
       dockerfile: packages/server/Dockerfile
     container_name: pinball-server-dev
+    working_dir: /app/packages/server
     environment:
       DATABASE_URL: "postgresql://dev_user:dev_password@db:5432/pinball_dev?schema=public"
       NODE_ENV: development
     ports:
-      - "3334:3334"
+      - "3334:3001"
     volumes:
       - ./packages/server/src:/app/packages/server/src
     depends_on:
       - db
-    # Correction de la syntaxe Bun filter
-    command: bun run --filter @pinball/server dev
+    command: bun --watch src/interface/index.ts
 
   app:
     build:
       context: .
       dockerfile: packages/app/Dockerfile
     container_name: pinball-app-dev
+    working_dir: /app/packages/app
     environment:
       NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "3333:3333"
+      - "3333:3000"
     volumes:
       - ./packages/app/src:/app/packages/app/src
       - ./packages/game-engine/src:/app/packages/game-engine/src
     depends_on:
       - server
-    # Correction de la syntaxe Bun filter
-    command: bun run --filter @pinball/app dev
+    command: bun run dev
 
 volumes:
   postgres_dev_data:
