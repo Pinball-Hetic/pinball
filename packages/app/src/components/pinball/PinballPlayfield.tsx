@@ -428,16 +428,19 @@ export default function PinballPlayfield() {
         scene.add(ballMesh);
 
         // Spawn : couloir du lanceur (bord droit), posée sur la surface de jeu
-        spawnX = fb.max.x - ballRadius * 3;
+        spawnX = fb.max.x - ballRadius * 4;
         spawnY = tableY + ballRadius * 1.5;        // bille posée avec petite marge
         spawnZ = drainAtMaxZ ? fb.max.z - fsz.z * 0.08 : fb.min.z + fsz.z * 0.08;
 
         // Vélocité de lancement : poussée horizontale sur l'axe Z uniquement
         // (pas de composante Y → la bille ne décolle pas de la table)
-        // Amplitude = ~40% de la longueur de la table → la bille atteint le haut sans saut
-        const launchSpeed = fsz.z * 0.6;
+        // Formule physique : v_min = √(2·g·d) pour atteindre le haut contre la gravité Z.
+        // On prend 1.6× ce minimum pour arriver avec de la vitesse résiduelle.
+        const gravZAbs  = Math.abs(gravZ);
+        const minLaunch = Math.sqrt(2 * gravZAbs * fsz.z);
+        const launchSpeed = minLaunch * 1.6;
         launchVelZ = drainAtMaxZ ? -launchSpeed : launchSpeed;
-        console.info(`[Physics] spawnY=${spawnY.toFixed(3)}, launchVelZ=${launchVelZ.toFixed(2)}, ballRadius=${ballRadius.toFixed(3)}`);
+        console.info(`[Physics] spawnY=${spawnY.toFixed(3)}, launchVelZ=${launchVelZ.toFixed(2)}, minLaunch=${minLaunch.toFixed(2)}, ballRadius=${ballRadius.toFixed(3)}`);
 
         // Placer la bille au spawn en état endormi
         ballBody.position.set(spawnX, spawnY, spawnZ);
