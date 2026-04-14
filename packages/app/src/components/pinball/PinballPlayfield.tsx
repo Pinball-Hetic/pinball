@@ -186,24 +186,24 @@ export default function PinballPlayfield() {
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
 
-        // Récupérer les flippers avant toute transformation
+        // Récupérer les flippers
         const leftFlipper  = playfieldRoot.getObjectByName(FLIPPER_LEFT_NAME)  ?? null;
         const rightFlipper = playfieldRoot.getObjectByName(FLIPPER_RIGHT_NAME) ?? null;
         if (!leftFlipper)  console.warn(`[Playfield] Introuvable : "${FLIPPER_LEFT_NAME}"`);
         if (!rightFlipper) console.warn(`[Playfield] Introuvable : "${FLIPPER_RIGHT_NAME}"`);
 
-        // Sauvegarder les bbox AVANT la transformation de charnière
+        // ① Centrer le modèle EN PREMIER — toutes les coordonnées ci-dessous seront centrées
+        const tb = new THREE.Box3().setFromObject(modelRoot);
+        modelRoot.position.sub(tb.getCenter(new THREE.Vector3()));
+        modelRoot.updateMatrixWorld(true);
+
+        // ② Sauvegarder les bbox des flippers APRÈS centrage (coordonnées physiques correctes)
         leftFlipper?.updateMatrixWorld(true);
         rightFlipper?.updateMatrixWorld(true);
         const leftFlipperBBox  = leftFlipper  ? new THREE.Box3().setFromObject(leftFlipper)  : null;
         const rightFlipperBBox = rightFlipper ? new THREE.Box3().setFromObject(rightFlipper) : null;
 
-        // Centrer le modèle
-        const tb = new THREE.Box3().setFromObject(modelRoot);
-        modelRoot.position.sub(tb.getCenter(new THREE.Vector3()));
-        modelRoot.updateMatrixWorld(true);
-
-        // Attacher les flippers à leurs pivots de charnière
+        // ③ Attacher les flippers à leurs pivots de charnière
         if (leftFlipper)  { leftPivot      = attachFlipperAtHinge(leftFlipper, 'left');   leftFlipperObj  = leftFlipper; }
         if (rightFlipper) { rightPivot     = attachFlipperAtHinge(rightFlipper, 'right'); rightFlipperObj = rightFlipper; }
 
@@ -222,10 +222,11 @@ export default function PinballPlayfield() {
         camera.lookAt(cameraTarget);
 
         // ── Physique ─────────────────────────────────────────────────────────
-        // La caméra est côté Z+ → bas de l'écran = Z+ = côté flippers/drain.
-        // On vérifie quand même avec la position des flippers pour couvrir
-        // une éventuelle orientation différente du modèle.
+        // Référence unique pour les flippers (utilisée à plusieurs endroits)
         const flipperRefBBox = leftFlipperBBox ?? rightFlipperBBox;
+
+        // Orientation du drain : flippers côté Z+ (vers caméra) ou Z- ?
+        // Maintenant que les bboxes sont capturées APRÈS centrage, la comparaison est fiable.
         const flipperCenterZ = flipperRefBBox
           ? flipperRefBBox.getCenter(new THREE.Vector3()).z
           : fc.z + 1; // fallback : on suppose Z+
@@ -250,10 +251,17 @@ export default function PinballPlayfield() {
 
         const wt = fsz.x * 0.04; // épaisseur des murs physiques
 
-        // Sol
+        // Surface de jeu réelle = bas des flippers (pas fb.min.y qui inclut les pieds/structure)
+        const tableY = flipperRefBBox
+          ? flipperRefBBox.min.y          // bas du flipper = surface de jeu
+          : fb.min.y + fsz.y * 0.25;     // fallback si flippers introuvables
+
+        console.info(`[Physics] tableY=${tableY.toFixed(3)}, fb.min.y=${fb.min.y.toFixed(3)}, fsz=${fsz.x.toFixed(2)}×${fsz.y.toFixed(2)}×${fsz.z.toFixed(2)}`);
+
+        // Sol : centré sur tableY, assez épais pour éviter le tunneling
         const floor = new CANNON.Body({ mass: 0, material: tableMat });
         floor.addShape(new CANNON.Box(new CANNON.Vec3(fsz.x / 2 + wt, wt, fsz.z / 2 + wt)));
-        floor.position.set(fc.x, fb.min.y - wt, fc.z);
+        floor.position.set(fc.x, tableY - wt, fc.z);
         physWorld.addBody(floor);
 
         // Mur gauche
@@ -346,7 +354,17 @@ export default function PinballPlayfield() {
         rightFlipperBody = makeFlipperBody(rightFlipperBBox);
 
         // ── Bille ─────────────────────────────────────────────────────────────
-        ballRadius = fsz.x / 22;
+        // Rayon basé sur la taille du flipper (référence réaliste) :
+        // un vrai flipper fait ~80 mm, une vraie bille ~27 mm → bille ≈ flipper_longueur / 6
+        if (flipperRefBBox) {
+          const flipSz = flipperRefBBox.getSize(new THREE.Vector3());
+          const flipLen = Math.max(flipSz.x, flipSz.z); // longueur = plus grande dim horizontale
+          ballRadius = flipLen / 6;
+        } else {
+          ballRadius = fsz.x / 40; // fallback conservateur
+        }
+        console.info(`[Physics] ballRadius=${ballRadius.toFixed(4)}`);
+
         ballBody = new CANNON.Body({
           mass: 1,
           shape: new CANNON.Sphere(ballRadius),
@@ -368,13 +386,16 @@ export default function PinballPlayfield() {
         ballMesh.visible       = false; // caché jusqu'au premier lancer
         scene.add(ballMesh);
 
-        // Spawn : lane droite, au niveau des flippers
+        // Spawn : lane droite, ON the surface de jeu (tableY + ballRadius)
         spawnX = fb.max.x - ballRadius * 3;
-        spawnY = fb.min.y + ballRadius * 1.5;
+        spawnY = tableY + ballRadius + ballRadius * 0.1; // bille posée sur la surface
         spawnZ = drainAtMaxZ ? fb.max.z - fsz.z * 0.1 : fb.min.z + fsz.z * 0.1;
 
         // Vélocité de lancement vers le haut de la table (opposé au drain)
-        launchVelZ = drainAtMaxZ ? -(fsz.z * 1.3) : (fsz.z * 1.3);
+        // sqrt(2 * gravZ * fsz.z) = vitesse minimale pour traverser la table × 1.5
+        const minLaunch = Math.sqrt(2 * 1.5 * fsz.z);
+        launchVelZ = drainAtMaxZ ? -(minLaunch * 1.5) : (minLaunch * 1.5);
+        console.info(`[Physics] spawnY=${spawnY.toFixed(3)}, launchVelZ=${launchVelZ.toFixed(2)}`);
 
         // Placer la bille au spawn en état endormi
         ballBody.position.set(spawnX, spawnY, spawnZ);
