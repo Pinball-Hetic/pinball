@@ -249,39 +249,79 @@ export default function PinballPlayfield() {
         physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, bumperMat,  { friction: 0.0,  restitution: 0.85 }));
         physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, flipperMat, { friction: 0.1,  restitution: 0.55 }));
 
-        const wt = fsz.x * 0.04; // épaisseur des murs physiques
+        const wt = fsz.x * 0.04; // épaisseur du filet de sécurité
 
-        // Surface de jeu réelle = bas des flippers (pas fb.min.y qui inclut les pieds/structure)
+        // Surface de jeu de référence = bas des flippers (utilisée pour spawn bille)
         const tableY = flipperRefBBox
           ? flipperRefBBox.min.y          // bas du flipper = surface de jeu
           : fb.min.y + fsz.y * 0.25;     // fallback si flippers introuvables
 
         console.info(`[Physics] tableY=${tableY.toFixed(3)}, fb.min.y=${fb.min.y.toFixed(3)}, fsz=${fsz.x.toFixed(2)}×${fsz.y.toFixed(2)}×${fsz.z.toFixed(2)}`);
 
-        // Sol : centré sur tableY, assez épais pour éviter le tunneling
-        const floor = new CANNON.Body({ mass: 0, material: tableMat });
-        floor.addShape(new CANNON.Box(new CANNON.Vec3(fsz.x / 2 + wt, wt, fsz.z / 2 + wt)));
-        floor.position.set(fc.x, tableY - wt, fc.z);
-        physWorld.addBody(floor);
+        // ── Collision trimesh : on extrait la vraie géométrie du playfield ──
+        // Au lieu de boîtes invisibles, on transforme chaque mesh statique du GLTF
+        // en CANNON.Trimesh. La bille rebondit alors sur la vraie forme du plateau.
+        const skipNamesLC = new Set<string>();
+        if (leftFlipper)  skipNamesLC.add(leftFlipper.name.toLowerCase());
+        if (rightFlipper) skipNamesLC.add(rightFlipper.name.toLowerCase());
 
-        // Mur gauche
-        const wallL = new CANNON.Body({ mass: 0, material: tableMat });
-        wallL.addShape(new CANNON.Box(new CANNON.Vec3(wt, fsz.y + 1, fsz.z / 2 + wt)));
-        wallL.position.set(fb.min.x - wt, fc.y, fc.z);
-        physWorld.addBody(wallL);
+        let trimeshCount = 0;
+        const tmpVec = new THREE.Vector3();
 
-        // Mur droit
-        const wallR = new CANNON.Body({ mass: 0, material: tableMat });
-        wallR.addShape(new CANNON.Box(new CANNON.Vec3(wt, fsz.y + 1, fsz.z / 2 + wt)));
-        wallR.position.set(fb.max.x + wt, fc.y, fc.z);
-        physWorld.addBody(wallR);
+        playfieldRoot.updateMatrixWorld(true);
+        playfieldRoot.traverse((obj) => {
+          if (!(obj instanceof THREE.Mesh)) return;
+          const nameLC = obj.name.toLowerCase();
 
-        // Mur du fond (haut de la table, côté opposé aux flippers)
-        const backZ = drainAtMaxZ ? fb.min.z : fb.max.z;
-        const wallBack = new CANNON.Body({ mass: 0, material: tableMat });
-        wallBack.addShape(new CANNON.Box(new CANNON.Vec3(fsz.x / 2 + wt * 2, fsz.y + 1, wt)));
-        wallBack.position.set(fc.x, fc.y, backZ + (drainAtMaxZ ? -wt : wt));
-        physWorld.addBody(wallBack);
+          // Ne pas trimesher les parties dynamiques/interactives
+          if (skipNamesLC.has(nameLC))               return;  // flippers (kinematic)
+          if (nameLC.includes('bump'))               return;  // bumpers (cylindres)
+          if (nameLC.includes('plunger'))            return;  // lanceur (plus tard)
+          if (nameLC.includes('ball'))               return;
+
+          const geom = obj.geometry as THREE.BufferGeometry;
+          const posAttr = geom.attributes.position;
+          if (!posAttr) return;
+
+          // Vertices en world-space (on applique la matrice monde du mesh)
+          const worldMatrix = obj.matrixWorld;
+          const vertCount = posAttr.count;
+          const vertices: number[] = new Array(vertCount * 3);
+          for (let i = 0; i < vertCount; i++) {
+            tmpVec.fromBufferAttribute(posAttr, i).applyMatrix4(worldMatrix);
+            vertices[i * 3]     = tmpVec.x;
+            vertices[i * 3 + 1] = tmpVec.y;
+            vertices[i * 3 + 2] = tmpVec.z;
+          }
+
+          // Indices : si la géométrie est non-indexée, on génère 0,1,2,3,...
+          let indices: number[];
+          if (geom.index) {
+            indices = Array.from(geom.index.array as ArrayLike<number>);
+          } else {
+            indices = new Array(vertCount);
+            for (let i = 0; i < vertCount; i++) indices[i] = i;
+          }
+
+          try {
+            const trimesh = new CANNON.Trimesh(vertices, indices);
+            const body = new CANNON.Body({ mass: 0, material: tableMat });
+            body.addShape(trimesh);
+            // Corps placé à l'origine : les vertices sont déjà en world-space
+            body.position.set(0, 0, 0);
+            physWorld!.addBody(body);
+            trimeshCount++;
+          } catch (e) {
+            console.warn(`[Physics] Trimesh "${obj.name}" rejeté :`, e);
+          }
+        });
+        console.info(`[Physics] ${trimeshCount} trimesh(es) générés depuis le GLTF.`);
+
+        // Filet de sécurité : sol invisible très bas, au cas où la bille passe à travers
+        const safetyNet = new CANNON.Body({ mass: 0, material: tableMat });
+        safetyNet.addShape(new CANNON.Box(new CANNON.Vec3(fsz.x, wt, fsz.z)));
+        safetyNet.position.set(fc.x, fb.min.y - fsz.y * 0.5, fc.z);
+        physWorld.addBody(safetyNet);
 
         // Zone de drain : légèrement au-delà du bord côté flippers
         drainZ = drainAtMaxZ
@@ -355,13 +395,14 @@ export default function PinballPlayfield() {
 
         // ── Bille ─────────────────────────────────────────────────────────────
         // Rayon basé sur la taille du flipper (référence réaliste) :
-        // un vrai flipper fait ~80 mm, une vraie bille ~27 mm → bille ≈ flipper_longueur / 6
+        // un vrai flipper fait ~80 mm, une vraie bille ~27 mm → bille ≈ flipper_longueur / 10
+        // (plus petite pour tenir dans les couloirs et éviter de grimper sur les rails)
         if (flipperRefBBox) {
           const flipSz = flipperRefBBox.getSize(new THREE.Vector3());
           const flipLen = Math.max(flipSz.x, flipSz.z); // longueur = plus grande dim horizontale
-          ballRadius = flipLen / 6;
+          ballRadius = flipLen / 10;
         } else {
-          ballRadius = fsz.x / 40; // fallback conservateur
+          ballRadius = fsz.x / 60; // fallback conservateur
         }
         console.info(`[Physics] ballRadius=${ballRadius.toFixed(4)}`);
 
@@ -386,16 +427,17 @@ export default function PinballPlayfield() {
         ballMesh.visible       = false; // caché jusqu'au premier lancer
         scene.add(ballMesh);
 
-        // Spawn : lane droite, ON the surface de jeu (tableY + ballRadius)
+        // Spawn : couloir du lanceur (bord droit), posée sur la surface de jeu
         spawnX = fb.max.x - ballRadius * 3;
-        spawnY = tableY + ballRadius + ballRadius * 0.1; // bille posée sur la surface
-        spawnZ = drainAtMaxZ ? fb.max.z - fsz.z * 0.1 : fb.min.z + fsz.z * 0.1;
+        spawnY = tableY + ballRadius * 1.5;        // bille posée avec petite marge
+        spawnZ = drainAtMaxZ ? fb.max.z - fsz.z * 0.08 : fb.min.z + fsz.z * 0.08;
 
-        // Vélocité de lancement vers le haut de la table (opposé au drain)
-        // sqrt(2 * gravZ * fsz.z) = vitesse minimale pour traverser la table × 1.5
-        const minLaunch = Math.sqrt(2 * 1.5 * fsz.z);
-        launchVelZ = drainAtMaxZ ? -(minLaunch * 1.5) : (minLaunch * 1.5);
-        console.info(`[Physics] spawnY=${spawnY.toFixed(3)}, launchVelZ=${launchVelZ.toFixed(2)}`);
+        // Vélocité de lancement : poussée horizontale sur l'axe Z uniquement
+        // (pas de composante Y → la bille ne décolle pas de la table)
+        // Amplitude = ~40% de la longueur de la table → la bille atteint le haut sans saut
+        const launchSpeed = fsz.z * 0.6;
+        launchVelZ = drainAtMaxZ ? -launchSpeed : launchSpeed;
+        console.info(`[Physics] spawnY=${spawnY.toFixed(3)}, launchVelZ=${launchVelZ.toFixed(2)}, ballRadius=${ballRadius.toFixed(3)}`);
 
         // Placer la bille au spawn en état endormi
         ballBody.position.set(spawnX, spawnY, spawnZ);
