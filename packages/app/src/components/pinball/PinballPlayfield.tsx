@@ -15,10 +15,10 @@ const SWING_SMOOTH = 0.42;
 /** Recul du pivot vers le centre de la palette (fraction de la largeur). */
 const HINGE_INSET_FROM_EDGE = 0.18;
 
-/** Pas physique fixe — évite le tunneling. */
-const FIXED_STEP = 1 / 60;
-/** Nombre max de sous-pas par frame. */
-const MAX_SUB = 3;
+/** Pas physique fixe — substep court pour éviter le tunneling à haute vitesse. */
+const FIXED_STEP = 1 / 240;
+/** Nombre max de sous-pas par frame (4 substeps à 60fps = couverture complète). */
+const MAX_SUB = 10;
 
 const INITIAL_LIVES = 3;
 const BUMPER_SCORE  = 100;
@@ -186,6 +186,7 @@ export default function PinballPlayfield() {
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
 
+
         // Récupérer les flippers
         const leftFlipper  = playfieldRoot.getObjectByName(FLIPPER_LEFT_NAME)  ?? null;
         const rightFlipper = playfieldRoot.getObjectByName(FLIPPER_RIGHT_NAME) ?? null;
@@ -232,9 +233,9 @@ export default function PinballPlayfield() {
           : fc.z + 1; // fallback : on suppose Z+
         drainAtMaxZ = flipperCenterZ > fc.z;
 
-        const gravZ = drainAtMaxZ ? 1.5 : -1.5;
+        const gravZ = drainAtMaxZ ? 500 : -500;
         physWorld = new CANNON.World({
-          gravity: new CANNON.Vec3(0, -9.75, gravZ),
+          gravity: new CANNON.Vec3(0, -1200, gravZ),
         });
         physWorld.broadphase = new CANNON.SAPBroadphase(physWorld);
         physWorld.allowSleep  = true;
@@ -244,12 +245,13 @@ export default function PinballPlayfield() {
         const tableMat   = new CANNON.Material('table');
         const bumperMat  = new CANNON.Material('bumper');
         const flipperMat = new CANNON.Material('flipper');
+        const wallMat    = new CANNON.Material('wall'); // murs périphériques — rebond plus vif que la table
 
-        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, tableMat,   { friction: 0.2,  restitution: 0.4  }));
-        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, bumperMat,  { friction: 0.0,  restitution: 0.85 }));
-        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, flipperMat, { friction: 0.1,  restitution: 0.55 }));
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, tableMat,   { friction: 0.1,  restitution: 0.02 }));
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, bumperMat,  { friction: 0.0,  restitution: 0.45 }));
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, flipperMat, { friction: 0.1,  restitution: 0.25 }));
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, wallMat,    { friction: 0.02, restitution: 0.30 }));
 
-        const wt = fsz.x * 0.04; // épaisseur du filet de sécurité
 
         // Surface de jeu de référence = bas des flippers (utilisée pour spawn bille)
         const tableY = flipperRefBBox
@@ -258,43 +260,105 @@ export default function PinballPlayfield() {
 
         console.info(`[Physics] tableY=${tableY.toFixed(3)}, fb.min.y=${fb.min.y.toFixed(3)}, fsz=${fsz.x.toFixed(2)}×${fsz.y.toFixed(2)}×${fsz.z.toFixed(2)}`);
 
-        // ── Collision trimesh : on extrait la vraie géométrie du playfield ──
-        // Au lieu de boîtes invisibles, on transforme chaque mesh statique du GLTF
-        // en CANNON.Trimesh. La bille rebondit alors sur la vraie forme du plateau.
-        const skipNamesLC = new Set<string>();
-        if (leftFlipper)  skipNamesLC.add(leftFlipper.name.toLowerCase());
-        if (rightFlipper) skipNamesLC.add(rightFlipper.name.toLowerCase());
+        // Helpers de nom
+        const isBumperName = (nameLC: string) =>
+          nameLC.includes('bump') ||
+          nameLC.includes('bumper') ||
+          nameLC.includes('pop') ||
+          nameLC.includes('kicker');
 
+        const isWallName = (nameLC: string) =>
+          nameLC.includes('wall') ||
+          nameLC.includes('rail') ||
+          nameLC.includes('guide') ||
+          nameLC.includes('lane');
+
+        // ── Rayon de la bille calculé tôt (nécessaire pour dimensionner les murs) ──
+        if (flipperRefBBox) {
+          const flipSz  = flipperRefBBox.getSize(new THREE.Vector3());
+          const flipLen = Math.max(flipSz.x, flipSz.z);
+          ballRadius = flipLen / 10;
+        } else {
+          ballRadius = fsz.x / 60;
+        }
+
+        // ── Détection du launcher (tôt pour connaître laneWallFaceX avant création des murs) ──
+        const isLauncherName = (nameLC: string) =>
+          nameLC.includes('plunger') || nameLC.includes('launcher') ||
+          nameLC.includes('lanceur') || nameLC.includes('launch');
+        let launcherBBox: THREE.Box3 | null = null;
+        modelRoot.traverse((obj) => {
+          const nameLC = obj.name.toLowerCase();
+          if (!isLauncherName(nameLC)) return;
+          if (obj.parent && isLauncherName(obj.parent.name.toLowerCase())) return;
+          const bb = new THREE.Box3().setFromObject(obj);
+          launcherBBox = launcherBBox ? launcherBBox.union(bb) : bb;
+        });
+        // laneWallFaceX = bord de séparation entre couloir et terrain principal
+        const laneWallFaceX = launcherBBox
+          ? (launcherBBox as THREE.Box3).min.x
+          : (fb.max.x - fsz.x * 0.09);
+        const laneIsOnRight = laneWallFaceX > fc.x;
+
+        // ── Collision trimesh : géométrie réelle du playfield ─────────────────
+        // Chaque THREE.Mesh statique du GLTF devient un CANNON.Trimesh.
+        // La bille rebondit sur la vraie forme du plateau (pas de boxes invisibles).
+        //
+        // Exclusions :
+        //   1. Flippers (corps cinématiques séparés)
+        //   2. Bumpers (cylindres + events)
+        //   3. Meshes dans la zone du launcher (bbox overlaps laneZone)
+        //      → évite que le tube/boîtier du plongeur emprisonne la bille
+
+        // Zone X du couloir de lancement (tout ce qui est au-delà de laneWallFaceX)
+        const laneMinX = laneIsOnRight ? laneWallFaceX : fb.min.x;
+        const laneMaxX = laneIsOnRight ? fb.max.x      : laneWallFaceX;
+
+        const skipForTrimesh = (obj: THREE.Object3D): boolean => {
+          const nameLC = obj.name.toLowerCase();
+          if (nameLC.includes('flipper'))  return true;
+          if (nameLC.includes('bump') || nameLC.includes('bumper') || nameLC.includes('pop')) return true;
+          if (nameLC.includes('ball'))     return true;
+          // Exclure tout mesh dont le centre X est dans la colonne du lanceur
+          if (obj instanceof THREE.Mesh) {
+            obj.updateMatrixWorld(true);
+            const objBB = new THREE.Box3().setFromObject(obj);
+            const cx = (objBB.min.x + objBB.max.x) / 2;
+            if (cx >= laneMinX && cx <= laneMaxX) return true;
+          }
+          return false;
+        };
+
+        const tmpVec3 = new THREE.Vector3();
         let trimeshCount = 0;
-        const tmpVec = new THREE.Vector3();
+        let totalTris    = 0;
+        const includedNames: string[] = [];
+        const excludedNames: string[] = [];
 
         playfieldRoot.updateMatrixWorld(true);
         playfieldRoot.traverse((obj) => {
           if (!(obj instanceof THREE.Mesh)) return;
-          const nameLC = obj.name.toLowerCase();
 
-          // Ne pas trimesher les parties dynamiques/interactives
-          if (skipNamesLC.has(nameLC))               return;  // flippers (kinematic)
-          if (nameLC.includes('bump'))               return;  // bumpers (cylindres)
-          if (nameLC.includes('plunger'))            return;  // lanceur (plus tard)
-          if (nameLC.includes('ball'))               return;
+          if (skipForTrimesh(obj)) {
+            excludedNames.push(obj.name || '(unnamed)');
+            return;
+          }
+          includedNames.push(obj.name || '(unnamed)');
 
           const geom = obj.geometry as THREE.BufferGeometry;
           const posAttr = geom.attributes.position;
-          if (!posAttr) return;
+          if (!posAttr || posAttr.count < 3) return;
 
-          // Vertices en world-space (on applique la matrice monde du mesh)
           const worldMatrix = obj.matrixWorld;
           const vertCount = posAttr.count;
           const vertices: number[] = new Array(vertCount * 3);
           for (let i = 0; i < vertCount; i++) {
-            tmpVec.fromBufferAttribute(posAttr, i).applyMatrix4(worldMatrix);
-            vertices[i * 3]     = tmpVec.x;
-            vertices[i * 3 + 1] = tmpVec.y;
-            vertices[i * 3 + 2] = tmpVec.z;
+            tmpVec3.fromBufferAttribute(posAttr, i).applyMatrix4(worldMatrix);
+            vertices[i * 3]     = tmpVec3.x;
+            vertices[i * 3 + 1] = tmpVec3.y;
+            vertices[i * 3 + 2] = tmpVec3.z;
           }
 
-          // Indices : si la géométrie est non-indexée, on génère 0,1,2,3,...
           let indices: number[];
           if (geom.index) {
             indices = Array.from(geom.index.array as ArrayLike<number>);
@@ -302,48 +366,58 @@ export default function PinballPlayfield() {
             indices = new Array(vertCount);
             for (let i = 0; i < vertCount; i++) indices[i] = i;
           }
+          if (indices.length < 3) return;
+
+          // Parois/rails → wallMat (rebond plus vif) ; surface de jeu → tableMat
+          const nameLC = obj.name.toLowerCase();
+          const meshMat = (nameLC.includes('wall') || nameLC.includes('rail') ||
+                           nameLC.includes('guide') || nameLC.includes('lane'))
+            ? wallMat : tableMat;
 
           try {
             const trimesh = new CANNON.Trimesh(vertices, indices);
-            const body = new CANNON.Body({ mass: 0, material: tableMat });
+            const body = new CANNON.Body({ mass: 0, material: meshMat });
             body.addShape(trimesh);
-            // Corps placé à l'origine : les vertices sont déjà en world-space
             body.position.set(0, 0, 0);
             physWorld!.addBody(body);
             trimeshCount++;
+            totalTris += indices.length / 3;
           } catch (e) {
             console.warn(`[Physics] Trimesh "${obj.name}" rejeté :`, e);
           }
         });
-        console.info(`[Physics] ${trimeshCount} trimesh(es) générés depuis le GLTF.`);
-
-        // Filet de sécurité : sol invisible très bas, au cas où la bille passe à travers
-        const safetyNet = new CANNON.Body({ mass: 0, material: tableMat });
-        safetyNet.addShape(new CANNON.Box(new CANNON.Vec3(fsz.x, wt, fsz.z)));
-        safetyNet.position.set(fc.x, fb.min.y - fsz.y * 0.5, fc.z);
-        physWorld.addBody(safetyNet);
 
         // Zone de drain : légèrement au-delà du bord côté flippers
         drainZ = drainAtMaxZ
-          ? fb.max.z + fsz.z * 0.06
-          : fb.min.z - fsz.z * 0.06;
+          ? fb.max.z + ballRadius * 4
+          : fb.min.z - ballRadius * 4;
+
+        // #region agent log v23
+        fetch('http://127.0.0.1:7386/ingest/1bbfc8c6-de63-478c-8ead-cebcbb8d6ffa',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b9fd4'},body:JSON.stringify({sessionId:'4b9fd4',runId:'v23',location:'PinballPlayfield.tsx',message:'trimeshInit',data:{trimeshCount,totalTris:Math.round(totalTris),ballRadius:+ballRadius.toFixed(2),tableY,drainZ:+drainZ.toFixed(1),laneMinX:+laneMinX.toFixed(1),laneMaxX:+laneMaxX.toFixed(1),includedCount:includedNames.length,excludedCount:excludedNames.length,includedNames,excludedNames},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
         // ── Bumpers ──────────────────────────────────────────────────────────
+        // Les nœuds bumpers sont des Groups (pas des Mesh) — on doit traverser
+        // tous les Object3D. On saute si le parent a déjà matché pour éviter les doublons.
         let bumpersFound = 0;
         modelRoot.traverse((obj) => {
-          if (!(obj instanceof THREE.Mesh)) return;
-          if (!obj.name.toLowerCase().includes('bump')) return;
+          const nameLC = obj.name.toLowerCase();
+          if (!isBumperName(nameLC)) return;
+          // Éviter de traiter un enfant si le parent a déjà un nom de bumper
+          if (obj.parent && isBumperName(obj.parent.name.toLowerCase())) return;
 
           obj.updateMatrixWorld(true);
           const bb  = new THREE.Box3().setFromObject(obj);
           const bc  = bb.getCenter(new THREE.Vector3());
           const bs  = bb.getSize(new THREE.Vector3());
-          const rad = Math.max(bs.x, bs.z) / 2;
+          const rawRad = Math.min(bs.x, bs.z) / 2;
+          const rad = Math.max(rawRad, ballRadius * 1.5);
           const h   = Math.max(bs.y, rad * 0.5);
 
           const bumperBody = new CANNON.Body({ mass: 0, material: bumperMat });
           bumperBody.addShape(new CANNON.Cylinder(rad, rad, h, 8));
-          bumperBody.position.set(bc.x, bc.y, bc.z);
+          // Ancrer le bas du cylindre sur la surface (Y=tableY) pour éviter kick vertical
+          bumperBody.position.set(bc.x, tableY + h / 2, bc.z);
           physWorld!.addBody(bumperBody);
 
           // Collision : impulsion radiale + score
@@ -353,7 +427,8 @@ export default function PinballPlayfield() {
             const dz  = other.position.z - bumperBody.position.z;
             const len = Math.sqrt(dx * dx + dz * dz);
             if (len > 0) {
-              const forceMag = fsz.x * 2.5;
+              // Impulsion calibrée pour mm : ~300 mm/s (≈ 0.3 m/s, flipper réaliste)
+              const forceMag = ballRadius * 35;
               other.applyImpulse(
                 new CANNON.Vec3((dx / len) * forceMag, 0, (dz / len) * forceMag),
                 other.position,
@@ -367,51 +442,45 @@ export default function PinballPlayfield() {
         });
 
         if (bumpersFound === 0) {
-          console.warn('[Physics] Aucun bumper trouvé (objets dont le nom contient "bump"). Vérifier le GLTF.');
+          console.warn('[Physics] Aucun bumper trouvé. Vérifier le GLTF.');
         } else {
           console.info(`[Physics] ${bumpersFound} bumper(s) détecté(s).`);
         }
+
+        // (wall.glb / laneWallBody est créé plus bas avec des dimensions précises)
 
         // ── Corps cinématiques des flippers ──────────────────────────────────
         // KINEMATIC = 4 dans cannon-es (CANNON.Body.KINEMATIC)
         const KINEMATIC = 4 as const;
 
-        const makeFlipperBody = (bbox: THREE.Box3 | null): CANNON.Body | null => {
+        const makeFlipperBody = (bbox: THREE.Box3 | null, label: string): CANNON.Body | null => {
           if (!bbox) return null;
           const sz = bbox.getSize(new THREE.Vector3());
           const cx = bbox.getCenter(new THREE.Vector3());
           const body = new CANNON.Body({ mass: 0, type: KINEMATIC, material: flipperMat });
-          // On garantit une épaisseur minimum pour détecter les collisions
+          // Hauteur = taille visuelle exacte (pas wt) pour éviter que la bille
+          // se retrouve dans le corps du flipper au spawn
           body.addShape(
-            new CANNON.Box(new CANNON.Vec3(sz.x / 2, Math.max(sz.y / 2, wt), sz.z / 2)),
+            new CANNON.Box(new CANNON.Vec3(sz.x / 2, sz.y / 2, sz.z / 2)),
           );
           body.position.set(cx.x, cx.y, cx.z);
           physWorld!.addBody(body);
           return body;
         };
 
-        leftFlipperBody  = makeFlipperBody(leftFlipperBBox);
-        rightFlipperBody = makeFlipperBody(rightFlipperBBox);
+        leftFlipperBody  = makeFlipperBody(leftFlipperBBox, 'left');
+        rightFlipperBody = makeFlipperBody(rightFlipperBBox, 'right');
 
         // ── Bille ─────────────────────────────────────────────────────────────
-        // Rayon basé sur la taille du flipper (référence réaliste) :
-        // un vrai flipper fait ~80 mm, une vraie bille ~27 mm → bille ≈ flipper_longueur / 10
-        // (plus petite pour tenir dans les couloirs et éviter de grimper sur les rails)
-        if (flipperRefBBox) {
-          const flipSz = flipperRefBBox.getSize(new THREE.Vector3());
-          const flipLen = Math.max(flipSz.x, flipSz.z); // longueur = plus grande dim horizontale
-          ballRadius = flipLen / 10;
-        } else {
-          ballRadius = fsz.x / 60; // fallback conservateur
-        }
+        // ballRadius est déjà calculé plus haut (avant les murs)
         console.info(`[Physics] ballRadius=${ballRadius.toFixed(4)}`);
 
         ballBody = new CANNON.Body({
           mass: 1,
           shape: new CANNON.Sphere(ballRadius),
           material: ballMat,
-          linearDamping: 0.05,
-          angularDamping: 0.4,
+          linearDamping: 0.02,
+          angularDamping: 0.05,
         });
         ballBody.allowSleep     = true;
         ballBody.sleepSpeedLimit = 0.1;
@@ -427,9 +496,23 @@ export default function PinballPlayfield() {
         ballMesh.visible       = false; // caché jusqu'au premier lancer
         scene.add(ballMesh);
 
-        // Spawn : couloir du lanceur (bord droit), posée sur la surface de jeu
-        spawnX = fb.max.x - ballRadius * 4;
-        spawnY = tableY + ballRadius * 1.5;        // bille posée avec petite marge
+        // Spawn : couloir du lanceur — launcherBBox déjà détecté dans la section murs.
+        if (launcherBBox) {
+          const launcherBounds = launcherBBox as THREE.Box3;
+          const center = launcherBounds.getCenter(new THREE.Vector3());
+          const size   = launcherBounds.getSize(new THREE.Vector3());
+          const safeHalfLane = Math.max(ballRadius * 1.4, Math.min(size.x / 2, ballRadius * 2.6));
+          const maxOffset = Math.max(0, size.x / 2 - safeHalfLane);
+          const laneBias  = maxOffset * 0.35;
+          const biasDir   = center.x > fc.x ? -1 : 1;
+          spawnX = center.x + biasDir * laneBias;
+
+        } else {
+          spawnX = fb.max.x - ballRadius * 8;
+        }
+        // Spawn au-dessus du flipper body (maxY) + marge d'un rayon
+        const flipperBodyTopY = flipperRefBBox ? flipperRefBBox.max.y : tableY;
+        spawnY = flipperBodyTopY + ballRadius * 2;
         spawnZ = drainAtMaxZ ? fb.max.z - fsz.z * 0.08 : fb.min.z + fsz.z * 0.08;
 
         // Vélocité de lancement : poussée horizontale sur l'axe Z uniquement
@@ -438,7 +521,7 @@ export default function PinballPlayfield() {
         // On prend 1.6× ce minimum pour arriver avec de la vitesse résiduelle.
         const gravZAbs  = Math.abs(gravZ);
         const minLaunch = Math.sqrt(2 * gravZAbs * fsz.z);
-        const launchSpeed = minLaunch * 1.6;
+        const launchSpeed = minLaunch * 1.3;
         launchVelZ = drainAtMaxZ ? -launchSpeed : launchSpeed;
         console.info(`[Physics] spawnY=${spawnY.toFixed(3)}, launchVelZ=${launchVelZ.toFixed(2)}, minLaunch=${minLaunch.toFixed(2)}, ballRadius=${ballRadius.toFixed(3)}`);
 
@@ -526,7 +609,23 @@ export default function PinballPlayfield() {
 
       // Sync bille Three.js ← Cannon.js + détection drain
       if (ballBody && ballMesh && ballMesh.visible && gameStateRef.current === 'playing') {
-        const { position: p, quaternion: q } = ballBody;
+        const { position: p, quaternion: q, velocity: v } = ballBody;
+
+        // #region agent log v24 spike-detect
+        if(typeof (ballBody as any)._fc==='undefined'){(ballBody as any)._fc=0;(ballBody as any)._prevSpd=0;}
+        const _fc=(ballBody as any)._fc++;
+        const _spd=Math.sqrt(v.x*v.x+v.y*v.y+v.z*v.z);
+        const _prev=(ballBody as any)._prevSpd as number;
+        // Log spike : vitesse qui double en une frame (rebond anormal)
+        if(_spd>_prev*2&&_spd>300){fetch('http://127.0.0.1:7386/ingest/1bbfc8c6-de63-478c-8ead-cebcbb8d6ffa',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b9fd4'},body:JSON.stringify({sessionId:'4b9fd4',runId:'v24',hypothesisId:'H-spike',location:'PinballPlayfield.tsx:animate',message:'spike',data:{px:+p.x.toFixed(1),py:+p.y.toFixed(1),pz:+p.z.toFixed(1),prevSpd:+_prev.toFixed(1),newSpd:+_spd.toFixed(1),ratio:+(_spd/_prev).toFixed(2),vx:+v.x.toFixed(1),vy:+v.y.toFixed(1),vz:+v.z.toFixed(1),fc:_fc},timestamp:Date.now()})}).catch(()=>{});}
+        (ballBody as any)._prevSpd=_spd;
+        // Log every 60 frames
+        if(_fc%60===0){fetch('http://127.0.0.1:7386/ingest/1bbfc8c6-de63-478c-8ead-cebcbb8d6ffa',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b9fd4'},body:JSON.stringify({sessionId:'4b9fd4',runId:'v24',location:'PinballPlayfield.tsx:animate',message:'ball',data:{px:+p.x.toFixed(1),py:+p.y.toFixed(1),pz:+p.z.toFixed(1),spd:+_spd.toFixed(1),fc:_fc},timestamp:Date.now()})}).catch(()=>{});}
+        // Velocity cap : empêche les rebonds Trimesh abusifs (> 2000 mm/s)
+        const MAX_SPD = 2000;
+        if(_spd>MAX_SPD){const s=MAX_SPD/_spd;v.x*=s;v.y*=s;v.z*=s;}
+        // #endregion
+
         ballMesh.position.set(p.x, p.y, p.z);
         ballMesh.quaternion.set(q.x, q.y, q.z, q.w);
 
