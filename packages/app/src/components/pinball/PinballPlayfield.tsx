@@ -4,9 +4,13 @@ import * as CANNON from 'cannon-es';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const PLAYFIELD_URL      = '/playfield/playfield.glb';
-const FLIPPER_LEFT_NAME  = 'flipper_leftglb';
-const FLIPPER_RIGHT_NAME = 'flipper_rightglb';
+const PLAYFIELD_URL      = '/playfield/pinball-machine.glb';
+// Modèle Sketchfab "Pinball Machine" par Ranguel (CC Attribution)
+// Le GLB expose un seul nœud "flipper" (mesh combiné gauche+droite).
+// Les deux constantes pointent vers le même nœud ; seul le pivot gauche
+// sera animé indépendamment (le droit partagera le même mesh).
+const FLIPPER_LEFT_NAME  = 'flipper';
+const FLIPPER_RIGHT_NAME = 'flipper';
 
 /** Amplitude de battement des flippers (rad). */
 const SWING_RAD = 0.65;
@@ -15,13 +19,30 @@ const SWING_SMOOTH = 0.42;
 /** Recul du pivot vers le centre de la palette (fraction de la largeur). */
 const HINGE_INSET_FROM_EDGE = 0.18;
 
-/** Pas physique fixe — substep court pour éviter le tunneling à haute vitesse. */
-const FIXED_STEP = 1 / 240;
-/** Nombre max de sous-pas par frame (4 substeps à 60fps = couverture complète). */
-const MAX_SUB = 10;
+const FIXED_STEP = 1 / 480;
+const MAX_SUB    = 20;
 
 const INITIAL_LIVES = 3;
 const BUMPER_SCORE  = 100;
+
+/** Durée max de charge du plongeur (ms) — relâcher Espace lance. */
+const PLUNGER_CHARGE_MS = 1800;
+/** Facteur vitesse min / max selon la charge (évite un tap trop faible). */
+const PLUNGER_MIN_FACTOR = 0.32;
+const PLUNGER_MAX_FACTOR = 1;
+
+/**
+ * Plateau « vertical » (mur de flipper) : on tourne le GLB (plateau horizontal dans le fichier)
+ * puis gravité monde sur **-Z** ; la bille est lancée en **+Z** et retombe avec la même gravité.
+ * Sinon : plateau horizontal classique, gravité **-Y**.
+ */
+const PLAYFIELD_VERTICAL = true;
+
+/** Module de la gravité monde (|-Y| ou |-Z| selon PLAYFIELD_VERTICAL). */
+const PHYS_GRAVITY_MAG = 420;
+
+/** Référence pour impulsions arcade (bumpers). */
+const ARCADE_IMPULSE_REF = 1100;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type GameState = 'idle' | 'playing' | 'game_over';
@@ -57,6 +78,112 @@ function attachFlipperAtHinge(
   parent.add(pivot);
   pivot.attach(flipper);
   return pivot;
+}
+
+// ── Helper : split géométrique du flipper unique en deux moitiés ──────────────
+/**
+ * Cas B — le GLB expose un seul nœud "flipper" contenant les deux palettes.
+ *
+ * Algorithme :
+ *  1. On transforme chaque vertex en world space (matrixWorld du mesh).
+ *  2. Pour chaque triangle, on calcule le centroïde world-X.
+ *     - centroïde X ≤ 0  → moitié gauche
+ *     - centroïde X  > 0 → moitié droite
+ *     (le modèle est centré sur l'origine juste avant l'appel)
+ *  3. On reconvertit les positions retenues en espace local du parent du flipper
+ *     (via inverse de parentMatrixWorld) pour que les pivots d'animation
+ *     tournent dans le même repère que l'ancien code.
+ *  4. On recompute les normales depuis la géométrie (computeVertexNormals).
+ *
+ * Les deux THREE.Mesh retournés sont prêts à être ajoutés à flipperObj.parent.
+ */
+function splitFlipperIntoTwo(
+  flipperObj: THREE.Object3D,
+): [THREE.Mesh | null, THREE.Mesh | null] {
+
+  // Trouver le premier Mesh dans l'objet (peut être un Group)
+  let src: THREE.Mesh | null = null;
+  if (flipperObj instanceof THREE.Mesh) {
+    src = flipperObj;
+  } else {
+    flipperObj.traverse((c) => {
+      if (!src && c instanceof THREE.Mesh) src = c as THREE.Mesh;
+    });
+  }
+  if (!src || !flipperObj.parent) return [null, null];
+
+  src.updateMatrixWorld(true);
+  flipperObj.parent.updateMatrixWorld(true);
+
+  const worldMat  = src.matrixWorld;
+  const toParent  = flipperObj.parent.matrixWorld.clone().invert();
+  const geom      = src.geometry as THREE.BufferGeometry;
+  const posAttr   = geom.attributes.position as THREE.BufferAttribute;
+  const uvAttr    = geom.attributes.uv       as THREE.BufferAttribute | undefined;
+  const vertCount = posAttr.count;
+
+  // Positions world-X (pour décision split) et parent-local (pour la géo finale)
+  const wX:         number[]   = new Array(vertCount);
+  const localVerts: number[][] = new Array(vertCount);
+  const tmp = new THREE.Vector3();
+  for (let i = 0; i < vertCount; i++) {
+    tmp.fromBufferAttribute(posAttr, i).applyMatrix4(worldMat);
+    wX[i] = tmp.x;
+    tmp.applyMatrix4(toParent);
+    localVerts[i] = [tmp.x, tmp.y, tmp.z];
+  }
+
+  // Indices (indexed ou non-indexed)
+  const idxArr: number[] = geom.index
+    ? Array.from(geom.index.array as ArrayLike<number>)
+    : Array.from({ length: vertCount }, (_, i) => i);
+
+  // Tri des triangles par centroïde world-X
+  const leftTris:  number[] = [];
+  const rightTris: number[] = [];
+  for (let t = 0; t < idxArr.length; t += 3) {
+    const a = idxArr[t], b = idxArr[t + 1], c = idxArr[t + 2];
+    const cx = (wX[a] + wX[b] + wX[c]) / 3;
+    (cx <= 0 ? leftTris : rightTris).push(a, b, c);
+  }
+
+  // Construire une BufferGeometry compacte (re-index pour ne garder que les verts utilisés)
+  const buildGeom = (tris: number[]): THREE.BufferGeometry | null => {
+    if (tris.length === 0) return null;
+    const remap = new Map<number, number>();
+    const pos: number[] = [], uvs: number[] = [], idx: number[] = [];
+    for (const old of tris) {
+      if (!remap.has(old)) {
+        remap.set(old, pos.length / 3);
+        const [lx, ly, lz] = localVerts[old];
+        pos.push(lx, ly, lz);
+        if (uvAttr) uvs.push(uvAttr.getX(old), uvAttr.getY(old));
+      }
+      idx.push(remap.get(old)!);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    if (uvs.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals(); // recalcul depuis la géo (PBR smooth)
+    return g;
+  };
+
+  // Récupérer le matériau (cloner pour que chaque moitié soit indépendante)
+  const baseMat = src.material as THREE.MeshStandardMaterial;
+  const makeMesh = (tris: number[], name: string): THREE.Mesh | null => {
+    const g = buildGeom(tris);
+    if (!g) return null;
+    const m = new THREE.Mesh(g, baseMat.clone());
+    m.name = name;
+    m.castShadow = m.receiveShadow = true;
+    return m;
+  };
+
+  return [
+    makeMesh(leftTris,  'flipper_left_split'),
+    makeMesh(rightTris, 'flipper_right_split'),
+  ];
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -133,12 +260,29 @@ export default function PinballPlayfield() {
     let ballMesh:         THREE.Mesh   | null = null;
     let ballRadius                            = 0;
     let spawnX = 0, spawnY = 0, spawnZ = 0;
-    let launchVelZ = 0;
+    /** Module de vitesse au lancement (keyup → spawnBall). */
+    let launchVelMag = 0;
+    /** Couloir surtout le long de X (vers le terrain) ou de Z (vers le haut du plateau). */
+    let launchAxis: 'x' | 'z' = 'z';
     let drainZ     = Infinity;
     let drainAtMaxZ = true;
     let leftFlipperBody:  CANNON.Body | null = null;
     let rightFlipperBody: CANNON.Body | null = null;
     let prevFrameTime = 0;
+    let laneMinX = Infinity;   // seuil X du couloir lanceur (set lors de l'init)
+    let laneMaxX = Infinity;
+    /** Lanceur sur le côté +X (terrain principal à -X). */
+    let laneIsOnRight = true;
+    let hasLeftLauncher = false; // true dès que la balle a quitté le couloir
+    /** Vitesse de lancement de référence (module, avant charge plongeur). */
+    let launchSpeedBase = 0;
+    let tableYPhys = 0;
+    /** Hauteur max raisonnable pour la bille (plafond invisible). */
+    let ballCeilingY = 0;
+    let ballCeilingZ = Infinity;
+    let physicsReady = false;
+    let isChargingPlunger = false;
+    let chargeStartTime = 0;
 
     // ── Helpers de jeu ───────────────────────────────────────────────────────
     const updateGameState = (state: GameState) => {
@@ -148,9 +292,18 @@ export default function PinballPlayfield() {
 
     const spawnBall = () => {
       if (!ballBody || !ballMesh) return;
+      hasLeftLauncher = false;
       ballBody.position.set(spawnX, spawnY, spawnZ);
-      ballBody.velocity.set(0, 0, launchVelZ);
+      const mag = launchVelMag;
+      if (PLAYFIELD_VERTICAL) {
+        ballBody.velocity.set(0, 0, mag);
+      } else {
+        const vx = launchAxis === 'x' ? (laneIsOnRight ? -1 : 1) * mag : 0;
+        const vz = launchAxis === 'z' ? (drainAtMaxZ ? -1 : 1) * mag : 0;
+        ballBody.velocity.set(vx, 0, vz);
+      }
       ballBody.angularVelocity.set(0, 0, 0);
+      (ballBody as CANNON.Body & { _launchSettle?: number })._launchSettle = 22;
       ballBody.wakeUp();
       ballMesh.visible = true;
       updateGameState('playing');
@@ -186,36 +339,104 @@ export default function PinballPlayfield() {
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
 
+        // ── Étape 2 : log de tous les nœuds du GLB (debug / identification) ──
+        gltf.scene.traverse((child) => {
+          if (child.name) console.log('[GLB Node]', child.name, child.type);
+        });
 
-        // Récupérer les flippers
-        const leftFlipper  = playfieldRoot.getObjectByName(FLIPPER_LEFT_NAME)  ?? null;
-        const rightFlipper = playfieldRoot.getObjectByName(FLIPPER_RIGHT_NAME) ?? null;
-        if (!leftFlipper)  console.warn(`[Playfield] Introuvable : "${FLIPPER_LEFT_NAME}"`);
-        if (!rightFlipper) console.warn(`[Playfield] Introuvable : "${FLIPPER_RIGHT_NAME}"`);
+        // ── Étape 5 (optionnel) : override de matériaux ──────────────────────
+        // Le GLB Sketchfab embarque ses propres textures PBR — on les conserve
+        // mais on renforce l'émissivité des flippers pour un effet arcade.
+        gltf.scene.traverse((child) => {
+          if (!(child instanceof THREE.Mesh)) return;
+          const nameLC = child.name.toLowerCase();
+          const mat = child.material as THREE.MeshStandardMaterial;
+          if (!mat || Array.isArray(mat)) return;
+          if (nameLC.includes('flipper') && !nameLC.includes('button')) {
+            mat.emissive        = new THREE.Color('#ff6600');
+            mat.emissiveIntensity = 0.28;
+          }
+        });
+
+
+        // ── Récupérer le nœud flipper unique du GLB ─────────────────────────
+        // FLIPPER_RIGHT_NAME est intentionnellement ignoré ici : le GLB Sketchfab
+        // n'expose qu'un seul nœud "flipper". Le flipper droit est créé par clone
+        // + miroir (Cas A) juste après le centrage du modèle.
+        const baseFlipper = playfieldRoot.getObjectByName(FLIPPER_LEFT_NAME) ?? null;
+        if (!baseFlipper) console.warn(`[Playfield] Introuvable : "${FLIPPER_LEFT_NAME}"`);
 
         // ① Centrer le modèle EN PREMIER — toutes les coordonnées ci-dessous seront centrées
         const tb = new THREE.Box3().setFromObject(modelRoot);
         modelRoot.position.sub(tb.getCenter(new THREE.Vector3()));
+        if (PLAYFIELD_VERTICAL) {
+          modelRoot.rotation.x = Math.PI / 2;
+        }
         modelRoot.updateMatrixWorld(true);
 
-        // ② Sauvegarder les bbox des flippers APRÈS centrage (coordonnées physiques correctes)
+        // ── Cas B : split géométrique ─────────────────────────────────────────
+        // Le modèle est centré sur l'origine (X=0). On divise le mesh "flipper"
+        // en triangles dont le centroïde world-X ≤ 0 (gauche) et > 0 (droite).
+        // Chaque moitié devient un THREE.Mesh indépendant avec ses propres
+        // BufferGeometry, pivot d'animation et corps Cannon.js.
+        let leftFlipper:  THREE.Object3D | null = null;
+        let rightFlipper: THREE.Object3D | null = null;
+
+        if (baseFlipper?.parent) {
+          const [lMesh, rMesh] = splitFlipperIntoTwo(baseFlipper);
+
+          if (lMesh && rMesh) {
+            baseFlipper.visible = false;              // cacher le mesh original fusionné
+            baseFlipper.parent.add(lMesh);
+            baseFlipper.parent.add(rMesh);
+            disposableGeos.push(lMesh.geometry, rMesh.geometry);
+            disposableMats.push(
+              lMesh.material as THREE.Material,
+              rMesh.material as THREE.Material,
+            );
+            leftFlipper  = lMesh;
+            rightFlipper = rMesh;
+            console.info(
+              `[Flipper] Split géométrique OK — ` +
+              `gauche="${lMesh.name}" ${lMesh.geometry.attributes.position.count} verts | ` +
+              `droite="${rMesh.name}" ${rMesh.geometry.attributes.position.count} verts`,
+            );
+          } else {
+            // Fallback : le split a renvoyé 0 triangles d'un côté
+            // → le mesh est peut-être un seul flipper (pas une fusion gauche+droite)
+            leftFlipper  = baseFlipper;
+            rightFlipper = baseFlipper;
+            console.warn(
+              '[Flipper] Split échoué (0 triangles côté gauche ou droit) — ' +
+              'mesh unique utilisé en fallback. Vérifier la position X du nœud "flipper".',
+            );
+          }
+        }
+
+        // ② Sauvegarder les bbox des flippers APRÈS centrage + clonage
         leftFlipper?.updateMatrixWorld(true);
         rightFlipper?.updateMatrixWorld(true);
         const leftFlipperBBox  = leftFlipper  ? new THREE.Box3().setFromObject(leftFlipper)  : null;
         const rightFlipperBBox = rightFlipper ? new THREE.Box3().setFromObject(rightFlipper) : null;
 
         // ③ Attacher les flippers à leurs pivots de charnière
-        if (leftFlipper)  { leftPivot      = attachFlipperAtHinge(leftFlipper, 'left');   leftFlipperObj  = leftFlipper; }
-        if (rightFlipper) { rightPivot     = attachFlipperAtHinge(rightFlipper, 'right'); rightFlipperObj = rightFlipper; }
+        if (leftFlipper)  { leftPivot  = attachFlipperAtHinge(leftFlipper,  'left');  leftFlipperObj  = leftFlipper; }
+        if (rightFlipper) { rightPivot = attachFlipperAtHinge(rightFlipper, 'right'); rightFlipperObj = rightFlipper; }
 
-        // ── Caméra ───────────────────────────────────────────────────────────
+        // ── Caméra : face au flipper (centrée sur le plateau, regard vers fc, pas de décalé latéral en X)
         const fb  = new THREE.Box3().setFromObject(modelRoot);
         const fc  = fb.getCenter(new THREE.Vector3());
         const fsz = fb.getSize(new THREE.Vector3());
-        const maxS = Math.max(fsz.x, fsz.z);
+        const maxS = Math.max(fsz.x, fsz.y, fsz.z);
         const fov  = (camera.fov * Math.PI) / 180;
-        const dist = (maxS * 0.7) / Math.tan(fov / 2);
-        camera.position.set(fc.x, fc.y + dist * 0.75, fc.z + dist * 0.55);
+        const dist = (maxS * 0.72) / Math.tan(fov / 2);
+        if (PLAYFIELD_VERTICAL) {
+          // Mur de jeu dans ~YZ : on se place devant le plateau sur +Z, axe de vue passant par le centre
+          camera.position.set(fc.x, fc.y, fc.z + dist * 1.06);
+        } else {
+          // Plateau horizontal : vue joueur face à la machine (centrée X), légère élévation
+          camera.position.set(fc.x, fc.y + dist * 0.42, fc.z + dist * 0.95);
+        }
         camera.near = Math.max(0.01, dist / 200);
         camera.far  = dist * 20;
         camera.updateProjectionMatrix();
@@ -233,9 +454,10 @@ export default function PinballPlayfield() {
           : fc.z + 1; // fallback : on suppose Z+
         drainAtMaxZ = flipperCenterZ > fc.z;
 
-        const gravZ = drainAtMaxZ ? 500 : -500;
         physWorld = new CANNON.World({
-          gravity: new CANNON.Vec3(0, -1200, gravZ),
+          gravity: PLAYFIELD_VERTICAL
+            ? new CANNON.Vec3(0, 0, -PHYS_GRAVITY_MAG)
+            : new CANNON.Vec3(0, -PHYS_GRAVITY_MAG, 0),
         });
         physWorld.broadphase = new CANNON.SAPBroadphase(physWorld);
         physWorld.allowSleep  = true;
@@ -246,26 +468,33 @@ export default function PinballPlayfield() {
         const bumperMat  = new CANNON.Material('bumper');
         const flipperMat = new CANNON.Material('flipper');
         const wallMat    = new CANNON.Material('wall'); // murs périphériques — rebond plus vif que la table
+        const laneMat    = new CANNON.Material('lane'); // rails du couloir lanceur
 
-        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, tableMat,   { friction: 0.1,  restitution: 0.02 }));
-        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, bumperMat,  { friction: 0.0,  restitution: 0.45 }));
-        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, flipperMat, { friction: 0.1,  restitution: 0.25 }));
-        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, wallMat,    { friction: 0.02, restitution: 0.30 }));
+        // Restitution un peu plus basse sur table / lane pour limiter les pics Trimesh.
+        // Ex. three.js ballshooter : Rapier + sol lisse → pas de Trimesh ; ici restitution très basse = pas de cliquetis
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, tableMat,   { friction: 0.26, restitution: 0.03 }));
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, bumperMat,  { friction: 0.0,  restitution: 0.65 }));
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, flipperMat, { friction: 0.06, restitution: 0.48 }));
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, wallMat,    { friction: 0.03, restitution: 0.36 }));
+        physWorld.addContactMaterial(new CANNON.ContactMaterial(ballMat, laneMat,    { friction: 0.08, restitution: 0.06 }));
 
 
-        // Surface de jeu de référence = bas des flippers (utilisée pour spawn bille)
+        // Surface plateau (bumpers / flippers) = bas des flippers
         const tableY = flipperRefBBox
-          ? flipperRefBBox.min.y          // bas du flipper = surface de jeu
-          : fb.min.y + fsz.y * 0.25;     // fallback si flippers introuvables
+          ? flipperRefBBox.min.y
+          : fb.min.y + fsz.y * 0.25;
 
         console.info(`[Physics] tableY=${tableY.toFixed(3)}, fb.min.y=${fb.min.y.toFixed(3)}, fsz=${fsz.x.toFixed(2)}×${fsz.y.toFixed(2)}×${fsz.z.toFixed(2)}`);
 
         // Helpers de nom
+        // Nœuds bumpers du nouveau GLB : "pop bumper", "pop bumper left",
+        // "pop bumper right", "pop bumper guard" → matchent 'pop' et 'bumper' ✓
         const isBumperName = (nameLC: string) =>
           nameLC.includes('bump') ||
           nameLC.includes('bumper') ||
           nameLC.includes('pop') ||
-          nameLC.includes('kicker');
+          nameLC.includes('kicker') ||
+          nameLC.includes('slingshot');   // "slingshot" du nouveau modèle Sketchfab
 
         const isWallName = (nameLC: string) =>
           nameLC.includes('wall') ||
@@ -298,7 +527,7 @@ export default function PinballPlayfield() {
         const laneWallFaceX = launcherBBox
           ? (launcherBBox as THREE.Box3).min.x
           : (fb.max.x - fsz.x * 0.09);
-        const laneIsOnRight = laneWallFaceX > fc.x;
+        laneIsOnRight = laneWallFaceX > fc.x;
 
         // ── Collision trimesh : géométrie réelle du playfield ─────────────────
         // Chaque THREE.Mesh statique du GLTF devient un CANNON.Trimesh.
@@ -311,14 +540,33 @@ export default function PinballPlayfield() {
         //      → évite que le tube/boîtier du plongeur emprisonne la bille
 
         // Zone X du couloir de lancement (tout ce qui est au-delà de laneWallFaceX)
-        const laneMinX = laneIsOnRight ? laneWallFaceX : fb.min.x;
-        const laneMaxX = laneIsOnRight ? fb.max.x      : laneWallFaceX;
+        // On l'expose en outer scope pour la correction de drift dans animate()
+        laneMinX = laneIsOnRight ? laneWallFaceX : fb.min.x;
+        laneMaxX = laneIsOnRight ? fb.max.x : laneWallFaceX;
+
+        // Hauteur de roulement : le couloir peut être au-dessus du bas des flippers ;
+        // si on spawn avec tableY (flipper) seul, la bille est sous le sol du lanceur → éjection verticale.
+        const rollSurfaceY = Math.max(
+          tableY,
+          launcherBBox ? (launcherBBox as THREE.Box3).min.y : tableY,
+          fb.min.y,
+        );
+        tableYPhys = rollSurfaceY;
+        // Plafond « logique » seulement (pas de collider) — évite les micro-sauts dus au plafond physique
+        ballCeilingY = rollSurfaceY + Math.max(fsz.y * 0.92, 420);
+        ballCeilingZ = fc.z + fsz.z * 0.58;
 
         const skipForTrimesh = (obj: THREE.Object3D): boolean => {
           const nameLC = obj.name.toLowerCase();
-          if (nameLC.includes('flipper'))  return true;
+          if (nameLC.includes('flipper'))    return true;
           if (nameLC.includes('bump') || nameLC.includes('bumper') || nameLC.includes('pop')) return true;
-          if (nameLC.includes('ball'))     return true;
+          if (nameLC.includes('ball'))       return true;
+          // Exclure la vitre (formerait un plafond qui bloque la bille)
+          if (nameLC.includes('glass'))      return true;
+          // Exclure les pièces extérieures du cabinet (pas de collision utile)
+          if (nameLC.includes('score board') || nameLC.includes('coin slot') ||
+              nameLC.includes('exit cover')  || nameLC.includes('feet') ||
+              nameLC.includes('shoulder'))   return true;
           // Exclure tout mesh dont le centre X est dans la colonne du lanceur
           if (obj instanceof THREE.Mesh) {
             obj.updateMatrixWorld(true);
@@ -387,14 +635,66 @@ export default function PinballPlayfield() {
           }
         });
 
+        // Sol de sécurité : rattrape la balle si elle tombe à travers un trou du trimesh
+        // (observé py=-42 dans les logs — le sol trimesh a des lacunes)
+        const floorSafety = new CANNON.Body({ mass: 0, material: tableMat });
+        floorSafety.addShape(new CANNON.Box(new CANNON.Vec3(fsz.x, 5, fsz.z)));
+        floorSafety.position.set(fc.x, rollSurfaceY - ballRadius * 10, fc.z);
+        physWorld.addBody(floorSafety);
+
+        // Murs de sécurité extérieurs (balle s'échappait à px=-1817, pz=-3318)
+        const wL = new CANNON.Body({ mass: 0, material: wallMat });
+        wL.addShape(new CANNON.Box(new CANNON.Vec3(5, fsz.y * 2, fsz.z + 20)));
+        wL.position.set(fb.min.x - 10, fc.y, fc.z); physWorld.addBody(wL);
+        const wR = new CANNON.Body({ mass: 0, material: wallMat });
+        wR.addShape(new CANNON.Box(new CANNON.Vec3(5, fsz.y * 2, fsz.z + 20)));
+        wR.position.set(fb.max.x + 10, fc.y, fc.z); physWorld.addBody(wR);
+        const wTop = new CANNON.Body({ mass: 0, material: wallMat });
+        wTop.addShape(new CANNON.Box(new CANNON.Vec3(fsz.x + 20, fsz.y * 2, 5)));
+        wTop.position.set(fc.x, fc.y, fb.min.z - 10); physWorld.addBody(wTop);
+        const wBot = new CANNON.Body({ mass: 0, material: wallMat });
+        wBot.addShape(new CANNON.Box(new CANNON.Vec3(fsz.x + 20, fsz.y * 2, 5)));
+        wBot.position.set(fc.x, fc.y, fb.max.z + 10); physWorld.addBody(wBot);
+
+        // Rails du couloir lanceur (les meshes du tube sont exclus du Trimesh)
+        if (launcherBBox) {
+          const lb    = launcherBBox as THREE.Box3;
+          const lsz   = lb.getSize(new THREE.Vector3());
+          const lcx   = (lb.min.x + lb.max.x) / 2;
+          const lcz   = (lb.min.z + lb.max.z) / 2;
+
+          // Sol du couloir : sans ça, aucun Trimesh sous la bille dans la colonne lanceur → chute en Y puis
+          // choc / rebond (saut puis retombée visuel au lancement).
+          const laneFloorHalfY = 2.8;
+          const laneFloor      = new CANNON.Body({ mass: 0, material: tableMat });
+          laneFloor.addShape(
+            new CANNON.Box(new CANNON.Vec3(lsz.x / 2, laneFloorHalfY, lsz.z / 2)),
+          );
+          laneFloor.position.set(lcx, rollSurfaceY - laneFloorHalfY, lcz);
+          physWorld.addBody(laneFloor);
+
+          const wallT = Math.max(2.5, ballRadius * 0.35);
+          const wallH = Math.min(
+            Math.max(
+              flipperRefBBox ? flipperRefBBox.max.y - rollSurfaceY + ballRadius * 2.5 : 32,
+              ballRadius * 4,
+            ),
+            ballRadius * 14,
+          );
+          const yRail = rollSurfaceY + wallH / 2;
+
+          const outerX = laneIsOnRight ? lb.max.x - wallT / 2 : lb.min.x + wallT / 2;
+          const outer = new CANNON.Body({ mass: 0, material: laneMat });
+          outer.addShape(new CANNON.Box(new CANNON.Vec3(wallT / 2, wallH / 2, lsz.z / 2)));
+          outer.position.set(outerX, yRail, lcz);
+          physWorld.addBody(outer);
+          // Pas de mur « fond de couloir » : pouvait coincer / projeter la bille verticalement
+        }
+
         // Zone de drain : légèrement au-delà du bord côté flippers
         drainZ = drainAtMaxZ
           ? fb.max.z + ballRadius * 4
           : fb.min.z - ballRadius * 4;
-
-        // #region agent log v23
-        fetch('http://127.0.0.1:7386/ingest/1bbfc8c6-de63-478c-8ead-cebcbb8d6ffa',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b9fd4'},body:JSON.stringify({sessionId:'4b9fd4',runId:'v23',location:'PinballPlayfield.tsx',message:'trimeshInit',data:{trimeshCount,totalTris:Math.round(totalTris),ballRadius:+ballRadius.toFixed(2),tableY,drainZ:+drainZ.toFixed(1),laneMinX:+laneMinX.toFixed(1),laneMaxX:+laneMaxX.toFixed(1),includedCount:includedNames.length,excludedCount:excludedNames.length,includedNames,excludedNames},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
 
         // ── Bumpers ──────────────────────────────────────────────────────────
         // Les nœuds bumpers sont des Groups (pas des Mesh) — on doit traverser
@@ -427,8 +727,7 @@ export default function PinballPlayfield() {
             const dz  = other.position.z - bumperBody.position.z;
             const len = Math.sqrt(dx * dx + dz * dz);
             if (len > 0) {
-              // Impulsion calibrée pour mm : ~300 mm/s (≈ 0.3 m/s, flipper réaliste)
-              const forceMag = ballRadius * 35;
+              const forceMag = ballRadius * ARCADE_IMPULSE_REF * 0.28;
               other.applyImpulse(
                 new CANNON.Vec3((dx / len) * forceMag, 0, (dz / len) * forceMag),
                 other.position,
@@ -476,15 +775,13 @@ export default function PinballPlayfield() {
         console.info(`[Physics] ballRadius=${ballRadius.toFixed(4)}`);
 
         ballBody = new CANNON.Body({
-          mass: 1,
+          mass: 0.07,
           shape: new CANNON.Sphere(ballRadius),
           material: ballMat,
           linearDamping: 0.02,
-          angularDamping: 0.05,
+          angularDamping: 0.38,
         });
-        ballBody.allowSleep     = true;
-        ballBody.sleepSpeedLimit = 0.1;
-        ballBody.sleepTimeLimit  = 1;
+        ballBody.allowSleep = false; // jamais d'auto-sleep → évite le gel mid-field
         physWorld.addBody(ballBody);
 
         // Mesh visuel argenté métallique
@@ -510,27 +807,75 @@ export default function PinballPlayfield() {
         } else {
           spawnX = fb.max.x - ballRadius * 8;
         }
-        // Spawn au-dessus du flipper body (maxY) + marge d'un rayon
-        const flipperBodyTopY = flipperRefBBox ? flipperRefBBox.max.y : tableY;
-        spawnY = flipperBodyTopY + ballRadius * 2;
-        spawnZ = drainAtMaxZ ? fb.max.z - fsz.z * 0.08 : fb.min.z + fsz.z * 0.08;
+        // Centre de la sphère : surface de roulement réelle (couloir vs flipper)
+        spawnY = rollSurfaceY + ballRadius;
+        spawnZ = launcherBBox
+          ? (launcherBBox as THREE.Box3).getCenter(new THREE.Vector3()).z
+          : (drainAtMaxZ ? fb.max.z - fsz.z * 0.08 : fb.min.z + fsz.z * 0.08);
 
-        // Vélocité de lancement : poussée horizontale sur l'axe Z uniquement
-        // (pas de composante Y → la bille ne décolle pas de la table)
-        // Formule physique : v_min = √(2·g·d) pour atteindre le haut contre la gravité Z.
-        // On prend 1.6× ce minimum pour arriver avec de la vitesse résiduelle.
-        const gravZAbs  = Math.abs(gravZ);
-        const minLaunch = Math.sqrt(2 * gravZAbs * fsz.z);
-        const launchSpeed = minLaunch * 1.3;
-        launchVelZ = drainAtMaxZ ? -launchSpeed : launchSpeed;
-        console.info(`[Physics] spawnY=${spawnY.toFixed(3)}, launchVelZ=${launchVelZ.toFixed(2)}, minLaunch=${minLaunch.toFixed(2)}, ballRadius=${ballRadius.toFixed(3)}`);
+        if (launcherBBox) {
+          const lb = launcherBBox as THREE.Box3;
+          const pad = ballRadius * 2.8;
+          if (laneIsOnRight) spawnX = Math.min(spawnX, lb.max.x - pad);
+          else spawnX = Math.max(spawnX, lb.min.x + pad);
+        }
+
+        // Axe du couloir : beaucoup de GLTF ont un lanceur long en X (vers le terrain), pas en Z.
+        if (launcherBBox) {
+          const lb  = launcherBBox as THREE.Box3;
+          const lsz = lb.getSize(new THREE.Vector3());
+          launchAxis = lsz.x > lsz.z * 1.06 ? 'x' : 'z';
+        } else {
+          launchAxis = 'z';
+        }
+        if (PLAYFIELD_VERTICAL) launchAxis = 'z';
+
+        // Distance le long de l’axe de lancement jusqu’à la sortie du couloir
+        let launchDist = Math.max(ballRadius * 2, fsz.z * 0.1);
+        if (launcherBBox) {
+          const lb  = launcherBBox as THREE.Box3;
+          const lsz = lb.getSize(new THREE.Vector3());
+          if (launchAxis === 'x') {
+            const xExit = laneIsOnRight ? lb.min.x : lb.max.x;
+            launchDist = Math.abs(spawnX - xExit);
+            launchDist = Math.max(ballRadius * 2.5, Math.min(launchDist, lsz.x * 0.95));
+          } else {
+            const zExit = drainAtMaxZ ? lb.min.z : lb.max.z;
+            launchDist = Math.abs(spawnZ - zExit);
+            launchDist = Math.max(ballRadius * 2.5, Math.min(launchDist, lsz.z * 0.95));
+          }
+        }
+        // Vitesse de plongeur : calibrée en unités/s selon la taille du plateau et la longueur du couloir,
+        // sans formule √(2 g d) liée à la gravité — sinon chaque changement de g casse le lancement.
+        const tableSpan = Math.max(fsz.x, fsz.z, 120);
+        let laneNorm = 0.42;
+        if (launcherBBox) {
+          const lb  = launcherBBox as THREE.Box3;
+          const lsz = lb.getSize(new THREE.Vector3());
+          const denom = launchAxis === 'x' ? lsz.x : lsz.z;
+          laneNorm = launchDist / Math.max(denom, 1e-6);
+        }
+        laneNorm = THREE.MathUtils.clamp(laneNorm, 0.14, 1.05);
+        launchSpeedBase = THREE.MathUtils.clamp(
+          245 + 640 * laneNorm + tableSpan * 0.16,
+          285,
+          1180,
+        );
+        launchSpeedBase = Math.min(launchSpeedBase * 1.22, launchSpeedBase + 380);
+        launchVelMag = launchSpeedBase;
+        console.info(
+          `[Physics] spawn=(${spawnX.toFixed(1)},${spawnY.toFixed(1)},${spawnZ.toFixed(1)}) axis=${launchAxis} ` +
+          `launchDist=${launchDist.toFixed(1)} laneNorm=${laneNorm.toFixed(2)} launchSpeedBase=${launchSpeedBase.toFixed(1)} ` +
+          `g=${PLAYFIELD_VERTICAL ? `-Z ${PHYS_GRAVITY_MAG}` : `-Y ${PHYS_GRAVITY_MAG}`} ballR=${ballRadius.toFixed(2)}`,
+        );
 
         // Placer la bille au spawn en état endormi
         ballBody.position.set(spawnX, spawnY, spawnZ);
         ballBody.sleep();
 
+        physicsReady = true;
         mountEl.focus();
-        console.info('[Playfield] ✔ Physique initialisée — appuyer sur ESPACE pour lancer.');
+        console.info('[Playfield] ✔ Physique initialisée — maintenir ESPACE, relâcher pour lancer.');
       } catch (err) {
         console.error('[Playfield] Erreur chargement :', err);
       }
@@ -545,15 +890,31 @@ export default function PinballPlayfield() {
       if (e.key === 'ArrowLeft'  || e.key === 'q' || e.key === 'Q') leftTarget  = 1;
       if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') rightTarget = 1;
       if (e.key === ' ') {
-        if      (gameStateRef.current === 'idle')      spawnBall();
-        else if (gameStateRef.current === 'game_over') resetGame();
+        if (gameStateRef.current === 'game_over') {
+          resetGame();
+          return;
+        }
+        if (gameStateRef.current === 'idle' && physicsReady && ballBody) {
+          isChargingPlunger = true;
+          chargeStartTime   = performance.now();
+        }
       }
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (['ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+      if (['ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
       if (e.key === 'ArrowLeft'  || e.key === 'q' || e.key === 'Q') leftTarget  = 0;
       if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') rightTarget = 0;
+      if (e.key === ' ' && gameStateRef.current === 'idle' && isChargingPlunger) {
+        isChargingPlunger = false;
+        if (!physicsReady || !ballBody || launchSpeedBase <= 0) return;
+        const t =
+          Math.min(1, (performance.now() - chargeStartTime) / PLUNGER_CHARGE_MS) ** 1.15;
+        const factor =
+          PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t;
+        launchVelMag = launchSpeedBase * factor;
+        spawnBall();
+      }
     };
 
     document.addEventListener('keydown', onKeyDown);
@@ -570,6 +931,7 @@ export default function PinballPlayfield() {
       swing:   number,
       prevSw:  number,
       dt:      number,
+      side:    'left' | 'right',
     ) => {
       if (!body || !flipper) return;
       flipper.updateMatrixWorld(true);
@@ -579,8 +941,9 @@ export default function PinballPlayfield() {
       flipper.getWorldQuaternion(wq);
       body.position.set(wp.x, wp.y, wp.z);
       body.quaternion.set(wq.x, wq.y, wq.z, wq.w);
-      // Vitesse angulaire autour de Y → Cannon.js transfère l'élan à la bille au contact
-      body.angularVelocity.set(0, dt > 0 ? (swing - prevSw) / dt : 0, 0);
+      const angVel = dt > 0 ? (swing - prevSw) / dt : 0;
+      const sign   = side === 'left' ? 1 : -1;
+      body.angularVelocity.set(0, angVel * sign, 0);
     };
 
     // ── Boucle de rendu ───────────────────────────────────────────────────────
@@ -595,6 +958,19 @@ export default function PinballPlayfield() {
       // Pas physique
       if (physWorld) physWorld.step(FIXED_STEP, dt, MAX_SUB);
 
+      // Pendant l’éjection : plateau horizontal → pas de vy parasite ; vertical → lancement pur +Z (vx,vy nuls)
+      if (ballBody && ballMesh?.visible && gameStateRef.current === 'playing') {
+        const bb = ballBody as CANNON.Body & { _launchSettle?: number };
+        if ((bb._launchSettle ?? 0) > 0) {
+          if (PLAYFIELD_VERTICAL) {
+            ballBody.velocity.x = 0;
+            ballBody.velocity.y = 0;
+          } else {
+            ballBody.velocity.y = 0;
+          }
+        }
+      }
+
       // Flippers visuels
       leftSwing  += (leftTarget  * SWING_RAD - leftSwing)  * SWING_SMOOTH;
       rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
@@ -602,8 +978,8 @@ export default function PinballPlayfield() {
       if (rightPivot) rightPivot.rotation.y = -rightSwing;
 
       // Sync corps cinématiques
-      syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftSwing,  prevLeftSwing,  dt);
-      syncFlipperBody(rightFlipperBody, rightFlipperObj, rightSwing, prevRightSwing, dt);
+      syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftSwing,  prevLeftSwing,  dt, 'left');
+      syncFlipperBody(rightFlipperBody, rightFlipperObj, rightSwing, prevRightSwing, dt, 'right');
       prevLeftSwing  = leftSwing;
       prevRightSwing = rightSwing;
 
@@ -611,20 +987,94 @@ export default function PinballPlayfield() {
       if (ballBody && ballMesh && ballMesh.visible && gameStateRef.current === 'playing') {
         const { position: p, quaternion: q, velocity: v } = ballBody;
 
-        // #region agent log v24 spike-detect
-        if(typeof (ballBody as any)._fc==='undefined'){(ballBody as any)._fc=0;(ballBody as any)._prevSpd=0;}
-        const _fc=(ballBody as any)._fc++;
-        const _spd=Math.sqrt(v.x*v.x+v.y*v.y+v.z*v.z);
-        const _prev=(ballBody as any)._prevSpd as number;
-        // Log spike : vitesse qui double en une frame (rebond anormal)
-        if(_spd>_prev*2&&_spd>300){fetch('http://127.0.0.1:7386/ingest/1bbfc8c6-de63-478c-8ead-cebcbb8d6ffa',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b9fd4'},body:JSON.stringify({sessionId:'4b9fd4',runId:'v24',hypothesisId:'H-spike',location:'PinballPlayfield.tsx:animate',message:'spike',data:{px:+p.x.toFixed(1),py:+p.y.toFixed(1),pz:+p.z.toFixed(1),prevSpd:+_prev.toFixed(1),newSpd:+_spd.toFixed(1),ratio:+(_spd/_prev).toFixed(2),vx:+v.x.toFixed(1),vy:+v.y.toFixed(1),vz:+v.z.toFixed(1),fc:_fc},timestamp:Date.now()})}).catch(()=>{});}
-        (ballBody as any)._prevSpd=_spd;
-        // Log every 60 frames
-        if(_fc%60===0){fetch('http://127.0.0.1:7386/ingest/1bbfc8c6-de63-478c-8ead-cebcbb8d6ffa',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b9fd4'},body:JSON.stringify({sessionId:'4b9fd4',runId:'v24',location:'PinballPlayfield.tsx:animate',message:'ball',data:{px:+p.x.toFixed(1),py:+p.y.toFixed(1),pz:+p.z.toFixed(1),spd:+_spd.toFixed(1),fc:_fc},timestamp:Date.now()})}).catch(()=>{});}
-        // Velocity cap : empêche les rebonds Trimesh abusifs (> 2000 mm/s)
-        const MAX_SPD = 2000;
-        if(_spd>MAX_SPD){const s=MAX_SPD/_spd;v.x*=s;v.y*=s;v.z*=s;}
-        // #endregion
+        const spd = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+        const bbAny = ballBody as CANNON.Body & {
+          _prevSpd?: number;
+          _stuckFc?: number;
+          _launchSettle?: number;
+        };
+        const prevSpd = bbAny._prevSpd ?? 0;
+        bbAny._prevSpd = spd;
+        if ((bbAny._launchSettle ?? 0) > 0) bbAny._launchSettle!--;
+
+        // Lissage des pics Trimesh (normales / triangles dégénérés)
+        if (
+          (bbAny._launchSettle ?? 0) <= 0 &&
+          spd > prevSpd * 2.2 &&
+          spd > 380 &&
+          prevSpd > 2
+        ) {
+          const s = (prevSpd * 1.85) / spd;
+          v.x *= s;
+          v.y *= s;
+          v.z *= s;
+        }
+        if ((bbAny._launchSettle ?? 0) <= 0 && spd > 2200) {
+          const s = 2200 / spd;
+          v.x *= s;
+          v.y *= s;
+          v.z *= s;
+        }
+
+        // Anti micro-saut (plateau horizontal uniquement ; en vertical la chute est sur Z)
+        if (!PLAYFIELD_VERTICAL) {
+          const restY = tableYPhys + ballRadius;
+          const dy      = p.y - restY;
+          const settle  = bbAny._launchSettle ?? 0;
+          if (
+            settle <= 0 &&
+            Math.abs(v.x) < 72 &&
+            Math.abs(v.z) < 72 &&
+            spd < 360 &&
+            dy > -ballRadius * 0.2 &&
+            dy < ballRadius * 0.12 &&
+            v.y > -26 &&
+            v.y < 26
+          ) {
+            v.y *= 0.35;
+            if (Math.abs(v.y) < 9) {
+              v.y = 0;
+              if (dy < ballRadius * 0.05) p.y = restY;
+            }
+          } else if (settle <= 0 && v.y > 360) {
+            v.y *= 0.84;
+          }
+
+          if (p.y > ballCeilingY - 8) {
+            p.y = Math.min(p.y, ballCeilingY - 4);
+            if (v.y > 0) v.y *= 0.15;
+          }
+        } else if (ballCeilingZ < Infinity && p.z > ballCeilingZ - 6) {
+          p.z = Math.min(p.z, ballCeilingZ - 3);
+          if (v.z > 0) v.z *= 0.2;
+        }
+
+        // Réintégration du couloir : correction proportionnelle au dt (remplace +400/frame)
+        const inLauncher =
+          laneMinX < Infinity &&
+          p.x >= laneMinX - ballRadius * 2 &&
+          p.x <= laneMaxX + ballRadius * 2;
+        if (!hasLeftLauncher && !inLauncher) hasLeftLauncher = true;
+        if (hasLeftLauncher && inLauncher) {
+          const reEnter = laneIsOnRight ? v.x > 5 : v.x < -5;
+          if (reEnter) {
+            const pushDir = laneIsOnRight ? -1 : 1;
+            v.x += pushDir * 2400 * dt;
+          }
+        }
+
+        // Débloquer les équilibres parasites (vitesse quasi nulle pendant longtemps)
+        if (spd < 1.1) bbAny._stuckFc = (bbAny._stuckFc ?? 0) + 1;
+        else bbAny._stuckFc = 0;
+        if ((bbAny._stuckFc ?? 0) > 140 && spd < 0.65) {
+          const j = 90;
+          v.x += (Math.random() - 0.5) * j;
+          v.z += (Math.random() - 0.5) * j;
+          if (!PLAYFIELD_VERTICAL) {
+            p.y = Math.max(p.y, tableYPhys + ballRadius * 1.01);
+          }
+          bbAny._stuckFc = 0;
+        }
 
         ballMesh.position.set(p.x, p.y, p.z);
         ballMesh.quaternion.set(q.x, q.y, q.z, q.w);
@@ -670,8 +1120,11 @@ export default function PinballPlayfield() {
 
   // ── JSX ───────────────────────────────────────────────────────────────────
   const hintLine =
-    gameState === 'idle'      ? '▶  ESPACE pour lancer la bille' :
-    gameState === 'game_over' ? 'ESPACE pour rejouer'             : null;
+    gameState === 'idle'
+      ? '▶  Maintenir ESPACE — relâcher pour lancer'
+      : gameState === 'game_over'
+        ? 'ESPACE pour rejouer'
+        : null;
 
   return (
     <div className="relative min-h-screen bg-black text-zinc-100">
@@ -701,7 +1154,7 @@ export default function PinballPlayfield() {
         <div className="text-right font-mono text-[10px] text-zinc-500 space-y-0.5 leading-relaxed">
           <div>Q / ← — Flipper gauche</div>
           <div>D / → — Flipper droit</div>
-          <div>ESPACE — Lancer</div>
+          <div>ESPACE — Charger / lancer</div>
         </div>
       </header>
 
@@ -726,7 +1179,7 @@ export default function PinballPlayfield() {
         ref={mountRef}
         className="h-screen w-full cursor-grab outline-none focus:outline-none"
         tabIndex={0}
-        aria-label="Terrain de flipper — Q/D ou ← → pour les flippers, ESPACE pour lancer"
+        aria-label="Terrain de flipper — Q/D ou ← → pour les flippers, maintenir ESPACE et relâcher pour lancer"
       />
     </div>
   );
