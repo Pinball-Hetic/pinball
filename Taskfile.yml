@@ -21,6 +21,11 @@ tasks:
     cmds:
       - docker compose down
 
+  "docker:dev:restart":
+    desc: Redémarrer les containers Docker dev sans rebuild
+    cmds:
+      - docker restart pinball-app-dev pinball-server-dev pinball-db-dev
+
   clean:
     desc: Supprimer artefacts de build et node_modules
     cmds:
