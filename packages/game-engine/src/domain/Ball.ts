@@ -3,11 +3,11 @@ export const BALL_RADIUS          = 0.01474;
 export const BALL_MASS            = 0.08;
 export const BALL_RESTITUTION     = 0.4;
 export const BALL_FRICTION        = 0.1;
-export const BALL_LINEAR_DAMPING  = 0.05;
-export const BALL_ANGULAR_DAMPING = 0.05;
+export const BALL_LINEAR_DAMPING  = 0.02;
+export const BALL_ANGULAR_DAMPING = 0.02;
 
-// Spawn — launcher lane floor Y≈0.99 + ball radius
-export const BALL_SPAWN_POSITION = { x: 0.2365, y: 1.005, z: 0.1610 } as const;
+// Spawn — lane: left sep X≈0.208, right wall X=0.265, center≈0.236
+export const BALL_SPAWN_POSITION = { x: 0.235, y: 1.010, z: 0.1610 } as const;
 
 // Plunger
 export const PLUNGER_IMPULSE_Z = -2.4;
@@ -24,8 +24,8 @@ export const BUMPER_POSITIONS = [
   { x: -0.1045, y: 1.0451, z: -0.3062 }, // right
 ] as const;
 export const BUMPER_RADIUS       = 0.0345; // GLB size X=0.069 → radius 0.0345
-export const BUMPER_RESTITUTION  = 0.6;
-export const BUMPER_EJECT_IMPULSE = 0.15;
+export const BUMPER_RESTITUTION  = 0.3;
+export const BUMPER_EJECT_IMPULSE = 0.04;
 
 // Walls — from GLB playfield mesh extents
 export const WALL_LEFT_X    = -0.265;

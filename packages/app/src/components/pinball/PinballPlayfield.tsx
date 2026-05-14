@@ -318,6 +318,9 @@ export default function PinballPlayfield() {
     let chargeStartTime = 0;
     let physicsReady = false;
     let prevFrameTime = 0;
+    let laneAnimSpeed = 0;  // >0 means ball is being animated through lane
+    let leftFlipperHit = false;
+    let rightFlipperHit = false;
 
     // ── Plunger kinématique ───────────────────────────────────────────────────
     let plungerBody: RAPIER.RigidBody | null = null;
@@ -459,17 +462,38 @@ export default function PinballPlayfield() {
         // Include: playfield surface, rails, guides, shoulders, slingshots, sides
         // Exclude: cabinet box, glass, decorative, bumpers (have cylinders), sensors
         playfieldRoot.updateMatrixWorld(true);
-        const SKIP_PREFIXES = [
-          'ball', 'box', 'glass', 'feet', 'score board',
-          'coin slot', 'plunger panel', 'exit cover', 'plate',
-          'start button', 'spinner', 'flipper', 'flipper_left_split', 'flipper_right_split',
-          'pop bumper', 'drop target', 'switch', 'launcher',
-        ];
+        // Include all physical elements. Exclude: cabinet, decorative, bumpers (have cylinders), sensors
+        // Names from Three.js (underscores, not spaces)
+        const SKIP = new Set([
+          'ball', 'box', 'glass', 'feet', 'score_board', 'coin_slot',
+          'plunger_panel', 'exit_cover', 'plate', 'start_button', 'spinner',
+          'flipper', 'flipper_buttons', 'flipper_left_split', 'flipper_right_split',
+          'pop_bumper', 'pop_bumper_left', 'pop_bumper_right', 'pop_bumper_guard',
+          'drop_target_left_1', 'drop_target_left_2',
+          'drop_target_right_1', 'drop_target_right_2', 'drop_target_right_3',
+          'switch_out', 'switch_center_pop_bumper_zone', 'switch_left_pop_bumper_zone',
+          'switch_right_pop_bumper_zone', 'switch_plunger', 'switch_rocket', 'switch_slingshot',
+          'launcher',
+          // Dark objects blocking passages
+          'shoulder', 'slingshot', 'separator_left', 'separator_right',
+          'plastic_pop_bumper_zone',
+          // Rails — ball rides on top of them instead of playfield surface
+          'plastic', 'plastic_left', 'plastic_rocket',
+          // Sides — has lane wall geometry that traps ball, walls are box colliders
+          'playfield_sides',
+        ]);
         const trimGeos: THREE.BufferGeometry[] = [];
         playfieldRoot.traverse((child) => {
           if (!(child instanceof THREE.Mesh)) return;
-          const nameLC = child.name.toLowerCase();
-          if (SKIP_PREFIXES.some((p) => nameLC.startsWith(p))) return;
+          // Check mesh name AND all parent names against SKIP
+          let skipped = false;
+          let node: THREE.Object3D | null = child;
+          while (node) {
+            if (SKIP.has(node.name.toLowerCase())) { skipped = true; break; }
+            node = node.parent;
+          }
+          if (skipped) return;
+          console.info(`[Trimesh include] "${child.name}" parent="${child.parent?.name}" verts=${(child.geometry as THREE.BufferGeometry).getAttribute('position').count}`);
           child.updateMatrixWorld(true);
           const geo = child.geometry.clone() as THREE.BufferGeometry;
           geo.applyMatrix4(child.matrixWorld);
@@ -506,10 +530,39 @@ export default function PinballPlayfield() {
           console.info(`[Trimesh] ${allVerts.length / 3} verts, ${allIdx.length / 3} tris`);
         }
 
+        // ── Launcher lane floor — no trimesh geometry here ──────────────────
+        // Lane: X [0.206, 0.265], Z [0.03, 0.42], tilted surface
+        {
+          const surfaceYAtZ = (z: number) => 1.068 - ((z + 0.552) / 0.970) * 0.110;
+          const laneTopZ = 0.03;
+          const laneBotZ = 0.42;
+          const laneMidZ = (laneTopZ + laneBotZ) / 2;
+          const laneHalfZ = (laneBotZ - laneTopZ) / 2;
+          const laneMidX = (0.206 + 0.265) / 2;
+          const laneHalfX = (0.265 - 0.206) / 2;
+          const yTop = surfaceYAtZ(laneTopZ);
+          const yBot = surfaceYAtZ(laneBotZ);
+          const laneMidY = (yTop + yBot) / 2;
+          const tiltAngle = Math.atan2(yTop - yBot, laneBotZ - laneTopZ);
+          const laneFloorBody = world.createRigidBody(
+            RAPIER.RigidBodyDesc.fixed()
+              .setTranslation(laneMidX, laneMidY, laneMidZ)
+              .setRotation({
+                x: Math.sin(tiltAngle / 2), y: 0, z: 0, w: Math.cos(tiltAngle / 2),
+              }),
+          );
+          world.createCollider(
+            RAPIER.ColliderDesc.cuboid(laneHalfX, 0.003, laneHalfZ)
+              .setRestitution(0.35).setFriction(0.15),
+            laneFloorBody,
+          );
+          console.info(`[Collider] Lane floor ✔ center=(${laneMidX.toFixed(3)}, ${laneMidY.toFixed(3)}, ${laneMidZ.toFixed(3)})`);
+        }
+
         // ── Walls ────────────────────────────────────────────────────────────
         {
           const WALL_H = 0.06;
-          const WALL_T = 0.006;
+          const WALL_T = 0.015;
           const HH = WALL_H / 2;
           const HT = WALL_T / 2;
           const surfaceYAtZ = (z: number) => 1.068 - ((z + 0.552) / 0.970) * 0.110;
@@ -519,7 +572,7 @@ export default function PinballPlayfield() {
             { hx: HT, hy: HH, hz: 0.485, px: -0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
             { hx: HT, hy: HH, hz: 0.485, px:  0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
             { hx: 0.265, hy: HH, hz: HT, px: 0.0, py: surfaceYAtZ(-0.552) + HH, pz: -0.552 },
-            { hx: HT, hy: HH, hz: 0.180, px: laneSepX, py: surfaceYAtZ(0.240) + HH, pz: 0.240 },
+            { hx: HT, hy: HH, hz: 0.35, px: laneSepX, py: surfaceYAtZ(0.10) + HH, pz: 0.10 },
             { hx: 0.265, hy: HH, hz: HT, px: 0.0, py: surfaceYAtZ(0.418) + HH, pz: 0.420 },
           ];
           for (const w of walls) {
@@ -541,7 +594,7 @@ export default function PinballPlayfield() {
           );
           const bumperCol = world.createCollider(
             RAPIER.ColliderDesc.cylinder(0.025, 0.0345)
-              .setRestitution(0.6)
+              .setRestitution(0.3)
               .setFriction(0)
               .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
             bumperBody,
@@ -549,28 +602,17 @@ export default function PinballPlayfield() {
           colliderMap!.set(bumperCol.handle, `bumper_${i}`);
         }
 
-        // ── Séparateurs : Cylinder — exact GLB positions ──────────────────────
-        const SEPARATOR_DATA = [
-          { cx: -0.0525, cy: 1.0730, cz: -0.4459, r: 0.012, h: 0.011 },
-          { cx:  0.0075, cy: 1.0730, cz: -0.4459, r: 0.012, h: 0.011 },
-        ] as const;
-        for (const sep of SEPARATOR_DATA) {
-          const sepBody = world.createRigidBody(
-            RAPIER.RigidBodyDesc.fixed().setTranslation(sep.cx, sep.cy, sep.cz),
-          );
-          world.createCollider(
-            RAPIER.ColliderDesc.cylinder(sep.h / 2, sep.r).setRestitution(0.4).setFriction(0.1),
-            sepBody,
-          );
-        }
+        // Séparateurs désactivés — bloquaient les passages
 
-        // ── Drain sensor — bottom of playfield ────────────────────────────────
+        // ── Drain sensor — at actual bottom of playfield, not GLB switch_out ──
         {
+          const surfaceYAtZ = (z: number) => 1.068 - ((z + 0.552) / 0.970) * 0.110;
+          const drainZ = 0.40; // just before bottom wall
           const drainBody = world.createRigidBody(
-            RAPIER.RigidBodyDesc.fixed().setTranslation(-0.0219, 0.999, 0.0989),
+            RAPIER.RigidBodyDesc.fixed().setTranslation(0.0, surfaceYAtZ(drainZ), drainZ),
           );
           const drainCol = world.createCollider(
-            RAPIER.ColliderDesc.cuboid(0.209, 0.008, 0.018)
+            RAPIER.ColliderDesc.cuboid(0.25, 0.03, 0.01)
               .setSensor(true)
               .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
             drainBody,
@@ -686,11 +728,11 @@ export default function PinballPlayfield() {
             RAPIER.RigidBodyDesc.kinematicPositionBased()
               .setTranslation(cx.x, cx.y, cx.z),
           );
-          const halfY = Math.max(sz.y / 2, BALL_RADIUS * 2);
+          const halfY = Math.max(sz.y / 2, BALL_RADIUS * 3);
           world.createCollider(
-            RAPIER.ColliderDesc.cuboid(sz.x / 2, halfY, sz.z / 2)
-              .setRestitution(0.55)
-              .setFriction(0.1)
+            RAPIER.ColliderDesc.cuboid(sz.x / 2, halfY, sz.z / 2 + BALL_RADIUS)
+              .setRestitution(0.8)
+              .setFriction(0.2)
               .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
             body,
           );
@@ -802,10 +844,20 @@ export default function PinballPlayfield() {
             setDebugColliders((prev) => !prev);
             return;
           }
-          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q")
+          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") {
             leftTarget = 1;
-          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D")
+            if (ballPhysicsInst) {
+              const p = ballPhysicsInst.body.translation();
+              console.log(`[Flipper L pressed] ball at x=${p.x.toFixed(3)} y=${p.y.toFixed(3)} z=${p.z.toFixed(3)}`);
+            }
+          }
+          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
             rightTarget = 1;
+            if (ballPhysicsInst) {
+              const p = ballPhysicsInst.body.translation();
+              console.log(`[Flipper R pressed] ball at x=${p.x.toFixed(3)} y=${p.y.toFixed(3)} z=${p.z.toFixed(3)}`);
+            }
+          }
           if (e.key === " ") {
             console.log("[KEY] space down — state:", gameStateRef.current, "physicsReady:", physicsReady);
             if (gameStateRef.current === "game_over") {
@@ -846,11 +898,8 @@ export default function PinballPlayfield() {
             const factor = PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t;
             plungerReleaseSpeed = factor * 4.5;
             launchBallUC?.execute();
-            if (ballPhysicsInst) {
-              ballPhysicsInst.body.wakeUp();
-              // Impulse tuned for straight gravity + tilted surface
-              ballPhysicsInst.body.applyImpulse({ x: 0, y: 0, z: -0.45 * factor }, true);
-            }
+            // Don't use physics impulse — animate through lane instead
+            laneAnimSpeed = 0.5 + factor * 2.0;  // 0.5–2.5 m/s along -Z
           }
         };
 
@@ -897,7 +946,7 @@ export default function PinballPlayfield() {
       const wq = new THREE.Quaternion();
       flipper.getWorldPosition(wp);
       flipper.getWorldQuaternion(wq);
-      body.setNextKinematicTranslation({ x: wp.x, y: BALL_SPAWN_POSITION.y, z: wp.z });
+      body.setNextKinematicTranslation({ x: wp.x, y: wp.y, z: wp.z });
       body.setNextKinematicRotation({ x: wq.x, y: wq.y, z: wq.z, w: wq.w });
     };
 
@@ -952,28 +1001,120 @@ export default function PinballPlayfield() {
       if (leftPivot) leftPivot.rotation.y = leftSwing;
       if (rightPivot) rightPivot.rotation.y = -rightSwing;
 
+      // ── Flipper hit — manual impulse, one hit per swing ──
+      if (ballPhysicsInst && gameStateRef.current === 'playing' && laneAnimSpeed <= 0) {
+        const bp = ballPhysicsInst.body.translation();
+        const fZ = 0.26;
+        const hitZone = 0.08;
+        const FLIPPER_POWER = 0.12; // tuned: sends ball at ~1.5 m/s
+
+        // Left flipper
+        const ld = leftSwing - prevLeftSwing;
+        if (ld > 0.01 && !leftFlipperHit && bp.z > fZ - hitZone && bp.z < fZ + hitZone && bp.x > -0.18 && bp.x < 0.05) {
+          leftFlipperHit = true;
+          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true); // reset first
+          ballPhysicsInst.body.applyImpulse({ x: FLIPPER_POWER * 0.3, y: 0, z: -FLIPPER_POWER }, true);
+          console.log('[Flipper L] HIT');
+        }
+        if (leftTarget === 0) leftFlipperHit = false;
+
+        // Right flipper
+        const rd = rightSwing - prevRightSwing;
+        if (rd > 0.01 && !rightFlipperHit && bp.z > fZ - hitZone && bp.z < fZ + hitZone && bp.x > -0.08 && bp.x < 0.15) {
+          rightFlipperHit = true;
+          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          ballPhysicsInst.body.applyImpulse({ x: -FLIPPER_POWER * 0.3, y: 0, z: -FLIPPER_POWER }, true);
+          console.log('[Flipper R] HIT');
+        }
+        if (rightTarget === 0) rightFlipperHit = false;
+      }
+
       prevLeftSwing = leftSwing;
       prevRightSwing = rightSwing;
 
       // Sync bille
       if (ballMesh?.visible && ballPhysicsInst) {
         if (gameStateRef.current === "idle" && physicsReady && !debugCursorRef.current?.visible) {
-          ballPhysicsInst.body.setTranslation({
-            x: BALL_SPAWN_POSITION.x,
-            y: ballPhysicsInst.body.translation().y,
-            z: ballPhysicsInst.body.translation().z,
-          }, false);
-          const vel = ballPhysicsInst.body.linvel();
-          ballPhysicsInst.body.setLinvel({ x: 0, y: vel.y, z: vel.z }, false);
+          ballPhysicsInst.body.setTranslation(
+            { x: BALL_SPAWN_POSITION.x, y: BALL_SPAWN_POSITION.y, z: BALL_SPAWN_POSITION.z },
+            true,
+          );
+          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        }
+
+        // ── Lane animation — straight up, curve at top, release ──
+        const laneSurfaceY = (z: number) => 1.068 - ((z + 0.552) / 0.970) * 0.110 + BALL_RADIUS + 0.004;
+        // Phase 1: straight up lane  (Z from spawn to CURVE_START_Z)
+        // Phase 2: curve around top   (Z from CURVE_START_Z to CURVE_END_Z, X shifts left)
+        // Phase 3: release to physics
+        const CURVE_START_Z = -0.35;
+        const CURVE_END_Z   = -0.40;
+        const CURVE_START_X = BALL_SPAWN_POSITION.x;
+        const CURVE_END_X   = 0.05;
+
+        if (laneAnimSpeed > 0) {
+          const curZ = ballPhysicsInst.body.translation().z;
+          const newZ = curZ - laneAnimSpeed * dt;
+
+          if (newZ <= CURVE_END_Z) {
+            const exitSpeed = laneAnimSpeed;
+            laneAnimSpeed = 0;
+            const exitPos = { x: CURVE_END_X, y: laneSurfaceY(CURVE_END_Z), z: CURVE_END_Z };
+            const exitVel = { x: -exitSpeed * 0.4, y: 0, z: exitSpeed * 0.6 };
+            ballPhysicsInst.body.setTranslation(exitPos, true);
+            ballPhysicsInst.body.setLinvel(exitVel, true);
+            ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+            ballPhysicsInst.body.wakeUp();
+            console.log(`[Lane EXIT] pos=(${exitPos.x.toFixed(3)},${exitPos.y.toFixed(3)},${exitPos.z.toFixed(3)}) vel=(${exitVel.x.toFixed(3)},${exitVel.y.toFixed(3)},${exitVel.z.toFixed(3)}) exitSpeed=${exitSpeed.toFixed(3)}`);
+          } else if (newZ <= CURVE_START_Z) {
+            // Phase 2: curving — interpolate X from lane to playfield
+            const t = (CURVE_START_Z - newZ) / (CURVE_START_Z - CURVE_END_Z);
+            // Smooth ease-in curve
+            const tSmooth = t * t * (3 - 2 * t);
+            const curX = CURVE_START_X + (CURVE_END_X - CURVE_START_X) * tSmooth;
+            ballPhysicsInst.body.setTranslation(
+              { x: curX, y: laneSurfaceY(newZ), z: newZ },
+              true,
+            );
+            ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          } else {
+            // Phase 1: straight up lane
+            ballPhysicsInst.body.setTranslation(
+              { x: BALL_SPAWN_POSITION.x, y: laneSurfaceY(newZ), z: newZ },
+              true,
+            );
+            ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          }
         }
 
         ballPhysicsInst.syncToMesh(ballMesh);
 
+        // Clamp ball speed to prevent teleportation
+        const bVelClamp = ballPhysicsInst.body.linvel();
+        const speed = Math.sqrt(bVelClamp.x**2 + bVelClamp.y**2 + bVelClamp.z**2);
+        const MAX_SPEED = 2.0;
+        if (speed > MAX_SPEED) {
+          const scale = MAX_SPEED / speed;
+          ballPhysicsInst.body.setLinvel(
+            { x: bVelClamp.x * scale, y: bVelClamp.y * scale, z: bVelClamp.z * scale },
+            true,
+          );
+        }
+
         const bPos = ballPhysicsInst.body.translation();
+        const bVel = ballPhysicsInst.body.linvel();
+
+        // Log ball state every 30 frames when playing
+        if (gameStateRef.current === 'playing' && laneAnimSpeed <= 0 && Math.round(time / 16) % 30 === 0) {
+          console.log(`[Ball] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)}) vel=(${bVel.x.toFixed(3)},${bVel.y.toFixed(3)},${bVel.z.toFixed(3)}) speed=${Math.sqrt(bVel.x**2+bVel.y**2+bVel.z**2).toFixed(3)}`);
+        }
 
         if (gameStateRef.current === "playing" && drainBallUC) {
-          // Drain: ball passed drain zone OR fell below playfield
-          if ((bPos.z > DRAIN_Z && bPos.x < fieldBounds.laneSepX) || bPos.y < 0.9) {
+          if ((bPos.z > DRAIN_Z && bPos.x < fieldBounds.laneSepX) || bPos.y < 0.8) {
+            console.log(`[DRAIN] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)}) reason=${bPos.y < 0.8 ? 'Y_FALL' : 'Z_DRAIN'}`);
             drainBallUC.execute();
           }
         }
