@@ -25,7 +25,7 @@ export const BUMPER_POSITIONS = [
 ] as const;
 export const BUMPER_RADIUS       = 0.0345; // GLB size X=0.069 → radius 0.0345
 export const BUMPER_RESTITUTION  = 0.3;
-export const BUMPER_EJECT_IMPULSE = 0.04;
+export const BUMPER_EJECT_IMPULSE = 0.06;
 
 // Walls — from GLB playfield mesh extents
 export const WALL_LEFT_X    = -0.265;
@@ -42,3 +42,22 @@ export const DRAIN_SWITCH_CENTER = { x: -0.0219, y: 0.9990, z: 0.0989 } as const
 export const SLINGSHOT_LEFT_CENTER  = { x: -0.166, y: 1.032, z: 0.116 } as const;
 export const SLINGSHOT_RIGHT_CENTER = { x:  0.121, y: 1.032, z: 0.116 } as const;
 export const SLINGSHOT_RESTITUTION  = 0.8;
+
+// Pop bumper zone sensors — from GLB switch positions
+export const POP_ZONE_SENSORS = [
+  { x: -0.0225, y: 1.057, z: -0.448 },
+  { x: -0.087,  y: 1.056, z: -0.438 },
+  { x:  0.042,  y: 1.056, z: -0.438 },
+] as const;
+
+// Rocket ramp sensor
+export const ROCKET_SENSOR = { x: 0.193, y: 1.021, z: -0.130 } as const;
+
+// Drop targets — from GLB
+export const DROP_TARGETS = [
+  { id: 'drop_left_1',  x: -0.209, y: 1.022, z: -0.019, side: 'left' as const },
+  { id: 'drop_left_2',  x: -0.205, y: 1.026, z: -0.049, side: 'left' as const },
+  { id: 'drop_right_1', x:  0.157, y: 1.024, z: -0.041, side: 'right' as const },
+  { id: 'drop_right_2', x:  0.148, y: 1.028, z: -0.077, side: 'right' as const },
+  { id: 'drop_right_3', x:  0.137, y: 1.032, z: -0.114, side: 'right' as const },
+] as const;

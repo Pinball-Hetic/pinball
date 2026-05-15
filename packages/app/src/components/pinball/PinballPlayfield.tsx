@@ -18,6 +18,11 @@ import {
   WALL_RIGHT_X,
   BALL_RADIUS,
   BALL_SPAWN_POSITION,
+  SLINGSHOT_LEFT_CENTER,
+  SLINGSHOT_RIGHT_CENTER,
+  POP_ZONE_SENSORS,
+  ROCKET_SENSOR,
+  DROP_TARGETS,
 } from "@pinball/game-engine";
 import type { GameEventListener } from "@pinball/game-engine";
 
@@ -304,12 +309,14 @@ export default function PinballPlayfield() {
       laneSepX: BALL_SPAWN_POSITION.x - BALL_RADIUS * 2,
     };
     let ballMesh: THREE.Object3D | null = null;
+    let playfieldRootRef: THREE.Object3D | null = null;
     let physicsWorld: PhysicsWorld | null = null;
     let ballPhysicsInst: BallPhysics | null = null;
     let launchBallUC: LaunchBall | null = null;
     let bumperHitUC: BumperHit | null = null;
     let drainBallUC: DrainBall | null = null;
     let colliderMap: Map<number, string> | null = null;
+    let emitFn: GameEventListener | null = null;
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
     let leftFlipperBBox: THREE.Box3 | null = null;
@@ -321,6 +328,9 @@ export default function PinballPlayfield() {
     let laneAnimSpeed = 0;  // >0 means ball is being animated through lane
     let leftFlipperHit = false;
     let rightFlipperHit = false;
+    let stuckTimer = 0;  // time ball has been near-stationary
+    const dropTargetDown: Record<string, boolean> = {};
+    for (const dt of DROP_TARGETS) dropTargetDown[dt.id] = false;
 
     // ── Plunger kinématique ───────────────────────────────────────────────────
     let plungerBody: RAPIER.RigidBody | null = null;
@@ -360,12 +370,9 @@ export default function PinballPlayfield() {
       try {
         const gltf = await loader.loadAsync(PLAYFIELD_URL);
         const playfieldRoot = gltf.scene;
+        playfieldRootRef = playfieldRoot;
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
-
-        gltf.scene.traverse((child) => {
-          if (child.name) console.log("[GLB Node]", child.name, child.type);
-        });
 
         gltf.scene.traverse((child) => {
           if (!(child instanceof THREE.Mesh)) return;
@@ -454,8 +461,6 @@ export default function PinballPlayfield() {
           surfaceY: BALL_SPAWN_POSITION.y - BALL_RADIUS,
           laneSepX: BALL_SPAWN_POSITION.x - BALL_RADIUS * 2,
         };
-        console.info('[Bounds]', JSON.stringify(fieldBounds, (_, v) => typeof v === 'number' ? +v.toFixed(4) : v));
-
         colliderMap = new Map<number, string>();
 
         // ── Trimesh — merged from physical GLB meshes ─────────────────────────
@@ -475,12 +480,10 @@ export default function PinballPlayfield() {
           'switch_right_pop_bumper_zone', 'switch_plunger', 'switch_rocket', 'switch_slingshot',
           'launcher',
           // Dark objects blocking passages
-          'shoulder', 'slingshot', 'separator_left', 'separator_right',
+          'separator_left', 'separator_right',
           'plastic_pop_bumper_zone',
           // Rails — ball rides on top of them instead of playfield surface
           'plastic', 'plastic_left', 'plastic_rocket',
-          // Sides — has lane wall geometry that traps ball, walls are box colliders
-          'playfield_sides',
         ]);
         const trimGeos: THREE.BufferGeometry[] = [];
         playfieldRoot.traverse((child) => {
@@ -493,7 +496,6 @@ export default function PinballPlayfield() {
             node = node.parent;
           }
           if (skipped) return;
-          console.info(`[Trimesh include] "${child.name}" parent="${child.parent?.name}" verts=${(child.geometry as THREE.BufferGeometry).getAttribute('position').count}`);
           child.updateMatrixWorld(true);
           const geo = child.geometry.clone() as THREE.BufferGeometry;
           geo.applyMatrix4(child.matrixWorld);
@@ -527,7 +529,6 @@ export default function PinballPlayfield() {
             ).setRestitution(0.35).setFriction(0.15),
             trimBody,
           );
-          console.info(`[Trimesh] ${allVerts.length / 3} verts, ${allIdx.length / 3} tris`);
         }
 
         // ── Launcher lane floor — no trimesh geometry here ──────────────────
@@ -556,7 +557,6 @@ export default function PinballPlayfield() {
               .setRestitution(0.35).setFriction(0.15),
             laneFloorBody,
           );
-          console.info(`[Collider] Lane floor ✔ center=(${laneMidX.toFixed(3)}, ${laneMidY.toFixed(3)}, ${laneMidZ.toFixed(3)})`);
         }
 
         // ── Walls ────────────────────────────────────────────────────────────
@@ -572,7 +572,7 @@ export default function PinballPlayfield() {
             { hx: HT, hy: HH, hz: 0.485, px: -0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
             { hx: HT, hy: HH, hz: 0.485, px:  0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
             { hx: 0.265, hy: HH, hz: HT, px: 0.0, py: surfaceYAtZ(-0.552) + HH, pz: -0.552 },
-            { hx: HT, hy: HH, hz: 0.35, px: laneSepX, py: surfaceYAtZ(0.10) + HH, pz: 0.10 },
+            { hx: HT, hy: HH, hz: 0.50, px: laneSepX, py: surfaceYAtZ(-0.05) + HH, pz: -0.05 },
             { hx: 0.265, hy: HH, hz: HT, px: 0.0, py: surfaceYAtZ(0.418) + HH, pz: 0.420 },
           ];
           for (const w of walls) {
@@ -593,7 +593,7 @@ export default function PinballPlayfield() {
             RAPIER.RigidBodyDesc.fixed().setTranslation(pos.x, pos.y, pos.z),
           );
           const bumperCol = world.createCollider(
-            RAPIER.ColliderDesc.cylinder(0.025, 0.0345)
+            RAPIER.ColliderDesc.cylinder(0.020, 0.025)
               .setRestitution(0.3)
               .setFriction(0)
               .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
@@ -602,7 +602,126 @@ export default function PinballPlayfield() {
           colliderMap!.set(bumperCol.handle, `bumper_${i}`);
         }
 
-        // Séparateurs désactivés — bloquaient les passages
+        // ── Playfield barriers — shoulders, slingshots, posts, guides ────────
+        {
+          const surfY = (z: number) => 1.068 - ((z + 0.552) / 0.970) * 0.110;
+
+          // Posts + right-side wall to close drain gap
+          const barriers: Array<{
+            name: string; color: number;
+            type: 'cyl' | 'box';
+            px: number; pz: number; hAbove: number;
+            r?: number; hh?: number;
+            hx?: number; hy?: number; hz?: number;
+            rest?: number;
+          }> = [
+            // Outlane posts — wider apart to cover flipper edges
+            { name: 'OutlaneL', color: 0xff00ff, type: 'cyl', px: -0.14, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
+            { name: 'OutlaneR', color: 0x00ffff, type: 'cyl', px: 0.10, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
+            // Center post between flippers
+            { name: 'CenterPost', color: 0xffffff, type: 'cyl', px: -0.02, pz: 0.32, hAbove: 0.012, r: 0.015, hh: 0.015 },
+            // Right-side wall: closes gap between outlane R and lane separator
+            { name: 'WallR', color: 0xff8800, type: 'box', px: 0.155, pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
+            // Left-side wall: closes gap between outlane L and left wall
+            { name: 'WallL', color: 0x88ff00, type: 'box', px: -0.20, pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
+          ];
+
+          for (const b of barriers) {
+            const py = surfY(b.pz) + b.hAbove;
+            const body = world.createRigidBody(
+              RAPIER.RigidBodyDesc.fixed().setTranslation(b.px, py, b.pz),
+            );
+            let dg: THREE.BufferGeometry;
+            if (b.type === 'cyl') {
+              world.createCollider(
+                RAPIER.ColliderDesc.cylinder(b.hh!, b.r!)
+                  .setRestitution(b.rest ?? 0.4).setFriction(0.1),
+                body,
+              );
+              dg = new THREE.CylinderGeometry(b.r!, b.r!, b.hh! * 2, 12);
+            } else {
+              world.createCollider(
+                RAPIER.ColliderDesc.cuboid(b.hx!, b.hy!, b.hz!)
+                  .setRestitution(b.rest ?? 0.4).setFriction(0.1),
+                body,
+              );
+              dg = new THREE.BoxGeometry(b.hx! * 2, b.hy! * 2, b.hz! * 2);
+            }
+            const dm = new THREE.MeshBasicMaterial({ color: b.color, transparent: true, opacity: 0.7 });
+            const dMesh = new THREE.Mesh(dg, dm);
+            dMesh.position.set(b.px, py, b.pz);
+            dMesh.name = b.name;
+            scene.add(dMesh);
+          }
+        }
+
+        // ── Slingshot sensors (×2) — score + repulsion ──────────────────────
+        {
+          const slings = [
+            { pos: SLINGSHOT_LEFT_CENTER, role: 'slingshot_left' },
+            { pos: SLINGSHOT_RIGHT_CENTER, role: 'slingshot_right' },
+          ];
+          for (const s of slings) {
+            const b = world.createRigidBody(
+              RAPIER.RigidBodyDesc.fixed().setTranslation(s.pos.x, s.pos.y, s.pos.z),
+            );
+            const col = world.createCollider(
+              RAPIER.ColliderDesc.cuboid(0.06, 0.015, 0.03)
+                .setSensor(true)
+                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+              b,
+            );
+            colliderMap!.set(col.handle, s.role);
+          }
+        }
+
+        // ── Pop bumper zone sensors (×3) — bonus score ────────────────────────
+        {
+          for (let i = 0; i < POP_ZONE_SENSORS.length; i++) {
+            const p = POP_ZONE_SENSORS[i];
+            const b = world.createRigidBody(
+              RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
+            );
+            const col = world.createCollider(
+              RAPIER.ColliderDesc.cuboid(0.015, 0.010, 0.015)
+                .setSensor(true)
+                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+              b,
+            );
+            colliderMap!.set(col.handle, `pop_zone_${i}`);
+          }
+        }
+
+        // ── Rocket ramp sensor — high-value target ────────────────────────────
+        {
+          const b = world.createRigidBody(
+            RAPIER.RigidBodyDesc.fixed().setTranslation(ROCKET_SENSOR.x, ROCKET_SENSOR.y, ROCKET_SENSOR.z),
+          );
+          const col = world.createCollider(
+            RAPIER.ColliderDesc.cuboid(0.015, 0.010, 0.020)
+              .setSensor(true)
+              .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+            b,
+          );
+          colliderMap!.set(col.handle, 'rocket_ramp');
+        }
+
+        // ── Drop targets (×5) — physical blockers + score ─────────────────────
+        {
+          for (const dt of DROP_TARGETS) {
+            const b = world.createRigidBody(
+              RAPIER.RigidBodyDesc.fixed().setTranslation(dt.x, dt.y, dt.z),
+            );
+            const col = world.createCollider(
+              RAPIER.ColliderDesc.cuboid(0.006, 0.020, 0.015)
+                .setRestitution(0.3)
+                .setFriction(0.1)
+                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+              b,
+            );
+            colliderMap!.set(col.handle, dt.id);
+          }
+        }
 
         // ── Drain sensor — at actual bottom of playfield, not GLB switch_out ──
         {
@@ -819,7 +938,7 @@ export default function PinballPlayfield() {
         const plunger = new Plunger();
 
         const emit: GameEventListener = (event) => {
-          if (event.type === "BUMPER_HIT") {
+          if ('scoreIncrement' in event && event.scoreIncrement) {
             scoreRef.current += event.scoreIncrement;
             setScore(scoreRef.current);
           }
@@ -830,6 +949,7 @@ export default function PinballPlayfield() {
             updateGameState("playing");
           }
         };
+        emitFn = emit;
 
         launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
         bumperHitUC = new BumperHit(ballPhysicsInst, emit);
@@ -846,20 +966,11 @@ export default function PinballPlayfield() {
           }
           if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") {
             leftTarget = 1;
-            if (ballPhysicsInst) {
-              const p = ballPhysicsInst.body.translation();
-              console.log(`[Flipper L pressed] ball at x=${p.x.toFixed(3)} y=${p.y.toFixed(3)} z=${p.z.toFixed(3)}`);
-            }
           }
           if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
             rightTarget = 1;
-            if (ballPhysicsInst) {
-              const p = ballPhysicsInst.body.translation();
-              console.log(`[Flipper R pressed] ball at x=${p.x.toFixed(3)} y=${p.y.toFixed(3)} z=${p.z.toFixed(3)}`);
-            }
           }
           if (e.key === " ") {
-            console.log("[KEY] space down — state:", gameStateRef.current, "physicsReady:", physicsReady);
             if (gameStateRef.current === "game_over") {
               resetGame();
               return;
@@ -868,7 +979,6 @@ export default function PinballPlayfield() {
               plunger.startCharge(performance.now());
               isChargingPlunger = true;
               chargeStartTime = performance.now();
-              console.log("[KEY] charge started");
             }
           }
         };
@@ -880,9 +990,6 @@ export default function PinballPlayfield() {
             leftTarget = 0;
           if (e.key === "ArrowRight" || e.key === "d" || e.key === "D")
             rightTarget = 0;
-          if (e.key === " ") {
-            console.log("[KEY] space up — isCharging:", isChargingPlunger, "state:", gameStateRef.current);
-          }
           if (
             e.key === " " &&
             isChargingPlunger &&
@@ -899,7 +1006,7 @@ export default function PinballPlayfield() {
             plungerReleaseSpeed = factor * 4.5;
             launchBallUC?.execute();
             // Don't use physics impulse — animate through lane instead
-            laneAnimSpeed = 0.5 + factor * 2.0;  // 0.5–2.5 m/s along -Z
+            laneAnimSpeed = 1.0 + factor * 3.0;  // 1.0–4.0 m/s along -Z
           }
         };
 
@@ -925,9 +1032,7 @@ export default function PinballPlayfield() {
 
         physicsReady = true;
         mountEl.focus();
-        console.info(
-          "[Playfield] ✔ Physique Rapier initialisée — maintenir ESPACE, relâcher pour lancer.",
-        );
+        console.info('[Pinball] Physics ready');
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
       }
@@ -979,18 +1084,67 @@ export default function PinballPlayfield() {
           if (!started) return;
           const role = colliderMap!.get(h1) ?? colliderMap!.get(h2);
           if (!role) return;
+          console.log(`[Collision] ${role}`);
 
           if (role.startsWith('bumper_')) {
             const idx = parseInt(role.split('_')[1], 10);
             const pos = BUMPER_POSITIONS[idx];
-            if (pos) bumperHitUC?.execute(idx, pos);
+            if (pos && ballPhysicsInst) {
+              const bp = ballPhysicsInst.body.translation();
+              const bv = ballPhysicsInst.body.linvel();
+              console.log(`[Bumper ${idx}] PRE pos=(${bp.x.toFixed(3)},${bp.y.toFixed(3)},${bp.z.toFixed(3)}) vel=(${bv.x.toFixed(3)},${bv.y.toFixed(3)},${bv.z.toFixed(3)}) spd=${Math.sqrt(bv.x**2+bv.y**2+bv.z**2).toFixed(3)}`);
+              bumperHitUC?.execute(idx, pos);
+              const av = ballPhysicsInst.body.linvel();
+              console.log(`[Bumper ${idx}] POST vel=(${av.x.toFixed(3)},${av.y.toFixed(3)},${av.z.toFixed(3)}) spd=${Math.sqrt(av.x**2+av.y**2+av.z**2).toFixed(3)}`);
+            }
           }
           if (role === 'drain' && gameStateRef.current === 'playing') {
             drainBallUC?.execute();
+            // Reset drop targets on drain
+            for (const dt of DROP_TARGETS) {
+              dropTargetDown[dt.id] = false;
+              const mesh = playfieldRootRef?.getObjectByName(dt.id.replace('drop_', 'drop_target_'));
+              if (mesh) mesh.visible = true;
+            }
           }
+          // Slingshots — score only, no impulse (causes teleportation)
           if ((role === 'slingshot_left' || role === 'slingshot_right') && gameStateRef.current === 'playing') {
-            // emit is captured in init closure — use drainBallUC as a proxy to access emit
-            // slingshot hit is a game event without a dedicated use-case
+            const side = role === 'slingshot_left' ? 'left' as const : 'right' as const;
+            emitFn?.({ type: 'SLINGSHOT_HIT', side, scoreIncrement: 10 });
+          }
+          // Pop bumper zone sensors
+          if (role.startsWith('pop_zone_') && gameStateRef.current === 'playing') {
+            emitFn?.({ type: 'ZONE_HIT', zone: role, scoreIncrement: 50 });
+          }
+          // Rocket ramp
+          if (role === 'rocket_ramp' && gameStateRef.current === 'playing') {
+            emitFn?.({ type: 'RAMP_HIT', scoreIncrement: 200 });
+          }
+          // Drop targets
+          if (role.startsWith('drop_') && !role.startsWith('drop_target') && gameStateRef.current === 'playing') {
+            if (!dropTargetDown[role]) {
+              dropTargetDown[role] = true;
+              emitFn?.({ type: 'DROP_TARGET_HIT', targetId: role, scoreIncrement: 75 });
+              // Hide the target mesh
+              const meshName = role.replace('drop_', 'drop_target_');
+              const mesh = playfieldRootRef?.getObjectByName(meshName);
+              if (mesh) mesh.visible = false;
+              // Check completion
+              const target = DROP_TARGETS.find(t => t.id === role);
+              if (target) {
+                const sideTargets = DROP_TARGETS.filter(t => t.side === target.side);
+                const allDown = sideTargets.every(t => dropTargetDown[t.id]);
+                if (allDown) {
+                  emitFn?.({ type: 'DROP_TARGET_COMPLETE', side: target.side, scoreIncrement: 500 });
+                  // Reset this side
+                  for (const t of sideTargets) {
+                    dropTargetDown[t.id] = false;
+                    const m = playfieldRootRef?.getObjectByName(t.id.replace('drop_', 'drop_target_'));
+                    if (m) m.visible = true;
+                  }
+                }
+              }
+            }
           }
         });
       }
@@ -1001,30 +1155,40 @@ export default function PinballPlayfield() {
       if (leftPivot) leftPivot.rotation.y = leftSwing;
       if (rightPivot) rightPivot.rotation.y = -rightSwing;
 
-      // ── Flipper hit — manual impulse, one hit per swing ──
+      // ── Flipper hit — tight zones, rising-edge trigger, directional impulse ──
       if (ballPhysicsInst && gameStateRef.current === 'playing' && laneAnimSpeed <= 0) {
         const bp = ballPhysicsInst.body.translation();
-        const fZ = 0.26;
-        const hitZone = 0.08;
-        const FLIPPER_POWER = 0.12; // tuned: sends ball at ~1.5 m/s
+        const FLIPPER_POWER = 0.32;
+        const TRIGGER = 0.15;
+        const inFlipperZ = bp.z > 0.20 && bp.z < 0.33;
 
-        // Left flipper
-        const ld = leftSwing - prevLeftSwing;
-        if (ld > 0.01 && !leftFlipperHit && bp.z > fZ - hitZone && bp.z < fZ + hitZone && bp.x > -0.18 && bp.x < 0.05) {
+        // Left flipper — visual X [-0.129, 0], with margin
+        if (leftSwing > TRIGGER && prevLeftSwing <= TRIGGER
+            && inFlipperZ && bp.x > -0.145 && bp.x < 0.015) {
           leftFlipperHit = true;
-          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true); // reset first
-          ballPhysicsInst.body.applyImpulse({ x: FLIPPER_POWER * 0.3, y: 0, z: -FLIPPER_POWER }, true);
-          console.log('[Flipper L] HIT');
+          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          const flipperMidX = -0.065;
+          const normalizedPos = Math.max(-1, Math.min(1, (bp.x - flipperMidX) / 0.08));
+          const launchAngle = -0.4 + normalizedPos * 0.6;
+          ballPhysicsInst.body.applyImpulse(
+            { x: FLIPPER_POWER * Math.sin(launchAngle), y: 0, z: -FLIPPER_POWER * Math.cos(launchAngle) },
+            true,
+          );
         }
         if (leftTarget === 0) leftFlipperHit = false;
 
-        // Right flipper
-        const rd = rightSwing - prevRightSwing;
-        if (rd > 0.01 && !rightFlipperHit && bp.z > fZ - hitZone && bp.z < fZ + hitZone && bp.x > -0.08 && bp.x < 0.15) {
+        // Right flipper — visual X [0, 0.084], with margin
+        if (rightSwing > TRIGGER && prevRightSwing <= TRIGGER
+            && inFlipperZ && bp.x > -0.015 && bp.x < 0.10) {
           rightFlipperHit = true;
           ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          ballPhysicsInst.body.applyImpulse({ x: -FLIPPER_POWER * 0.3, y: 0, z: -FLIPPER_POWER }, true);
-          console.log('[Flipper R] HIT');
+          const flipperMidX = 0.042;
+          const normalizedPos = Math.max(-1, Math.min(1, (bp.x - flipperMidX) / 0.06));
+          const launchAngle = 0.4 - normalizedPos * 0.6;
+          ballPhysicsInst.body.applyImpulse(
+            { x: FLIPPER_POWER * Math.sin(launchAngle), y: 0, z: -FLIPPER_POWER * Math.cos(launchAngle) },
+            true,
+          );
         }
         if (rightTarget === 0) rightFlipperHit = false;
       }
@@ -1060,13 +1224,16 @@ export default function PinballPlayfield() {
           if (newZ <= CURVE_END_Z) {
             const exitSpeed = laneAnimSpeed;
             laneAnimSpeed = 0;
-            const exitPos = { x: CURVE_END_X, y: laneSurfaceY(CURVE_END_Z), z: CURVE_END_Z };
-            const exitVel = { x: -exitSpeed * 0.4, y: 0, z: exitSpeed * 0.6 };
+            // Exit right of bumper 0 (at X=-0.02), give room before bumper zone
+            const exitPos = { x: 0.06, y: laneSurfaceY(-0.38), z: -0.38 };
+            // Bias slightly left with spread, gentle downfield
+            const xSpread = (Math.random() - 0.6) * 0.4;
+            const exitVel = { x: exitSpeed * xSpread, y: 0, z: exitSpeed * 0.5 };
             ballPhysicsInst.body.setTranslation(exitPos, true);
             ballPhysicsInst.body.setLinvel(exitVel, true);
             ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
             ballPhysicsInst.body.wakeUp();
-            console.log(`[Lane EXIT] pos=(${exitPos.x.toFixed(3)},${exitPos.y.toFixed(3)},${exitPos.z.toFixed(3)}) vel=(${exitVel.x.toFixed(3)},${exitVel.y.toFixed(3)},${exitVel.z.toFixed(3)}) exitSpeed=${exitSpeed.toFixed(3)}`);
+            console.log(`[Lane EXIT] pos=(${exitPos.x.toFixed(3)},${exitPos.y.toFixed(3)},${exitPos.z.toFixed(3)}) vel=(${exitVel.x.toFixed(3)},${exitVel.y.toFixed(3)},${exitVel.z.toFixed(3)})`);
           } else if (newZ <= CURVE_START_Z) {
             // Phase 2: curving — interpolate X from lane to playfield
             const t = (CURVE_START_Z - newZ) / (CURVE_START_Z - CURVE_END_Z);
@@ -1095,7 +1262,7 @@ export default function PinballPlayfield() {
         // Clamp ball speed to prevent teleportation
         const bVelClamp = ballPhysicsInst.body.linvel();
         const speed = Math.sqrt(bVelClamp.x**2 + bVelClamp.y**2 + bVelClamp.z**2);
-        const MAX_SPEED = 2.0;
+        const MAX_SPEED = 4.0;
         if (speed > MAX_SPEED) {
           const scale = MAX_SPEED / speed;
           ballPhysicsInst.body.setLinvel(
@@ -1103,18 +1270,43 @@ export default function PinballPlayfield() {
             true,
           );
         }
+        // Prevent ball from going airborne
+        if (bVelClamp.y > 0.5) {
+          ballPhysicsInst.body.setLinvel(
+            { x: bVelClamp.x, y: 0.1, z: bVelClamp.z },
+            true,
+          );
+        }
 
         const bPos = ballPhysicsInst.body.translation();
         const bVel = ballPhysicsInst.body.linvel();
+        const bSpd = Math.sqrt(bVel.x**2 + bVel.y**2 + bVel.z**2);
 
-        // Log ball state every 30 frames when playing
+        // Stuck ball detector — nudge if stationary for 1s
+        if (gameStateRef.current === 'playing' && laneAnimSpeed <= 0) {
+          if (bSpd < 0.02) {
+            stuckTimer += dt;
+            if (stuckTimer > 1.0) {
+              stuckTimer = 0;
+              // Strong nudge: toward center + downhill + small Y pop to escape traps
+              const nudgeX = bPos.x > 0 ? -0.08 : 0.08;
+              ballPhysicsInst.body.applyImpulse({ x: nudgeX, y: 0.02, z: 0.12 }, true);
+              console.log(`[NUDGE] ball stuck at (${bPos.x.toFixed(3)},${bPos.z.toFixed(3)})`);
+            }
+          } else {
+            stuckTimer = 0;
+          }
+        }
+
+        // Ball state every ~0.5s
         if (gameStateRef.current === 'playing' && laneAnimSpeed <= 0 && Math.round(time / 16) % 30 === 0) {
-          console.log(`[Ball] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)}) vel=(${bVel.x.toFixed(3)},${bVel.y.toFixed(3)},${bVel.z.toFixed(3)}) speed=${Math.sqrt(bVel.x**2+bVel.y**2+bVel.z**2).toFixed(3)}`);
+          const spd = Math.sqrt(bVel.x**2+bVel.y**2+bVel.z**2);
+          console.log(`[Ball] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)}) vel=(${bVel.x.toFixed(3)},${bVel.y.toFixed(3)},${bVel.z.toFixed(3)}) spd=${spd.toFixed(3)}`);
         }
 
         if (gameStateRef.current === "playing" && drainBallUC) {
           if ((bPos.z > DRAIN_Z && bPos.x < fieldBounds.laneSepX) || bPos.y < 0.8) {
-            console.log(`[DRAIN] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)}) reason=${bPos.y < 0.8 ? 'Y_FALL' : 'Z_DRAIN'}`);
+            console.log(`[DRAIN] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)})`);
             drainBallUC.execute();
           }
         }
