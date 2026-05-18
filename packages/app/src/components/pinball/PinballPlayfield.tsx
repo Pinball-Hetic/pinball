@@ -622,7 +622,8 @@ export default function PinballPlayfield() {
         const bSpd = Math.sqrt(bVel.x ** 2 + bVel.y ** 2 + bVel.z ** 2);
 
         // Stuck ball detection
-        if (gameStateRef.current === "playing" && laneAnimSpeed <= 0) {
+        // Stuck detector — only when NOT in drain zone (Z<0.22)
+        if (gameStateRef.current === "playing" && laneAnimSpeed <= 0 && bPos.z < 0.22) {
           const stuckResult = stuckDetector.update(bSpd, bPos, dt);
           if (stuckResult) {
             if (stuckResult.type === 'force_drain') {
@@ -631,6 +632,8 @@ export default function PinballPlayfield() {
               ballPhysicsInst.body.applyImpulse(stuckResult.impulse, true);
             }
           }
+        } else {
+          stuckDetector.reset();
         }
 
         // Periodic ball state log
@@ -641,18 +644,19 @@ export default function PinballPlayfield() {
 
         // Drain by position fallback
         if (gameStateRef.current === "playing" && drainBallUC) {
-          // Drain zone: ball in lower area (Z>0.28) for 1s → drain
-          if (bPos.z > 0.28 && bPos.x < fieldBoundsLaneSepX) {
+          // Drain zone: ball in lower area (Z>0.22) for 1.5s → drain
+          // Threshold lowered to 0.22 so nudge-oscillations don't reset timer
+          if (bPos.z > 0.22 && bPos.x < fieldBoundsLaneSepX) {
             drainZoneTimer += dt;
-            if (drainZoneTimer > 1.0) {
+            if (drainZoneTimer > 1.5) {
               drainBallUC.execute();
               drainZoneTimer = 0;
             }
           } else {
             drainZoneTimer = 0;
           }
-          // Instant drain: past sensor OR fell below playfield
-          if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || bPos.y < 0.93) {
+          // Instant drain: fell below playfield
+          if (bPos.y < 0.93) {
             drainBallUC.execute();
             drainZoneTimer = 0;
           }
