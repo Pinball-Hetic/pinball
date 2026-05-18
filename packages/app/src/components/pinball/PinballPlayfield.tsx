@@ -327,6 +327,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let physicsReady = false;
     let prevFrameTime = 0;
     let laneAnimSpeed = 0;
+
     let leftFlipperHit = false;
     let rightFlipperHit = false;
 
@@ -516,6 +517,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (e.key === " ") {
             if (gameStateRef.current === "game_over") {
               resetGame();
+              if (ballMesh) ballMesh.visible = true;
               return;
             }
             if (gameStateRef.current === "idle" && physicsReady) {
@@ -661,9 +663,18 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const bSpd = Math.sqrt(bVel.x ** 2 + bVel.y ** 2 + bVel.z ** 2);
 
         // Stuck ball detection
-        if (gameStateRef.current === "playing" && laneAnimSpeed <= 0) {
-          const nudge = stuckDetector.update(bSpd, bPos, dt);
-          if (nudge) ballPhysicsInst.body.applyImpulse(nudge, true);
+        // Stuck detector — only when NOT in drain zone (Z<0.22)
+        if (gameStateRef.current === "playing" && laneAnimSpeed <= 0 && bPos.z < 0.22) {
+          const stuckResult = stuckDetector.update(bSpd, bPos, dt);
+          if (stuckResult) {
+            if (stuckResult.type === 'force_drain') {
+              drainBallUC?.execute();
+            } else if (stuckResult.impulse) {
+              ballPhysicsInst.body.applyImpulse(stuckResult.impulse, true);
+            }
+          }
+        } else {
+          stuckDetector.reset();
         }
 
         // Drain by position fallback

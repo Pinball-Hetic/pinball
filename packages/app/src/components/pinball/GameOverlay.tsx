@@ -3,9 +3,11 @@ interface GameOverlayProps {
   lives: number;
   gameState: "idle" | "playing" | "game_over";
   initialLives: number;
+  cabinetMode?: boolean;
 }
 
-export default function GameOverlay({ score, lives, gameState, initialLives }: GameOverlayProps) {
+export default function GameOverlay({ score, lives, gameState, initialLives, cabinetMode = false }: GameOverlayProps) {
+  void cabinetMode;
   const hintLine =
     gameState === "idle"
       ? "▶  Maintenir ESPACE — relâcher pour lancer"

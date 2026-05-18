@@ -25,7 +25,7 @@ export const BUMPER_POSITIONS = [
 ] as const;
 export const BUMPER_RADIUS       = 0.0345; // GLB size X=0.069 → radius 0.0345
 export const BUMPER_RESTITUTION  = 0.3;
-export const BUMPER_EJECT_IMPULSE = 0.06;
+export const BUMPER_EJECT_IMPULSE = 0.09;
 
 // Walls — from GLB playfield mesh extents
 export const WALL_LEFT_X    = -0.265;
@@ -39,8 +39,9 @@ export const WALL_THICKNESS =  0.006;
 export const DRAIN_SWITCH_CENTER = { x: -0.0219, y: 0.9990, z: 0.0989 } as const;
 
 // Slingshots — from GLB slingshot center=[−0.0225,1.032,0.1162] size=[0.2881,_,0.1132]
-export const SLINGSHOT_LEFT_CENTER  = { x: -0.166, y: 1.032, z: 0.116 } as const;
-export const SLINGSHOT_RIGHT_CENTER = { x:  0.121, y: 1.032, z: 0.116 } as const;
+// Y lowered to surface level so ball doesn't land on top
+export const SLINGSHOT_LEFT_CENTER  = { x: -0.166, y: 1.005, z: 0.116 } as const;
+export const SLINGSHOT_RIGHT_CENTER = { x:  0.121, y: 1.005, z: 0.116 } as const;
 export const SLINGSHOT_RESTITUTION  = 0.8;
 
 // Pop bumper zone sensors — from GLB switch positions

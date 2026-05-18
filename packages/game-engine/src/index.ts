@@ -21,3 +21,5 @@ export * from './infrastructure/PlayfieldTrimeshBuilder';
 export * from './infrastructure/PlayfieldColliderFactory';
 export * from './infrastructure/FlipperSplitter';
 export * from './infrastructure/CollisionEventProcessor';
+export * from './infrastructure/GltfNodeNames';
+export * from './infrastructure/GltfDisplay';
