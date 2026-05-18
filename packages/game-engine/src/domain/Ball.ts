@@ -25,7 +25,7 @@ export const BUMPER_POSITIONS = [
 ] as const;
 export const BUMPER_RADIUS       = 0.0345; // GLB size X=0.069 → radius 0.0345
 export const BUMPER_RESTITUTION  = 0.3;
-export const BUMPER_EJECT_IMPULSE = 0.06;
+export const BUMPER_EJECT_IMPULSE = 0.09;
 
 // Walls — from GLB playfield mesh extents
 export const WALL_LEFT_X    = -0.265;
