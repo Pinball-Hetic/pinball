@@ -28,10 +28,6 @@ export class LauncherLaneAnimator {
       ballBody.setLinvel(exitVel, true);
       ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
       ballBody.wakeUp();
-      console.log(
-        `[Lane EXIT] pos=(${exitPos.x.toFixed(3)},${exitPos.y.toFixed(3)},${exitPos.z.toFixed(3)})` +
-        ` vel=(${exitVel.x.toFixed(3)},${exitVel.y.toFixed(3)},${exitVel.z.toFixed(3)})`,
-      );
       return { done: true, exitVel };
     }
 

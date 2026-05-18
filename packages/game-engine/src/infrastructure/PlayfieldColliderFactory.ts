@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
   BUMPER_POSITIONS,
@@ -12,16 +11,34 @@ import {
 } from '../domain/Ball';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
+export type AnalyticalColliderOptions = {
+  /** Sol incliné du couloir plongeur (souvent en double avec le GLB). */
+  laneFloor?: boolean;
+  /** Murs latéraux / haut / séparateur lane (souvent en double avec le trimesh). */
+  walls?: boolean;
+  /** Outlanes, poteaux, murets analytiques. */
+  barriers?: boolean;
+  /** Cylindres bumpers (restent utiles si les bumpers sont exclus du trimesh). */
+  bumpers?: boolean;
+};
+
 export class PlayfieldColliderFactory {
   static createAll(
     world: RAPIER.World,
     colliderMap: Map<number, string>,
-    scene?: THREE.Scene,
+    analytical?: AnalyticalColliderOptions,
   ): void {
-    PlayfieldColliderFactory.createLaneFloor(world);
-    PlayfieldColliderFactory.createWalls(world);
-    PlayfieldColliderFactory.createBumpers(world, colliderMap);
-    PlayfieldColliderFactory.createBarriers(world, scene);
+    const a = {
+      laneFloor: analytical?.laneFloor ?? true,
+      walls: analytical?.walls ?? true,
+      barriers: analytical?.barriers ?? true,
+      bumpers: analytical?.bumpers ?? true,
+    };
+
+    if (a.laneFloor) PlayfieldColliderFactory.createLaneFloor(world);
+    if (a.walls) PlayfieldColliderFactory.createWalls(world);
+    if (a.bumpers) PlayfieldColliderFactory.createBumpers(world, colliderMap);
+    if (a.barriers) PlayfieldColliderFactory.createBarriers(world);
     PlayfieldColliderFactory.createSlingshotSensors(world, colliderMap);
     PlayfieldColliderFactory.createPopZoneSensors(world, colliderMap);
     PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
@@ -98,12 +115,10 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createBarriers(world: RAPIER.World, scene?: THREE.Scene): void {
+  private static createBarriers(world: RAPIER.World): void {
     const surfY = surfaceYAtZ;
 
     type BarrierDef = {
-      name: string;
-      color: number;
       type: 'cyl' | 'box';
       px: number;
       pz: number;
@@ -117,11 +132,11 @@ export class PlayfieldColliderFactory {
     };
 
     const barriers: BarrierDef[] = [
-      { name: 'OutlaneL',   color: 0xff00ff, type: 'cyl', px: -0.14, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
-      { name: 'OutlaneR',   color: 0x00ffff, type: 'cyl', px:  0.10, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
-      { name: 'CenterPost', color: 0xffffff, type: 'cyl', px: -0.02, pz: 0.32, hAbove: 0.012, r: 0.015, hh: 0.015 },
-      { name: 'WallR',      color: 0xff8800, type: 'box', px:  0.155, pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
-      { name: 'WallL',      color: 0x88ff00, type: 'box', px: -0.20,  pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
+      { type: 'cyl', px: -0.14, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
+      { type: 'cyl', px:  0.10, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
+      { type: 'cyl', px: -0.02, pz: 0.32, hAbove: 0.012, r: 0.015, hh: 0.015 },
+      { type: 'box', px:  0.155, pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
+      { type: 'box', px: -0.20,  pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
     ];
 
     for (const b of barriers) {
@@ -136,28 +151,12 @@ export class PlayfieldColliderFactory {
             .setRestitution(b.rest ?? 0.4).setFriction(0.1),
           body,
         );
-        if (scene) {
-          const dg = new THREE.CylinderGeometry(b.r!, b.r!, b.hh! * 2, 12);
-          const dm = new THREE.MeshBasicMaterial({ color: b.color, transparent: true, opacity: 0.7 });
-          const dMesh = new THREE.Mesh(dg, dm);
-          dMesh.position.set(b.px, py, b.pz);
-          dMesh.name = b.name;
-          scene.add(dMesh);
-        }
       } else {
         world.createCollider(
           RAPIER.ColliderDesc.cuboid(b.hx!, b.hy!, b.hz!)
             .setRestitution(b.rest ?? 0.4).setFriction(0.1),
           body,
         );
-        if (scene) {
-          const dg = new THREE.BoxGeometry(b.hx! * 2, b.hy! * 2, b.hz! * 2);
-          const dm = new THREE.MeshBasicMaterial({ color: b.color, transparent: true, opacity: 0.7 });
-          const dMesh = new THREE.Mesh(dg, dm);
-          dMesh.position.set(b.px, py, b.pz);
-          dMesh.name = b.name;
-          scene.add(dMesh);
-        }
       }
     }
   }

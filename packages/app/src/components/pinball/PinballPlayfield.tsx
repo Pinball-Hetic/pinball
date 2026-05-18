@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {
   PhysicsWorld,
   BallPhysics,
@@ -12,76 +11,233 @@ import {
   DrainBall,
   BALL_RADIUS,
   BALL_SPAWN_POSITION,
+  WALL_LEFT_X,
+  WALL_RIGHT_X,
   WALL_BOTTOM_Z,
   WALL_TOP_Z,
+  PLAYFIELD_SURFACE_Y,
   INITIAL_LIVES,
   PLUNGER_CHARGE_MS,
   PLUNGER_MIN_FACTOR,
   PLUNGER_MAX_FACTOR,
   SWING_RAD,
   SWING_SMOOTH,
+  FLIPPER_RESTITUTION,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
+  playfieldUsesCollOnlyCollision,
+  type AnalyticalColliderOptions,
   splitFlipperIntoTwo,
   attachFlipperAtHinge,
   CollisionEventProcessor,
   detectFlipperHit,
   LauncherLaneAnimator,
   StuckBallDetector,
+  findObjectByNormalizedName,
+  hideGltfDecorativeBall,
+  prepareGltfMaterialsForDisplay,
+  configureGltfRenderer,
 } from "@pinball/game-engine";
 import { useGameState } from "../../hooks/useGameState";
 import GameOverlay from "./GameOverlay";
-import DebugPanel from "./DebugPanel";
 
-const PLAYFIELD_URL = "/playfield/pinball-machine.glb";
+/** Plateau complet — `packages/app/public/playfield/Pinballmap.glb` */
+const PLAYFIELD_URL = "/playfield/Pinballmap.glb";
 const FLIPPER_LEFT_NAME = "flipper";
 const DRAIN_Z = WALL_BOTTOM_Z + BALL_RADIUS * 2;
 
-const COLLIDER_COLORS: Record<string, { color: string; label: string }> = {
-  playfield:       { color: "#00ff44", label: "Sol — Trimesh" },
-  playfield_sides: { color: "#333333", label: "Caisse externe — ignoré" },
-  plastic:                 { color: "#ff8800", label: "Rail haut — ConvexPoly" },
-  plastic_left:            { color: "#ff8800", label: "Rail gauche — ConvexPoly" },
-  plastic_pop_bumper_zone: { color: "#ff8800", label: "Zone bumpers — ConvexPoly" },
-  plastic_rocket:          { color: "#ff8800", label: "Rail droit — ConvexPoly" },
-  shoulder:                { color: "#ff8800", label: "Épaule — ConvexPoly" },
-  slingshot:       { color: "#cc2200", label: "Slingshot — ConvexPoly" },
-  pop_bumper:      { color: "#ff0022", label: "Bumper centre — Cylinder" },
-  pop_bumper_left: { color: "#ff0022", label: "Bumper gauche — Cylinder" },
-  pop_bumper_right:{ color: "#ff0022", label: "Bumper droit — Cylinder" },
-  separator_left:  { color: "#ffff00", label: "Séparateur G — Cylinder" },
-  separator_right: { color: "#ffff00", label: "Séparateur D — Cylinder" },
-  drop_target_left_1:  { color: "#cc00ff", label: "Target G1 — Box" },
-  drop_target_left_2:  { color: "#cc00ff", label: "Target G2 — Box" },
-  drop_target_right_1: { color: "#cc00ff", label: "Target D1 — Box" },
-  drop_target_right_2: { color: "#cc00ff", label: "Target D2 — Box" },
-  drop_target_right_3: { color: "#cc00ff", label: "Target D3 — Box" },
-  switch_out:                    { color: "#0088ff", label: "Drain — sensor" },
-  switch_center_pop_bumper_zone: { color: "#0088ff", label: "Sensor bumper C" },
-  switch_left_pop_bumper_zone:   { color: "#0088ff", label: "Sensor bumper G" },
-  switch_right_pop_bumper_zone:  { color: "#0088ff", label: "Sensor bumper D" },
-  switch_plunger:                { color: "#0088ff", label: "Sensor plunger" },
-  switch_slingshot:              { color: "#0088ff", label: "Sensor slingshot" },
-  switch_rocket:                 { color: "#0088ff", label: "Sensor rocket" },
-  box:             { color: "#1a1a1a", label: "Caisse — décoratif" },
-  feet:            { color: "#1a1a1a", label: "Pieds — décoratif" },
-  glass:           { color: "#1a1a1a", label: "Vitre — décoratif" },
-  launcher:        { color: "#1a1a1a", label: "Launcher — décoratif" },
-  plunger_panel:   { color: "#1a1a1a", label: "Panel — décoratif" },
-  score_board:     { color: "#1a1a1a", label: "Tableau — décoratif" },
-  coin_slot:       { color: "#1a1a1a", label: "Monnayeur — décoratif" },
-  flipper_buttons: { color: "#1a1a1a", label: "Boutons — décoratif" },
-  pop_bumper_guard:{ color: "#1a1a1a", label: "Guard bumper — décoratif" },
-  spinner:         { color: "#1a1a1a", label: "Spinner — décoratif" },
-  plate:           { color: "#1a1a1a", label: "Plaque — décoratif" },
-  start_button:    { color: "#1a1a1a", label: "Bouton start — décoratif" },
-  exit_cover:      { color: "#1a1a1a", label: "Cover — décoratif" },
-  flipper:             { color: "#00ffff", label: "Flipper — kinematic" },
-  flipper_left_split:  { color: "#00ffff", label: "Flipper G — kinematic" },
-  flipper_right_split: { color: "#00ffff", label: "Flipper D — kinematic" },
+/**
+ * Vue cabine fixe : joueur côté +Z (flippers), regarde vers le haut du tapis (-Z).
+ * Direction depuis la cible vers la caméra (haut + avant).
+ */
+const PLAYFIELD_VIEW_DIR = new THREE.Vector3(0, 0.48, 0.88).normalize();
+/** Marge NDC : plus bas = plus de bande autour du tapis. */
+const PLAYFIELD_VIEW_NDC_MARGIN = 0.78;
+const PLAYFIELD_CAM_DISTANCE_SCALE = 1.05;
+
+type PlayfieldCamFit = {
+  target: THREE.Vector3;
+  /** unitaire : depuis la cible vers la caméra */
+  dirToCamera: THREE.Vector3;
+  corners: THREE.Vector3[];
 };
 
-export default function PinballPlayfield() {
+function fillPlayfieldBoxCorners(box: THREE.Box3, reuse: THREE.Vector3[]): THREE.Vector3[] {
+  reuse.length = 0;
+  const { min, max } = box;
+  for (const x of [min.x, max.x] as const) {
+    for (const y of [min.y, max.y] as const) {
+      for (const z of [min.z, max.z] as const) {
+        reuse.push(new THREE.Vector3(x, y, z));
+      }
+    }
+  }
+  return reuse;
+}
+
+function playfieldCornersInView(
+  camera: THREE.PerspectiveCamera,
+  target: THREE.Vector3,
+  camPos: THREE.Vector3,
+  corners: readonly THREE.Vector3[],
+  ndcMargin: number,
+): boolean {
+  camera.up.set(0, 1, 0);
+  camera.position.copy(camPos);
+  camera.lookAt(target);
+  camera.updateMatrixWorld(true);
+  const clip = new THREE.Matrix4().multiplyMatrices(
+    camera.projectionMatrix,
+    camera.matrixWorldInverse,
+  );
+  const v4 = new THREE.Vector4();
+  for (const c of corners) {
+    v4.set(c.x, c.y, c.z, 1).applyMatrix4(clip);
+    const w = Math.abs(v4.w);
+    if (w < 1e-7) return false;
+    const nx = v4.x / w;
+    const ny = v4.y / w;
+    if (Math.abs(nx) > ndcMargin || Math.abs(ny) > ndcMargin) return false;
+  }
+  return true;
+}
+
+function distanceForTiltedPlayfieldView(
+  camera: THREE.PerspectiveCamera,
+  fit: PlayfieldCamFit,
+  ndcMargin: number,
+): number {
+  const { target: mc, dirToCamera, corners } = fit;
+  const pos = new THREE.Vector3();
+  let lo = 0.04;
+  let hi = 0.6;
+  while (!playfieldCornersInView(camera, mc, pos.copy(mc).addScaledVector(dirToCamera, hi), corners, ndcMargin) && hi < 240) {
+    hi *= 1.75;
+  }
+  if (!playfieldCornersInView(camera, mc, pos.copy(mc).addScaledVector(dirToCamera, hi), corners, ndcMargin)) {
+    return hi;
+  }
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    pos.copy(mc).addScaledVector(dirToCamera, mid);
+    if (playfieldCornersInView(camera, mc, pos, corners, ndcMargin)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+function applyPlayfieldCamera(
+  camera: THREE.PerspectiveCamera,
+  target: THREE.Vector3,
+  dirToCamera: THREE.Vector3,
+  distance: number,
+): void {
+  camera.up.set(0, 1, 0);
+  camera.position.copy(target).addScaledVector(dirToCamera, distance);
+  camera.lookAt(target);
+}
+
+/** Rectangle jouable (murs physiques + mesh tapis). */
+function boundingBoxPlayableArea(playfieldRoot: THREE.Object3D): THREE.Box3 {
+  const wallBox = new THREE.Box3(
+    new THREE.Vector3(WALL_LEFT_X - 0.012, PLAYFIELD_SURFACE_Y - 0.04, WALL_TOP_Z - 0.02),
+    new THREE.Vector3(WALL_RIGHT_X + 0.012, PLAYFIELD_SURFACE_Y + 0.1, WALL_BOTTOM_Z + 0.02),
+  );
+  const meshBox = boundingBoxPlayfieldSurface(playfieldRoot);
+  if (meshBox.isEmpty()) return wallBox;
+  return meshBox.union(wallBox);
+}
+
+function fitPlayfieldCamera(
+  camera: THREE.PerspectiveCamera,
+  fit: PlayfieldCamFit,
+  target: THREE.Vector3,
+): number {
+  const dist =
+    distanceForTiltedPlayfieldView(camera, fit, PLAYFIELD_VIEW_NDC_MARGIN) *
+    PLAYFIELD_CAM_DISTANCE_SCALE;
+  applyPlayfieldCamera(camera, target, fit.dirToCamera, dist);
+  return dist;
+}
+
+/** Boîte du tapis jouable uniquement (hors caisse / backbox). */
+function boundingBoxPlayfieldSurface(playfieldRoot: THREE.Object3D): THREE.Box3 {
+  const box = new THREE.Box3();
+  const named =
+    findObjectByNormalizedName(
+      playfieldRoot,
+      "playfield",
+      "pf_playfield",
+      "coll_playfield",
+    ) ?? null;
+  const sides =
+    findObjectByNormalizedName(
+      playfieldRoot,
+      "playfield_sides",
+      "pf_playfield_sides",
+    ) ?? null;
+  if (named) {
+    named.updateMatrixWorld(true);
+    box.setFromObject(named);
+    if (sides) {
+      sides.updateMatrixWorld(true);
+      box.union(new THREE.Box3().setFromObject(sides));
+    }
+  }
+  if (!box.isEmpty()) {
+    box.expandByScalar(0.006);
+    return box;
+  }
+
+  const tmp = new THREE.Box3();
+  let first = true;
+  const skipName = (n: string) =>
+    /backglass|backbox|cabinet|score.?board|coin|feet|foot|glass|launcher|plunger.?panel|epoxy|upright|stand|skirt|lockbar|siderail|caisse|vitre|button|monnayeur|start.?button/i.test(
+      n,
+    );
+  playfieldRoot.updateMatrixWorld(true);
+  playfieldRoot.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    const n = child.name.toLowerCase();
+    if (skipName(n)) return;
+    if (
+      n.includes("playfield") ||
+      n.includes("plastic") ||
+      n.includes("bumper") ||
+      n.includes("pop_") ||
+      n.includes("flipper") ||
+      n.includes("separator") ||
+      n.includes("sling") ||
+      n.includes("target") ||
+      n.includes("spinner") ||
+      n.includes("guide") ||
+      n.includes("rail") ||
+      n.includes("rocket") ||
+      n.startsWith("coll_") ||
+      n.startsWith("pf_")
+    ) {
+      tmp.setFromObject(child);
+      if (first) {
+        box.copy(tmp);
+        first = false;
+      } else {
+        box.union(tmp);
+      }
+    }
+  });
+  if (first) {
+    box.setFromObject(playfieldRoot);
+  }
+  box.expandByScalar(0.008);
+  return box;
+}
+
+type PinballPlayfieldProps = {
+  /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
+  cabinetMode?: boolean;
+};
+
+export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfieldProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   const {
@@ -93,21 +249,6 @@ export default function PinballPlayfield() {
     buildEmit,
   } = useGameState();
 
-  const [debugPos, setDebugPos] = useState({
-    x: BALL_SPAWN_POSITION.x as number,
-    y: BALL_SPAWN_POSITION.y as number,
-    z: BALL_SPAWN_POSITION.z as number,
-  });
-  const [debugColliders, setDebugColliders] = useState(false);
-  const [debugRadius, setDebugRadius] = useState(BALL_RADIUS);
-
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const wireframeMeshesRef = useRef<THREE.Mesh[]>([]);
-  const debugSpawnRef = useRef<((x: number, y: number, z: number) => void) | null>(null);
-  const debugCursorRef = useRef<THREE.Mesh | null>(null);
-  const debugResizeBallRef = useRef<((r: number) => void) | null>(null);
-  void debugCursorRef;
-
   useEffect(() => {
     let cancelled = false;
     const mountEl = mountRef.current;
@@ -115,22 +256,27 @@ export default function PinballPlayfield() {
 
     // ── Three.js setup ───────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    sceneRef.current = scene;
     scene.background = new THREE.Color("#050816");
     const loader = new GLTFLoader();
 
     const { clientWidth, clientHeight } = mountEl;
-    const camera = new THREE.PerspectiveCamera(60, clientWidth / clientHeight, 0.001, 100);
+    const camera = new THREE.PerspectiveCamera(50, clientWidth / clientHeight, 0.001, 100);
     const cameraTarget = new THREE.Vector3();
+    let playfieldCamFit: {
+      fit: PlayfieldCamFit;
+      camera: THREE.PerspectiveCamera;
+      cameraTarget: THREE.Vector3;
+    } | null = null;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
+    configureGltfRenderer(renderer);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(clientWidth, clientHeight);
     renderer.shadowMap.enabled = true;
     mountEl.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
     dirLight.position.set(2, 5, 3);
     dirLight.castShadow = true;
     scene.add(dirLight);
@@ -202,20 +348,11 @@ export default function PinballPlayfield() {
         playfieldRootRef = playfieldRoot;
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
-
-        gltf.scene.traverse((child) => {
-          if (!(child instanceof THREE.Mesh)) return;
-          const nameLC = child.name.toLowerCase();
-          const mat = child.material as THREE.MeshStandardMaterial;
-          if (!mat || Array.isArray(mat)) return;
-          if (nameLC.includes("flipper") && !nameLC.includes("button")) {
-            mat.emissive = new THREE.Color("#ff6600");
-            mat.emissiveIntensity = 0.28;
-          }
-        });
+        hideGltfDecorativeBall(playfieldRoot);
+        prepareGltfMaterialsForDisplay(playfieldRoot);
 
         // ── Ball mesh ────────────────────────────────────────────────────────
-        const glbBallNode = playfieldRoot.getObjectByName("ball");
+        const glbBallNode = findObjectByNormalizedName(playfieldRoot, "ball", "pf_ball");
         if (glbBallNode) glbBallNode.visible = false;
 
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
@@ -228,8 +365,13 @@ export default function PinballPlayfield() {
         ballMesh = ballSphere;
         ballMesh.visible = false;
 
-        // ── Flipper split ────────────────────────────────────────────────────
-        const baseFlipper = playfieldRoot.getObjectByName(FLIPPER_LEFT_NAME) ?? null;
+        const baseFlipper =
+          findObjectByNormalizedName(
+            playfieldRoot,
+            FLIPPER_LEFT_NAME,
+            "pf_flipper",
+            "pf_flipper_left",
+          ) ?? null;
         let leftFlipper: THREE.Object3D | null = null;
         let rightFlipper: THREE.Object3D | null = null;
 
@@ -268,96 +410,20 @@ export default function PinballPlayfield() {
         const world = physicsWorld.world;
 
         modelRoot.updateMatrixWorld(true);
-        const fieldBox = new THREE.Box3().setFromObject(modelRoot);
-        fieldBoundsLaneSepX = fieldBox.min.x;
+        const playfieldViewBox = boundingBoxPlayfieldSurface(playfieldRoot);
+        fieldBoundsLaneSepX = playfieldViewBox.min.x;
 
         const colliderMap = new Map<number, string>();
 
         PlayfieldTrimeshBuilder.build(playfieldRoot, world);
-        PlayfieldColliderFactory.createAll(world, colliderMap, scene);
 
-        // ── Wireframe debug ──────────────────────────────────────────────────
-        type WireframeDef =
-          | { type: "box"; hx: number; hy: number; hz: number; px: number; py: number; pz: number; qx: number; qy: number; qz: number; qw: number }
-          | { type: "sphere"; radius: number; px: number; py: number; pz: number }
-          | { type: "cylinder"; halfHeight: number; radius: number; px: number; py: number; pz: number };
-
-        const wireframeData: WireframeDef[] = [];
-
-        world.forEachCollider((col) => {
-          const parent = col.parent();
-          if (!parent) return;
-          const t = parent.translation();
-          const q = parent.rotation();
-          const shape = col.shape;
-          if (shape.type === RAPIER.ShapeType.Cuboid) {
-            const half = (shape as RAPIER.Cuboid).halfExtents;
-            wireframeData.push({ type: "box", hx: half.x, hy: half.y, hz: half.z, px: t.x, py: t.y, pz: t.z, qx: q.x, qy: q.y, qz: q.z, qw: q.w });
-          } else if (shape.type === RAPIER.ShapeType.Ball) {
-            wireframeData.push({ type: "sphere", radius: (shape as RAPIER.Ball).radius, px: t.x, py: t.y, pz: t.z });
-          } else if (shape.type === RAPIER.ShapeType.Cylinder) {
-            const cyl = shape as RAPIER.Cylinder;
-            wireframeData.push({ type: "cylinder", halfHeight: cyl.halfHeight, radius: cyl.radius, px: t.x, py: t.y, pz: t.z });
-          }
-        });
-
-        for (const wd of wireframeData) {
-          let geo: THREE.BufferGeometry;
-          if (wd.type === "box") {
-            geo = new THREE.BoxGeometry(wd.hx * 2, wd.hy * 2, wd.hz * 2);
-          } else if (wd.type === "sphere") {
-            geo = new THREE.SphereGeometry(wd.radius, 8, 6);
-          } else {
-            geo = new THREE.CylinderGeometry(wd.radius, wd.radius, wd.halfHeight * 2, 12);
-          }
-          const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, opacity: 0.55, transparent: true });
-          const wfMesh = new THREE.Mesh(geo, mat);
-          wfMesh.position.set(wd.px, wd.py, wd.pz);
-          if (wd.type === "box") wfMesh.quaternion.set(wd.qx, wd.qy, wd.qz, wd.qw);
-          wfMesh.visible = false;
-          wireframeMeshesRef.current.push(wfMesh);
-          scene.add(wfMesh);
-          disposableGeos.push(geo);
-          disposableMats.push(mat);
-        }
+        const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
+        const analytical: AnalyticalColliderOptions = collOnly
+          ? { laneFloor: false, walls: false, barriers: false, bumpers: false }
+          : { laneFloor: true, walls: true, barriers: true, bumpers: true };
+        PlayfieldColliderFactory.createAll(world, colliderMap, analytical);
 
         ballPhysicsInst = new BallPhysics(world);
-
-        // ── Resize ball at runtime ────────────────────────────────────────────
-        debugResizeBallRef.current = (newRadius: number) => {
-          if (!ballPhysicsInst || !ballMesh) return;
-          world.removeCollider(ballPhysicsInst.collider, false);
-          const density = 0.08 / ((4 / 3) * Math.PI * newRadius ** 3);
-          const newCol = world.createCollider(
-            RAPIER.ColliderDesc.ball(newRadius)
-              .setRestitution(0.4).setFriction(0.1)
-              .setDensity(density)
-              .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
-            ballPhysicsInst.body,
-          );
-          (ballPhysicsInst as unknown as Record<string, unknown>).collider = newCol;
-          const sphere = ballMesh as THREE.Mesh;
-          sphere.geometry.dispose();
-          sphere.geometry = new THREE.SphereGeometry(newRadius, 24, 24);
-          console.info(`[Debug] Ball radius → ${newRadius.toFixed(4)}`);
-        };
-
-        // ── Debug cursor ──────────────────────────────────────────────────────
-        const cursorGeo = new THREE.SphereGeometry(BALL_RADIUS, 12, 12);
-        const cursorMat = new THREE.MeshBasicMaterial({ color: 0xff6600, wireframe: true });
-        const cursorMesh = new THREE.Mesh(cursorGeo, cursorMat);
-        cursorMesh.visible = false;
-        scene.add(cursorMesh);
-        debugCursorRef.current = cursorMesh;
-        disposableGeos.push(cursorGeo);
-        disposableMats.push(cursorMat);
-
-        debugSpawnRef.current = (x: number, y: number, z: number) => {
-          ballPhysicsInst!.setSpawnPosition(x, y, z);
-          cursorMesh.position.set(x, y, z);
-          cursorMesh.visible = true;
-          console.info(`[Debug spawn] x=${x.toFixed(4)}, y=${y.toFixed(4)}, z=${z.toFixed(4)}`);
-        };
 
         // ── Flipper kinematic bodies ──────────────────────────────────────────
         const makeFlipperBody = (bbox: THREE.Box3 | null): RAPIER.RigidBody | null => {
@@ -370,7 +436,7 @@ export default function PinballPlayfield() {
           const halfY = Math.max(sz.y / 2, BALL_RADIUS * 3);
           world.createCollider(
             RAPIER.ColliderDesc.cuboid(sz.x / 2, halfY, sz.z / 2 + BALL_RADIUS)
-              .setRestitution(0.8).setFriction(0.2)
+              .setRestitution(FLIPPER_RESTITUTION).setFriction(0.28)
               .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
             body,
           );
@@ -405,48 +471,25 @@ export default function PinballPlayfield() {
           plungerBody,
         );
 
-        // ── Trajectory debug line ─────────────────────────────────────────────
-        const trajectoryPoints = [
-          new THREE.Vector3(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, WALL_BOTTOM_Z),
-          new THREE.Vector3(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, WALL_TOP_Z),
-        ];
-        const trajectoryGeo = new THREE.BufferGeometry().setFromPoints(trajectoryPoints);
-        const trajectoryMat = new THREE.LineBasicMaterial({ color: 0xffaa00, opacity: 0.8, transparent: true });
-        const trajectoryLine = new THREE.Line(trajectoryGeo, trajectoryMat);
-        trajectoryLine.visible = false;
-        scene.add(trajectoryLine);
-        disposableGeos.push(trajectoryGeo);
-        disposableMats.push(trajectoryMat);
-        wireframeMeshesRef.current.push(trajectoryLine as unknown as THREE.Mesh);
-
-        // ── Camera ────────────────────────────────────────────────────────────
+        // ── Caméra cabine fixe (non rotatable) — tapis jouable uniquement ───────
         modelRoot.updateMatrixWorld(true);
-        const mb = new THREE.Box3().setFromObject(modelRoot);
-        const mc = mb.getCenter(new THREE.Vector3());
-        const msz = mb.getSize(new THREE.Vector3());
+        const camFrameBox = boundingBoxPlayableArea(playfieldRoot);
+        camFrameBox.getCenter(cameraTarget);
+        const camCorners: THREE.Vector3[] = [];
+        fillPlayfieldBoxCorners(camFrameBox, camCorners);
+        const fit: PlayfieldCamFit = {
+          target: cameraTarget,
+          dirToCamera: PLAYFIELD_VIEW_DIR.clone(),
+          corners: camCorners,
+        };
 
-        const fovRad = (camera.fov * Math.PI) / 180;
-        const halfFovY = fovRad / 2;
-        const halfFovX = Math.atan(Math.tan(halfFovY) * camera.aspect);
-        const needH = Math.max(
-          (msz.x / 2) / Math.tan(halfFovX),
-          (msz.z / 2) / Math.tan(halfFovY),
-        ) * 1.35;
-
-        camera.near = msz.y * 0.01;
-        camera.far = needH * 4;
+        const msz = camFrameBox.getSize(new THREE.Vector3());
+        camera.near = Math.max(0.001, Math.min(msz.length() * 0.004, 0.25));
+        camera.far = Math.max(80, msz.length() * 120);
         camera.updateProjectionMatrix();
-        camera.position.set(mc.x, mc.y + needH, mc.z);
-        cameraTarget.copy(mc);
-        camera.lookAt(cameraTarget);
 
-        // ── OrbitControls ─────────────────────────────────────────────────────
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.target.copy(cameraTarget);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.08;
-        controls.update();
-        (physicsWorld as unknown as Record<string, unknown>)._controls = controls;
+        fitPlayfieldCamera(camera, fit, cameraTarget);
+        playfieldCamFit = { fit, camera, cameraTarget };
 
         // ── Use-cases ─────────────────────────────────────────────────────────
         const plunger = new Plunger();
@@ -468,10 +511,6 @@ export default function PinballPlayfield() {
         const onKeyDown = (e: KeyboardEvent) => {
           if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
           if (e.repeat) return;
-          if (e.key === "h" || e.key === "H") {
-            setDebugColliders((prev) => !prev);
-            return;
-          }
           if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") leftTarget = 1;
           if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") rightTarget = 1;
           if (e.key === " ") {
@@ -512,7 +551,6 @@ export default function PinballPlayfield() {
         if (ballMesh) ballMesh.visible = true;
         physicsReady = true;
         mountEl.focus();
-        console.info("[Pinball] Physics ready");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
       }
@@ -540,9 +578,6 @@ export default function PinballPlayfield() {
 
       const dt = prevFrameTime > 0 ? Math.min((time - prevFrameTime) / 1000, 0.05) : 0.016;
       prevFrameTime = time;
-
-      const ctrl = (physicsWorld as unknown as Record<string, unknown>)?._controls as OrbitControls | undefined;
-      ctrl?.update();
 
       syncFlipperBody(leftFlipperBody, leftFlipperObj);
       syncFlipperBody(rightFlipperBody, rightFlipperObj);
@@ -572,7 +607,12 @@ export default function PinballPlayfield() {
         leftFlipperHit = leftHit;
         rightFlipperHit = rightHit;
         if (result) {
-          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          const v = ballPhysicsInst.body.linvel();
+          const damp = 0.55;
+          ballPhysicsInst.body.setLinvel(
+            { x: v.x * damp, y: v.y * damp, z: v.z * damp },
+            true,
+          );
           ballPhysicsInst.body.applyImpulse(result.impulse, true);
         }
         if (leftTarget === 0) leftFlipperHit = false;
@@ -584,7 +624,7 @@ export default function PinballPlayfield() {
 
       // Ball sync
       if (ballMesh?.visible && ballPhysicsInst) {
-        if (gameStateRef.current === "idle" && physicsReady && !debugCursorRef.current?.visible) {
+        if (gameStateRef.current === "idle" && physicsReady) {
           ballPhysicsInst.body.setTranslation(
             { x: BALL_SPAWN_POSITION.x, y: BALL_SPAWN_POSITION.y, z: BALL_SPAWN_POSITION.z },
             true,
@@ -604,7 +644,7 @@ export default function PinballPlayfield() {
         // Clamp ball speed
         const bVelClamp = ballPhysicsInst.body.linvel();
         const speed = Math.sqrt(bVelClamp.x ** 2 + bVelClamp.y ** 2 + bVelClamp.z ** 2);
-        const MAX_SPEED = 4.0;
+        const MAX_SPEED = 2.8;
         if (speed > MAX_SPEED) {
           const scale = MAX_SPEED / speed;
           ballPhysicsInst.body.setLinvel(
@@ -626,16 +666,9 @@ export default function PinballPlayfield() {
           if (nudge) ballPhysicsInst.body.applyImpulse(nudge, true);
         }
 
-        // Periodic ball state log
-        if (gameStateRef.current === "playing" && laneAnimSpeed <= 0 && Math.round(time / 16) % 30 === 0) {
-          const spd = Math.sqrt(bVel.x ** 2 + bVel.y ** 2 + bVel.z ** 2);
-          console.log(`[Ball] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)}) vel=(${bVel.x.toFixed(3)},${bVel.y.toFixed(3)},${bVel.z.toFixed(3)}) spd=${spd.toFixed(3)}`);
-        }
-
         // Drain by position fallback
         if (gameStateRef.current === "playing" && drainBallUC) {
           if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || bPos.y < 0.8) {
-            console.log(`[DRAIN] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)})`);
             drainBallUC.execute();
           }
         }
@@ -676,7 +709,16 @@ export default function PinballPlayfield() {
       const { clientWidth: w, clientHeight: h } = mountEl;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      camera.lookAt(cameraTarget);
+      if (playfieldCamFit) {
+        fitPlayfieldCamera(
+          playfieldCamFit.camera,
+          playfieldCamFit.fit,
+          playfieldCamFit.cameraTarget,
+        );
+      } else {
+        camera.up.set(0, 1, 0);
+        camera.lookAt(cameraTarget);
+      }
       renderer.setSize(w, h);
     };
     window.addEventListener("resize", handleResize);
@@ -689,81 +731,56 @@ export default function PinballPlayfield() {
       const pw = physicsWorld as (PhysicsWorld & { _onKeyDown?: (e: KeyboardEvent) => void; _onKeyUp?: (e: KeyboardEvent) => void }) | null;
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
       if (pw?._onKeyUp) document.removeEventListener("keyup", pw._onKeyUp);
-      const ctrl2 = (physicsWorld as unknown as Record<string, unknown>)?._controls as OrbitControls | undefined;
-      ctrl2?.dispose();
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
-      wireframeMeshesRef.current.forEach((m) => {
-        m.geometry?.dispose();
-        if (m.material) (m.material as THREE.Material).dispose();
-      });
-      wireframeMeshesRef.current = [];
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();
     };
   }, []);
 
-  // ── Debug collider highlight effect ──────────────────────────────────────────
-  useEffect(() => {
-    const s = sceneRef.current;
-    if (!s) return;
-    s.traverse((node) => {
-      if (!(node instanceof THREE.Mesh)) return;
-      let target: THREE.Object3D | null = node;
-      let colorInfo: { color: string; label: string } | undefined;
-      while (target) {
-        colorInfo = COLLIDER_COLORS[target.name];
-        if (colorInfo) break;
-        target = target.parent;
+  const cabinetFrameStyle: CSSProperties = cabinetMode
+    ? {
+        width: "min(100dvw, calc(100dvh * 9 / 16))",
+        height: "min(100dvh, calc(100dvw * 16 / 9))",
       }
-      const mat = node.material as THREE.MeshStandardMaterial;
-      if (!mat || Array.isArray(mat) || !("emissive" in mat)) return;
-      if (debugColliders && colorInfo) {
-        mat.emissive = new THREE.Color(colorInfo.color);
-        mat.emissiveIntensity = 0.85;
-      } else {
-        mat.emissive = new THREE.Color(0x000000);
-        mat.emissiveIntensity = 0;
-      }
-    });
-    wireframeMeshesRef.current.forEach((m) => { m.visible = debugColliders; });
-  }, [debugColliders]);
+    : {};
 
   // ── JSX ───────────────────────────────────────────────────────────────────
   return (
-    <div className="relative min-h-screen bg-black text-zinc-100">
-      <GameOverlay
-        score={score}
-        lives={lives}
-        gameState={gameState}
-        initialLives={INITIAL_LIVES}
-      />
-
-      <DebugPanel
-        debugPos={debugPos}
-        onDebugPosChange={(pos) => {
-          setDebugPos(pos);
-          debugSpawnRef.current?.(pos.x, pos.y, pos.z);
-        }}
-        debugRadius={debugRadius}
-        onDebugRadiusChange={(r) => {
-          setDebugRadius(r);
-          debugResizeBallRef.current?.(r);
-        }}
-        debugColliders={debugColliders}
-        onLogSpawn={() =>
-          console.info(
-            `BALL_SPAWN_POSITION = { x: ${debugPos.x.toFixed(4)}, y: ${debugPos.y.toFixed(4)}, z: ${debugPos.z.toFixed(4)} }`,
-          )
+    <div
+      className={
+        cabinetMode
+          ? "flex min-h-[100dvh] w-full items-center justify-center bg-black text-zinc-100"
+          : "relative min-h-screen bg-black text-zinc-100"
+      }
+    >
+      <div
+        className={
+          cabinetMode
+            ? "relative overflow-hidden rounded-sm shadow-[0_0_80px_rgba(0,0,0,0.85)] ring-1 ring-zinc-800/40"
+            : "relative min-h-screen w-full"
         }
-      />
+        style={cabinetFrameStyle}
+      >
+        <GameOverlay
+          score={score}
+          lives={lives}
+          gameState={gameState}
+          initialLives={INITIAL_LIVES}
+          cabinetMode={cabinetMode}
+        />
 
-      <main
-        ref={mountRef}
-        className="h-screen w-full cursor-grab outline-none focus:outline-none"
-        tabIndex={0}
-        aria-label="Terrain de flipper — Q/D ou ← → pour les flippers, maintenir ESPACE et relâcher pour lancer"
-      />
+        <main
+          ref={mountRef}
+          className={
+            cabinetMode
+              ? "absolute inset-0 h-full w-full touch-none outline-none focus:outline-none"
+              : "h-screen w-full touch-none outline-none focus:outline-none"
+          }
+          tabIndex={0}
+          aria-label="Terrain de flipper — Q/D ou ← → pour les flippers, maintenir ESPACE et relâcher pour lancer"
+        />
+      </div>
     </div>
   );
 }

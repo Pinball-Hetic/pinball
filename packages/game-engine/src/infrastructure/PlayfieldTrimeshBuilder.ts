@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
+import {
+  canonicalGltfName,
+  isJunkGltfMeshName,
+  isVisualOnlyGltfName,
+  normalizeGltfName,
+  playfieldUsesCollOnlyCollision,
+} from './GltfNodeNames';
 
+/** Côtés / caisse : inclus dans le trimesh pour bordures réelles (évite de dépendre des murs analytiques). */
 const SKIP = new Set([
   'ball', 'box', 'glass', 'feet', 'score_board', 'coin_slot',
   'plunger_panel', 'exit_cover', 'plate', 'start_button', 'spinner',
@@ -14,12 +22,20 @@ const SKIP = new Set([
   'separator_left', 'separator_right',
   'plastic_pop_bumper_zone',
   'plastic', 'plastic_left', 'plastic_rocket',
+  'shoulder',
 ]);
 
-function isSkipped(node: THREE.Object3D): boolean {
+function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
+  const selfNorm = normalizeGltfName(node.name);
+  if (isJunkGltfMeshName(node.name)) return true;
+  if (collOnly && !selfNorm.startsWith('coll_')) return true;
+
   let current: THREE.Object3D | null = node;
   while (current) {
-    if (SKIP.has(current.name.toLowerCase())) return true;
+    if (isVisualOnlyGltfName(current.name)) return true;
+    const n = normalizeGltfName(current.name);
+    const c = canonicalGltfName(current.name);
+    if (SKIP.has(n) || SKIP.has(c)) return true;
     current = current.parent;
   }
   return false;
@@ -29,11 +45,12 @@ export class PlayfieldTrimeshBuilder {
   static build(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
     playfieldRoot.updateMatrixWorld(true);
 
+    const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
     const trimGeos: THREE.BufferGeometry[] = [];
 
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
-      if (isSkipped(child)) return;
+      if (isSkipped(child, collOnly)) return;
 
       child.updateMatrixWorld(true);
       const geo = child.geometry.clone() as THREE.BufferGeometry;

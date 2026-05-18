@@ -11,7 +11,6 @@ export class StuckBallDetector {
       if (this.timer > 1.0) {
         this.timer = 0;
         const nudgeX = ballPos.x > 0 ? -0.08 : 0.08;
-        console.log(`[NUDGE] ball stuck at x=${ballPos.x.toFixed(3)}`);
         return { x: nudgeX, y: 0.02, z: 0.12 };
       }
       return null;
