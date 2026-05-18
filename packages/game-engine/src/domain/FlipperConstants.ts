@@ -1,0 +1,17 @@
+export const SWING_RAD = 0.65;
+export const SWING_SMOOTH = 0.42;
+export const HINGE_INSET_FROM_EDGE = 0.18;
+export const FLIPPER_POWER = 0.32;
+export const FLIPPER_TRIGGER = 0.15;
+export const FLIPPER_Z_MIN = 0.20;
+export const FLIPPER_Z_MAX = 0.33;
+export const FLIPPER_LEFT_X_MIN = -0.145;
+export const FLIPPER_LEFT_X_MAX = 0.015;
+export const FLIPPER_LEFT_MID_X = -0.065;
+export const FLIPPER_RIGHT_X_MIN = -0.015;
+export const FLIPPER_RIGHT_X_MAX = 0.10;
+export const FLIPPER_RIGHT_MID_X = 0.042;
+export const INITIAL_LIVES = 3;
+export const PLUNGER_CHARGE_MS = 1800;
+export const PLUNGER_MIN_FACTOR = 0.32;
+export const PLUNGER_MAX_FACTOR = 1.0;
