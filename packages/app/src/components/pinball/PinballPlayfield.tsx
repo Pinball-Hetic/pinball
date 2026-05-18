@@ -478,6 +478,7 @@ export default function PinballPlayfield() {
           if (e.key === " ") {
             if (gameStateRef.current === "game_over") {
               resetGame();
+              if (ballMesh) ballMesh.visible = true;
               return;
             }
             if (gameStateRef.current === "idle" && physicsReady) {
