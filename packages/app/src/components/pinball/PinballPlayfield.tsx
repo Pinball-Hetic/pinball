@@ -622,8 +622,14 @@ export default function PinballPlayfield() {
 
         // Stuck ball detection
         if (gameStateRef.current === "playing" && laneAnimSpeed <= 0) {
-          const nudge = stuckDetector.update(bSpd, bPos, dt);
-          if (nudge) ballPhysicsInst.body.applyImpulse(nudge, true);
+          const stuckResult = stuckDetector.update(bSpd, bPos, dt);
+          if (stuckResult) {
+            if (stuckResult.type === 'force_drain') {
+              drainBallUC?.execute();
+            } else if (stuckResult.impulse) {
+              ballPhysicsInst.body.applyImpulse(stuckResult.impulse, true);
+            }
+          }
         }
 
         // Periodic ball state log
