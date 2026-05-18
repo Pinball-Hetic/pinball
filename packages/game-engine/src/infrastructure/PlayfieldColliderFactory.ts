@@ -171,8 +171,9 @@ export class PlayfieldColliderFactory {
       const b = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(s.pos.x, s.pos.y, s.pos.z),
       );
+      // Thin wall (hx=0.06 wide, hy=0.025 tall, hz=0.006 thin) — not a platform
       const col = world.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.06, 0.015, 0.03)
+        RAPIER.ColliderDesc.cuboid(0.06, 0.025, 0.006)
           .setRestitution(0.8)
           .setFriction(0.05)
           .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
