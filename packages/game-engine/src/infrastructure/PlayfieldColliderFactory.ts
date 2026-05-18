@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
   BUMPER_POSITIONS,
@@ -12,16 +11,34 @@ import {
 } from '../domain/Ball';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
+export type AnalyticalColliderOptions = {
+  /** Sol incliné du couloir plongeur (souvent en double avec le GLB). */
+  laneFloor?: boolean;
+  /** Murs latéraux / haut / séparateur lane (souvent en double avec le trimesh). */
+  walls?: boolean;
+  /** Outlanes, poteaux, murets analytiques. */
+  barriers?: boolean;
+  /** Cylindres bumpers (restent utiles si les bumpers sont exclus du trimesh). */
+  bumpers?: boolean;
+};
+
 export class PlayfieldColliderFactory {
   static createAll(
     world: RAPIER.World,
     colliderMap: Map<number, string>,
-    scene?: THREE.Scene,
+    analytical?: AnalyticalColliderOptions,
   ): void {
-    PlayfieldColliderFactory.createLaneFloor(world);
-    PlayfieldColliderFactory.createWalls(world);
-    PlayfieldColliderFactory.createBumpers(world, colliderMap);
-    PlayfieldColliderFactory.createBarriers(world, scene);
+    const a = {
+      laneFloor: analytical?.laneFloor ?? true,
+      walls: analytical?.walls ?? true,
+      barriers: analytical?.barriers ?? true,
+      bumpers: analytical?.bumpers ?? true,
+    };
+
+    if (a.laneFloor) PlayfieldColliderFactory.createLaneFloor(world);
+    if (a.walls) PlayfieldColliderFactory.createWalls(world);
+    if (a.bumpers) PlayfieldColliderFactory.createBumpers(world, colliderMap);
+    if (a.barriers) PlayfieldColliderFactory.createBarriers(world);
     PlayfieldColliderFactory.createSlingshotSensors(world, colliderMap);
     PlayfieldColliderFactory.createPopZoneSensors(world, colliderMap);
     PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
@@ -98,9 +115,50 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  // Barriers removed — trimesh (shoulder + slingshot + plastics) handles physical collisions
-  private static createBarriers(_world: RAPIER.World, _scene?: THREE.Scene): void {
-    // No additional barriers needed
+  private static createBarriers(world: RAPIER.World): void {
+    const surfY = surfaceYAtZ;
+
+    type BarrierDef = {
+      type: 'cyl' | 'box';
+      px: number;
+      pz: number;
+      hAbove: number;
+      r?: number;
+      hh?: number;
+      hx?: number;
+      hy?: number;
+      hz?: number;
+      rest?: number;
+    };
+
+    const barriers: BarrierDef[] = [
+      { type: 'cyl', px: -0.14, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
+      { type: 'cyl', px:  0.10, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
+      { type: 'cyl', px: -0.02, pz: 0.32, hAbove: 0.012, r: 0.015, hh: 0.015 },
+      { type: 'box', px:  0.155, pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
+      { type: 'box', px: -0.20,  pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
+    ];
+
+    for (const b of barriers) {
+      const py = surfY(b.pz) + b.hAbove;
+      const body = world.createRigidBody(
+        RAPIER.RigidBodyDesc.fixed().setTranslation(b.px, py, b.pz),
+      );
+
+      if (b.type === 'cyl') {
+        world.createCollider(
+          RAPIER.ColliderDesc.cylinder(b.hh!, b.r!)
+            .setRestitution(b.rest ?? 0.4).setFriction(0.1),
+          body,
+        );
+      } else {
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(b.hx!, b.hy!, b.hz!)
+            .setRestitution(b.rest ?? 0.4).setFriction(0.1),
+          body,
+        );
+      }
+    }
   }
 
   private static createSlingshotSensors(world: RAPIER.World, colliderMap: Map<number, string>): void {
