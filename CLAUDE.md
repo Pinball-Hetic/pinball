@@ -70,9 +70,3 @@ File: `packages/app/public/playfield/pinball-machine.glb`
 - Node names use underscores in Three.js (e.g. `pop_bumper`, not `pop bumper`)
 - Playfield surface Y formula: `1.068 - ((z + 0.552) / 0.970) * 0.110`
 - Playfield X range: [-0.265, 0.265], Z range: [-0.552, 0.418]
-
-## Dev Workflow
-
-- 3 developers work in parallel — respect file boundaries to avoid conflicts
-- Run `npx tsc --noEmit -p packages/game-engine/tsconfig.json && npx tsc --noEmit -p packages/app/tsconfig.json` before committing
-- No Co-Authored-By in commits
