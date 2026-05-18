@@ -371,7 +371,7 @@ export default function PinballPlayfield() {
           const halfY = Math.max(sz.y / 2, BALL_RADIUS * 3);
           world.createCollider(
             RAPIER.ColliderDesc.cuboid(sz.x / 2, halfY, sz.z / 2 + BALL_RADIUS)
-              .setRestitution(0.8).setFriction(0.2)
+              .setRestitution(0.9).setFriction(0.2)
               .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
             body,
           );
@@ -606,7 +606,7 @@ export default function PinballPlayfield() {
         // Clamp ball speed
         const bVelClamp = ballPhysicsInst.body.linvel();
         const speed = Math.sqrt(bVelClamp.x ** 2 + bVelClamp.y ** 2 + bVelClamp.z ** 2);
-        const MAX_SPEED = 4.0;
+        const MAX_SPEED = 6.5;
         if (speed > MAX_SPEED) {
           const scale = MAX_SPEED / speed;
           ballPhysicsInst.body.setLinvel(
@@ -657,7 +657,7 @@ export default function PinballPlayfield() {
             drainZoneTimer = 0;
           }
           // Instant drain: fell below playfield
-          if (bPos.y < 0.93) {
+          if (bPos.y < 0.8) {
             drainBallUC.execute();
             drainZoneTimer = 0;
           }
