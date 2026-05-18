@@ -98,68 +98,9 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createBarriers(world: RAPIER.World, scene?: THREE.Scene): void {
-    const surfY = surfaceYAtZ;
-
-    type BarrierDef = {
-      name: string;
-      color: number;
-      type: 'cyl' | 'box';
-      px: number;
-      pz: number;
-      hAbove: number;
-      r?: number;
-      hh?: number;
-      hx?: number;
-      hy?: number;
-      hz?: number;
-      rest?: number;
-    };
-
-    const barriers: BarrierDef[] = [
-      { name: 'OutlaneL',   color: 0xff00ff, type: 'cyl', px: -0.14, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
-      { name: 'OutlaneR',   color: 0x00ffff, type: 'cyl', px:  0.10, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
-      { name: 'CenterPost', color: 0xffffff, type: 'cyl', px: -0.02, pz: 0.32, hAbove: 0.012, r: 0.015, hh: 0.015 },
-      { name: 'WallR',      color: 0xff8800, type: 'box', px:  0.155, pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
-      { name: 'WallL',      color: 0x88ff00, type: 'box', px: -0.20,  pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
-    ];
-
-    for (const b of barriers) {
-      const py = surfY(b.pz) + b.hAbove;
-      const body = world.createRigidBody(
-        RAPIER.RigidBodyDesc.fixed().setTranslation(b.px, py, b.pz),
-      );
-
-      if (b.type === 'cyl') {
-        world.createCollider(
-          RAPIER.ColliderDesc.cylinder(b.hh!, b.r!)
-            .setRestitution(b.rest ?? 0.4).setFriction(0.1),
-          body,
-        );
-        if (scene) {
-          const dg = new THREE.CylinderGeometry(b.r!, b.r!, b.hh! * 2, 12);
-          const dm = new THREE.MeshBasicMaterial({ color: b.color, transparent: true, opacity: 0.7 });
-          const dMesh = new THREE.Mesh(dg, dm);
-          dMesh.position.set(b.px, py, b.pz);
-          dMesh.name = b.name;
-          scene.add(dMesh);
-        }
-      } else {
-        world.createCollider(
-          RAPIER.ColliderDesc.cuboid(b.hx!, b.hy!, b.hz!)
-            .setRestitution(b.rest ?? 0.4).setFriction(0.1),
-          body,
-        );
-        if (scene) {
-          const dg = new THREE.BoxGeometry(b.hx! * 2, b.hy! * 2, b.hz! * 2);
-          const dm = new THREE.MeshBasicMaterial({ color: b.color, transparent: true, opacity: 0.7 });
-          const dMesh = new THREE.Mesh(dg, dm);
-          dMesh.position.set(b.px, py, b.pz);
-          dMesh.name = b.name;
-          scene.add(dMesh);
-        }
-      }
-    }
+  // Barriers removed — trimesh (shoulder + slingshot + plastics) handles physical collisions
+  private static createBarriers(_world: RAPIER.World, _scene?: THREE.Scene): void {
+    // No additional barriers needed
   }
 
   private static createSlingshotSensors(world: RAPIER.World, colliderMap: Map<number, string>): void {
