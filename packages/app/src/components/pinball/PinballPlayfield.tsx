@@ -270,7 +270,7 @@ export default function PinballPlayfield() {
 
         modelRoot.updateMatrixWorld(true);
         const fieldBox = new THREE.Box3().setFromObject(modelRoot);
-        fieldBoundsLaneSepX = fieldBox.min.x;
+        // fieldBoundsLaneSepX stays at initial value (BALL_SPAWN_POSITION.x - BALL_RADIUS * 2 ≈ 0.206)
 
         const colliderMap = new Map<number, string>();
 
