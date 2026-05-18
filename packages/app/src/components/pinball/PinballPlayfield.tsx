@@ -274,7 +274,7 @@ export default function PinballPlayfield() {
         const colliderMap = new Map<number, string>();
 
         PlayfieldTrimeshBuilder.build(playfieldRoot, world);
-        PlayfieldColliderFactory.createAll(world, colliderMap, scene);
+        PlayfieldColliderFactory.createAll(world, colliderMap);
 
         // ── Wireframe debug ──────────────────────────────────────────────────
         type WireframeDef =
