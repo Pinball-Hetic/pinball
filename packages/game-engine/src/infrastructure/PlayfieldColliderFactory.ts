@@ -173,7 +173,8 @@ export class PlayfieldColliderFactory {
       );
       const col = world.createCollider(
         RAPIER.ColliderDesc.cuboid(0.06, 0.015, 0.03)
-          .setSensor(true)
+          .setRestitution(0.8)
+          .setFriction(0.05)
           .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
         b,
       );
