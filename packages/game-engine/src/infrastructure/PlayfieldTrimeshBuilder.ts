@@ -13,7 +13,6 @@ const SKIP = new Set([
   'launcher',
   'separator_left', 'separator_right',
   'plastic_pop_bumper_zone',
-  'plastic', 'plastic_left', 'plastic_rocket',
 ]);
 
 function isSkipped(node: THREE.Object3D): boolean {
