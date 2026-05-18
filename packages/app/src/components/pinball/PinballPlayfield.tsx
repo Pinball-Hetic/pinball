@@ -641,10 +641,10 @@ export default function PinballPlayfield() {
 
         // Drain by position fallback
         if (gameStateRef.current === "playing" && drainBallUC) {
-          // Drain zone: if ball stays in lower area (Z>0.28) for 2 seconds, drain
+          // Drain zone: ball in lower area (Z>0.28) for 1s → drain
           if (bPos.z > 0.28 && bPos.x < fieldBoundsLaneSepX) {
             drainZoneTimer += dt;
-            if (drainZoneTimer > 2.0) {
+            if (drainZoneTimer > 1.0) {
               drainBallUC.execute();
               drainZoneTimer = 0;
             }
