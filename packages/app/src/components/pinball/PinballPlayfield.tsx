@@ -181,6 +181,7 @@ export default function PinballPlayfield() {
     let physicsReady = false;
     let prevFrameTime = 0;
     let laneAnimSpeed = 0;
+    let drainZoneTimer = 0;
     let leftFlipperHit = false;
     let rightFlipperHit = false;
 
@@ -640,11 +641,20 @@ export default function PinballPlayfield() {
 
         // Drain by position fallback
         if (gameStateRef.current === "playing" && drainBallUC) {
-          // Drain: past drain sensor OR ball in flipper area and slow OR fell below playfield
-          const inDrainZone = bPos.z > 0.30 && bPos.x < fieldBoundsLaneSepX && bSpd < 0.15;
-          if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || inDrainZone || bPos.y < 0.8) {
-            console.log(`[DRAIN] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)})`);
+          // Drain zone: if ball stays in lower area (Z>0.28) for 2 seconds, drain
+          if (bPos.z > 0.28 && bPos.x < fieldBoundsLaneSepX) {
+            drainZoneTimer += dt;
+            if (drainZoneTimer > 2.0) {
+              drainBallUC.execute();
+              drainZoneTimer = 0;
+            }
+          } else {
+            drainZoneTimer = 0;
+          }
+          // Instant drain: past sensor OR fell below playfield
+          if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || bPos.y < 0.8) {
             drainBallUC.execute();
+            drainZoneTimer = 0;
           }
         }
       }
