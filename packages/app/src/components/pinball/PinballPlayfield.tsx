@@ -652,7 +652,7 @@ export default function PinballPlayfield() {
             drainZoneTimer = 0;
           }
           // Instant drain: past sensor OR fell below playfield
-          if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || bPos.y < 0.8) {
+          if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || bPos.y < 0.93) {
             drainBallUC.execute();
             drainZoneTimer = 0;
           }
