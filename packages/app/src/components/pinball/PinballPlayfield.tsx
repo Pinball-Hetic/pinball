@@ -640,8 +640,8 @@ export default function PinballPlayfield() {
 
         // Drain by position fallback
         if (gameStateRef.current === "playing" && drainBallUC) {
-          // Drain: past drain sensor OR ball in flipper area and stopped OR fell below playfield
-          const inDrainZone = bPos.z > 0.30 && bPos.x < fieldBoundsLaneSepX && bSpd < 0.05;
+          // Drain: past drain sensor OR ball in flipper area and slow OR fell below playfield
+          const inDrainZone = bPos.z > 0.30 && bPos.x < fieldBoundsLaneSepX && bSpd < 0.15;
           if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || inDrainZone || bPos.y < 0.8) {
             console.log(`[DRAIN] pos=(${bPos.x.toFixed(3)},${bPos.y.toFixed(3)},${bPos.z.toFixed(3)})`);
             drainBallUC.execute();
