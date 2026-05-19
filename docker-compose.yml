@@ -37,7 +37,7 @@ services:
   scoreboard:
     build:
       context: .
-      dockerfile: apps/scoreboard/Dockerfile
+      dockerfile: apps/dmd/Dockerfile
     container_name: pinball-scoreboard
     ports:
       - "3335:3000"
@@ -47,7 +47,7 @@ services:
   leaderboard:
     build:
       context: .
-      dockerfile: apps/leaderboard/Dockerfile
+      dockerfile: apps/backglass/Dockerfile
     container_name: pinball-leaderboard
     ports:
       - "3336:3000"

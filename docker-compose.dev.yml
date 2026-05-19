@@ -51,7 +51,7 @@ services:
   scoreboard:
     build:
       context: .
-      dockerfile: apps/scoreboard/Dockerfile
+      dockerfile: apps/dmd/Dockerfile
     container_name: pinball-scoreboard-dev
     working_dir: /app/apps/scoreboard
     environment:
@@ -69,7 +69,7 @@ services:
   leaderboard:
     build:
       context: .
-      dockerfile: apps/leaderboard/Dockerfile
+      dockerfile: apps/backglass/Dockerfile
     container_name: pinball-leaderboard-dev
     working_dir: /app/apps/leaderboard
     environment:
