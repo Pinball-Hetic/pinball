@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "bun@1.2.4",
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "scripts": {

@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEventListener } from '../domain/GameEvents';
 import { BUMPER_POSITIONS, DROP_TARGETS } from '../domain/Ball';
@@ -13,7 +12,6 @@ export class CollisionEventProcessor {
     private readonly bumperHitUC: BumperHit,
     private readonly drainBallUC: DrainBall,
     private readonly emit: GameEventListener,
-    private readonly getPlayfieldRoot: () => THREE.Object3D | null,
   ) {
     for (const dt of DROP_TARGETS) this.dropTargetDown[dt.id] = false;
   }
@@ -23,7 +21,6 @@ export class CollisionEventProcessor {
       if (!started) return;
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
-      console.log(`[Collision] ${role}`);
 
       if (role.startsWith('bumper_')) {
         const idx = parseInt(role.split('_')[1], 10);
@@ -58,12 +55,10 @@ export class CollisionEventProcessor {
   }
 
   resetDropTargets(): void {
-    const playfieldRoot = this.getPlayfieldRoot();
     for (const dt of DROP_TARGETS) {
       this.dropTargetDown[dt.id] = false;
-      const mesh = playfieldRoot?.getObjectByName(dt.id.replace('drop_', 'drop_target_'));
-      if (mesh) mesh.visible = true;
     }
+    this.emit({ type: 'DROP_TARGET_RESET' });
   }
 
   private handleDropTarget(role: string): void {
@@ -71,11 +66,6 @@ export class CollisionEventProcessor {
 
     this.dropTargetDown[role] = true;
     this.emit({ type: 'DROP_TARGET_HIT', targetId: role, scoreIncrement: 75 });
-
-    const playfieldRoot = this.getPlayfieldRoot();
-    const meshName = role.replace('drop_', 'drop_target_');
-    const mesh = playfieldRoot?.getObjectByName(meshName);
-    if (mesh) mesh.visible = false;
 
     const target = DROP_TARGETS.find((t) => t.id === role);
     if (!target) return;
@@ -88,8 +78,6 @@ export class CollisionEventProcessor {
 
     for (const t of sideTargets) {
       this.dropTargetDown[t.id] = false;
-      const m = playfieldRoot?.getObjectByName(t.id.replace('drop_', 'drop_target_'));
-      if (m) m.visible = true;
     }
   }
 }

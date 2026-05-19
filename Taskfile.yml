@@ -24,9 +24,9 @@ tasks:
   "docker:dev:restart":
     desc: Redémarrer les containers Docker dev sans rebuild
     cmds:
-      - docker restart pinball-app-dev pinball-server-dev pinball-db-dev
+      - docker restart pinball-playfield-dev pinball-server-dev pinball-db-dev pinball-scoreboard-dev pinball-leaderboard-dev
 
   clean:
     desc: Supprimer artefacts de build et node_modules
     cmds:
-      - rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/ .next bun.lockb
+      - rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist apps/*/.next bun.lockb

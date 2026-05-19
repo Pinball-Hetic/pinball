@@ -10,7 +10,8 @@ import {
   ROCKET_SENSOR,
   DROP_TARGETS,
 } from '../domain/Ball';
-import { computeLauncherLaneZBounds, surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
 
 export type AnalyticalColliderOptions = {
   /** Sol incliné du couloir plongeur (souvent en double avec le GLB). */

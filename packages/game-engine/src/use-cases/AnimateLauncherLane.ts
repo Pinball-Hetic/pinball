@@ -1,6 +1,13 @@
-import RAPIER from '@dimforge/rapier3d-compat';
 import { BALL_SPAWN_POSITION } from '../domain/Ball';
 import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
+
+export interface IAnimatableBody {
+  translation(): { x: number; y: number; z: number };
+  setTranslation(pos: { x: number; y: number; z: number }, wakeUp: boolean): void;
+  setLinvel(vel: { x: number; y: number; z: number }, wakeUp: boolean): void;
+  setAngvel(vel: { x: number; y: number; z: number }, wakeUp: boolean): void;
+  wakeUp(): void;
+}
 
 const CURVE_START_Z = -0.35;
 const CURVE_END_Z   = -0.40;
@@ -9,7 +16,7 @@ const CURVE_END_X   = 0.05;
 
 export class LauncherLaneAnimator {
   update(
-    ballBody: RAPIER.RigidBody,
+    ballBody: IAnimatableBody,
     speed: number,
     dt: number,
   ): { done: boolean; exitVel?: { x: number; y: number; z: number } } {

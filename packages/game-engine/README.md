@@ -1,1 +1,3 @@
-# @pinball/game-engine\n\nMoteur de jeu (Three.js + Cannon.js)
+# @pinball/game-engine
+
+Moteur de jeu (Three.js + Rapier3D)
