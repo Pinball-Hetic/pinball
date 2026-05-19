@@ -320,8 +320,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let collisionProcessor: CollisionEventProcessor | null = null;
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
-    let leftFlipperBBox: THREE.Box3 | null = null;
-    let rightFlipperBBox: THREE.Box3 | null = null;
     let isChargingPlunger = false;
     let chargeStartTime = 0;
     let physicsReady = false;
@@ -394,8 +392,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         leftFlipper?.updateMatrixWorld(true);
         rightFlipper?.updateMatrixWorld(true);
-        leftFlipperBBox = leftFlipper ? new THREE.Box3().setFromObject(leftFlipper) : null;
-        rightFlipperBBox = rightFlipper ? new THREE.Box3().setFromObject(rightFlipper) : null;
 
         if (leftFlipper) {
           leftPivot = attachFlipperAtHinge(leftFlipper, "left");
@@ -427,24 +423,41 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         ballPhysicsInst = new BallPhysics(world);
 
         // ── Flipper kinematic bodies ──────────────────────────────────────────
-        const makeFlipperBody = (bbox: THREE.Box3 | null): RAPIER.RigidBody | null => {
-          if (!bbox) return null;
-          const sz = bbox.getSize(new THREE.Vector3());
-          const cx = bbox.getCenter(new THREE.Vector3());
+        // Utilise un ConvexHull basé sur les vrais vertices du mesh pour que
+        // le collider coïncide exactement avec la forme visuelle de la palette.
+        const makeFlipperBody = (flipper: THREE.Mesh | null): RAPIER.RigidBody | null => {
+          if (!flipper) return null;
+          flipper.updateMatrixWorld(true);
+          const worldPos = new THREE.Vector3();
+          const worldQuat = new THREE.Quaternion();
+          flipper.getWorldPosition(worldPos);
+          flipper.getWorldQuaternion(worldQuat);
+          const invWorldQuat = worldQuat.clone().invert();
+          const posAttr = flipper.geometry.attributes.position as THREE.BufferAttribute;
+          const raw: number[] = [];
+          const v = new THREE.Vector3();
+          for (let i = 0; i < posAttr.count; i++) {
+            v.fromBufferAttribute(posAttr, i);
+            v.applyMatrix4(flipper.matrixWorld); // local → world
+            v.sub(worldPos);                      // relatif à l'origine du body
+            v.applyQuaternion(invWorldQuat);       // dans le repère local du body
+            raw.push(v.x, v.y, v.z);
+          }
           const body = world.createRigidBody(
-            RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(cx.x, cx.y, cx.z),
+            RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(worldPos.x, worldPos.y, worldPos.z),
           );
-          const halfY = Math.max(sz.y / 2, BALL_RADIUS * 3);
-          world.createCollider(
-            RAPIER.ColliderDesc.cuboid(sz.x / 2, halfY, sz.z / 2 + BALL_RADIUS)
-              .setRestitution(FLIPPER_RESTITUTION).setFriction(0.28)
-              .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
-            body,
-          );
+          const desc = RAPIER.ColliderDesc.convexHull(new Float32Array(raw));
+          if (desc) {
+            world.createCollider(
+              desc.setRestitution(FLIPPER_RESTITUTION).setFriction(0.28)
+                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+              body,
+            );
+          }
           return body;
         };
-        leftFlipperBody = makeFlipperBody(leftFlipperBBox);
-        rightFlipperBody = makeFlipperBody(rightFlipperBBox);
+        leftFlipperBody = makeFlipperBody(leftFlipper as THREE.Mesh | null);
+        rightFlipperBody = makeFlipperBody(rightFlipper as THREE.Mesh | null);
 
         ballPhysicsInst.setSpawnPosition(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, BALL_SPAWN_POSITION.z);
         ballPhysicsInst.body.wakeUp();
