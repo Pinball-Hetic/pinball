@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  turbopack: { root: '../..' },
   transpilePackages: ['@pinball/game-engine'],
   async rewrites() {
     return [
