@@ -2,7 +2,7 @@ export const SWING_RAD = 0.65;
 export const SWING_SMOOTH = 0.42;
 export const HINGE_INSET_FROM_EDGE = 0.18;
 /** Impulsion manuelle au moment du flip (évite les tirs trop violents avec la restitution). */
-export const FLIPPER_POWER = 0.11;
+export const FLIPPER_POWER = 0.138; // +25 % vs 0.11
 /** Rebond du collider flipper (Rapier) — bas = on s’appuie surtout sur FLIPPER_POWER. */
 export const FLIPPER_RESTITUTION = 0.22;
 /** Friction du collider flipper — bas pour que la balle glisse sans accrocher. */

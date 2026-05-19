@@ -13,9 +13,10 @@ import {
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 import { BALL_RADIUS } from '../domain/Ball';
 
-/** Bande verticale valide autour de la surface : au-dessus ET pas trop en dessous (= derrière la palette). */
-const FLIPPER_Y_ABOVE = BALL_RADIUS * 5;  // ~0.074 m au-dessus de la surface
-const FLIPPER_Y_BELOW = BALL_RADIUS * 1.5; // ~0.022 m en dessous — si < ça, la balle est derrière
+/** Bande verticale valide : balle strictement AU-DESSUS de la surface uniquement.
+ *  Zéro tolérance vers le bas — si la balle est sous la palette, pas d'impulsion. */
+const FLIPPER_Y_ABOVE = BALL_RADIUS * 6;  // ~0.088 m au-dessus
+const FLIPPER_Y_BELOW = -BALL_RADIUS;     // négatif = balle doit être au-dessus de la surface
 
 /** Si la balle monte à plus de cette vitesse (m/s vers le haut du tapis), elle a déjà été frappée. */
 const FLIPPER_VEL_Z_MIN = -0.5;

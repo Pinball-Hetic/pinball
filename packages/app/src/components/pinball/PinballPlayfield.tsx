@@ -557,9 +557,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             v.applyQuaternion(invWorldQuat);
             allBodyLocal.push(v.clone());
           }
-          // Médiane Y — on ne garde que la moitié supérieure pour exclure la face arrière
+          // Médiane Y (50e percentile) — on garde la moitié supérieure du mesh
+          // pour avoir un volume ConvexHull valide (≥ 4 points non coplanaires).
+          // L'effet "aimant" est géré par FLIPPER_Y_BELOW dans DetectFlipperHit.
           const sortedY = allBodyLocal.map(p => p.y).sort((a, b) => a - b);
-          const medianY = sortedY[Math.floor(sortedY.length / 2)];
+          const medianY = sortedY[Math.floor(sortedY.length * 0.50)];
           const points = allBodyLocal.filter(p => p.y >= medianY);
           const raw: number[] = [];
           for (const p of points) raw.push(p.x, p.y, p.z);
@@ -752,10 +754,21 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const dt = prevFrameTime > 0 ? Math.min((time - prevFrameTime) / 1000, 0.05) : 0.016;
       prevFrameTime = time;
 
+      // ── 1. Swing mis à jour EN PREMIER — le collider Rapier suivra la position visuelle ──
+      // Sans cet ordre, le collider physique est toujours en retard d'une frame :
+      // la palette visuelle avance mais le collider reste derrière → la balle passe à travers.
+      prevLeftSwing = leftSwing;
+      prevRightSwing = rightSwing;
+      leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
+      rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
+      if (leftPivot) leftPivot.rotation.y = leftSwing;
+      if (rightPivot) rightPivot.rotation.y = -rightSwing;
+
+      // ── 2. Sync corps cinématiques sur la position ACTUELLE (ce frame, pas le précédent) ──
       syncFlipperBody(leftFlipperBody, leftFlipperObj);
       syncFlipperBody(rightFlipperBody, rightFlipperObj);
 
-      // Sync debug wireframes avec les bodies cinématiques
+      // Sync debug wireframes
       if (leftFlipperDebug && leftFlipperObj) {
         const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
         leftFlipperObj.getWorldPosition(wp); leftFlipperObj.getWorldQuaternion(wq);
@@ -769,6 +782,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         rightFlipperDebug.quaternion.copy(wq);
       }
 
+      // ── 3. Step physique — Rapier voit la palette à sa position réelle ──
       if (physicsWorld) physicsWorld.update(time);
 
       // Collision events
@@ -776,13 +790,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
       }
 
-      // Flipper visuals
-      leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
-      rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
-      if (leftPivot) leftPivot.rotation.y = leftSwing;
-      if (rightPivot) rightPivot.rotation.y = -rightSwing;
-
-      // Flipper hit detection
+      // ── 4. Détection du hit — prevSwing déjà mis à jour en haut ──
       if (ballPhysicsInst && gameStateRef.current === "playing" && laneAnimSpeed <= 0) {
         const bp = ballPhysicsInst.body.translation();
         const bv = ballPhysicsInst.body.linvel();
@@ -807,9 +815,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         if (leftTarget === 0) leftFlipperHit = false;
         if (rightTarget === 0) rightFlipperHit = false;
       }
-
-      prevLeftSwing = leftSwing;
-      prevRightSwing = rightSwing;
 
       // Ball sync
       if (ballMesh?.visible && ballPhysicsInst) {
