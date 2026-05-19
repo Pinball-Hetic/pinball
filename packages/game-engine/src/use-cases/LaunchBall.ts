@@ -2,7 +2,7 @@ import type { Plunger } from '../domain/Plunger';
 import type { GameEventListener } from '../domain/GameEvents';
 
 export interface IBallPhysics {
-  applyPlungerImpulse(): void;
+  applyPlungerImpulse(factor?: number): void;
   resetToSpawn(): void;
 }
 
@@ -13,9 +13,9 @@ export class LaunchBall {
     private readonly emit: GameEventListener,
   ) {}
 
-  execute(): void {
+  execute(factor = 1): void {
     this.plunger.release();
-    this.ballPhysics.applyPlungerImpulse();
+    this.ballPhysics.applyPlungerImpulse(factor);
     this.emit({ type: 'BALL_LAUNCHED' });
   }
 }

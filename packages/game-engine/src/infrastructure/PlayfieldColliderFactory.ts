@@ -1,3 +1,4 @@
+import type * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
   BUMPER_POSITIONS,
@@ -9,7 +10,7 @@ import {
   ROCKET_SENSOR,
   DROP_TARGETS,
 } from '../domain/Ball';
-import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { computeLauncherLaneZBounds, surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
 export type AnalyticalColliderOptions = {
   /** Sol incliné du couloir plongeur (souvent en double avec le GLB). */
@@ -27,6 +28,7 @@ export class PlayfieldColliderFactory {
     world: RAPIER.World,
     colliderMap: Map<number, string>,
     analytical?: AnalyticalColliderOptions,
+    playfieldRoot?: THREE.Object3D,
   ): void {
     const a = {
       laneFloor: analytical?.laneFloor ?? true,
@@ -35,7 +37,13 @@ export class PlayfieldColliderFactory {
       bumpers: analytical?.bumpers ?? true,
     };
 
-    if (a.laneFloor) PlayfieldColliderFactory.createLaneFloor(world);
+    if (a.laneFloor) {
+      if (playfieldRoot) {
+        PlayfieldColliderFactory.createLaneFloorFromPlayfield(world, playfieldRoot);
+      } else {
+        PlayfieldColliderFactory.createLaneFloor(world);
+      }
+    }
     if (a.walls) PlayfieldColliderFactory.createWalls(world);
     if (a.bumpers) PlayfieldColliderFactory.createBumpers(world, colliderMap);
     if (a.barriers) PlayfieldColliderFactory.createBarriers(world);
@@ -46,9 +54,19 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createDrainSensor(world, colliderMap);
   }
 
-  private static createLaneFloor(world: RAPIER.World): void {
-    const laneTopZ = 0.03;
-    const laneBotZ = 0.42;
+  static createLaneFloorFromPlayfield(
+    world: RAPIER.World,
+    playfieldRoot: THREE.Object3D,
+  ): void {
+    const { minZ, maxZ } = computeLauncherLaneZBounds(playfieldRoot);
+    PlayfieldColliderFactory.createLaneFloor(world, minZ, maxZ);
+  }
+
+  private static createLaneFloor(
+    world: RAPIER.World,
+    laneTopZ = 0.03,
+    laneBotZ = 0.42,
+  ): void {
     const laneMidZ = (laneTopZ + laneBotZ) / 2;
     const laneHalfZ = (laneBotZ - laneTopZ) / 2;
     const laneMidX = (0.206 + 0.265) / 2;
