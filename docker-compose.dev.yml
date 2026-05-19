@@ -48,12 +48,12 @@ services:
       - server
     command: bun run dev
 
-  scoreboard:
+  dmd:
     build:
       context: .
       dockerfile: apps/dmd/Dockerfile
-    container_name: pinball-scoreboard-dev
-    working_dir: /app/apps/scoreboard
+    container_name: pinball-dmd-dev
+    working_dir: /app/apps/dmd
     environment:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
@@ -61,17 +61,17 @@ services:
     ports:
       - "3335:3000"
     volumes:
-      - ./apps/scoreboard/src:/app/apps/scoreboard/src
+      - ./apps/dmd/src:/app/apps/dmd/src
     depends_on:
       - server
     command: bun run dev
 
-  leaderboard:
+  backglass:
     build:
       context: .
       dockerfile: apps/backglass/Dockerfile
-    container_name: pinball-leaderboard-dev
-    working_dir: /app/apps/leaderboard
+    container_name: pinball-backglass-dev
+    working_dir: /app/apps/backglass
     environment:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
@@ -79,7 +79,7 @@ services:
     ports:
       - "3336:3000"
     volumes:
-      - ./apps/leaderboard/src:/app/apps/leaderboard/src
+      - ./apps/backglass/src:/app/apps/backglass/src
     depends_on:
       - server
     command: bun run dev

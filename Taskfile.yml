@@ -24,7 +24,7 @@ tasks:
   "docker:dev:restart":
     desc: Redémarrer les containers Docker dev sans rebuild
     cmds:
-      - docker restart pinball-playfield-dev pinball-server-dev pinball-db-dev pinball-scoreboard-dev pinball-leaderboard-dev
+      - docker restart pinball-playfield-dev pinball-server-dev pinball-db-dev pinball-dmd-dev pinball-backglass-dev
 
   clean:
     desc: Supprimer artefacts de build et node_modules

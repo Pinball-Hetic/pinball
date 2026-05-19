@@ -7,8 +7,8 @@ Monorepo with apps/ (deployable) and packages/ (libraries):
 ```
 apps/
 ├── playfield/      # Écran jeu 3D (Next.js + Three.js + Rapier)
-├── scoreboard/     # Écran score temps réel (Next.js + Socket.io)
-├── leaderboard/    # Écran classement (Next.js + Socket.io)
+├── dmd/            # Écran DMD — score temps réel (Next.js + Socket.io)
+├── backglass/      # Écran backglass — classement (Next.js + Socket.io)
 └── server/         # Backend API + WebSocket (Express + Prisma)
 
 packages/
@@ -53,10 +53,10 @@ Clean architecture: domain / infrastructure / use-cases.
 **Hooks** (`src/hooks/`):
 - `useGameState.ts` — score, lives, gameState management, emit callback factory
 
-### `apps/scoreboard` — Écran score temps réel
+### `apps/dmd` — Écran DMD (score temps réel)
 Reçoit événements Socket.io du server, affiche score/combo live.
 
-### `apps/leaderboard` — Écran classement
+### `apps/backglass` — Écran backglass (classement)
 Fetch leaderboard via API REST + refresh Socket.io.
 
 ### `packages/shared-types` — Types partagés
@@ -99,6 +99,6 @@ File: `apps/playfield/public/playfield/Pinballmap.glb`
 |-----|-----------|----------------|
 | playfield | 3333 | 3000 |
 | server | 3334 | 3001 |
-| scoreboard | 3335 | 3000 |
-| leaderboard | 3336 | 3000 |
+| dmd | 3335 | 3000 |
+| backglass | 3336 | 3000 |
 | db | 5432 | 5432 |

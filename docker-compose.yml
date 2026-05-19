@@ -34,21 +34,21 @@ services:
     depends_on:
       - server
 
-  scoreboard:
+  dmd:
     build:
       context: .
       dockerfile: apps/dmd/Dockerfile
-    container_name: pinball-scoreboard
+    container_name: pinball-dmd
     ports:
       - "3335:3000"
     depends_on:
       - server
 
-  leaderboard:
+  backglass:
     build:
       context: .
       dockerfile: apps/backglass/Dockerfile
-    container_name: pinball-leaderboard
+    container_name: pinball-backglass
     ports:
       - "3336:3000"
     depends_on:
