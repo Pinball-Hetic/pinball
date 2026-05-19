@@ -10,6 +10,15 @@ import {
   FLIPPER_RIGHT_X_MAX,
   FLIPPER_RIGHT_MID_X,
 } from '../domain/FlipperConstants';
+import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { BALL_RADIUS } from '../domain/Ball';
+
+/** Bande verticale valide autour de la surface : au-dessus ET pas trop en dessous (= derrière la palette). */
+const FLIPPER_Y_ABOVE = BALL_RADIUS * 5;  // ~0.074 m au-dessus de la surface
+const FLIPPER_Y_BELOW = BALL_RADIUS * 1.5; // ~0.022 m en dessous — si < ça, la balle est derrière
+
+/** Si la balle monte à plus de cette vitesse (m/s vers le haut du tapis), elle a déjà été frappée. */
+const FLIPPER_VEL_Z_MIN = -0.5;
 
 export interface FlipperHitResult {
   impulse: { x: number; y: number; z: number };
@@ -17,7 +26,8 @@ export interface FlipperHitResult {
 }
 
 export function detectFlipperHit(
-  ballPos: { x: number; z: number },
+  ballPos: { x: number; y: number; z: number },
+  ballVel: { z: number },
   leftSwing: number,
   prevLeftSwing: number,
   rightSwing: number,
@@ -26,6 +36,12 @@ export function detectFlipperHit(
   rightHitFlag: boolean,
 ): { result: FlipperHitResult | null; leftHit: boolean; rightHit: boolean } {
   const inFlipperZ = ballPos.z > FLIPPER_Z_MIN && ballPos.z < FLIPPER_Z_MAX;
+  const surfY = surfaceYAtZ(ballPos.z);
+  // Balle dans la bande verticale : ni trop haut (en l'air) ni trop bas (derrière la palette)
+  const inFlipperY = ballPos.y > surfY - FLIPPER_Y_BELOW &&
+                     ballPos.y < surfY + FLIPPER_Y_ABOVE;
+  // Balle ne doit pas déjà fuir vers le haut du tapis (déjà frappée ou derrière)
+  const approachingFlipper = ballVel.z > FLIPPER_VEL_Z_MIN;
   let result: FlipperHitResult | null = null;
   let newLeftHit = leftHitFlag;
   let newRightHit = rightHitFlag;
@@ -34,6 +50,8 @@ export function detectFlipperHit(
     leftSwing > FLIPPER_TRIGGER &&
     prevLeftSwing <= FLIPPER_TRIGGER &&
     inFlipperZ &&
+    inFlipperY &&
+    approachingFlipper &&
     ballPos.x > FLIPPER_LEFT_X_MIN &&
     ballPos.x < FLIPPER_LEFT_X_MAX
   ) {
@@ -54,6 +72,8 @@ export function detectFlipperHit(
     rightSwing > FLIPPER_TRIGGER &&
     prevRightSwing <= FLIPPER_TRIGGER &&
     inFlipperZ &&
+    inFlipperY &&
+    approachingFlipper &&
     ballPos.x > FLIPPER_RIGHT_X_MIN &&
     ballPos.x < FLIPPER_RIGHT_X_MAX
   ) {

@@ -131,13 +131,7 @@ export class PlayfieldColliderFactory {
       rest?: number;
     };
 
-    const barriers: BarrierDef[] = [
-      { type: 'cyl', px: -0.14, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
-      { type: 'cyl', px:  0.10, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
-      { type: 'cyl', px: -0.02, pz: 0.32, hAbove: 0.012, r: 0.015, hh: 0.015 },
-      { type: 'box', px:  0.155, pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
-      { type: 'box', px: -0.20,  pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
-    ];
+    const barriers: BarrierDef[] = [];
 
     for (const b of barriers) {
       const py = surfY(b.pz) + b.hAbove;

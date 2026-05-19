@@ -47,7 +47,6 @@ const SKIP = new Set([
   'switch_right_pop_bumper_zone', 'switch_plunger', 'switch_rocket', 'switch_slingshot',
   'launcher',
   'separator_left', 'separator_right',
-  'shoulder',
   // Elements handled by dedicated trimeshes
   ...NO_BOUNCE,
   ...PLASTIC_SOLID,
