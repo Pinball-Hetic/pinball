@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   canonicalGltfName,
   isJunkGltfMeshName,
@@ -11,7 +12,8 @@ import {
 const COLLISION_SOLIDS = new Set([
   'flipper',
   'plastic', 'plastic_left', 'plastic_pop_bumper_zone', 'plastic_rocket',
-  'playfield', 'playfield_sides',
+  // 'playfield' removed — replaced by analytical floor in PlayfieldColliderFactory
+  'playfield_sides',
   'plunger_panel',
   'pop_bumper', 'pop_bumper_left', 'pop_bumper_right', 'pop_bumper_guard',
   'separator_left', 'separator_right',
@@ -117,6 +119,52 @@ function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
   return false;
 }
 
+/**
+ * Lissage Laplacien du mesh de collision.
+ * - mergeVertices : soude les vertices en doublon → élimine les T-junctions
+ * - N passes de smooth : chaque vertex se rapproche de la moyenne de ses voisins
+ *   (factor ∈ [0,1] — bas = doux, ne déforme pas les bords)
+ */
+function laplacianSmooth(
+  geo: THREE.BufferGeometry,
+  iterations: number,
+  factor: number,
+): THREE.BufferGeometry {
+  const welded = mergeVertices(geo, 1e-4);
+  const pos = welded.attributes.position as THREE.BufferAttribute;
+  const idx = welded.index;
+  if (!idx) return welded;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const sums   = new Float32Array(pos.count * 3);
+    const counts = new Uint32Array(pos.count);
+
+    for (let i = 0; i < idx.count; i += 3) {
+      const a = idx.getX(i), b = idx.getX(i + 1), c = idx.getX(i + 2);
+      for (const [u, v] of [[a, b], [b, c], [a, c]] as [number, number][]) {
+        sums[u * 3]     += pos.getX(v); sums[u * 3 + 1] += pos.getY(v); sums[u * 3 + 2] += pos.getZ(v);
+        sums[v * 3]     += pos.getX(u); sums[v * 3 + 1] += pos.getY(u); sums[v * 3 + 2] += pos.getZ(u);
+        counts[u]++; counts[v]++;
+      }
+    }
+
+    for (let i = 0; i < pos.count; i++) {
+      if (counts[i] === 0) continue;
+      const cx = sums[i * 3]     / counts[i];
+      const cy = sums[i * 3 + 1] / counts[i];
+      const cz = sums[i * 3 + 2] / counts[i];
+      pos.setXYZ(i,
+        pos.getX(i) + (cx - pos.getX(i)) * factor,
+        pos.getY(i) + (cy - pos.getY(i)) * factor,
+        pos.getZ(i) + (cz - pos.getZ(i)) * factor,
+      );
+    }
+    pos.needsUpdate = true;
+  }
+
+  return welded;
+}
+
 export class PlayfieldTrimeshBuilder {
   static build(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
     playfieldRoot.updateMatrixWorld(true);
@@ -201,11 +249,20 @@ export class PlayfieldTrimeshBuilder {
   ): void {
     const { verts, indices } = PlayfieldTrimeshBuilder.mergeGeos(geos);
     if (verts.length === 0) return;
+
+    // Laplacian smoothing: merge duplicate vertices + 4 passes to eliminate T-junctions
+    const rawGeo = new THREE.BufferGeometry();
+    rawGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+    rawGeo.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
+    const smoothed = laplacianSmooth(rawGeo, 4, 0.25);
+    const smoothPos = smoothed.attributes.position as THREE.BufferAttribute;
+    const smoothIdx = smoothed.index!;
+
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     world.createCollider(
       RAPIER.ColliderDesc.trimesh(
-        new Float32Array(verts),
-        new Uint32Array(indices),
+        new Float32Array(smoothPos.array as ArrayLike<number>),
+        new Uint32Array(smoothIdx.array as ArrayLike<number>),
       ).setRestitution(restitution).setFriction(friction),
       body,
     );

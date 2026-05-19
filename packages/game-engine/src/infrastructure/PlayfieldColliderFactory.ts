@@ -38,6 +38,7 @@ export class PlayfieldColliderFactory {
       bumpers: analytical?.bumpers ?? true,
     };
 
+    PlayfieldColliderFactory.createPlayfieldFloor(world);
     if (a.laneFloor) {
       if (playfieldRoot) {
         PlayfieldColliderFactory.createLaneFloorFromPlayfield(world, playfieldRoot);
@@ -53,6 +54,36 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, colliderMap);
     PlayfieldColliderFactory.createDrainSensor(world, colliderMap);
+  }
+
+  /**
+   * Plan incliné lisse qui remplace le trimesh `playfield` du GLB.
+   * Une seule face parfaitement plane → la balle roule sans accrocher.
+   * Dimensions : X [-0.265, 0.265], Z [-0.552, 0.418] (surface jouable complète).
+   * Pente : dY/dZ = -0.110/0.970 ≈ -6.5° autour de l'axe X.
+   */
+  private static createPlayfieldFloor(world: RAPIER.World): void {
+    const zMin = -0.552, zMax = 0.418;
+    const midZ = (zMin + zMax) / 2;
+    const midY = surfaceYAtZ(midZ);
+    const halfX = 0.270;
+    const halfZ = (zMax - zMin) / 2;
+    const tiltAngle = Math.atan2(
+      surfaceYAtZ(zMin) - surfaceYAtZ(zMax),
+      zMax - zMin,
+    );
+    const qx = Math.sin(tiltAngle / 2);
+    const qw = Math.cos(tiltAngle / 2);
+    const floorBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed()
+        .setTranslation(0, midY, midZ)
+        .setRotation({ x: qx, y: 0, z: 0, w: qw }),
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(halfX, 0.003, halfZ)
+        .setRestitution(0.35).setFriction(0.15),
+      floorBody,
+    );
   }
 
   static createLaneFloorFromPlayfield(
@@ -150,13 +181,7 @@ export class PlayfieldColliderFactory {
       rest?: number;
     };
 
-    const barriers: BarrierDef[] = [
-      { type: 'cyl', px: -0.14, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
-      { type: 'cyl', px:  0.10, pz: 0.28, hAbove: 0.012, r: 0.012, hh: 0.015 },
-      { type: 'cyl', px: -0.02, pz: 0.32, hAbove: 0.012, r: 0.015, hh: 0.015 },
-      { type: 'box', px:  0.155, pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
-      { type: 'box', px: -0.20,  pz: 0.32, hAbove: 0.015, hx: 0.008, hy: 0.025, hz: 0.08 },
-    ];
+    const barriers: BarrierDef[] = [];
 
     for (const b of barriers) {
       const py = surfY(b.pz) + b.hAbove;
