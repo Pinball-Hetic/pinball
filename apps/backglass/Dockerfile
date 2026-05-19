@@ -8,8 +8,8 @@ COPY . .
 
 RUN bun install
 
-RUN bun run --filter @pinball/leaderboard build
+RUN bun run --filter @pinball/backglass build
 
 EXPOSE 3000
 
-CMD ["bun", "run", "--filter", "@pinball/leaderboard", "start"]
+CMD ["bun", "run", "--filter", "@pinball/backglass", "start"]

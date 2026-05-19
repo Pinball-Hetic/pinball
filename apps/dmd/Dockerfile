@@ -8,8 +8,8 @@ COPY . .
 
 RUN bun install
 
-RUN bun run --filter @pinball/scoreboard build
+RUN bun run --filter @pinball/dmd build
 
 EXPOSE 3000
 
-CMD ["bun", "run", "--filter", "@pinball/scoreboard", "start"]
+CMD ["bun", "run", "--filter", "@pinball/dmd", "start"]
