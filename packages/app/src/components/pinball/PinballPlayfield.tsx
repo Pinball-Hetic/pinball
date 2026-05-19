@@ -864,12 +864,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           stuckDetector.reset();
         }
 
-        // Drain by position fallback
-        if (gameStateRef.current === "playing" && drainBallUC) {
-          if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || bPos.y < 0.8) {
-            drainBallUC.execute();
-          }
-        }
+        // Drain géré uniquement par le sensor Rapier (CollisionEventProcessor)
+        // → pas de drain-par-position qui tue la balle avant que les flippers aient pu agir
       }
 
       // Plunger animation

@@ -35,6 +35,7 @@ export class PlayfieldColliderFactory {
       bumpers: analytical?.bumpers ?? true,
     };
 
+    PlayfieldColliderFactory.createPlayfieldFloor(world);
     if (a.laneFloor) PlayfieldColliderFactory.createLaneFloor(world);
     if (a.walls) PlayfieldColliderFactory.createWalls(world);
     if (a.bumpers) PlayfieldColliderFactory.createBumpers(world, colliderMap);
@@ -44,6 +45,37 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, colliderMap);
     PlayfieldColliderFactory.createDrainSensor(world, colliderMap);
+  }
+
+  /**
+   * Plan incliné lisse qui remplace le trimesh `playfield` du GLB.
+   * Une seule face parfaitement plane → la balle roule sans accrocher.
+   * Dimensions : X [-0.265, 0.265], Z [-0.552, 0.418] (surface jouable complète).
+   * Pente : dY/dZ = -0.110/0.970 ≈ -6.5° autour de l'axe X.
+   */
+  private static createPlayfieldFloor(world: RAPIER.World): void {
+    const zMin = -0.552, zMax = 0.418;
+    const midZ = (zMin + zMax) / 2;                     // -0.067
+    const midY = surfaceYAtZ(midZ);                     // ≈ 1.013
+    const halfX = 0.270;
+    const halfZ = (zMax - zMin) / 2;                    // 0.485
+    // Pente : sin/cos pour la rotation autour de l'axe X
+    const tiltAngle = Math.atan2(
+      surfaceYAtZ(zMin) - surfaceYAtZ(zMax),
+      zMax - zMin,
+    );                                                   // ≈ +0.113 rad
+    const qx = Math.sin(tiltAngle / 2);
+    const qw = Math.cos(tiltAngle / 2);
+    const floorBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed()
+        .setTranslation(0, midY, midZ)
+        .setRotation({ x: qx, y: 0, z: 0, w: qw }),
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(halfX, 0.003, halfZ)
+        .setRestitution(0.35).setFriction(0.15),
+      floorBody,
+    );
   }
 
   private static createLaneFloor(world: RAPIER.World): void {
