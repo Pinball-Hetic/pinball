@@ -16,10 +16,12 @@ export * from './use-cases/DetectStuckBall';
 // Infrastructure
 export * from './infrastructure/PhysicsWorld';
 export * from './infrastructure/BallPhysics';
-export * from './infrastructure/PlayfieldColliderBuilder';
 export * from './infrastructure/PlayfieldTrimeshBuilder';
 export * from './infrastructure/PlayfieldColliderFactory';
+export * from './infrastructure/LauncherLaneBounds';
 export * from './infrastructure/FlipperSplitter';
 export * from './infrastructure/CollisionEventProcessor';
 export * from './infrastructure/GltfNodeNames';
+export * from './infrastructure/FlipperPhysics';
+export * from './infrastructure/PlungerPhysics';
 export * from './infrastructure/GltfDisplay';

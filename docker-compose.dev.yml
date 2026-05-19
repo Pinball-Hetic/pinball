@@ -15,26 +15,26 @@ services:
   server:
     build:
       context: .
-      dockerfile: packages/server/Dockerfile
+      dockerfile: apps/server/Dockerfile
     container_name: pinball-server-dev
-    working_dir: /app/packages/server
+    working_dir: /app/apps/server
     environment:
       DATABASE_URL: "postgresql://dev_user:dev_password@db:5432/pinball_dev?schema=public"
       NODE_ENV: development
     ports:
       - "3334:3001"
     volumes:
-      - ./packages/server/src:/app/packages/server/src
+      - ./apps/server/src:/app/apps/server/src
     depends_on:
       - db
     command: bun --watch src/interface/index.ts
 
-  app:
+  playfield:
     build:
       context: .
-      dockerfile: packages/app/Dockerfile
-    container_name: pinball-app-dev
-    working_dir: /app/packages/app
+      dockerfile: apps/playfield/Dockerfile
+    container_name: pinball-playfield-dev
+    working_dir: /app/apps/playfield
     environment:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
@@ -42,8 +42,44 @@ services:
     ports:
       - "3333:3000"
     volumes:
-      - ./packages/app/src:/app/packages/app/src
+      - ./apps/playfield/src:/app/apps/playfield/src
       - ./packages/game-engine/src:/app/packages/game-engine/src
+    depends_on:
+      - server
+    command: bun run dev
+
+  dmd:
+    build:
+      context: .
+      dockerfile: apps/dmd/Dockerfile
+    container_name: pinball-dmd-dev
+    working_dir: /app/apps/dmd
+    environment:
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3335:3000"
+    volumes:
+      - ./apps/dmd/src:/app/apps/dmd/src
+    depends_on:
+      - server
+    command: bun run dev
+
+  backglass:
+    build:
+      context: .
+      dockerfile: apps/backglass/Dockerfile
+    container_name: pinball-backglass-dev
+    working_dir: /app/apps/backglass
+    environment:
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3336:3000"
+    volumes:
+      - ./apps/backglass/src:/app/apps/backglass/src
     depends_on:
       - server
     command: bun run dev

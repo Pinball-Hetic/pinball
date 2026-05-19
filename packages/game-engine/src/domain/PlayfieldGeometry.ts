@@ -4,4 +4,9 @@ export function surfaceYAtZ(z: number): number {
   return 1.068 - ((z + 0.552) / 0.970) * 0.110;
 }
 
+/** Centre de la sphère posé sur le tapis incliné à l'abscisse Z donnée. */
+export function ballCenterOnSurface(z: number, margin = 0.002): number {
+  return surfaceYAtZ(z) + BALL_RADIUS + margin;
+}
+
 export const DRAIN_Z_THRESHOLD = WALL_BOTTOM_Z + BALL_RADIUS * 2;

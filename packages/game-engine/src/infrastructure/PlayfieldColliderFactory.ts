@@ -1,3 +1,4 @@
+import type * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
   BUMPER_POSITIONS,
@@ -10,6 +11,7 @@ import {
   DROP_TARGETS,
 } from '../domain/Ball';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
 
 export type AnalyticalColliderOptions = {
   /** Sol incliné du couloir plongeur (souvent en double avec le GLB). */
@@ -27,6 +29,7 @@ export class PlayfieldColliderFactory {
     world: RAPIER.World,
     colliderMap: Map<number, string>,
     analytical?: AnalyticalColliderOptions,
+    playfieldRoot?: THREE.Object3D,
   ): void {
     const a = {
       laneFloor: analytical?.laneFloor ?? true,
@@ -36,7 +39,13 @@ export class PlayfieldColliderFactory {
     };
 
     PlayfieldColliderFactory.createPlayfieldFloor(world);
-    if (a.laneFloor) PlayfieldColliderFactory.createLaneFloor(world);
+    if (a.laneFloor) {
+      if (playfieldRoot) {
+        PlayfieldColliderFactory.createLaneFloorFromPlayfield(world, playfieldRoot);
+      } else {
+        PlayfieldColliderFactory.createLaneFloor(world);
+      }
+    }
     if (a.walls) PlayfieldColliderFactory.createWalls(world);
     if (a.bumpers) PlayfieldColliderFactory.createBumpers(world, colliderMap);
     if (a.barriers) PlayfieldColliderFactory.createBarriers(world);
@@ -55,15 +64,14 @@ export class PlayfieldColliderFactory {
    */
   private static createPlayfieldFloor(world: RAPIER.World): void {
     const zMin = -0.552, zMax = 0.418;
-    const midZ = (zMin + zMax) / 2;                     // -0.067
-    const midY = surfaceYAtZ(midZ);                     // ≈ 1.013
+    const midZ = (zMin + zMax) / 2;
+    const midY = surfaceYAtZ(midZ);
     const halfX = 0.270;
-    const halfZ = (zMax - zMin) / 2;                    // 0.485
-    // Pente : sin/cos pour la rotation autour de l'axe X
+    const halfZ = (zMax - zMin) / 2;
     const tiltAngle = Math.atan2(
       surfaceYAtZ(zMin) - surfaceYAtZ(zMax),
       zMax - zMin,
-    );                                                   // ≈ +0.113 rad
+    );
     const qx = Math.sin(tiltAngle / 2);
     const qw = Math.cos(tiltAngle / 2);
     const floorBody = world.createRigidBody(
@@ -78,9 +86,19 @@ export class PlayfieldColliderFactory {
     );
   }
 
-  private static createLaneFloor(world: RAPIER.World): void {
-    const laneTopZ = 0.03;
-    const laneBotZ = 0.42;
+  static createLaneFloorFromPlayfield(
+    world: RAPIER.World,
+    playfieldRoot: THREE.Object3D,
+  ): void {
+    const { minZ, maxZ } = computeLauncherLaneZBounds(playfieldRoot);
+    PlayfieldColliderFactory.createLaneFloor(world, minZ, maxZ);
+  }
+
+  private static createLaneFloor(
+    world: RAPIER.World,
+    laneTopZ = 0.03,
+    laneBotZ = 0.42,
+  ): void {
     const laneMidZ = (laneTopZ + laneBotZ) / 2;
     const laneHalfZ = (laneBotZ - laneTopZ) / 2;
     const laneMidX = (0.206 + 0.265) / 2;

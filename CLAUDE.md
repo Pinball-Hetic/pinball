@@ -2,7 +2,20 @@
 
 ## Architecture
 
-Monorepo with two packages:
+Monorepo with apps/ (deployable) and packages/ (libraries):
+
+```
+apps/
+├── playfield/      # Écran jeu 3D (Next.js + Three.js + Rapier)
+├── dmd/            # Écran DMD — score temps réel (Next.js + Socket.io)
+├── backglass/      # Écran backglass — classement (Next.js + Socket.io)
+└── server/         # Backend API + WebSocket (Express + Prisma)
+
+packages/
+├── game-engine/    # Physique Rapier, pas de React
+├── shared-types/   # Types Socket.io/score partagés
+└── config/         # TSconfig + ESLint partagés
+```
 
 ### `packages/game-engine` — Physics, game logic, no React
 Clean architecture: domain / infrastructure / use-cases.
@@ -30,7 +43,7 @@ Clean architecture: domain / infrastructure / use-cases.
 - `AnimateLauncherLane.ts` — 3-phase scripted lane animation (straight, curve, release)
 - `DetectStuckBall.ts` — stuck timer + nudge impulse when ball stationary
 
-### `packages/app` — Next.js frontend, React components
+### `apps/playfield` — Next.js frontend, jeu 3D
 
 **Components** (`src/components/pinball/`):
 - `PinballPlayfield.tsx` — orchestrator: Three.js scene, animate loop, delegates to game-engine modules
@@ -39,6 +52,15 @@ Clean architecture: domain / infrastructure / use-cases.
 
 **Hooks** (`src/hooks/`):
 - `useGameState.ts` — score, lives, gameState management, emit callback factory
+
+### `apps/dmd` — Écran DMD (score temps réel)
+Reçoit événements Socket.io du server, affiche score/combo live.
+
+### `apps/backglass` — Écran backglass (classement)
+Fetch leaderboard via API REST + refresh Socket.io.
+
+### `packages/shared-types` — Types partagés
+Types Socket.io (ServerToClientEvents, ClientToServerEvents), ScoreUpdate, LeaderboardEntry.
 
 ## SRP Rules
 
@@ -66,7 +88,17 @@ Never put physics code in React components. Never put React code in game-engine.
 
 ## GLB Model
 
-File: `packages/app/public/playfield/pinball-machine.glb`
+File: `apps/playfield/public/playfield/Pinballmap.glb`
 - Node names use underscores in Three.js (e.g. `pop_bumper`, not `pop bumper`)
 - Playfield surface Y formula: `1.068 - ((z + 0.552) / 0.970) * 0.110`
 - Playfield X range: [-0.265, 0.265], Z range: [-0.552, 0.418]
+
+## Ports
+
+| App | Port hôte | Port conteneur |
+|-----|-----------|----------------|
+| playfield | 3333 | 3000 |
+| server | 3334 | 3001 |
+| dmd | 3335 | 3000 |
+| backglass | 3336 | 3000 |
+| db | 5432 | 5432 |
