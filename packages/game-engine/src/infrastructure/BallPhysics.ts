@@ -6,7 +6,9 @@ import {
   BALL_ANGULAR_DAMPING,
   BALL_SPAWN_POSITION,
   BUMPER_EJECT_IMPULSE,
+  PLUNGER_IMPULSE_Z,
 } from '../domain/Ball';
+import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
 import type { IBallPhysics } from '../use-cases/LaunchBall';
 import type { IBumperEject } from '../use-cases/BumperHit';
 
@@ -37,16 +39,23 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
 
   setSpawnPosition(x: number, y: number, z: number): void {
     this.spawnX = x;
-    this.spawnY = y;
     this.spawnZ = z;
-    this.body.setTranslation({ x, y, z }, true);
+    this.spawnY = ballCenterOnSurface(z);
+    this.body.setTranslation({ x: this.spawnX, y: this.spawnY, z: this.spawnZ }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.wakeUp();
   }
 
-  applyPlungerImpulse(): void {
+  applyPlungerImpulse(factor = 1): void {
     this.body.wakeUp();
+    const z = this.spawnZ;
+    const y = ballCenterOnSurface(z);
+    this.body.setTranslation({ x: this.spawnX, y, z }, true);
+    this.body.applyImpulse(
+      { x: 0, y: -0.02 * factor, z: PLUNGER_IMPULSE_Z * factor },
+      true,
+    );
   }
 
   resetToSpawn(): void {

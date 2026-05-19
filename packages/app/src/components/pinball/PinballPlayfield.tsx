@@ -37,7 +37,10 @@ import {
   hideGltfDecorativeBall,
   prepareGltfMaterialsForDisplay,
   configureGltfRenderer,
+  ballCenterOnSurface,
+  surfaceYAtZ,
 } from "@pinball/game-engine";
+import type { GameState } from "../../hooks/useGameState";
 import { useGameState } from "../../hooks/useGameState";
 import GameOverlay from "./GameOverlay";
 
@@ -330,6 +333,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
     let leftFlipperHit = false;
     let rightFlipperHit = false;
+    let prevGameState: GameState = "idle";
 
     const laneAnimator = new LauncherLaneAnimator();
     const stuckDetector = new StuckBallDetector();
@@ -422,7 +426,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const analytical: AnalyticalColliderOptions = collOnly
           ? { laneFloor: false, walls: false, barriers: false, bumpers: false }
           : { laneFloor: true, walls: true, barriers: true, bumpers: true };
-        PlayfieldColliderFactory.createAll(world, colliderMap, analytical);
+        PlayfieldColliderFactory.createAll(world, colliderMap, analytical, playfieldRoot);
 
         ballPhysicsInst = new BallPhysics(world);
 
@@ -537,7 +541,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             plungerState = "releasing";
             const t = Math.min(1, (performance.now() - chargeStartTime) / PLUNGER_CHARGE_MS) ** 1.15;
             const factor = PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t;
-            launchBallUC?.execute();
+            launchBallUC?.execute(factor);
             laneAnimSpeed = 1.0 + factor * 3.0;
           }
         };
@@ -581,6 +585,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const dt = prevFrameTime > 0 ? Math.min((time - prevFrameTime) / 1000, 0.05) : 0.016;
       prevFrameTime = time;
 
+      // Flipper visuals (avant sync physique)
+      leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
+      rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
+      if (leftPivot) leftPivot.rotation.y = leftSwing;
+      if (rightPivot) rightPivot.rotation.y = -rightSwing;
+
       syncFlipperBody(leftFlipperBody, leftFlipperObj);
       syncFlipperBody(rightFlipperBody, rightFlipperObj);
 
@@ -590,12 +600,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (physicsWorld && collisionProcessor) {
         collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
       }
-
-      // Flipper visuals
-      leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
-      rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
-      if (leftPivot) leftPivot.rotation.y = leftSwing;
-      if (rightPivot) rightPivot.rotation.y = -rightSwing;
 
       // Flipper hit detection
       if (ballPhysicsInst && gameStateRef.current === "playing" && laneAnimSpeed <= 0) {
@@ -626,14 +630,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
       // Ball sync
       if (ballMesh?.visible && ballPhysicsInst) {
-        if (gameStateRef.current === "idle" && physicsReady) {
+        const gs = gameStateRef.current;
+        if (gs === "idle" && prevGameState !== "idle") {
+          ballPhysicsInst.resetToSpawn();
+        }
+        if (gs === "idle" && physicsReady && laneAnimSpeed <= 0 && !isChargingPlunger) {
+          const z = BALL_SPAWN_POSITION.z;
           ballPhysicsInst.body.setTranslation(
-            { x: BALL_SPAWN_POSITION.x, y: BALL_SPAWN_POSITION.y, z: BALL_SPAWN_POSITION.z },
+            { x: BALL_SPAWN_POSITION.x, y: ballCenterOnSurface(z), z },
             true,
           );
           ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
           ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         }
+        prevGameState = gs;
 
         // Lane animation
         if (laneAnimSpeed > 0) {
@@ -654,8 +664,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             true,
           );
         }
-        if (bVelClamp.y > 0.5) {
-          ballPhysicsInst.body.setLinvel({ x: bVelClamp.x, y: 0.1, z: bVelClamp.z }, true);
+        if (bVelClamp.y > 1.25) {
+          ballPhysicsInst.body.setLinvel({ x: bVelClamp.x, y: 0.35, z: bVelClamp.z }, true);
         }
 
         const bPos = ballPhysicsInst.body.translation();
@@ -677,9 +687,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           stuckDetector.reset();
         }
 
-        // Drain by position fallback
+        // Drain by position fallback (sous le tapis réel, pas un seuil Y arbitraire)
         if (gameStateRef.current === "playing" && drainBallUC) {
-          if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || bPos.y < 0.8) {
+          const underTableY = surfaceYAtZ(bPos.z) - BALL_RADIUS * 4;
+          if ((bPos.z > DRAIN_Z && bPos.x < fieldBoundsLaneSepX) || bPos.y < underTableY) {
             drainBallUC.execute();
           }
         }
