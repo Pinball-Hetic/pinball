@@ -29,7 +29,6 @@ import {
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   playfieldUsesCollOnlyCollision,
-  type AnalyticalColliderOptions,
   attachFlipperAtHinge,
   resolvePlayfieldFlippers,
   applyFlipperSwing,
@@ -38,8 +37,7 @@ import {
   LauncherLaneAnimator,
   StuckBallDetector,
   findObjectByNormalizedName,
-  hideGltfDecorativeBall,
-  hidePinballmapDecorativeMeshes,
+  removePinballmapUnusedMeshes,
   prepareGltfMaterialsForDisplay,
   configureGltfRenderer,
   createGltfLoader,
@@ -377,8 +375,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         playfieldRootRef = playfieldRoot;
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
-        hideGltfDecorativeBall(playfieldRoot);
-        hidePinballmapDecorativeMeshes(playfieldRoot);
+        removePinballmapUnusedMeshes(playfieldRoot);
         prepareGltfMaterialsForDisplay(playfieldRoot);
 
         bumperVisuals = new BumperVisuals();
@@ -387,9 +384,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         garlandLights.setup(playfieldRoot);
 
         // ── Ball mesh ────────────────────────────────────────────────────────
-        const glbBallNode = findObjectByNormalizedName(playfieldRoot, "ball", "pf_ball");
-        if (glbBallNode) glbBallNode.visible = false;
-
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
         const ballMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d4, metalness: 0.95, roughness: 0.08 });
         const ballSphere = new THREE.Mesh(ballGeo, ballMat);
@@ -434,10 +428,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         PlayfieldTrimeshBuilder.build(playfieldRoot, world);
 
         const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
-        const analytical: AnalyticalColliderOptions = collOnly
-          ? { laneFloor: false, walls: false, barriers: false, bumpers: false }
-          : { laneFloor: true, walls: true, barriers: true, bumpers: true };
-        PlayfieldColliderFactory.createAll(world, colliderMap, analytical, playfieldRoot);
+        PlayfieldColliderFactory.createAll(
+          world,
+          colliderMap,
+          playfieldRoot,
+          collOnly
+            ? { laneFloor: false, walls: false, bumpers: false }
+            : undefined,
+        );
 
         ballPhysicsInst = new BallPhysics(world);
 

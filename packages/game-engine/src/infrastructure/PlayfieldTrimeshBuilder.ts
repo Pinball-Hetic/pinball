@@ -3,14 +3,16 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   canonicalGltfName,
+  hasPinballmapRoot,
   isFlipperGltfMesh,
   isJunkGltfMeshName,
-  isPinballmapFloorMesh,
   isPinballmapGameplayMesh,
+  isPinballmapRailMesh,
   isVisualOnlyGltfName,
   normalizeGltfName,
   playfieldUsesCollOnlyCollision,
 } from './GltfNodeNames';
+import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
 const COLLISION_SOLIDS = new Set([
   'flipper',
@@ -77,8 +79,8 @@ const EXCLUDED_NODES = new Set([
   ...HIDDEN_NODES,
 ]);
 
-const PINBALLMAP_TRIMESH_RESTITUTION = 0.45;
-const PINBALLMAP_TRIMESH_FRICTION = 0.06;
+const PINBALLMAP_TRIMESH_RESTITUTION = 0.35;
+const PINBALLMAP_TRIMESH_FRICTION = 0.12;
 
 const PLASTIC_GROUPS = new Set([
   'plastic', 'plastic_left', 'plastic_pop_bumper_zone', 'plastic_rocket',
@@ -105,7 +107,6 @@ function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
   if (isPinballmapGameplayMesh(node)) {
     if (collOnly && !selfNorm.startsWith('coll_')) return true;
     if (isFlipperGltfMesh(node)) return true;
-    if (isPinballmapFloorMesh(node)) return true;
     return false;
   }
 
@@ -132,6 +133,36 @@ function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
   return false;
 }
 
+function extractWorldGeometry(mesh: THREE.Mesh): THREE.BufferGeometry {
+  mesh.updateMatrixWorld(true);
+  const geo = mesh.geometry.clone() as THREE.BufferGeometry;
+  geo.applyMatrix4(mesh.matrixWorld);
+  const posOnly = new THREE.BufferGeometry();
+  posOnly.setAttribute('position', geo.getAttribute('position'));
+  if (geo.index) posOnly.setIndex(geo.index);
+  return posOnly;
+}
+
+function doubleSidedGeometry(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const welded = mergeVertices(geo, 1e-4);
+  const idx = welded.index;
+  if (!idx) return welded;
+
+  const n = idx.count;
+  const doubled = new Uint32Array(n * 2);
+  doubled.set(idx.array as ArrayLike<number>);
+  for (let i = 0; i < n; i += 3) {
+    doubled[n + i] = idx.getX(i + 2);
+    doubled[n + i + 1] = idx.getX(i + 1);
+    doubled[n + i + 2] = idx.getX(i);
+  }
+
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', welded.attributes.position);
+  out.setIndex(new THREE.BufferAttribute(doubled, 1));
+  return out;
+}
+
 function laplacianSmooth(
   geo: THREE.BufferGeometry,
   iterations: number,
@@ -143,24 +174,25 @@ function laplacianSmooth(
   if (!idx) return welded;
 
   for (let iter = 0; iter < iterations; iter++) {
-    const sums   = new Float32Array(pos.count * 3);
+    const sums = new Float32Array(pos.count * 3);
     const counts = new Uint32Array(pos.count);
 
     for (let i = 0; i < idx.count; i += 3) {
       const a = idx.getX(i), b = idx.getX(i + 1), c = idx.getX(i + 2);
       for (const [u, v] of [[a, b], [b, c], [a, c]] as [number, number][]) {
-        sums[u * 3]     += pos.getX(v); sums[u * 3 + 1] += pos.getY(v); sums[u * 3 + 2] += pos.getZ(v);
-        sums[v * 3]     += pos.getX(u); sums[v * 3 + 1] += pos.getY(u); sums[v * 3 + 2] += pos.getZ(u);
+        sums[u * 3] += pos.getX(v); sums[u * 3 + 1] += pos.getY(v); sums[u * 3 + 2] += pos.getZ(v);
+        sums[v * 3] += pos.getX(u); sums[v * 3 + 1] += pos.getY(u); sums[v * 3 + 2] += pos.getZ(u);
         counts[u]++; counts[v]++;
       }
     }
 
     for (let i = 0; i < pos.count; i++) {
       if (counts[i] === 0) continue;
-      const cx = sums[i * 3]     / counts[i];
+      const cx = sums[i * 3] / counts[i];
       const cy = sums[i * 3 + 1] / counts[i];
       const cz = sums[i * 3 + 2] / counts[i];
-      pos.setXYZ(i,
+      pos.setXYZ(
+        i,
         pos.getX(i) + (cx - pos.getX(i)) * factor,
         pos.getY(i) + (cy - pos.getY(i)) * factor,
         pos.getZ(i) + (cz - pos.getZ(i)) * factor,
@@ -176,41 +208,98 @@ export class PlayfieldTrimeshBuilder {
   static build(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
     playfieldRoot.updateMatrixWorld(true);
 
+    if (hasPinballmapRoot(playfieldRoot)) {
+      PlayfieldTrimeshBuilder.buildPinballmap(playfieldRoot, world);
+      return;
+    }
+
     const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
     const mainGeos: THREE.BufferGeometry[] = [];
-    let pinballmapTrimesh = false;
 
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       if (isSkipped(child, collOnly)) return;
-
-      if (
-        isPinballmapGameplayMesh(child) &&
-        !isFlipperGltfMesh(child) &&
-        !isPinballmapFloorMesh(child)
-      ) {
-        pinballmapTrimesh = true;
-      }
-
-      child.updateMatrixWorld(true);
-      const geo = child.geometry.clone() as THREE.BufferGeometry;
-      geo.applyMatrix4(child.matrixWorld);
-
-      const posOnly = new THREE.BufferGeometry();
-      posOnly.setAttribute('position', geo.getAttribute('position'));
-      if (geo.index) posOnly.setIndex(geo.index);
-      mainGeos.push(posOnly);
+      mainGeos.push(extractWorldGeometry(child));
     });
 
     if (mainGeos.length > 0) {
-      const restitution = pinballmapTrimesh ? PINBALLMAP_TRIMESH_RESTITUTION : 0.35;
-      const friction = pinballmapTrimesh ? PINBALLMAP_TRIMESH_FRICTION : 0.15;
-      PlayfieldTrimeshBuilder.createTrimeshCollider(world, mainGeos, restitution, friction);
+      PlayfieldTrimeshBuilder.createTrimeshCollider(world, mainGeos, 0.35, 0.15, true, false);
     }
 
     PlayfieldTrimeshBuilder.buildTrimeshGroup(playfieldRoot, world, TRIMESH_NO_BOUNCE, 0, 0.1);
     PlayfieldTrimeshBuilder.buildTrimeshGroup(playfieldRoot, world, TRIMESH_MISC, 0.35, 0.15);
     PlayfieldTrimeshBuilder.buildPlasticTrimeshes(playfieldRoot, world);
+  }
+
+  private static buildPinballmap(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
+    playfieldRoot.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      if (!isPinballmapGameplayMesh(child)) return;
+      if (isFlipperGltfMesh(child)) return;
+
+      if (isPinballmapRailMesh(child)) {
+        PlayfieldTrimeshBuilder.createRailColliders(
+          world,
+          child,
+          PINBALLMAP_TRIMESH_RESTITUTION,
+          PINBALLMAP_TRIMESH_FRICTION,
+        );
+        return;
+      }
+
+      PlayfieldTrimeshBuilder.createTrimeshCollider(
+        world,
+        [extractWorldGeometry(child)],
+        PINBALLMAP_TRIMESH_RESTITUTION,
+        PINBALLMAP_TRIMESH_FRICTION,
+        false,
+        true,
+      );
+    });
+  }
+
+  private static createRailColliders(
+    world: RAPIER.World,
+    mesh: THREE.Mesh,
+    restitution: number,
+    friction: number,
+  ): void {
+    const geo = extractWorldGeometry(mesh);
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox;
+    if (!bb) return;
+
+    PlayfieldTrimeshBuilder.createTrimeshCollider(
+      world,
+      [geo],
+      restitution,
+      friction,
+      false,
+      true,
+    );
+
+    const cx = (bb.min.x + bb.max.x) * 0.5;
+    const cz = (bb.min.z + bb.max.z) * 0.5;
+    const floorY = surfaceYAtZ(cz);
+    const baseY = Math.min(bb.min.y, floorY);
+    const topY = bb.max.y;
+    const height = topY - baseY;
+    if (height < 0.004) return;
+
+    const hx = Math.max((bb.max.x - bb.min.x) * 0.5, 0.004);
+    const hz = Math.max((bb.max.z - bb.min.z) * 0.5, 0.004);
+    const hy = height * 0.5;
+    const cy = baseY + hy;
+
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(cx, cy, cz),
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(hx, hy, hz)
+        .setRestitution(restitution)
+        .setFriction(friction),
+      body,
+    );
   }
 
   private static buildTrimeshGroup(
@@ -222,7 +311,7 @@ export class PlayfieldTrimeshBuilder {
   ): void {
     const geos = PlayfieldTrimeshBuilder.collectMeshes(root, include, HIDDEN_NODES);
     if (geos.length === 0) return;
-    PlayfieldTrimeshBuilder.createTrimeshCollider(world, geos, restitution, friction);
+    PlayfieldTrimeshBuilder.createTrimeshCollider(world, geos, restitution, friction, true, false);
   }
 
   private static buildPlasticTrimeshes(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
@@ -243,19 +332,13 @@ export class PlayfieldTrimeshBuilder {
       }
       if (!groupName) return;
 
-      child.updateMatrixWorld(true);
-      const geo = child.geometry.clone() as THREE.BufferGeometry;
-      geo.applyMatrix4(child.matrixWorld);
-      const posOnly = new THREE.BufferGeometry();
-      posOnly.setAttribute('position', geo.getAttribute('position'));
-      if (geo.index) posOnly.setIndex(geo.index);
       if (!groupGeos.has(groupName)) groupGeos.set(groupName, []);
-      groupGeos.get(groupName)!.push(posOnly);
+      groupGeos.get(groupName)!.push(extractWorldGeometry(child));
     });
 
     for (const geos of groupGeos.values()) {
       if (geos.length === 0) continue;
-      PlayfieldTrimeshBuilder.createTrimeshCollider(world, geos, 0.3, 0.1);
+      PlayfieldTrimeshBuilder.createTrimeshCollider(world, geos, 0.3, 0.1, true, false);
     }
   }
 
@@ -264,23 +347,36 @@ export class PlayfieldTrimeshBuilder {
     geos: THREE.BufferGeometry[],
     restitution: number,
     friction: number,
+    smooth = true,
+    doubleSided = false,
   ): void {
     const { verts, indices } = PlayfieldTrimeshBuilder.mergeGeos(geos);
-    if (verts.length === 0) return;
+    if (verts.length === 0 || indices.length === 0) return;
 
     const rawGeo = new THREE.BufferGeometry();
     rawGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     rawGeo.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
-    const smoothed = laplacianSmooth(rawGeo, 4, 0.25);
-    const smoothPos = smoothed.attributes.position as THREE.BufferAttribute;
-    const smoothIdx = smoothed.index!;
+
+    let finalGeo = smooth ? laplacianSmooth(rawGeo, 4, 0.25) : mergeVertices(rawGeo, 1e-4);
+    if (doubleSided) finalGeo = doubleSidedGeometry(finalGeo);
+
+    const pos = finalGeo.attributes.position as THREE.BufferAttribute;
+    let idx = finalGeo.index;
+    if (!idx) {
+      finalGeo = mergeVertices(finalGeo, 1e-4);
+      idx = finalGeo.index;
+    }
+    if (!idx) return;
+
+    const vertsF = new Float32Array(pos.array as ArrayLike<number>);
+    const indU = new Uint32Array(idx.array as ArrayLike<number>);
 
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    const desc = RAPIER.ColliderDesc.trimesh(vertsF, indU);
+    if (!desc) return;
+
     world.createCollider(
-      RAPIER.ColliderDesc.trimesh(
-        new Float32Array(smoothPos.array as ArrayLike<number>),
-        new Uint32Array(smoothIdx.array as ArrayLike<number>),
-      ).setRestitution(restitution).setFriction(friction),
+      desc.setRestitution(restitution).setFriction(friction),
       body,
     );
   }
@@ -294,13 +390,7 @@ export class PlayfieldTrimeshBuilder {
     root.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       if (!meshMatchesSet(child, include) || exclude.has(child.name.toLowerCase())) return;
-      child.updateMatrixWorld(true);
-      const geo = child.geometry.clone() as THREE.BufferGeometry;
-      geo.applyMatrix4(child.matrixWorld);
-      const posOnly = new THREE.BufferGeometry();
-      posOnly.setAttribute('position', geo.getAttribute('position'));
-      if (geo.index) posOnly.setIndex(geo.index);
-      result.push(posOnly);
+      result.push(extractWorldGeometry(child));
     });
     return result;
   }
