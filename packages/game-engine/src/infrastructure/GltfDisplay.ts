@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 const TEXTURE_KEYS = [
   'map',
@@ -28,4 +30,12 @@ export function configureGltfRenderer(renderer: THREE.WebGLRenderer): void {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.45;
+}
+
+export function createGltfLoader(decoderPath = '/draco/'): GLTFLoader {
+  const dracoLoader = new DRACOLoader();
+  dracoLoader.setDecoderPath(decoderPath);
+  const loader = new GLTFLoader();
+  loader.setDRACOLoader(dracoLoader);
+  return loader;
 }

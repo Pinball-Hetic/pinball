@@ -1,7 +1,6 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {
@@ -43,6 +42,7 @@ import {
   hidePinballmapDecorativeMeshes,
   prepareGltfMaterialsForDisplay,
   configureGltfRenderer,
+  createGltfLoader,
   ballCenterOnSurface,
   surfaceYAtZ,
   DROP_TARGETS,
@@ -266,7 +266,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     // ── Three.js setup ───────────────────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#121828");
-    const loader = new GLTFLoader();
+    const loader = createGltfLoader();
 
     const { clientWidth, clientHeight } = mountEl;
     const camera = new THREE.PerspectiveCamera(50, clientWidth / clientHeight, 0.001, 100);
