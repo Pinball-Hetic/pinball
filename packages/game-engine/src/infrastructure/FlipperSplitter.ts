@@ -1,5 +1,106 @@
 import * as THREE from 'three';
 import { HINGE_INSET_FROM_EDGE } from '../domain/FlipperConstants';
+import { findObjectByNormalizedName, normalizeGltfName } from './GltfNodeNames';
+
+export type PlayfieldFlipperPair = {
+  left: THREE.Mesh;
+  right: THREE.Mesh;
+  hide: THREE.Object3D;
+};
+
+function meshCenterX(mesh: THREE.Mesh): number {
+  mesh.updateMatrixWorld(true);
+  return new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()).x;
+}
+
+function meshSpansPlayfieldCenter(mesh: THREE.Mesh, centerLine = 0): boolean {
+  mesh.updateMatrixWorld(true);
+  const { min, max } = new THREE.Box3().setFromObject(mesh);
+  return min.x < centerLine - 0.015 && max.x > centerLine + 0.015;
+}
+
+function extractFlipperHalves(meshes: THREE.Mesh[]): THREE.Mesh[] {
+  const halves: THREE.Mesh[] = [];
+  for (const mesh of meshes) {
+    if (meshSpansPlayfieldCenter(mesh)) {
+      const [leftHalf, rightHalf] = splitFlipperIntoTwo(mesh);
+      if (leftHalf) halves.push(leftHalf);
+      if (rightHalf) halves.push(rightHalf);
+      mesh.visible = false;
+    } else {
+      halves.push(mesh);
+    }
+  }
+  return halves;
+}
+
+export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipperPair | null {
+  const group =
+    findObjectByNormalizedName(root, 'flipper.001', 'flipper', 'pf_flipper', 'pf_flipper_left') ??
+    null;
+
+  const meshes: THREE.Mesh[] = [];
+  if (group) {
+    for (const child of group.children) {
+      if (child instanceof THREE.Mesh) meshes.push(child);
+    }
+  }
+  if (meshes.length === 0) {
+    const left = findObjectByNormalizedName(root, 'flipper.002');
+    const right = findObjectByNormalizedName(root, 'flipper.003');
+    if (left instanceof THREE.Mesh) meshes.push(left);
+    if (right instanceof THREE.Mesh) meshes.push(right);
+  }
+  if (meshes.length === 0) {
+    const searchRoot = group ?? root;
+    searchRoot.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      const n = normalizeGltfName(obj.name);
+      if (n === 'flipper' || (n.startsWith('flipper.') && n !== 'flipper.001')) meshes.push(obj);
+    });
+  }
+  if (meshes.length === 0 && group instanceof THREE.Mesh) {
+    meshes.push(group);
+  }
+  if (meshes.length === 0) return null;
+
+  const center = new THREE.Vector3();
+  meshes.sort((a, b) => {
+    a.updateMatrixWorld(true);
+    b.updateMatrixWorld(true);
+    const ax = new THREE.Box3().setFromObject(a).getCenter(center).x;
+    const bx = new THREE.Box3().setFromObject(b).getCenter(center).x;
+    return ax - bx;
+  });
+
+  if (meshes.length === 1) {
+    const [lMesh, rMesh] = splitFlipperIntoTwo(meshes[0]!);
+    if (!lMesh || !rMesh) return null;
+    const parent = group?.parent ?? root;
+    parent.add(lMesh);
+    parent.add(rMesh);
+    if (group) group.visible = false;
+    meshes[0]!.visible = false;
+    return { left: lMesh, right: rMesh, hide: group ?? meshes[0]! };
+  }
+
+  const halves = extractFlipperHalves(meshes);
+  if (halves.length === 0) return null;
+  halves.sort((a, b) => meshCenterX(a) - meshCenterX(b));
+
+  if (halves.length === 1) {
+    const [lMesh, rMesh] = splitFlipperIntoTwo(halves[0]!);
+    if (!lMesh || !rMesh) return null;
+    halves[0]!.visible = false;
+    return { left: lMesh, right: rMesh, hide: group ?? halves[0]! };
+  }
+
+  return {
+    left: halves[0]!,
+    right: halves[halves.length - 1]!,
+    hide: group ?? meshes[0]!.parent ?? root,
+  };
+}
 
 export function splitFlipperIntoTwo(
   flipperObj: THREE.Object3D,
@@ -98,7 +199,7 @@ export function attachFlipperAtHinge(
   const midZ = (min.z + max.z) / 2;
   const widthX = max.x - min.x;
   const inset = widthX * HINGE_INSET_FROM_EDGE;
-  const hingeX = side === 'left' ? min.x + inset : max.x - inset;
+  const hingeX = side === 'left' ? max.x - inset : min.x + inset;
 
   const pivot = new THREE.Group();
   pivot.name = `${flipper.name}_pivot`;
@@ -109,4 +210,19 @@ export function attachFlipperAtHinge(
   parent.add(pivot);
   pivot.attach(flipper);
   return pivot;
+}
+
+export function applyFlipperSwing(
+  pivot: THREE.Object3D,
+  side: 'left' | 'right',
+  angle: number,
+  axis: 'x' | 'y',
+): void {
+  pivot.rotation.set(0, 0, 0);
+  if (axis === 'x') {
+    pivot.rotation.x = side === 'left' ? angle : -angle;
+  } else {
+    pivot.rotation.y = side === 'left' ? angle : -angle;
+  }
+  pivot.updateMatrixWorld(true);
 }

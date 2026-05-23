@@ -17,13 +17,12 @@ export const PLUNGER_IMPULSE_Z = -2.4;
 export const PLAYFIELD_TILT_DEG  = 6.5;
 export const PLAYFIELD_SURFACE_Y = 1.0681; // top of playfield mesh = 1.0171 + 0.1019/2
 
-// Bumpers — exact GLB centers
 export const BUMPER_POSITIONS = [
-  { x: -0.0225, y: 1.0334, z: -0.1975 }, // center (pop bumper)
-  { x:  0.0555, y: 1.0451, z: -0.3062 }, // left
-  { x: -0.1045, y: 1.0451, z: -0.3062 }, // right
+  { x: -0.020586, y: 1.0482, z: -0.1967 },
+  { x: -0.097406, y: 1.0621, z: -0.30509 },
+  { x:  0.059483, y: 1.0621, z: -0.30509 },
 ] as const;
-export const BUMPER_RADIUS       = 0.0345; // GLB size X=0.069 → radius 0.0345
+export const BUMPER_RADIUS       = 0.038;
 export const BUMPER_RESTITUTION  = 0.3;
 export const BUMPER_EJECT_IMPULSE = 0.09;
 

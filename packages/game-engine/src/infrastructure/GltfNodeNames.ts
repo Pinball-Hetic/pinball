@@ -51,6 +51,49 @@ export function findObjectByNormalizedName(
   return found;
 }
 
+export function hasNamedAncestor(obj: THREE.Object3D, ...names: string[]): boolean {
+  const wanted = new Set(names.map(normalizeGltfName));
+  let current: THREE.Object3D | null = obj;
+  while (current) {
+    if (wanted.has(normalizeGltfName(current.name))) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+export function isPinballmapGameplayMesh(mesh: THREE.Mesh): boolean {
+  return hasNamedAncestor(mesh, 'Pinballmap');
+}
+
+export function isFlipperGltfMesh(mesh: THREE.Mesh): boolean {
+  let current: THREE.Object3D | null = mesh;
+  while (current) {
+    const n = normalizeGltfName(current.name);
+    if (n === 'pinballmap') return false;
+    if (n === 'flipper' || n.startsWith('flipper.')) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+export function isPinballmapFloorMesh(mesh: THREE.Mesh): boolean {
+  const n = normalizeGltfName(mesh.name);
+  if (/^table\.\d+$/.test(n)) return true;
+  if (/^sphere\.\d+$/.test(n)) return true;
+  return false;
+}
+
+export function hidePinballmapDecorativeMeshes(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    if (!isPinballmapGameplayMesh(obj)) return;
+    const n = normalizeGltfName(obj.name);
+    if (/^sphere\.\d+$/.test(n)) {
+      obj.visible = false;
+    }
+  });
+}
+
 /** Au moins un mesh `coll_*` → trimesh limité à ces meshes. */
 export function playfieldUsesCollOnlyCollision(root: THREE.Object3D): boolean {
   let found = false;

@@ -43,6 +43,7 @@ services:
       - "3333:3000"
     volumes:
       - ./apps/playfield/src:/app/apps/playfield/src
+      - ./apps/playfield/public:/app/apps/playfield/public
       - ./packages/game-engine/src:/app/packages/game-engine/src
     depends_on:
       - server

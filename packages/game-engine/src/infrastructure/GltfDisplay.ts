@@ -27,5 +27,5 @@ export function prepareGltfMaterialsForDisplay(root: THREE.Object3D): void {
 export function configureGltfRenderer(renderer: THREE.WebGLRenderer): void {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.45;
 }

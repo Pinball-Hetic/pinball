@@ -25,3 +25,5 @@ export * from './infrastructure/GltfNodeNames';
 export * from './infrastructure/FlipperPhysics';
 export * from './infrastructure/PlungerPhysics';
 export * from './infrastructure/GltfDisplay';
+export * from './infrastructure/BumperVisuals';
+export * from './infrastructure/GarlandLights';

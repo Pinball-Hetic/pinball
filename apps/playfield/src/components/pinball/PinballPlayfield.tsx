@@ -24,33 +24,36 @@ import {
   PLUNGER_MAX_FACTOR,
   SWING_RAD,
   SWING_SMOOTH,
+  FLIPPER_SWING_AXIS,
   FLIPPER_RESTITUTION,
   FLIPPER_FRICTION,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   playfieldUsesCollOnlyCollision,
   type AnalyticalColliderOptions,
-  splitFlipperIntoTwo,
   attachFlipperAtHinge,
+  resolvePlayfieldFlippers,
+  applyFlipperSwing,
   CollisionEventProcessor,
   detectFlipperHit,
   LauncherLaneAnimator,
   StuckBallDetector,
   findObjectByNormalizedName,
   hideGltfDecorativeBall,
+  hidePinballmapDecorativeMeshes,
   prepareGltfMaterialsForDisplay,
   configureGltfRenderer,
   ballCenterOnSurface,
   surfaceYAtZ,
   DROP_TARGETS,
   PlungerPhysics,
+  BumperVisuals,
+  GarlandLights,
 } from "@pinball/game-engine";
 import { useGameState } from "../../hooks/useGameState";
 import GameOverlay from "./GameOverlay";
 
-/** Plateau complet — `packages/app/public/playfield/Pinballmap.glb` */
-const PLAYFIELD_URL = "/playfield/Pinballmap.glb";
-const FLIPPER_LEFT_NAME = "flipper";
+const PLAYFIELD_URL = "/playfield/Stranger-thingsblenderfinal.glb";
 
 /**
  * Vue cabine fixe : joueur côté +Z (flippers), regarde vers le haut du tapis (-Z).
@@ -262,7 +265,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
     // ── Three.js setup ───────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#050816");
+    scene.background = new THREE.Color("#121828");
     const loader = new GLTFLoader();
 
     const { clientWidth, clientHeight } = mountEl;
@@ -282,11 +285,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     renderer.shadowMap.enabled = true;
     mountEl.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
+    scene.add(new THREE.AmbientLight(0xfff4ee, 0.95));
+    scene.add(new THREE.HemisphereLight(0xaabbff, 0x553344, 0.55));
+    const dirLight = new THREE.DirectionalLight(0xfff8f0, 1.75);
     dirLight.position.set(2, 5, 3);
     dirLight.castShadow = true;
     scene.add(dirLight);
+    const fillLight = new THREE.DirectionalLight(0xffeedd, 0.65);
+    fillLight.position.set(-1.5, 3, -2);
+    scene.add(fillLight);
 
     const modelRoot = new THREE.Group();
     scene.add(modelRoot);
@@ -325,6 +332,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let bumperHitUC: BumperHit | null = null;
     let drainBallUC: DrainBall | null = null;
     let collisionProcessor: CollisionEventProcessor | null = null;
+    let bumperVisuals: BumperVisuals | null = null;
+    let garlandLights: GarlandLights | null = null;
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
     let isChargingPlunger = false;
@@ -369,7 +378,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
         hideGltfDecorativeBall(playfieldRoot);
+        hidePinballmapDecorativeMeshes(playfieldRoot);
         prepareGltfMaterialsForDisplay(playfieldRoot);
+
+        bumperVisuals = new BumperVisuals();
+        bumperVisuals.setup(playfieldRoot);
+        garlandLights = new GarlandLights();
+        garlandLights.setup(playfieldRoot);
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const glbBallNode = findObjectByNormalizedName(playfieldRoot, "ball", "pf_ball");
@@ -385,107 +400,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         ballMesh = ballSphere;
         ballMesh.visible = false;
 
-        const baseFlipper =
-          findObjectByNormalizedName(
-            playfieldRoot,
-            FLIPPER_LEFT_NAME,
-            "pf_flipper",
-            "pf_flipper_left",
-          ) ?? null;
+        const flipperSetup = resolvePlayfieldFlippers(playfieldRoot);
         let leftFlipper: THREE.Object3D | null = null;
         let rightFlipper: THREE.Object3D | null = null;
 
-        // ── Charger le nouveau GLB de palette ────────────────────────────────
-        const flipperGltf = await loader.loadAsync("/playfield/pinball_flipper.glb");
-        flipperGltf.scene.updateMatrixWorld(true);
-        prepareGltfMaterialsForDisplay(flipperGltf.scene);
-        let srcFlipperMesh: THREE.Mesh | null = null;
-        flipperGltf.scene.traverse((c) => {
-          if (!srcFlipperMesh && c instanceof THREE.Mesh) srcFlipperMesh = c as THREE.Mesh;
-        });
-
-        if (baseFlipper?.parent) {
-          const [lMesh, rMesh] = splitFlipperIntoTwo(baseFlipper);
-
-          if (lMesh && rMesh && srcFlipperMesh) {
-            baseFlipper.visible = false;
-            disposableGeos.push(lMesh.geometry, rMesh.geometry);
-            disposableMats.push(lMesh.material as THREE.Material, rMesh.material as THREE.Material);
-
-            const FLIPPER_Z_ADVANCE = -0;
-            const FLIPPER_LEFT_ROT_Y  = -Math.PI / 6;
-            const FLIPPER_RIGHT_ROT_Y = +Math.PI / 6;
-
-            const buildFitted = (
-              refMesh: THREE.Mesh,
-              mirror: boolean,
-              name: string,
-              rotY: number,
-            ): THREE.Mesh => {
-              const origAttr = refMesh.geometry.attributes.position as THREE.BufferAttribute;
-              let pMinX = Infinity, pMinY = Infinity, pMinZ = Infinity;
-              let pMaxX = -Infinity, pMaxY = -Infinity, pMaxZ = -Infinity;
-              for (let i = 0; i < origAttr.count; i++) {
-                const x = origAttr.getX(i), y = origAttr.getY(i), z = origAttr.getZ(i);
-                if (x < pMinX) pMinX = x; if (x > pMaxX) pMaxX = x;
-                if (y < pMinY) pMinY = y; if (y > pMaxY) pMaxY = y;
-                if (z < pMinZ) pMinZ = z; if (z > pMaxZ) pMaxZ = z;
-              }
-              const origSizeX  = pMaxX - pMinX;
-              const origCenterX = (pMinX + pMaxX) / 2;
-              const origCenterZ = (pMinZ + pMaxZ) / 2;
-
-              const geo = (srcFlipperMesh as THREE.Mesh).geometry.clone();
-              geo.applyMatrix4((srcFlipperMesh as THREE.Mesh).matrixWorld);
-
-              if (mirror) geo.applyMatrix4(new THREE.Matrix4().makeScale(-1, 1, 1));
-
-              geo.computeBoundingBox();
-              const nb = geo.boundingBox!;
-              const newSizeX = nb.max.x - nb.min.x;
-              const newCenter = nb.getCenter(new THREE.Vector3());
-
-              const uniformScale = origSizeX / newSizeX;
-              geo.translate(-newCenter.x, -newCenter.y, -newCenter.z);
-              geo.applyMatrix4(new THREE.Matrix4().makeScale(uniformScale, uniformScale * 2, uniformScale));
-
-              geo.applyMatrix4(new THREE.Matrix4().makeRotationY(rotY));
-
-              geo.computeBoundingBox();
-              const sb = geo.boundingBox!;
-              geo.translate(origCenterX, pMinY - sb.min.y, origCenterZ + FLIPPER_Z_ADVANCE);
-
-              const srcMat = (srcFlipperMesh as THREE.Mesh).material;
-              const mat = Array.isArray(srcMat)
-                ? (srcMat[0] as THREE.Material).clone()
-                : (srcMat as THREE.Material).clone();
-              const mesh = new THREE.Mesh(geo, mat);
-              mesh.name = name;
-              mesh.castShadow = mesh.receiveShadow = true;
-              disposableGeos.push(geo);
-              disposableMats.push(mat);
-              return mesh;
-            };
-
-            const newLeft  = buildFitted(lMesh, false, "flipper_left_split",  FLIPPER_LEFT_ROT_Y);
-            const newRight = buildFitted(rMesh, true,  "flipper_right_split", FLIPPER_RIGHT_ROT_Y);
-            baseFlipper.parent.add(newLeft);
-            baseFlipper.parent.add(newRight);
-            leftFlipper  = newLeft;
-            rightFlipper = newRight;
-
-          } else if (lMesh && rMesh) {
-            baseFlipper.visible = false;
-            baseFlipper.parent.add(lMesh);
-            baseFlipper.parent.add(rMesh);
-            disposableGeos.push(lMesh.geometry, rMesh.geometry);
-            disposableMats.push(lMesh.material as THREE.Material, rMesh.material as THREE.Material);
-            leftFlipper  = lMesh;
-            rightFlipper = rMesh;
-          } else {
-            leftFlipper  = baseFlipper;
-            rightFlipper = baseFlipper;
-          }
+        if (flipperSetup) {
+          leftFlipper = flipperSetup.left;
+          rightFlipper = flipperSetup.right;
         }
 
         leftFlipper?.updateMatrixWorld(true);
@@ -643,6 +564,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const baseEmit = buildEmit(() => { if (ballMesh) ballMesh.visible = false; });
         const emit: typeof baseEmit = (event) => {
           baseEmit(event);
+          bumperVisuals?.onGameEvent(event);
+          garlandLights?.onGameEvent(event);
           if (event.type === 'DROP_TARGET_HIT') {
             const meshName = event.targetId.replace('drop_', 'drop_target_');
             const mesh = playfieldRootRef?.getObjectByName(meshName);
@@ -745,13 +668,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const dt = prevFrameTime > 0 ? Math.min((time - prevFrameTime) / 1000, 0.05) : 0.016;
       prevFrameTime = time;
 
+      bumperVisuals?.update(dt);
+      garlandLights?.update(dt);
+
       // ── 1. Swing mis à jour EN PREMIER — le collider Rapier suivra la position visuelle ──
       prevLeftSwing = leftSwing;
       prevRightSwing = rightSwing;
       leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
       rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
-      if (leftPivot) leftPivot.rotation.y = leftSwing;
-      if (rightPivot) rightPivot.rotation.y = -rightSwing;
+      if (leftPivot) applyFlipperSwing(leftPivot, "left", leftSwing, FLIPPER_SWING_AXIS);
+      if (rightPivot) applyFlipperSwing(rightPivot, "right", rightSwing, FLIPPER_SWING_AXIS);
 
       // ── 2. Sync corps cinématiques sur la position ACTUELLE ──
       syncFlipperBody(leftFlipperBody, leftFlipperObj);
@@ -937,6 +863,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
       if (pw?._onKeyUp) document.removeEventListener("keyup", pw._onKeyUp);
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
+      bumperVisuals?.dispose();
+      garlandLights?.dispose();
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();

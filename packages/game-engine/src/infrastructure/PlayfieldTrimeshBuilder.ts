@@ -3,7 +3,10 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   canonicalGltfName,
+  isFlipperGltfMesh,
   isJunkGltfMeshName,
+  isPinballmapFloorMesh,
+  isPinballmapGameplayMesh,
   isVisualOnlyGltfName,
   normalizeGltfName,
   playfieldUsesCollOnlyCollision,
@@ -12,7 +15,6 @@ import {
 const COLLISION_SOLIDS = new Set([
   'flipper',
   'plastic', 'plastic_left', 'plastic_pop_bumper_zone', 'plastic_rocket',
-  // 'playfield' removed — replaced by analytical floor in PlayfieldColliderFactory
   'playfield_sides',
   'plunger_panel',
   'pop_bumper', 'pop_bumper_left', 'pop_bumper_right', 'pop_bumper_guard',
@@ -75,6 +77,9 @@ const EXCLUDED_NODES = new Set([
   ...HIDDEN_NODES,
 ]);
 
+const PINBALLMAP_TRIMESH_RESTITUTION = 0.45;
+const PINBALLMAP_TRIMESH_FRICTION = 0.06;
+
 const PLASTIC_GROUPS = new Set([
   'plastic', 'plastic_left', 'plastic_pop_bumper_zone', 'plastic_rocket',
 ]);
@@ -95,9 +100,17 @@ function meshMatchesSet(mesh: THREE.Mesh, names: Set<string>): boolean {
 
 function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
   const selfNorm = normalizeGltfName(node.name);
+  if (!(node instanceof THREE.Mesh)) return false;
+
+  if (isPinballmapGameplayMesh(node)) {
+    if (collOnly && !selfNorm.startsWith('coll_')) return true;
+    if (isFlipperGltfMesh(node)) return true;
+    if (isPinballmapFloorMesh(node)) return true;
+    return false;
+  }
+
   if (isJunkGltfMeshName(node.name)) return true;
   if (collOnly && !selfNorm.startsWith('coll_')) return true;
-  if (!(node instanceof THREE.Mesh)) return false;
 
   let current: THREE.Object3D | null = node;
   while (current) {
@@ -119,12 +132,6 @@ function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
   return false;
 }
 
-/**
- * Lissage Laplacien du mesh de collision.
- * - mergeVertices : soude les vertices en doublon → élimine les T-junctions
- * - N passes de smooth : chaque vertex se rapproche de la moyenne de ses voisins
- *   (factor ∈ [0,1] — bas = doux, ne déforme pas les bords)
- */
 function laplacianSmooth(
   geo: THREE.BufferGeometry,
   iterations: number,
@@ -171,10 +178,19 @@ export class PlayfieldTrimeshBuilder {
 
     const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
     const mainGeos: THREE.BufferGeometry[] = [];
+    let pinballmapTrimesh = false;
 
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       if (isSkipped(child, collOnly)) return;
+
+      if (
+        isPinballmapGameplayMesh(child) &&
+        !isFlipperGltfMesh(child) &&
+        !isPinballmapFloorMesh(child)
+      ) {
+        pinballmapTrimesh = true;
+      }
 
       child.updateMatrixWorld(true);
       const geo = child.geometry.clone() as THREE.BufferGeometry;
@@ -187,7 +203,9 @@ export class PlayfieldTrimeshBuilder {
     });
 
     if (mainGeos.length > 0) {
-      PlayfieldTrimeshBuilder.createTrimeshCollider(world, mainGeos, 0.35, 0.15);
+      const restitution = pinballmapTrimesh ? PINBALLMAP_TRIMESH_RESTITUTION : 0.35;
+      const friction = pinballmapTrimesh ? PINBALLMAP_TRIMESH_FRICTION : 0.15;
+      PlayfieldTrimeshBuilder.createTrimeshCollider(world, mainGeos, restitution, friction);
     }
 
     PlayfieldTrimeshBuilder.buildTrimeshGroup(playfieldRoot, world, TRIMESH_NO_BOUNCE, 0, 0.1);
@@ -250,7 +268,6 @@ export class PlayfieldTrimeshBuilder {
     const { verts, indices } = PlayfieldTrimeshBuilder.mergeGeos(geos);
     if (verts.length === 0) return;
 
-    // Laplacian smoothing: merge duplicate vertices + 4 passes to eliminate T-junctions
     const rawGeo = new THREE.BufferGeometry();
     rawGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     rawGeo.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
