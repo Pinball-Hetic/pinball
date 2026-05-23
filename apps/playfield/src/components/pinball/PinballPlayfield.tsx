@@ -53,7 +53,7 @@ import {
 import { useGameState } from "../../hooks/useGameState";
 import GameOverlay from "./GameOverlay";
 
-const PLAYFIELD_URL = "/playfield/Stranger-thingsblenderfinal.glb";
+const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
 
 /**
  * Vue cabine fixe : joueur côté +Z (flippers), regarde vers le haut du tapis (-Z).
