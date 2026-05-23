@@ -11,8 +11,8 @@ const BULB_PALETTE = [
 
 const TWINKLE_SPEED = 3.2;
 const TWINKLE_AMP = 0.45;
-const HIT_SURGE_DURATION = 0.45;
-const HIT_SURGE_BOOST = 2.2;
+const HIT_SURGE_DURATION = 0.25;
+const HIT_SURGE_BOOST = 0.5;
 
 type GarlandBulb = {
   mesh: THREE.Mesh;
@@ -91,18 +91,12 @@ export class GarlandLights {
       const twinkle =
         0.65 +
         Math.sin(this.elapsed * TWINKLE_SPEED + bulb.phase) * TWINKLE_AMP;
-      const emissive = bulb.baseIntensity * twinkle + surge;
+      const emissive = bulb.baseIntensity * twinkle + surge * 0.3;
 
       bulb.material.emissiveIntensity = emissive;
-      bulb.light.intensity = 0.25 * twinkle + surge * 0.5;
-
-      if (surge > 0) {
-        bulb.material.emissive.setHex(0xcc44ff);
-        bulb.light.color.setHex(0xcc44ff);
-      } else {
-        bulb.material.emissive.setHex(bulb.color);
-        bulb.light.color.setHex(bulb.color);
-      }
+      bulb.light.intensity = 0.25 * twinkle + surge * 0.12;
+      bulb.material.emissive.setHex(bulb.color);
+      bulb.light.color.setHex(bulb.color);
     }
   }
 

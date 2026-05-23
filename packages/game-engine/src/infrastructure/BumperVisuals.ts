@@ -23,8 +23,8 @@ const RING_ROUGHNESS = 0.48;
 
 const IDLE_PULSE_SPEED = 1.35;
 const IDLE_PULSE_AMP = 0.22;
-const HIT_FLASH_DURATION = 0.32;
-const HIT_FLASH_BOOST = 2.4;
+const HIT_FLASH_DURATION = 0.2;
+const HIT_FLASH_BOOST = 0.85;
 
 const _emissiveA = new THREE.Color();
 const _emissiveB = new THREE.Color();
@@ -224,19 +224,21 @@ export class BumperVisuals {
         part.material.emissiveIntensity = intensity;
 
         if (hitFactor > 0) {
-          part.material.emissive.lerp(_emissiveB.setHex(0xff2244), Math.min(0.85, hitFactor * 0.4));
+          part.material.emissive.lerp(_emissiveB.setHex(0xff2244), Math.min(0.25, hitFactor * 0.12));
         }
 
         if (part.portalLight) {
-          _portalLightColor.setHex(portal.rim).lerp(_emissiveB.setHex(0xff3355), Math.min(1, hitFactor * 0.5));
+          _portalLightColor.setHex(portal.rim).lerp(_emissiveB.setHex(0xff3355), Math.min(0.2, hitFactor * 0.15));
           part.portalLight.color.copy(_portalLightColor);
-          part.portalLight.intensity = 0.28 * slowBreath + hitFactor * 0.55;
+          part.portalLight.intensity = 0.28 * slowBreath + hitFactor * 0.16;
         }
       } else {
         part.material.emissive.setHex(RING_EMISSIVE);
         if (hitFactor > 0) {
-          part.material.emissive.setHex(portal.rim);
-          part.material.emissiveIntensity = 0.65 + hitFactor * 0.75;
+          _emissiveA.setHex(RING_EMISSIVE);
+          _emissiveB.setHex(portal.rim);
+          part.material.emissive.copy(_emissiveA).lerp(_emissiveB, Math.min(0.3, hitFactor * 0.18));
+          part.material.emissiveIntensity = 0.55 + hitFactor * 0.22;
         } else {
           part.material.emissiveIntensity = 0.55 + slowBreath * 0.25;
         }
