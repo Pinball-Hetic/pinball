@@ -81,7 +81,7 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
     parent.add(rMesh);
     if (group) group.visible = false;
     meshes[0]!.visible = false;
-    return { left: lMesh, right: rMesh, hide: group ?? meshes[0]! };
+    return finalizeFlipperPair(root, { left: lMesh, right: rMesh, hide: group ?? meshes[0]! });
   }
 
   const halves = extractFlipperHalves(meshes);
@@ -92,14 +92,35 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
     const [lMesh, rMesh] = splitFlipperIntoTwo(halves[0]!);
     if (!lMesh || !rMesh) return null;
     halves[0]!.visible = false;
-    return { left: lMesh, right: rMesh, hide: group ?? halves[0]! };
+    return finalizeFlipperPair(root, { left: lMesh, right: rMesh, hide: group ?? halves[0]! });
   }
 
-  return {
+  return finalizeFlipperPair(root, {
     left: halves[0]!,
     right: halves[halves.length - 1]!,
     hide: group ?? meshes[0]!.parent ?? root,
-  };
+  });
+}
+
+function hideUnusedFlipperMeshes(root: THREE.Object3D, left: THREE.Mesh, right: THREE.Mesh): void {
+  const keep = new Set<THREE.Object3D>([left, right]);
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const n = normalizeGltfName(obj.name);
+    if (!n.startsWith('flipper')) return;
+    if (keep.has(obj)) return;
+    if (n === 'flipper.001' || n === 'flipper' || meshSpansPlayfieldCenter(obj)) {
+      obj.visible = false;
+    }
+  });
+}
+
+function finalizeFlipperPair(
+  root: THREE.Object3D,
+  pair: PlayfieldFlipperPair,
+): PlayfieldFlipperPair {
+  hideUnusedFlipperMeshes(root, pair.left, pair.right);
+  return pair;
 }
 
 export function splitFlipperIntoTwo(
@@ -170,11 +191,15 @@ export function splitFlipperIntoTwo(
   };
 
   const baseMat = src.material as THREE.MeshStandardMaterial;
+  const srcTransform = src;
   const makeMesh = (tris: number[], name: string): THREE.Mesh | null => {
     const g = buildGeom(tris);
     if (!g) return null;
     const m = new THREE.Mesh(g, baseMat.clone());
     m.name = name;
+    m.position.copy(srcTransform.position);
+    m.rotation.copy(srcTransform.rotation);
+    m.scale.copy(srcTransform.scale);
     m.castShadow = m.receiveShadow = true;
     return m;
   };
