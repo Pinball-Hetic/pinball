@@ -7,6 +7,11 @@ import type { DrainBall } from '../use-cases/DrainBall';
 export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
   private demogorgonTriggered = false;
+  private demogorgonFightActive = false;
+
+  setDemogorgonFightActive(active: boolean): void {
+    this.demogorgonFightActive = active;
+  }
 
   constructor(
     private readonly colliderMap: Map<number, string>,
@@ -33,6 +38,7 @@ export class CollisionEventProcessor {
 
       if (role === 'drain' && gameState === 'playing') {
         this.demogorgonTriggered = false;
+        this.demogorgonFightActive = false;
         this.drainBallUC.execute();
         this.resetDropTargets();
       }
@@ -53,8 +59,14 @@ export class CollisionEventProcessor {
       if (role === 'demogorgon_center' && gameState === 'playing') {
         if (!this.demogorgonTriggered) {
           this.demogorgonTriggered = true;
+          this.demogorgonFightActive = true;
           this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: 150 });
         }
+      }
+
+      if (role === 'demogorgon_target' && gameState === 'playing' && this.demogorgonFightActive) {
+        this.demogorgonFightActive = false;
+        this.emit({ type: 'DEMOGORGON_DEFEATED', scoreIncrement: 500 });
       }
 
       if (role.startsWith('drop_') && !role.startsWith('drop_target') && gameState === 'playing') {

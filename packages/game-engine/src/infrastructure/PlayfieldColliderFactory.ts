@@ -9,6 +9,7 @@ import {
   POP_ZONE_SENSORS,
   ROCKET_SENSOR,
   DEMOGORGON_SENSOR,
+  DEMOGORGON_TARGET,
   DROP_TARGETS,
 } from '../domain/Ball';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
@@ -65,6 +66,7 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createPopZoneSensors(world, colliderMap);
     PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
     PlayfieldColliderFactory.createDemogorgonSensor(world, colliderMap);
+    PlayfieldColliderFactory.createDemogorgonTarget(world, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, colliderMap);
     PlayfieldColliderFactory.createDrainSensor(world, colliderMap);
   }
@@ -204,6 +206,20 @@ export class PlayfieldColliderFactory {
       );
       colliderMap.set(col.handle, `pop_zone_${i}`);
     }
+  }
+
+  private static createDemogorgonTarget(world: RAPIER.World, colliderMap: Map<number, string>): void {
+    const p = DEMOGORGON_TARGET;
+    const b = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
+    );
+    const col = world.createCollider(
+      RAPIER.ColliderDesc.ball(0.034)
+        .setSensor(true)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+      b,
+    );
+    colliderMap.set(col.handle, 'demogorgon_target');
   }
 
   private static createDemogorgonSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {

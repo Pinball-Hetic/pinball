@@ -7,6 +7,7 @@ export type GameEvent =
   | { type: 'DROP_TARGET_RESET' }
   | { type: 'ZONE_HIT'; zone: string; scoreIncrement: number }
   | { type: 'DEMOGORGON_REVEAL'; scoreIncrement: number }
+  | { type: 'DEMOGORGON_DEFEATED'; scoreIncrement: number }
   | { type: 'DRAIN' }
   | { type: 'BALL_LAUNCHED' };
 
