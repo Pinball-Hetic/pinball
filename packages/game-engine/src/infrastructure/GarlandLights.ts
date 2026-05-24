@@ -79,15 +79,17 @@ export class GarlandLights {
   private atmosphereStrobe = 0;
   private strobeActive = false;
   private strobeOn = false;
+  private strobeNormalWhenOn = false;
 
   setAtmosphere(dim: number, strobe: number): void {
     this.atmosphereDim = dim;
     this.atmosphereStrobe = strobe;
   }
 
-  setStrobe(active: boolean, on: boolean): void {
+  setStrobe(active: boolean, on: boolean, normalWhenOn = false): void {
     this.strobeActive = active;
     this.strobeOn = on;
+    this.strobeNormalWhenOn = normalWhenOn;
   }
 
   setup(root: THREE.Object3D): void {
@@ -151,15 +153,22 @@ export class GarlandLights {
       : 0;
 
     if (this.strobeActive) {
-      for (const bulb of this.bulbs) {
-        const emissive = this.strobeOn ? bulb.baseIntensity * 3.2 : 0;
-        const lightLevel = this.strobeOn ? bulb.lightBase * 5 : 0;
-        bulb.material.emissiveIntensity = emissive;
-        bulb.light.intensity = lightLevel;
-        bulb.material.emissive.setHex(this.strobeOn ? 0xff1133 : 0x000000);
-        bulb.light.color.setHex(this.strobeOn ? 0xff1133 : 0x000000);
+      if (!this.strobeOn) {
+        for (const bulb of this.bulbs) {
+          bulb.material.emissiveIntensity = 0;
+          bulb.light.intensity = 0;
+        }
+        return;
       }
-      return;
+      if (!this.strobeNormalWhenOn) {
+        for (const bulb of this.bulbs) {
+          bulb.material.emissiveIntensity = bulb.baseIntensity * 3.2;
+          bulb.light.intensity = bulb.lightBase * 5;
+          bulb.material.emissive.setHex(0xff1133);
+          bulb.light.color.setHex(0xff1133);
+        }
+        return;
+      }
     }
 
     const strobeFlash = this.atmosphereStrobe > 0

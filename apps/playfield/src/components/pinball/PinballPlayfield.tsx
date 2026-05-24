@@ -392,14 +392,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           root: playfieldRoot,
           scene,
           camera,
-          renderer,
-          lights: {
-            ambient: ambientLight,
-            hemisphere: hemiLight,
-            directional: dirLight,
-            fill: fillLight,
-          },
           garlandLights,
+          bumperVisuals,
         });
 
         // ── Ball mesh ────────────────────────────────────────────────────────

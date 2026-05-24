@@ -91,6 +91,15 @@ export class BumperVisuals {
   private hitTimers = new Map<number, number>();
   private elapsed = 0;
   private vines: BumperVineTextures | null = null;
+  private strobeActive = false;
+  private strobeOn = false;
+  private strobeNormalWhenOn = false;
+
+  setStrobe(active: boolean, on: boolean, normalWhenOn = false): void {
+    this.strobeActive = active;
+    this.strobeOn = on;
+    this.strobeNormalWhenOn = normalWhenOn;
+  }
 
   setup(root: THREE.Object3D): void {
     this.dispose();
@@ -190,6 +199,27 @@ export class BumperVisuals {
       const next = t - dt;
       if (next <= 0) this.hitTimers.delete(idx);
       else this.hitTimers.set(idx, next);
+    }
+
+    if (this.strobeActive) {
+      if (!this.strobeOn) {
+        for (const part of this.parts) {
+          part.material.emissiveIntensity = 0;
+          if (part.portalLight) part.portalLight.intensity = 0;
+        }
+        return;
+      }
+      if (!this.strobeNormalWhenOn) {
+        for (const part of this.parts) {
+          part.material.emissive.setHex(0xff1133);
+          part.material.emissiveIntensity = 1.8;
+          if (part.portalLight) {
+            part.portalLight.color.setHex(0xff1133);
+            part.portalLight.intensity = 0.7;
+          }
+        }
+        return;
+      }
     }
 
     for (const part of this.parts) {

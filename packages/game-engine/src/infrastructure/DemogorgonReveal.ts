@@ -2,35 +2,29 @@ import * as THREE from 'three';
 import type { GameEvent } from '../domain/GameEvents';
 import { DEMOGORGON_SENSOR } from '../domain/Ball';
 import type { GarlandLights } from './GarlandLights';
+import type { BumperVisuals } from './BumperVisuals';
 
 const TEXTURE_URL = '/playfield/demogorgon.png';
 
 const BLACKOUT = 0.12;
-const REVEAL = 0.22;
-const HOLD = 0.42;
-const RESTORE = 0.24;
+const REVEAL = 0.5;
+const FLICKER = 10;
+const RESTORE = 0.3;
 
 const STROBE_HZ = 11;
-const FOG_DENSITY = 4.5;
-const BASE_EXPOSURE = 1.45;
-const DARK_EXPOSURE = 0.04;
 
-type Phase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore';
+const PLAYFIELD_W = 0.58;
+const PLAYFIELD_D = 1.02;
+const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 
-type SceneLights = {
-  ambient: THREE.AmbientLight;
-  hemisphere: THREE.HemisphereLight;
-  directional: THREE.DirectionalLight;
-  fill: THREE.DirectionalLight;
-};
+type Phase = 'idle' | 'blackout' | 'reveal' | 'flicker' | 'restore';
 
 export type DemogorgonSetup = {
   root: THREE.Object3D;
   scene: THREE.Scene;
   camera: THREE.Camera;
-  renderer: THREE.WebGLRenderer;
-  lights: SceneLights;
   garlandLights: GarlandLights | null;
+  bumperVisuals: BumperVisuals | null;
 };
 
 const _camPos = new THREE.Vector3();
@@ -49,20 +43,14 @@ function strobeOn(t: number): boolean {
 }
 
 export class DemogorgonReveal {
-  private scene: THREE.Scene | null = null;
   private camera: THREE.Camera | null = null;
-  private renderer: THREE.WebGLRenderer | null = null;
-  private lights: SceneLights | null = null;
   private garlandLights: GarlandLights | null = null;
+  private bumperVisuals: BumperVisuals | null = null;
 
-  private lightBase = { ambient: 0, hemi: 0, dir: 0, fill: 0 };
-  private sceneBackground: THREE.Color | null = null;
-  private fog: THREE.FogExp2 | null = null;
-
-  private overlay: THREE.Mesh | null = null;
-  private overlayMat: THREE.MeshBasicMaterial | null = null;
-  private sprite: THREE.Sprite | null = null;
-  private spriteMat: THREE.SpriteMaterial | null = null;
+  private playfieldShade: THREE.Mesh | null = null;
+  private playfieldShadeMat: THREE.MeshBasicMaterial | null = null;
+  private demogorgonSprite: THREE.Sprite | null = null;
+  private demogorgonMat: THREE.SpriteMaterial | null = null;
   private flashLight: THREE.PointLight | null = null;
 
   private phase: Phase = 'idle';
@@ -72,56 +60,42 @@ export class DemogorgonReveal {
 
   setup(config: DemogorgonSetup): void {
     this.dispose();
-    this.scene = config.scene;
     this.camera = config.camera;
-    this.renderer = config.renderer;
-    this.lights = config.lights;
     this.garlandLights = config.garlandLights;
+    this.bumperVisuals = config.bumperVisuals;
 
-    this.lightBase = {
-      ambient: config.lights.ambient.intensity,
-      hemi: config.lights.hemisphere.intensity,
-      dir: config.lights.directional.intensity,
-      fill: config.lights.fill.intensity,
-    };
-
-    if (config.scene.background instanceof THREE.Color) {
-      this.sceneBackground = config.scene.background.clone();
-    } else {
-      this.sceneBackground = new THREE.Color(0x000000);
-    }
-
-    this.fog = new THREE.FogExp2(0x120008, 0);
-    config.scene.fog = this.fog;
-
-    const overlayGeo = new THREE.PlaneGeometry(4, 4);
-    this.overlayMat = new THREE.MeshBasicMaterial({
+    this.playfieldShadeMat = new THREE.MeshBasicMaterial({
       color: 0x000000,
       transparent: true,
       opacity: 0,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
     });
-    this.overlay = new THREE.Mesh(overlayGeo, this.overlayMat);
-    this.overlay.renderOrder = 900;
-    this.overlay.visible = false;
-    config.scene.add(this.overlay);
+    this.playfieldShade = new THREE.Mesh(
+      new THREE.PlaneGeometry(PLAYFIELD_W, PLAYFIELD_D),
+      this.playfieldShadeMat,
+    );
+    this.playfieldShade.rotation.x = -Math.PI / 2 + PLAYFIELD_TILT;
+    this.playfieldShade.position.set(0, 1.062, -0.067);
+    this.playfieldShade.renderOrder = 600;
+    this.playfieldShade.visible = false;
+    config.root.add(this.playfieldShade);
 
-    this.spriteMat = new THREE.SpriteMaterial({
+    this.demogorgonMat = new THREE.SpriteMaterial({
       transparent: true,
       opacity: 0,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
     });
-    this.sprite = new THREE.Sprite(this.spriteMat);
-    this.sprite.center.set(0.5, 0.35);
-    this.sprite.scale.set(0.55, 0.72, 1);
-    this.sprite.renderOrder = 950;
-    this.sprite.visible = false;
-    config.scene.add(this.sprite);
+    this.demogorgonSprite = new THREE.Sprite(this.demogorgonMat);
+    this.demogorgonSprite.center.set(0.5, 0.35);
+    this.demogorgonSprite.scale.set(0.55, 0.72, 1);
+    this.demogorgonSprite.renderOrder = 950;
+    this.demogorgonSprite.visible = false;
+    config.scene.add(this.demogorgonSprite);
 
-    this.flashLight = new THREE.PointLight(0xff1122, 0, 1.8, 2);
+    this.flashLight = new THREE.PointLight(0xff1122, 0, 0.55, 2);
     this.flashLight.position.set(
       DEMOGORGON_SENSOR.x,
       DEMOGORGON_SENSOR.y + 0.12,
@@ -134,9 +108,9 @@ export class DemogorgonReveal {
       TEXTURE_URL,
       (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace;
-        if (this.spriteMat) {
-          this.spriteMat.map = tex;
-          this.spriteMat.needsUpdate = true;
+        if (this.demogorgonMat) {
+          this.demogorgonMat.map = tex;
+          this.demogorgonMat.needsUpdate = true;
         }
         this.imageReady = true;
       },
@@ -153,8 +127,8 @@ export class DemogorgonReveal {
       this.phase = 'blackout';
       this.elapsed = 0;
       this.strobeT = 0;
-      if (this.overlay) this.overlay.visible = true;
-      if (this.sprite) this.sprite.visible = true;
+      if (this.playfieldShade) this.playfieldShade.visible = true;
+      if (this.demogorgonSprite) this.demogorgonSprite.visible = true;
       return;
     }
     if (event.type === 'DRAIN') {
@@ -163,10 +137,11 @@ export class DemogorgonReveal {
   }
 
   update(dt: number): void {
-    this.syncHud();
+    this.syncDemogorgonScreen();
 
     if (this.phase === 'idle') {
       this.garlandLights?.setStrobe(false, false);
+      this.bumperVisuals?.setStrobe(false, false);
       return;
     }
 
@@ -179,8 +154,8 @@ export class DemogorgonReveal {
       : 1;
 
     if (this.phase === 'blackout') {
-      this.applyStrobe(on, darkMix * easeOut(Math.min(1, this.elapsed / BLACKOUT)));
-      this.setSpriteOpacity(0);
+      this.applyPlayfieldStrobe(on, false, darkMix * easeOut(Math.min(1, this.elapsed / BLACKOUT)));
+      this.setDemogorgonOpacity(0);
       if (this.elapsed >= BLACKOUT) {
         this.phase = 'reveal';
         this.elapsed = 0;
@@ -190,19 +165,21 @@ export class DemogorgonReveal {
 
     if (this.phase === 'reveal') {
       const t = Math.min(1, this.elapsed / REVEAL);
-      this.applyStrobe(on, 1);
-      this.setSpriteOpacity(this.imageReady && on ? easeOut(t) * 0.95 : 0);
+      this.applyPlayfieldStrobe(on, false, 1);
+      this.setDemogorgonOpacity(this.imageReady && on ? easeOut(t) * 0.95 : 0);
       if (this.elapsed >= REVEAL) {
-        this.phase = 'hold';
+        this.phase = 'flicker';
         this.elapsed = 0;
+        this.setDemogorgonOpacity(0);
+        if (this.demogorgonSprite) this.demogorgonSprite.visible = false;
       }
       return;
     }
 
-    if (this.phase === 'hold') {
-      this.applyStrobe(on, 1);
-      this.setSpriteOpacity(this.imageReady && on ? 0.95 : 0);
-      if (this.elapsed >= HOLD) {
+    if (this.phase === 'flicker') {
+      this.applyPlayfieldStrobe(on, true, 1);
+      this.setDemogorgonOpacity(0);
+      if (this.elapsed >= FLICKER) {
         this.phase = 'restore';
         this.elapsed = 0;
       }
@@ -214,102 +191,79 @@ export class DemogorgonReveal {
         this.resetAtmosphere();
         return;
       }
-      this.applyStrobe(on, darkMix);
-      this.setSpriteOpacity(this.imageReady && on ? 0.95 * darkMix : 0);
+      this.applyPlayfieldStrobe(on, true, darkMix);
+      this.setDemogorgonOpacity(0);
     }
   }
 
   dispose(): void {
     this.resetAtmosphere();
 
-    if (this.overlay) {
-      this.overlay.geometry.dispose();
-      this.overlay.parent?.remove(this.overlay);
+    if (this.playfieldShade) {
+      this.playfieldShade.geometry.dispose();
+      this.playfieldShade.parent?.remove(this.playfieldShade);
     }
-    if (this.overlayMat) this.overlayMat.dispose();
+    if (this.playfieldShadeMat) this.playfieldShadeMat.dispose();
 
-    if (this.spriteMat) {
-      this.spriteMat.map?.dispose();
-      this.spriteMat.dispose();
+    if (this.demogorgonMat) {
+      this.demogorgonMat.map?.dispose();
+      this.demogorgonMat.dispose();
     }
-    if (this.sprite) this.sprite.parent?.remove(this.sprite);
+    if (this.demogorgonSprite) this.demogorgonSprite.parent?.remove(this.demogorgonSprite);
 
     if (this.flashLight) {
       this.flashLight.dispose();
       this.flashLight.parent?.remove(this.flashLight);
     }
 
-    if (this.scene) this.scene.fog = null;
-
-    this.scene = null;
     this.camera = null;
-    this.renderer = null;
-    this.lights = null;
     this.garlandLights = null;
-    this.overlay = null;
-    this.overlayMat = null;
-    this.sprite = null;
-    this.spriteMat = null;
+    this.bumperVisuals = null;
+    this.playfieldShade = null;
+    this.playfieldShadeMat = null;
+    this.demogorgonSprite = null;
+    this.demogorgonMat = null;
     this.flashLight = null;
     this.phase = 'idle';
     this.elapsed = 0;
     this.imageReady = false;
   }
 
-  private syncHud(): void {
-    if (!this.camera || !this.overlay || !this.sprite) return;
+  private syncDemogorgonScreen(): void {
+    if (!this.camera || !this.demogorgonSprite || !this.demogorgonSprite.visible) return;
 
     this.camera.getWorldPosition(_camPos);
     this.camera.getWorldDirection(_lookTarget);
     _lookTarget.normalize();
 
-    this.overlay.position.copy(_camPos).addScaledVector(_lookTarget, 0.35);
-    this.overlay.quaternion.copy(this.camera.quaternion);
-
-    this.sprite.position.copy(_camPos).addScaledVector(_lookTarget, 0.38);
-    this.sprite.position.y += 0.06;
-    this.sprite.quaternion.copy(this.camera.quaternion);
+    this.demogorgonSprite.position.copy(_camPos).addScaledVector(_lookTarget, 0.38);
+    this.demogorgonSprite.position.y += 0.06;
+    this.demogorgonSprite.quaternion.copy(this.camera.quaternion);
   }
 
-  private applyStrobe(on: boolean, darkMix: number): void {
-    if (!this.lights || !this.renderer || !this.scene) return;
+  private applyPlayfieldStrobe(on: boolean, fullMap: boolean, mix: number): void {
+    if (!this.playfieldShadeMat) return;
 
-    const flashMul = on ? 0.28 * darkMix : 0;
-    this.lights.ambient.intensity = this.lightBase.ambient * flashMul;
-    this.lights.hemisphere.intensity = this.lightBase.hemi * flashMul;
-    this.lights.directional.intensity = this.lightBase.dir * flashMul;
-    this.lights.fill.intensity = this.lightBase.fill * flashMul;
+    const active = mix > 0.02;
+    const shadeOpacity = on
+      ? (fullMap ? 0 : 0.12) * mix
+      : 0.94 * mix;
 
-    this.renderer.toneMappingExposure = on
-      ? BASE_EXPOSURE * 0.22 * darkMix + DARK_EXPOSURE
-      : DARK_EXPOSURE;
-
-    if (this.sceneBackground) {
-      this.scene.background = this.sceneBackground.clone().lerp(
-        new THREE.Color(0x000000),
-        darkMix,
-      );
-    }
-
-    if (this.fog) {
-      this.fog.density = FOG_DENSITY * darkMix * (on ? 0.5 : 1.2);
-      this.fog.color.setHex(on ? 0x440010 : 0x000000);
-    }
+    this.playfieldShadeMat.opacity = THREE.MathUtils.clamp(shadeOpacity, 0, 0.96);
+    if (this.playfieldShade) this.playfieldShade.visible = active;
 
     if (this.flashLight) {
-      this.flashLight.intensity = on ? 3.5 * darkMix : 0;
+      this.flashLight.intensity = on && !fullMap ? 2.8 * mix : 0;
     }
 
-    this.setOverlayOpacity(on ? 0.35 * darkMix : 0.88 * darkMix);
-    this.garlandLights?.setStrobe(darkMix > 0.05, on);
+    this.garlandLights?.setStrobe(active, on, fullMap);
+    this.bumperVisuals?.setStrobe(active, on, fullMap);
   }
 
-  private setOverlayOpacity(opacity: number): void {
-    if (this.overlayMat) this.overlayMat.opacity = THREE.MathUtils.clamp(opacity, 0, 0.95);
-  }
-
-  private setSpriteOpacity(opacity: number): void {
-    if (this.spriteMat) this.spriteMat.opacity = THREE.MathUtils.clamp(opacity, 0, 1);
+  private setDemogorgonOpacity(opacity: number): void {
+    if (this.demogorgonMat) {
+      this.demogorgonMat.opacity = THREE.MathUtils.clamp(opacity, 0, 1);
+    }
   }
 
   private resetAtmosphere(): void {
@@ -317,31 +271,15 @@ export class DemogorgonReveal {
     this.elapsed = 0;
     this.strobeT = 0;
 
-    if (this.lights) {
-      this.lights.ambient.intensity = this.lightBase.ambient;
-      this.lights.hemisphere.intensity = this.lightBase.hemi;
-      this.lights.directional.intensity = this.lightBase.dir;
-      this.lights.fill.intensity = this.lightBase.fill;
-    }
-
-    if (this.renderer) {
-      this.renderer.toneMappingExposure = BASE_EXPOSURE;
-    }
-
-    if (this.scene && this.sceneBackground) {
-      this.scene.background = this.sceneBackground.clone();
-    }
-
-    if (this.fog) this.fog.density = 0;
-
     if (this.flashLight) this.flashLight.intensity = 0;
 
-    if (this.overlay) this.overlay.visible = false;
-    if (this.overlayMat) this.overlayMat.opacity = 0;
+    if (this.playfieldShade) this.playfieldShade.visible = false;
+    if (this.playfieldShadeMat) this.playfieldShadeMat.opacity = 0;
 
-    if (this.sprite) this.sprite.visible = false;
-    if (this.spriteMat) this.spriteMat.opacity = 0;
+    if (this.demogorgonSprite) this.demogorgonSprite.visible = false;
+    if (this.demogorgonMat) this.demogorgonMat.opacity = 0;
 
     this.garlandLights?.setStrobe(false, false);
+    this.bumperVisuals?.setStrobe(false, false);
   }
 }
