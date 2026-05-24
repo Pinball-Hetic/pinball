@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { INITIAL_LIVES, DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
 import type { GameEventListener } from "@pinball/game-engine";
+import { handlePinballSoundEvent } from "../audio/PinballSounds";
 
 export type GameState = "idle" | "playing" | "game_over";
 
@@ -63,6 +64,8 @@ export function useGameState() {
 
   const buildEmit = (hideBall: () => void): GameEventListener =>
     (event) => {
+      handlePinballSoundEvent(event);
+
       if ("scoreIncrement" in event && event.scoreIncrement) {
         scoreRef.current += event.scoreIncrement;
         setScore(scoreRef.current);

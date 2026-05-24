@@ -51,6 +51,7 @@ import {
   DemogorgonReveal,
 } from "@pinball/game-engine";
 import { useGameState } from "../../hooks/useGameState";
+import { unlockPinballAudio } from "../../audio/PinballSounds";
 import GameOverlay from "./GameOverlay";
 
 const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
@@ -630,6 +631,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // ── Input handling ────────────────────────────────────────────────────
         const onKeyDown = (e: KeyboardEvent) => {
           if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+          unlockPinballAudio();
           if (e.repeat) return;
           if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") leftTarget = 1;
           if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") rightTarget = 1;
