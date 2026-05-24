@@ -627,6 +627,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           drainBallUC,
           emit,
         );
+        demogorgonReveal?.setEmit(emit);
 
         // ── Input handling ────────────────────────────────────────────────────
         const onKeyDown = (e: KeyboardEvent) => {

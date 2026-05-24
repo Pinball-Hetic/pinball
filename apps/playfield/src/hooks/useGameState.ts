@@ -9,12 +9,14 @@ export type DemogorgonHud = {
   active: boolean;
   hits: number;
   victory: boolean;
+  elevenFlash: boolean;
 };
 
 const initialDemogorgonHud = (): DemogorgonHud => ({
   active: false,
   hits: 0,
   victory: false,
+  elevenFlash: false,
 });
 
 export function useGameState() {
@@ -27,11 +29,16 @@ export function useGameState() {
   const livesRef = useRef(INITIAL_LIVES);
   const gameStateRef = useRef<GameState>("idle");
   const victoryTimerRef = useRef<number | null>(null);
+  const elevenTimerRef = useRef<number | null>(null);
 
   const clearDemogorgonHud = useCallback(() => {
     if (victoryTimerRef.current !== null) {
       window.clearTimeout(victoryTimerRef.current);
       victoryTimerRef.current = null;
+    }
+    if (elevenTimerRef.current !== null) {
+      window.clearTimeout(elevenTimerRef.current);
+      elevenTimerRef.current = null;
     }
     setDemogorgonHud(initialDemogorgonHud());
   }, []);
@@ -75,11 +82,31 @@ export function useGameState() {
           window.clearTimeout(victoryTimerRef.current);
           victoryTimerRef.current = null;
         }
-        setDemogorgonHud({ active: true, hits: 0, victory: false });
+        setDemogorgonHud({ active: true, hits: 0, victory: false, elevenFlash: false });
+      }
+      if (event.type === "ELEVEN_ASSIST") {
+        setDemogorgonHud((prev) => ({
+          ...prev,
+          active: true,
+          elevenFlash: true,
+        }));
+        if (elevenTimerRef.current !== null) {
+          window.clearTimeout(elevenTimerRef.current);
+        }
+        elevenTimerRef.current = window.setTimeout(() => {
+          elevenTimerRef.current = null;
+          setDemogorgonHud((prev) => ({ ...prev, elevenFlash: false }));
+        }, 900);
       }
       if (event.type === "DEMOGORGON_TARGET_HIT") {
         const victory = event.hitCount >= DEMOGORGON_TARGET_HITS;
-        setDemogorgonHud({ active: true, hits: event.hitCount, victory });
+        setDemogorgonHud((prev) => ({
+          ...prev,
+          active: true,
+          hits: event.hitCount,
+          victory,
+          elevenFlash: false,
+        }));
         if (victory) {
           victoryTimerRef.current = window.setTimeout(() => {
             victoryTimerRef.current = null;

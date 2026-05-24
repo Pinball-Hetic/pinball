@@ -106,6 +106,12 @@ function playVictory(): void {
   window.setTimeout(() => playNoise(0.15, 0.12, 2000), 280);
 }
 
+function playElevenAssist(): void {
+  playTone(880, 0.12, "sine", 0.14, 200);
+  playTone(1320, 0.18, "triangle", 0.1, 100);
+  playNoise(0.08, 0.08, 2400);
+}
+
 export function handlePinballSoundEvent(event: GameEvent): void {
   switch (event.type) {
     case "BALL_LAUNCHED":
@@ -122,6 +128,9 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       if (event.hitCount >= DEMOGORGON_TARGET_HITS) {
         window.setTimeout(() => playVictory(), 80);
       }
+      break;
+    case "ELEVEN_ASSIST":
+      playElevenAssist();
       break;
     default:
       break;

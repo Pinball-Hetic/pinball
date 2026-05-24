@@ -8,6 +8,7 @@ export type GameEvent =
   | { type: 'ZONE_HIT'; zone: string; scoreIncrement: number }
   | { type: 'DEMOGORGON_REVEAL'; scoreIncrement: number }
   | { type: 'DEMOGORGON_TARGET_HIT'; hitCount: number; scoreIncrement: number }
+  | { type: 'ELEVEN_ASSIST'; scoreIncrement: number }
   | { type: 'DRAIN' }
   | { type: 'BALL_LAUNCHED' };
 
