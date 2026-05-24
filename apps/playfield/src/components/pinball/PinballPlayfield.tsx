@@ -23,15 +23,16 @@ import {
   PLUNGER_MAX_FACTOR,
   SWING_RAD,
   SWING_SMOOTH,
-  FLIPPER_SWING_AXIS,
   FLIPPER_RESTITUTION,
   FLIPPER_FRICTION,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   playfieldUsesCollOnlyCollision,
-  attachFlipperAtHinge,
   resolvePlayfieldFlippers,
+  attachFlipperAtHinge,
   applyFlipperSwing,
+  prepareFlipperMesh,
+  type FlipperPivot,
   CollisionEventProcessor,
   detectFlipperHit,
   LauncherLaneAnimator,
@@ -47,6 +48,7 @@ import {
   PlungerPhysics,
   BumperVisuals,
   GarlandLights,
+  DemogorgonReveal,
 } from "@pinball/game-engine";
 import { useGameState } from "../../hooks/useGameState";
 import GameOverlay from "./GameOverlay";
@@ -283,8 +285,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     renderer.shadowMap.enabled = true;
     mountEl.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xfff4ee, 0.95));
-    scene.add(new THREE.HemisphereLight(0xaabbff, 0x553344, 0.55));
+    const ambientLight = new THREE.AmbientLight(0xfff4ee, 0.95);
+    scene.add(ambientLight);
+    const hemiLight = new THREE.HemisphereLight(0xaabbff, 0x553344, 0.55);
+    scene.add(hemiLight);
     const dirLight = new THREE.DirectionalLight(0xfff8f0, 1.75);
     dirLight.position.set(2, 5, 3);
     dirLight.castShadow = true;
@@ -312,8 +316,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     };
 
     // ── Flipper visual state ─────────────────────────────────────────────────
-    let leftPivot: THREE.Object3D | null = null;
-    let rightPivot: THREE.Object3D | null = null;
+    let leftFlipperPivot: FlipperPivot | null = null;
+    let rightFlipperPivot: FlipperPivot | null = null;
     let leftFlipperObj: THREE.Object3D | null = null;
     let rightFlipperObj: THREE.Object3D | null = null;
     let leftSwing = 0, rightSwing = 0;
@@ -332,6 +336,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let collisionProcessor: CollisionEventProcessor | null = null;
     let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
+    let demogorgonReveal: DemogorgonReveal | null = null;
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
     let isChargingPlunger = false;
@@ -382,6 +387,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         bumperVisuals.setup(playfieldRoot);
         garlandLights = new GarlandLights();
         garlandLights.setup(playfieldRoot);
+        demogorgonReveal = new DemogorgonReveal();
+        demogorgonReveal.setup({
+          root: playfieldRoot,
+          scene,
+          camera,
+          renderer,
+          lights: {
+            ambient: ambientLight,
+            hemisphere: hemiLight,
+            directional: dirLight,
+            fill: fillLight,
+          },
+          garlandLights,
+        });
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
@@ -394,24 +413,48 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         ballMesh = ballSphere;
         ballMesh.visible = false;
 
-        const flipperSetup = resolvePlayfieldFlippers(playfieldRoot);
+        modelRoot.updateMatrixWorld(true);
+
+        const pinballmap =
+          findObjectByNormalizedName(playfieldRoot, 'Pinballmap', 'pinballmap') ?? playfieldRoot;
+
+        let flipperSetup = resolvePlayfieldFlippers(playfieldRoot);
+        if (!flipperSetup) {
+          const meshA = playfieldRoot.getObjectByName('flipper.002');
+          const meshB = playfieldRoot.getObjectByName('flipper.003');
+          if ((meshA as THREE.Mesh | null)?.isMesh && (meshB as THREE.Mesh | null)?.isMesh) {
+            const leftMesh = meshA as THREE.Mesh;
+            const rightMesh = meshB as THREE.Mesh;
+            const center = new THREE.Vector3();
+            leftMesh.updateMatrixWorld(true);
+            rightMesh.updateMatrixWorld(true);
+            const lx = new THREE.Box3().setFromObject(leftMesh).getCenter(center).x;
+            const rx = new THREE.Box3().setFromObject(rightMesh).getCenter(center).x;
+            flipperSetup = lx <= rx
+              ? { left: leftMesh, right: rightMesh, hide: playfieldRoot }
+              : { left: rightMesh, right: leftMesh, hide: playfieldRoot };
+          }
+        }
+
         let leftFlipper: THREE.Object3D | null = null;
         let rightFlipper: THREE.Object3D | null = null;
 
         if (flipperSetup) {
           leftFlipper = flipperSetup.left;
           rightFlipper = flipperSetup.right;
+          prepareFlipperMesh(flipperSetup.left);
+          prepareFlipperMesh(flipperSetup.right);
         }
 
         leftFlipper?.updateMatrixWorld(true);
         rightFlipper?.updateMatrixWorld(true);
 
-        if (leftFlipper) {
-          leftPivot = attachFlipperAtHinge(leftFlipper, "left");
+        if (leftFlipper && (leftFlipper as THREE.Mesh).isMesh) {
+          leftFlipperPivot = attachFlipperAtHinge(leftFlipper, "left", pinballmap);
           leftFlipperObj = leftFlipper;
         }
-        if (rightFlipper) {
-          rightPivot = attachFlipperAtHinge(rightFlipper, "right");
+        if (rightFlipper && (rightFlipper as THREE.Mesh).isMesh) {
+          rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", pinballmap);
           rightFlipperObj = rightFlipper;
         }
 
@@ -564,6 +607,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           baseEmit(event);
           bumperVisuals?.onGameEvent(event);
           garlandLights?.onGameEvent(event);
+          demogorgonReveal?.onGameEvent(event);
           if (event.type === 'DROP_TARGET_HIT') {
             const meshName = event.targetId.replace('drop_', 'drop_target_');
             const mesh = playfieldRootRef?.getObjectByName(meshName);
@@ -645,8 +689,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
     void init();
 
-    // ── Sync flipper kinematic body ───────────────────────────────────────────
-    const syncFlipperBody = (body: RAPIER.RigidBody | null, flipper: THREE.Object3D | null) => {
+    const syncFlipperBody = (
+      body: RAPIER.RigidBody | null,
+      flipper: THREE.Object3D | null,
+    ) => {
       if (!body || !flipper) return;
       flipper.updateMatrixWorld(true);
       const wp = new THREE.Vector3();
@@ -668,20 +714,18 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
       bumperVisuals?.update(dt);
       garlandLights?.update(dt);
+      demogorgonReveal?.update(dt);
 
-      // ── 1. Swing mis à jour EN PREMIER — le collider Rapier suivra la position visuelle ──
       prevLeftSwing = leftSwing;
       prevRightSwing = rightSwing;
       leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
       rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
-      if (leftPivot) applyFlipperSwing(leftPivot, "left", leftSwing, FLIPPER_SWING_AXIS);
-      if (rightPivot) applyFlipperSwing(rightPivot, "right", rightSwing, FLIPPER_SWING_AXIS);
+      if (leftFlipperPivot) applyFlipperSwing(leftFlipperPivot, leftSwing);
+      if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
 
-      // ── 2. Sync corps cinématiques sur la position ACTUELLE ──
       syncFlipperBody(leftFlipperBody, leftFlipperObj);
       syncFlipperBody(rightFlipperBody, rightFlipperObj);
 
-      // Sync debug wireframes
       if (leftFlipperDebug && leftFlipperObj) {
         const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
         leftFlipperObj.getWorldPosition(wp); leftFlipperObj.getWorldQuaternion(wq);
@@ -695,15 +739,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         rightFlipperDebug.quaternion.copy(wq);
       }
 
-      // ── 3. Step physique — Rapier voit la palette à sa position réelle ──
       if (physicsWorld) physicsWorld.update(time);
 
-      // Collision events
       if (physicsWorld && collisionProcessor) {
         collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
       }
 
-      // ── 4. Détection du hit — prevSwing déjà mis à jour en haut ──
       if (ballPhysicsInst && gameStateRef.current === "playing" && laneAnimSpeed <= 0) {
         const bp = ballPhysicsInst.body.translation();
         const bv = ballPhysicsInst.body.linvel();
@@ -863,6 +904,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
       bumperVisuals?.dispose();
       garlandLights?.dispose();
+      demogorgonReveal?.dispose();
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();

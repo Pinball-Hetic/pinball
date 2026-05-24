@@ -75,6 +75,20 @@ export class GarlandLights {
   private bulbs: GarlandBulb[] = [];
   private hitSurge = 0;
   private elapsed = 0;
+  private atmosphereDim = 1;
+  private atmosphereStrobe = 0;
+  private strobeActive = false;
+  private strobeOn = false;
+
+  setAtmosphere(dim: number, strobe: number): void {
+    this.atmosphereDim = dim;
+    this.atmosphereStrobe = strobe;
+  }
+
+  setStrobe(active: boolean, on: boolean): void {
+    this.strobeActive = active;
+    this.strobeOn = on;
+  }
 
   setup(root: THREE.Object3D): void {
     this.dispose();
@@ -123,7 +137,7 @@ export class GarlandLights {
   }
 
   onGameEvent(event: GameEvent): void {
-    if (event.type === 'BUMPER_HIT') {
+    if (event.type === 'BUMPER_HIT' || event.type === 'DEMOGORGON_REVEAL') {
       this.hitSurge = HIT_SURGE_DURATION;
     }
   }
@@ -136,16 +150,41 @@ export class GarlandLights {
       ? (this.hitSurge / HIT_SURGE_DURATION) * HIT_SURGE_BOOST
       : 0;
 
+    if (this.strobeActive) {
+      for (const bulb of this.bulbs) {
+        const emissive = this.strobeOn ? bulb.baseIntensity * 3.2 : 0;
+        const lightLevel = this.strobeOn ? bulb.lightBase * 5 : 0;
+        bulb.material.emissiveIntensity = emissive;
+        bulb.light.intensity = lightLevel;
+        bulb.material.emissive.setHex(this.strobeOn ? 0xff1133 : 0x000000);
+        bulb.light.color.setHex(this.strobeOn ? 0xff1133 : 0x000000);
+      }
+      return;
+    }
+
+    const strobeFlash = this.atmosphereStrobe > 0
+      ? (Math.sin(this.elapsed * 18) * 0.5 + 0.5) * this.atmosphereStrobe
+      : 0;
+    const moodMul = this.atmosphereDim + strobeFlash * (1 - this.atmosphereDim);
+    const upsideDown = this.atmosphereStrobe > 0.2;
+
     for (const bulb of this.bulbs) {
       const twinkle =
         0.65 +
         Math.sin(this.elapsed * TWINKLE_SPEED + bulb.phase) * bulb.twinkleAmp;
-      const emissive = bulb.baseIntensity * twinkle + surge * 0.3;
+      const emissive = (bulb.baseIntensity * twinkle + surge * 0.3) * moodMul;
+      const lightLevel = (bulb.lightBase * twinkle + surge * 0.12) * moodMul;
 
       bulb.material.emissiveIntensity = emissive;
-      bulb.light.intensity = bulb.lightBase * twinkle + surge * 0.12;
-      bulb.material.emissive.setHex(bulb.color);
-      bulb.light.color.setHex(bulb.color);
+      bulb.light.intensity = lightLevel;
+      if (upsideDown) {
+        const flashRed = strobeFlash > 0.45 ? 0xff0022 : 0x660011;
+        bulb.material.emissive.setHex(flashRed);
+        bulb.light.color.setHex(flashRed);
+      } else {
+        bulb.material.emissive.setHex(bulb.color);
+        bulb.light.color.setHex(bulb.color);
+      }
     }
   }
 

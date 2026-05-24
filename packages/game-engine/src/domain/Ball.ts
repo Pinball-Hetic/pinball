@@ -22,6 +22,12 @@ export const BUMPER_POSITIONS = [
   { x: -0.097406, y: 1.0621, z: -0.30509 },
   { x:  0.059483, y: 1.0621, z: -0.30509 },
 ] as const;
+export const DEMOGORGON_SENSOR = {
+  x: -0.0195,
+  y: 1.0575,
+  z: -0.269,
+} as const;
+
 export const BUMPER_RADIUS       = 0.038;
 export const BUMPER_RESTITUTION  = 0.3;
 export const BUMPER_EJECT_IMPULSE = 0.09;
