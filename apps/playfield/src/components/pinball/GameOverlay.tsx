@@ -1,12 +1,23 @@
+import { DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
+import type { DemogorgonHud } from "../../hooks/useGameState";
+
 interface GameOverlayProps {
   score: number;
   lives: number;
   gameState: "idle" | "playing" | "game_over";
   initialLives: number;
+  demogorgonHud: DemogorgonHud;
   cabinetMode?: boolean;
 }
 
-export default function GameOverlay({ score, lives, gameState, initialLives, cabinetMode = false }: GameOverlayProps) {
+export default function GameOverlay({
+  score,
+  lives,
+  gameState,
+  initialLives,
+  demogorgonHud,
+  cabinetMode = false,
+}: GameOverlayProps) {
   void cabinetMode;
   const hintLine =
     gameState === "idle"
@@ -14,6 +25,9 @@ export default function GameOverlay({ score, lives, gameState, initialLives, cab
       : gameState === "game_over"
         ? "ESPACE pour rejouer"
         : null;
+
+  const showDemogorgonHud =
+    gameState === "playing" && demogorgonHud.active;
 
   return (
     <>
@@ -41,6 +55,27 @@ export default function GameOverlay({ score, lives, gameState, initialLives, cab
           <div>H — Debug colliders</div>
         </div>
       </header>
+
+      {showDemogorgonHud && !demogorgonHud.victory && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-8 z-10 flex justify-center">
+          <div className="rounded border border-red-500/40 bg-black/70 px-4 py-2 text-center font-mono backdrop-blur-sm">
+            <p className="text-[10px] uppercase tracking-[0.35em] text-red-300/90">
+              Cible Demogorgon
+            </p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-red-400 drop-shadow-[0_0_10px_rgba(255,60,60,0.7)]">
+              {demogorgonHud.hits} / {DEMOGORGON_TARGET_HITS}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showDemogorgonHud && demogorgonHud.victory && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <p className="font-mono text-2xl font-bold uppercase tracking-[0.2em] text-amber-300 drop-shadow-[0_0_20px_rgba(255,200,80,0.9)] sm:text-3xl">
+            Demogorgon vaincu !
+          </p>
+        </div>
+      )}
 
       {(gameState === "idle" || gameState === "game_over") && (
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4">

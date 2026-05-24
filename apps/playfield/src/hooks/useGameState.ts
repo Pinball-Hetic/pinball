@@ -1,17 +1,39 @@
-import { useState, useRef } from "react";
-import { INITIAL_LIVES } from "@pinball/game-engine";
+import { useState, useRef, useCallback } from "react";
+import { INITIAL_LIVES, DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
 import type { GameEventListener } from "@pinball/game-engine";
 
 export type GameState = "idle" | "playing" | "game_over";
+
+export type DemogorgonHud = {
+  active: boolean;
+  hits: number;
+  victory: boolean;
+};
+
+const initialDemogorgonHud = (): DemogorgonHud => ({
+  active: false,
+  hits: 0,
+  victory: false,
+});
 
 export function useGameState() {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(INITIAL_LIVES);
   const [gameState, setGameState] = useState<GameState>("idle");
+  const [demogorgonHud, setDemogorgonHud] = useState<DemogorgonHud>(initialDemogorgonHud);
 
   const scoreRef = useRef(0);
   const livesRef = useRef(INITIAL_LIVES);
   const gameStateRef = useRef<GameState>("idle");
+  const victoryTimerRef = useRef<number | null>(null);
+
+  const clearDemogorgonHud = useCallback(() => {
+    if (victoryTimerRef.current !== null) {
+      window.clearTimeout(victoryTimerRef.current);
+      victoryTimerRef.current = null;
+    }
+    setDemogorgonHud(initialDemogorgonHud());
+  }, []);
 
   const updateGameState = (state: GameState) => {
     gameStateRef.current = state;
@@ -35,6 +57,7 @@ export function useGameState() {
     setScore(0);
     livesRef.current = INITIAL_LIVES;
     setLives(INITIAL_LIVES);
+    clearDemogorgonHud();
     updateGameState("idle");
   };
 
@@ -44,7 +67,25 @@ export function useGameState() {
         scoreRef.current += event.scoreIncrement;
         setScore(scoreRef.current);
       }
+      if (event.type === "DEMOGORGON_REVEAL") {
+        if (victoryTimerRef.current !== null) {
+          window.clearTimeout(victoryTimerRef.current);
+          victoryTimerRef.current = null;
+        }
+        setDemogorgonHud({ active: true, hits: 0, victory: false });
+      }
+      if (event.type === "DEMOGORGON_TARGET_HIT") {
+        const victory = event.hitCount >= DEMOGORGON_TARGET_HITS;
+        setDemogorgonHud({ active: true, hits: event.hitCount, victory });
+        if (victory) {
+          victoryTimerRef.current = window.setTimeout(() => {
+            victoryTimerRef.current = null;
+            setDemogorgonHud(initialDemogorgonHud());
+          }, 1400);
+        }
+      }
       if (event.type === "DRAIN") {
+        clearDemogorgonHud();
         handleDrain(hideBall);
       }
       if (event.type === "BALL_LAUNCHED") {
@@ -57,6 +98,7 @@ export function useGameState() {
     lives,
     gameState,
     gameStateRef,
+    demogorgonHud,
     resetGame,
     buildEmit,
   };
