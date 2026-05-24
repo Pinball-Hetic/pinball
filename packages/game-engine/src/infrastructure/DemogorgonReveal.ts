@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { GameEvent } from '../domain/GameEvents';
-import { DEMOGORGON_SENSOR, DEMOGORGON_TARGET } from '../domain/Ball';
+import { DEMOGORGON_SENSOR, DEMOGORGON_TARGET, DEMOGORGON_TARGET_HITS } from '../domain/Ball';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
 
@@ -8,8 +8,8 @@ const TEXTURE_URL = '/playfield/demogorgon.png';
 
 const BLACKOUT = 0.12;
 const REVEAL = 0.5;
-const FLICKER = 10;
 const RESTORE = 0.3;
+const TARGET_HIT_FLASH = 0.18;
 
 const STROBE_HZ = 11;
 
@@ -65,6 +65,7 @@ export class DemogorgonReveal {
   private elapsed = 0;
   private strobeT = 0;
   private pulseT = 0;
+  private targetHitFlash = 0;
   private imageReady = false;
 
   setup(config: DemogorgonSetup): void {
@@ -153,9 +154,12 @@ export class DemogorgonReveal {
       if (this.targetGroup) this.targetGroup.visible = true;
       return;
     }
-    if (event.type === 'DEMOGORGON_DEFEATED') {
+    if (event.type === 'DEMOGORGON_TARGET_HIT') {
       if (this.phase === 'idle' || this.phase === 'restore') return;
-      this.beginRestore();
+      this.targetHitFlash = TARGET_HIT_FLASH;
+      if (event.hitCount >= DEMOGORGON_TARGET_HITS) {
+        this.beginRestore();
+      }
       return;
     }
     if (event.type === 'DRAIN') {
@@ -165,6 +169,7 @@ export class DemogorgonReveal {
 
   update(dt: number): void {
     this.syncDemogorgonScreen();
+    if (this.targetHitFlash > 0) this.targetHitFlash = Math.max(0, this.targetHitFlash - dt);
     this.updateTargetPulse(dt);
 
     if (this.phase === 'idle') {
@@ -207,9 +212,6 @@ export class DemogorgonReveal {
     if (this.phase === 'flicker') {
       this.applyPlayfieldStrobe(on, true, 1);
       this.setDemogorgonOpacity(0);
-      if (this.elapsed >= FLICKER) {
-        this.beginRestore();
-      }
       return;
     }
 
@@ -309,11 +311,14 @@ export class DemogorgonReveal {
   private updateTargetPulse(dt: number): void {
     if (!this.targetGroup?.visible) return;
     this.pulseT += dt;
-    const pulse = 0.75 + Math.sin(this.pulseT * 8) * 0.25;
+    const hitBoost = this.targetHitFlash > 0 ? 1.8 : 1;
+    const pulse = (0.75 + Math.sin(this.pulseT * 8) * 0.25) * hitBoost;
     if (this.targetRingMat) this.targetRingMat.emissiveIntensity = 1.6 * pulse;
     if (this.targetCoreMat) this.targetCoreMat.emissiveIntensity = 1.2 * pulse;
     if (this.targetLight) this.targetLight.intensity = 0.45 * pulse;
     this.targetGroup.rotation.z = Math.sin(this.pulseT * 3) * 0.08;
+    const scale = 1 + (this.targetHitFlash / TARGET_HIT_FLASH) * 0.25;
+    this.targetGroup.scale.setScalar(scale);
   }
 
   private syncDemogorgonScreen(): void {
@@ -333,7 +338,10 @@ export class DemogorgonReveal {
     this.elapsed = 0;
     this.setDemogorgonOpacity(0);
     if (this.demogorgonSprite) this.demogorgonSprite.visible = false;
-    if (this.targetGroup) this.targetGroup.visible = false;
+    if (this.targetGroup) {
+      this.targetGroup.visible = false;
+      this.targetGroup.scale.setScalar(1);
+    }
   }
 
   private applyPlayfieldStrobe(on: boolean, fullMap: boolean, mix: number): void {
@@ -376,7 +384,10 @@ export class DemogorgonReveal {
     if (this.demogorgonSprite) this.demogorgonSprite.visible = false;
     if (this.demogorgonMat) this.demogorgonMat.opacity = 0;
 
-    if (this.targetGroup) this.targetGroup.visible = false;
+    if (this.targetGroup) {
+      this.targetGroup.visible = false;
+      this.targetGroup.scale.setScalar(1);
+    }
 
     this.garlandLights?.setStrobe(false, false);
     this.bumperVisuals?.setStrobe(false, false);

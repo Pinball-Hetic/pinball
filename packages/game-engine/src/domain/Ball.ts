@@ -34,6 +34,8 @@ export const DEMOGORGON_TARGET = {
   z: -0.02,
 } as const;
 
+export const DEMOGORGON_TARGET_HITS = 2;
+
 export const BUMPER_RADIUS       = 0.038;
 export const BUMPER_RESTITUTION  = 0.3;
 export const BUMPER_EJECT_IMPULSE = 0.09;

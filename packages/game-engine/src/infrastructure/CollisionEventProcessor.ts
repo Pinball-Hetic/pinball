@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEventListener } from '../domain/GameEvents';
-import { BUMPER_POSITIONS, DROP_TARGETS } from '../domain/Ball';
+import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS } from '../domain/Ball';
 import type { BumperHit } from '../use-cases/BumperHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 
@@ -8,6 +8,8 @@ export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
   private demogorgonTriggered = false;
   private demogorgonFightActive = false;
+  private demogorgonTargetHits = 0;
+  private demogorgonTargetLastHitMs = 0;
 
   setDemogorgonFightActive(active: boolean): void {
     this.demogorgonFightActive = active;
@@ -39,6 +41,7 @@ export class CollisionEventProcessor {
       if (role === 'drain' && gameState === 'playing') {
         this.demogorgonTriggered = false;
         this.demogorgonFightActive = false;
+        this.demogorgonTargetHits = 0;
         this.drainBallUC.execute();
         this.resetDropTargets();
       }
@@ -60,13 +63,25 @@ export class CollisionEventProcessor {
         if (!this.demogorgonTriggered) {
           this.demogorgonTriggered = true;
           this.demogorgonFightActive = true;
+          this.demogorgonTargetHits = 0;
+          this.demogorgonTargetLastHitMs = 0;
           this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: 150 });
         }
       }
 
       if (role === 'demogorgon_target' && gameState === 'playing' && this.demogorgonFightActive) {
-        this.demogorgonFightActive = false;
-        this.emit({ type: 'DEMOGORGON_DEFEATED', scoreIncrement: 500 });
+        const now = performance.now();
+        if (now - this.demogorgonTargetLastHitMs < 450) return;
+        this.demogorgonTargetLastHitMs = now;
+        this.demogorgonTargetHits += 1;
+        this.emit({
+          type: 'DEMOGORGON_TARGET_HIT',
+          hitCount: this.demogorgonTargetHits,
+          scoreIncrement: 250,
+        });
+        if (this.demogorgonTargetHits >= DEMOGORGON_TARGET_HITS) {
+          this.demogorgonFightActive = false;
+        }
       }
 
       if (role.startsWith('drop_') && !role.startsWith('drop_target') && gameState === 'playing') {
