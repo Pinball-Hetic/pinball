@@ -3,12 +3,18 @@ export interface ServerToClientEvents {
   'game:start': (data: GameStart) => void
   'game:over': (data: GameOver) => void
   'leaderboard:refresh': (data: LeaderboardEntry[]) => void
+  'input:button': (data: ButtonInput) => void
+  'input:tilt': (data: TiltInput) => void
+  'input:sensor': (data: SensorInput) => void
 }
 
 export interface ClientToServerEvents {
   'score:update': (data: ScoreUpdate) => void
   'game:start': (data: GameStart) => void
   'game:over': (data: GameOver) => void
+  'input:button': (data: ButtonInput) => void
+  'input:tilt': (data: TiltInput) => void
+  'input:sensor': (data: SensorInput) => void
 }
 
 export interface ScoreUpdate {
@@ -32,4 +38,21 @@ export interface LeaderboardEntry {
   name: string
   score: number
   date: string
+}
+
+export type ButtonId = 'LEFT' | 'RIGHT' | 'PLUNGER' | 'START'
+export type ButtonAction = 'DOWN' | 'UP'
+
+export interface ButtonInput {
+  id: ButtonId
+  action: ButtonAction
+}
+
+export interface TiltInput {
+  state: 'TRIGGERED'
+}
+
+export interface SensorInput {
+  id: string
+  value: number
 }

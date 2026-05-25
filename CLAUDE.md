@@ -143,8 +143,13 @@ Cette app est packagée pour [Fliphetic](https://pandormedia.github.io/fliphetic
 - **Ne jamais hardcoder `localhost:<port>`** dans les frontends :
   Chromium tourne sur l'hôte avec un port dynamique. Utiliser des URLs
   **same-origin** (cf. ci-dessous).
+- **Les events réseau ne doivent JAMAIS déclencher de re-render React
+  dans `playfield`** : Three.js démonterait la scène. Utiliser des refs
+  (`useRef` + callbacks) — pattern identique à `useGameState`. Cf.
+  `usePhysicalInputs.ts` qui expose un `callbacksRef` rempli depuis le
+  `useEffect` principal de `PinballPlayfield.tsx`.
 
-### Socket.io same-origin
+### Socket.io same-origin (résolution Étape 5)
 
 `server` n'a pas de port hôte sous Fliphetic. Pour que les frontends
 puissent ouvrir une Socket.io vers lui :
@@ -160,7 +165,8 @@ puissent ouvrir une Socket.io vers lui :
 - Pourquoi polling en Fliphetic : les rewrites Next.js ne proxient pas
   les upgrades WebSocket (`HTTP/1.1 Upgrade` → 101 Switching Protocols
   perd l'upgrade après le rewrite). Latence polling ~50–100 ms,
-  acceptable pour boutons/score.
+  acceptable pour boutons/score. À reconsidérer si gameplay compétitif
+  exigeant (sidecar reverse proxy ou exposition `server` via Fliphetic).
 - Dev local hors Docker : surcharger
   `SERVER_INTERNAL_URL=http://localhost:3001` (pour les rewrites) et/ou
   `NEXT_PUBLIC_SOCKET_URL=http://localhost:3334` (pour les clients
@@ -182,6 +188,34 @@ rouvrir ce débat sans raison nouvelle. Le serial-CDC est immédiat,
 debugable (`cu`/`screen`), tolère le reboot USB ESP32 après flash
 Fliphetic (l'`input-bridge` retente l'ouverture 60×500 ms).
 
+### Flow complet inputs physiques
+
+```
+ESP32 firmware
+  → port série USB-CDC (texte ex. "BTN:LEFT:DOWN\n")
+    → apps/input-bridge
+        parse ligne + emit Socket.io 'input:button'/'input:tilt'/'input:sensor'
+      → apps/server
+          handler typé + socket.broadcast.emit (renvoie à tous SAUF l'émetteur)
+        → apps/playfield, dmd, backglass
+            usePhysicalInputs.ts (hook : socket.io-client + callbacksRef)
+          → PinballPlayfield.tsx
+              callbacksRef.current.onButton(...) → mute leftTarget/rightTarget,
+              plunger.startCharge / launchBallUC.execute, resetGame, ...
+```
+
+Types et noms d'events centralisés dans
+`packages/shared-types/src/socket-events.ts` (`ButtonId`, `ButtonAction`,
+`ButtonInput`, `TiltInput`, `SensorInput`, `'input:*'`).
+
+### Duplication clavier ↔ physique (assumée)
+
+`PinballPlayfield.tsx` contient deux chemins quasi identiques :
+`onKeyDown/onKeyUp` (clavier) et `physicalInputsRef.current.onButton`
+(socket). C'est **volontaire** pour cette étape (changements localisés,
+lisibles, faciles à reverter). Refacto DRY en TODO ci-dessous. Ne pas
+extraire de helpers sans accord.
+
 ### TODO Fliphetic (hors session courante)
 
 - **Firmware ESP32** : tant que les specs hardware HETIC ne sont pas
@@ -198,9 +232,15 @@ Fliphetic (l'`input-bridge` retente l'ouverture 60×500 ms).
   plusieurs minutes au chargement Fliphetic. Optimisation perf à faire
   en session dédiée (cf. Recette 4 de la doc Fliphetic).
 - **`[deploy].strategy = "tag"`** quand l'app est stable.
-- **Handlers Socket.io côté `apps/server`** pour traiter les events
-  `button`/`tilt`/`sensor` émis par `input-bridge`. Touche à la logique
-  de jeu → session dédiée.
 - **`fliphetic validate .`** en local (nécessite le CLI Fliphetic).
 - **Supprimer le scénario démo mock** d'`apps/input-bridge/src/index.ts`
   dès qu'un firmware réel émet des events.
+- **Refacto inputs DRY** : extraire helpers `pressLeft/releaseLeft/
+  chargePlunger/releasePlunger` partagés entre clavier et physique
+  (`PinballPlayfield.tsx` + `usePhysicalInputs`).
+- **Logique tilt** : pénalité, désactivation flippers temporaire,
+  cooldown. Pour l'instant l'event est seulement loggé côté playfield.
+- **Logique sensor analogique plunger** : force = valeur capteur au lieu
+  de timing manuel. Touche `LaunchBall` + UI plunger.
+- **Renommer `ButtonId`** (`LEFT/RIGHT/PLUNGER/START`) selon les vrais
+  boutons HETIC quand les specs sont reçues.

@@ -3,13 +3,21 @@ import { SerialPortStream } from '@serialport/stream';
 import { MockBinding } from '@serialport/binding-mock';
 import { autoDetect } from '@serialport/bindings-cpp';
 import { io, type Socket } from 'socket.io-client';
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  ButtonId,
+  ButtonAction,
+} from '@pinball/shared-types';
 
 const MODE = process.env.INPUT_BRIDGE_MODE === 'serial' ? 'serial' : 'mock';
 const SERIAL_PATH = process.env.SERIAL_PATH ?? '/dev/MOCK_ESP32';
 const SERIAL_BAUD = Number(process.env.SERIAL_BAUD ?? '115200');
 const SERVER_URL = process.env.SERVER_URL ?? 'http://server:3001';
 
-const socket: Socket = io(SERVER_URL, {
+const VALID_BUTTON_IDS: readonly ButtonId[] = ['LEFT', 'RIGHT', 'PLUNGER', 'START'];
+
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
   transports: ['websocket'],
   reconnection: true,
 });
@@ -18,19 +26,23 @@ socket.on('connect', () => console.log('[socket] connected to', SERVER_URL, 'id=
 socket.on('disconnect', (reason) => console.log('[socket] disconnected:', reason));
 socket.on('connect_error', (err) => console.log('[socket] connect_error:', err.message));
 
-function emitButton(id: string, action: 'DOWN' | 'UP') {
-  socket.emit('button', { id, action });
-  console.log('[evt] button', id, action);
+function isButtonId(value: string): value is ButtonId {
+  return (VALID_BUTTON_IDS as readonly string[]).includes(value);
 }
 
-function emitTilt(state: string) {
-  socket.emit('tilt', { state });
-  console.log('[evt] tilt', state);
+function emitButton(id: ButtonId, action: ButtonAction) {
+  socket.emit('input:button', { id, action });
+  console.log('[evt] input:button', id, action);
+}
+
+function emitTilt() {
+  socket.emit('input:tilt', { state: 'TRIGGERED' });
+  console.log('[evt] input:tilt TRIGGERED');
 }
 
 function emitSensor(id: string, value: number) {
-  socket.emit('sensor', { id, value });
-  console.log('[evt] sensor', id, value);
+  socket.emit('input:sensor', { id, value });
+  console.log('[evt] input:sensor', id, value);
 }
 
 function handleLine(raw: string) {
@@ -38,16 +50,21 @@ function handleLine(raw: string) {
   if (!line) return;
   const parts = line.split(':');
   if (parts[0] === 'BTN' && parts.length === 3) {
+    const id = parts[1];
     const action = parts[2];
+    if (!isButtonId(id)) {
+      console.error('[parse] unknown button id:', JSON.stringify(line));
+      return;
+    }
     if (action !== 'DOWN' && action !== 'UP') {
       console.error('[parse] invalid btn action:', JSON.stringify(line));
       return;
     }
-    emitButton(parts[1], action);
+    emitButton(id, action);
     return;
   }
-  if (parts[0] === 'TILT' && parts.length === 2) {
-    emitTilt(parts[1]);
+  if (parts[0] === 'TILT' && parts[1] === 'TRIGGERED' && parts.length === 2) {
+    emitTilt();
     return;
   }
   if (parts[0] === 'SENSOR' && parts.length === 3) {
@@ -77,9 +94,8 @@ async function openMockPort(): Promise<SerialPortStream> {
 
   // TODO: remove when real ESP32 firmware exists.
   // Démo : émet un appui aléatoire toutes les 2s pour valider le pipeline.
-  const buttons = ['LEFT', 'RIGHT', 'PLUNGER', 'START'];
   setInterval(() => {
-    const id = buttons[Math.floor(Math.random() * buttons.length)];
+    const id = VALID_BUTTON_IDS[Math.floor(Math.random() * VALID_BUTTON_IDS.length)];
     port.port?.emitData(Buffer.from(`BTN:${id}:DOWN\n`));
     setTimeout(() => port.port?.emitData(Buffer.from(`BTN:${id}:UP\n`)), 80);
   }, 2000);

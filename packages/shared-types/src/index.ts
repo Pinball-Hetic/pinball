@@ -5,4 +5,9 @@ export type {
   GameStart,
   GameOver,
   LeaderboardEntry,
+  ButtonId,
+  ButtonAction,
+  ButtonInput,
+  TiltInput,
+  SensorInput,
 } from './socket-events'

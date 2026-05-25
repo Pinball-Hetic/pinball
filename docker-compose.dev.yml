@@ -39,6 +39,7 @@ services:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+      NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
     ports:
       - "3333:3000"
     volumes:
@@ -58,6 +59,7 @@ services:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+      NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
     ports:
       - "3335:3000"
     volumes:
@@ -76,6 +78,7 @@ services:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+      NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
     ports:
       - "3336:3000"
     volumes:

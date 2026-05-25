@@ -45,7 +45,8 @@ import {
   DROP_TARGETS,
   PlungerPhysics,
 } from "@pinball/game-engine";
-import { useGameState } from "../../hooks/useGameState";
+import { useGameState } from "@/hooks/useGameState";
+import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import GameOverlay from "./GameOverlay";
 
 /** Plateau complet — `packages/app/public/playfield/Pinballmap.glb` */
@@ -254,6 +255,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     resetGame,
     buildEmit,
   } = useGameState();
+
+  const { callbacksRef: physicalInputsRef } = usePhysicalInputs();
 
   useEffect(() => {
     let cancelled = false;
@@ -713,6 +716,56 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyDown = onKeyDown;
         (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyUp = onKeyUp;
+
+        // ── Inputs physiques (ESP32 via input-bridge → server → socket.io) ──
+        // Duplication volontaire avec onKeyDown/onKeyUp — refacto DRY listée en
+        // TODO Fliphetic (CLAUDE.md). Ne pas extraire maintenant.
+        physicalInputsRef.current = {
+          onButton: (data) => {
+            if (data.id === "LEFT") {
+              leftTarget = data.action === "DOWN" ? 1 : 0;
+              return;
+            }
+            if (data.id === "RIGHT") {
+              rightTarget = data.action === "DOWN" ? 1 : 0;
+              return;
+            }
+            if (data.id === "PLUNGER") {
+              if (data.action === "DOWN") {
+                if (gameStateRef.current === "game_over") {
+                  resetGame();
+                  if (ballMesh) ballMesh.visible = true;
+                  return;
+                }
+                if (gameStateRef.current === "idle" && physicsReady) {
+                  plunger.startCharge(performance.now());
+                  isChargingPlunger = true;
+                  chargeStartTime = performance.now();
+                }
+              } else if (isChargingPlunger && gameStateRef.current === "idle") {
+                isChargingPlunger = false;
+                plungerState = "releasing";
+                const t = Math.min(1, (performance.now() - chargeStartTime) / PLUNGER_CHARGE_MS) ** 1.15;
+                const factor = PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t;
+                launchBallUC?.execute(factor);
+                laneAnimSpeed = 1.0 + factor * 3.0;
+              }
+              return;
+            }
+            if (data.id === "START") {
+              if (data.action === "DOWN" && gameStateRef.current === "game_over") {
+                resetGame();
+                if (ballMesh) ballMesh.visible = true;
+              }
+            }
+          },
+          onTilt: (data) => {
+            console.log("[playfield] tilt reçu:", data, "— logique non implémentée");
+          },
+          onSensor: (data) => {
+            console.log("[playfield] sensor reçu:", data, "— logique non implémentée");
+          },
+        };
 
         if (ballMesh) ballMesh.visible = true;
         physicsReady = true;
