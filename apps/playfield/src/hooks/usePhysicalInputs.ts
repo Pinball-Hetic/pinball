@@ -14,6 +14,8 @@ export interface PhysicalInputCallbacks {
   onSensor?: (data: SensorInput) => void;
 }
 
+type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+
 export interface UsePhysicalInputs {
   callbacksRef: React.MutableRefObject<PhysicalInputCallbacks>;
   /**
@@ -24,11 +26,18 @@ export interface UsePhysicalInputs {
    * useState ici.
    */
   isConnectedRef: React.MutableRefObject<boolean>;
+  /**
+   * Émet un event `dev:simulate-button` vers le server. Utilisé par le
+   * mode clavier `simulate-esp32` pour valider la chaîne réseau sans
+   * hardware ESP32. No-op si le socket n'est pas connecté.
+   */
+  simulateButton: (data: ButtonInput) => void;
 }
 
 export function usePhysicalInputs(): UsePhysicalInputs {
   const callbacksRef = useRef<PhysicalInputCallbacks>({});
   const isConnectedRef = useRef(false);
+  const socketRef = useRef<PinballSocket | null>(null);
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
@@ -36,7 +45,8 @@ export function usePhysicalInputs(): UsePhysicalInputs {
     // url undefined (prod Fliphetic, same-origin via rewrite Next.js) → polling
     // pur, car les rewrites ne proxient pas l'upgrade WebSocket.
     const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling'];
-    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(url, { transports });
+    const socket: PinballSocket = io(url, { transports });
+    socketRef.current = socket;
 
     socket.on('connect', () => {
       isConnectedRef.current = true;
@@ -51,8 +61,16 @@ export function usePhysicalInputs(): UsePhysicalInputs {
 
     return () => {
       socket.disconnect();
+      socketRef.current = null;
     };
   }, []);
 
-  return { callbacksRef, isConnectedRef };
+  const simulateButton = (data: ButtonInput) => {
+    const socket = socketRef.current;
+    if (!socket?.connected) return;
+    console.log('[playfield] sending dev:simulate-button', data.id, data.action);
+    socket.emit('dev:simulate-button', data);
+  };
+
+  return { callbacksRef, isConnectedRef, simulateButton };
 }

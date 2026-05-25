@@ -30,9 +30,16 @@ Lignes vides ignorées. Format invalide → log d'erreur, pas de crash.
 
 ### `mock` (défaut en dev / CI)
 
-Crée un port virtuel via `@serialport/binding-mock`. Un scénario de démo
-émet une paire `BTN:<ID>:DOWN`/`UP` aléatoire (LEFT/RIGHT/PLUNGER/START)
-toutes les 2 secondes — à supprimer dès que le firmware ESP32 existe.
+Crée un port virtuel via `@serialport/binding-mock`. N'émet rien
+spontanément. Utilisé conjointement avec le mode clavier
+`simulate-esp32` du playfield : le server route `dev:simulate-button`
+ici, le handler écrit la ligne protocolaire correspondante sur le port
+mock, et le parser interne la relit comme s'il s'agissait d'un vrai
+ESP32. Le chemin complet est ainsi exercé sans hardware.
+
+En mode `serial` (vrai ESP32 branché), les events `dev:simulate-button`
+sont ignorés avec un warning — la simulation n'a pas de sens dès qu'on
+a le hardware réel.
 
 ### `serial` (borne en production)
 

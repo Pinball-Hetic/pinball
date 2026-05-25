@@ -191,12 +191,12 @@ Fliphetic (l'`input-bridge` retente l'ouverture 60×500 ms).
 ### Flow complet inputs physiques
 
 ```
-ESP32 firmware
+ESP32 firmware (ou clavier en mode simulate-esp32)
   → port série USB-CDC (texte ex. "BTN:LEFT:DOWN\n")
     → apps/input-bridge
         parse ligne + emit Socket.io 'input:button'/'input:tilt'/'input:sensor'
       → apps/server
-          handler typé + socket.broadcast.emit (renvoie à tous SAUF l'émetteur)
+          handler typé + io.emit (broadcast À TOUS, y compris l'émetteur)
         → apps/playfield, dmd, backglass
             usePhysicalInputs.ts (hook : socket.io-client + callbacksRef)
           → PinballPlayfield.tsx
@@ -204,17 +204,77 @@ ESP32 firmware
               plunger.startCharge / launchBallUC.execute, resetGame, ...
 ```
 
+En mode dev `simulate-esp32`, le clavier court-circuite l'ESP32 mais
+réutilise toute la chaîne en amont :
+
+```
+clavier playfield → dev:simulate-button → server (route ciblé)
+  → input-bridge (room 'input-bridge') → injection sur port mock
+    → parser interne relit → input:button → server broadcast → frontends
+```
+
 Types et noms d'events centralisés dans
 `packages/shared-types/src/socket-events.ts` (`ButtonId`, `ButtonAction`,
-`ButtonInput`, `TiltInput`, `SensorInput`, `'input:*'`).
+`ButtonInput`, `TiltInput`, `SensorInput`, `'input:*'`,
+`'dev:simulate-button'`).
+
+### Identification des clients Socket.io
+
+Le server distingue les rôles via `socket.handshake.auth.role` :
+
+- `input-bridge` → joint la room `input-bridge` à la connexion. Sert au
+  routage ciblé des events `dev:simulate-button`.
+- (aucune auth) → frontends (playfield, dmd, backglass). Traités comme
+  clients standards.
+
+Pas de validation cryptographique (réseau Tailscale privé, contexte
+projet étudiant).
 
 ### Duplication clavier ↔ physique (assumée)
 
-`PinballPlayfield.tsx` contient deux chemins quasi identiques :
-`onKeyDown/onKeyUp` (clavier) et `physicalInputsRef.current.onButton`
-(socket). C'est **volontaire** pour cette étape (changements localisés,
-lisibles, faciles à reverter). Refacto DRY en TODO ci-dessous. Ne pas
-extraire de helpers sans accord.
+Le callback `physicalInputsRef.current.onButton` est la **source de
+vérité unique** des effets sur le game loop (flippers, plunger, reset).
+Il est appelé soit par les events réseau `input:button`, soit
+localement par `dispatchButton(...)` en mode clavier `direct`. Pas de
+duplication d'effet dans `onKeyDown`/`onKeyUp` — ils ne font que router
+vers `dispatchButton`. Refacto plus poussée (extraire des helpers
+nommés `pressLeft/releaseLeft/...`) reste en TODO.
+
+### Modes clavier (dev)
+
+Le composant `PinballPlayfield` supporte trois modes pour le clavier,
+sélectionnés par `NEXT_PUBLIC_KEYBOARD_MODE` (build-time Next.js) :
+
+- **`direct`** (défaut) : `dispatchButton` appelle directement le
+  callback métier. Latence nulle. Pour le dev quotidien.
+- **`simulate-esp32`** : `dispatchButton` émet `dev:simulate-button` au
+  server. Le server **route uniquement vers la room `input-bridge`**
+  (identification par `socket.handshake.auth.role === 'input-bridge'`).
+  L'input-bridge injecte la ligne protocolaire (`BTN:LEFT:DOWN\n`) sur
+  son port mock virtuel ; son propre parser relit et émet `input:button`
+  au server, qui broadcast à tous les frontends via `io.emit`. Le
+  playfield émetteur reçoit son propre event en retour. **Chemin
+  identique à un vrai ESP32**, latence ~30–50 ms aller-retour. Si
+  l'input-bridge tourne en mode `serial` (vrai ESP32 branché), les
+  events `dev:simulate-button` sont ignorés avec un warning — cohérent
+  avec la présence du hardware réel.
+- **`disabled`** : touches de jeu ignorées (sauf `H` debug). Pour
+  tester uniquement le hardware ESP32 réel.
+
+La touche `H` (toggle debug colliders) reste **toujours active**.
+
+Activer un mode dans `docker-compose.dev.yml` :
+
+```yaml
+playfield:
+  environment:
+    NEXT_PUBLIC_KEYBOARD_MODE: "simulate-esp32"
+```
+
+Puis `docker compose -f docker-compose.dev.yml up --force-recreate
+playfield` (force pour réinjecter les `NEXT_PUBLIC_*` dans le bundle).
+
+Détails dans `apps/playfield/README.md`.
 
 ### TODO Fliphetic (hors session courante)
 

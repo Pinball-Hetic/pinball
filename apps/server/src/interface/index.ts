@@ -12,33 +12,49 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer);
 
 const PORT = process.env.PORT || 3001;
 
+const INPUT_BRIDGE_ROOM = 'input-bridge';
+
 app.get('/', (req, res) => {
   res.send('Pinball Server is running');
 });
 
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  const role = (socket.handshake.auth as { role?: string } | undefined)?.role;
+  console.log('[server] client connected:', socket.id, 'role=', role ?? 'frontend');
+
+  if (role === 'input-bridge') {
+    socket.join(INPUT_BRIDGE_ROOM);
+    console.log('[server] input-bridge joined room');
+  }
 
   socket.on('input:button', (data) => {
-    console.log('[input:button]', data);
-    socket.broadcast.emit('input:button', data);
+    console.log('[server] input:button', data.id, data.action, '→ broadcast');
+    io.emit('input:button', data);
   });
 
   socket.on('input:tilt', (data) => {
-    console.log('[input:tilt]', data);
-    socket.broadcast.emit('input:tilt', data);
+    console.log('[server] input:tilt', data.state, '→ broadcast');
+    io.emit('input:tilt', data);
   });
 
   socket.on('input:sensor', (data) => {
-    console.log('[input:sensor]', data);
-    socket.broadcast.emit('input:sensor', data);
+    console.log('[server] input:sensor', data.id, data.value, '→ broadcast');
+    io.emit('input:sensor', data);
+  });
+
+  // Mode dev `simulate-esp32` : route ciblé vers l'input-bridge. C'est
+  // l'input-bridge qui injectera le texte sur son port mock, son parser
+  // relira, et émettra `input:button` au server → broadcast à tous.
+  socket.on('dev:simulate-button', (data) => {
+    console.log('[server] dev:simulate-button', data.id, data.action, '→ input-bridge');
+    io.to(INPUT_BRIDGE_ROOM).emit('dev:simulate-button', data);
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected');
+    console.log('[server] client disconnected:', socket.id);
   });
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`[server] listening on port ${PORT}`);
 });

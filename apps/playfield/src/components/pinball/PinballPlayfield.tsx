@@ -45,6 +45,7 @@ import {
   DROP_TARGETS,
   PlungerPhysics,
 } from "@pinball/game-engine";
+import type { ButtonAction, ButtonId } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import GameOverlay from "./GameOverlay";
@@ -52,6 +53,18 @@ import GameOverlay from "./GameOverlay";
 /** Plateau complet — `packages/app/public/playfield/Pinballmap.glb` */
 const PLAYFIELD_URL = "/playfield/Pinballmap.glb";
 const FLIPPER_LEFT_NAME = "flipper";
+
+/**
+ * Mode du clavier — `NEXT_PUBLIC_KEYBOARD_MODE` :
+ * - `direct` : applique localement (defaut). Latence ~0.
+ * - `simulate-esp32` : émet un event Socket.io `dev:simulate-button` au
+ *   server qui le retransforme en `input:button` broadcast. Permet de
+ *   valider la chaîne réseau sans hardware.
+ * - `disabled` : ignore le clavier de jeu. Touche `H` (debug) reste active.
+ */
+type KeyboardMode = "direct" | "simulate-esp32" | "disabled";
+const KEYBOARD_MODE: KeyboardMode =
+  (process.env.NEXT_PUBLIC_KEYBOARD_MODE as KeyboardMode) || "direct";
 
 /**
  * Vue cabine fixe : joueur côté +Z (flippers), regarde vers le haut du tapis (-Z).
@@ -256,7 +269,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     buildEmit,
   } = useGameState();
 
-  const { callbacksRef: physicalInputsRef } = usePhysicalInputs();
+  const { callbacksRef: physicalInputsRef, simulateButton } = usePhysicalInputs();
 
   useEffect(() => {
     let cancelled = false;
@@ -670,56 +683,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         );
 
         // ── Input handling ────────────────────────────────────────────────────
-        const onKeyDown = (e: KeyboardEvent) => {
-          if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
-          if (e.repeat) return;
-          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") leftTarget = 1;
-          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") rightTarget = 1;
-          if (e.key === "h" || e.key === "H") {
-            debugCollidersOn = !debugCollidersOn;
-            rapierDebugLines.visible = debugCollidersOn;
-            if (leftFlipperDebug)  leftFlipperDebug.visible  = debugCollidersOn;
-            if (rightFlipperDebug) rightFlipperDebug.visible = debugCollidersOn;
-          }
-          if (e.key === " ") {
-            if (gameStateRef.current === "game_over") {
-              resetGame();
-              if (ballMesh) ballMesh.visible = true;
-              return;
-            }
-            if (gameStateRef.current === "idle" && physicsReady) {
-              plunger.startCharge(performance.now());
-              isChargingPlunger = true;
-              chargeStartTime = performance.now();
-            }
-          }
-        };
+        console.log("[PinballPlayfield] KEYBOARD_MODE =", KEYBOARD_MODE);
 
-        const onKeyUp = (e: KeyboardEvent) => {
-          if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
-          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") leftTarget = 0;
-          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") rightTarget = 0;
-          if (e.key === " " && isChargingPlunger && gameStateRef.current === "idle") {
-            isChargingPlunger = false;
-            plungerState = "releasing";
-            const t = Math.min(1, (performance.now() - chargeStartTime) / PLUNGER_CHARGE_MS) ** 1.15;
-            const factor = PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t;
-            launchBallUC?.execute(factor);
-            laneAnimSpeed = 1.0 + factor * 3.0;
-          }
-        };
-
-        if (cancelled) return;
-
-        document.addEventListener("keydown", onKeyDown);
-        document.addEventListener("keyup", onKeyUp);
-
-        (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyDown = onKeyDown;
-        (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyUp = onKeyUp;
-
-        // ── Inputs physiques (ESP32 via input-bridge → server → socket.io) ──
-        // Duplication volontaire avec onKeyDown/onKeyUp — refacto DRY listée en
-        // TODO Fliphetic (CLAUDE.md). Ne pas extraire maintenant.
+        // Le callback métier (vrai effet sur le game loop). Source de vérité
+        // unique : appelé soit par les events réseau `input:button`, soit
+        // localement en mode `direct` via dispatchButton. Le mode
+        // `simulate-esp32` n'appelle PAS ce callback directement — il émet sur
+        // le réseau et c'est le broadcast server qui rappelle ce même
+        // callback via socket.on('input:button').
         physicalInputsRef.current = {
           onButton: (data) => {
             if (data.id === "LEFT") {
@@ -766,6 +737,46 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             console.log("[playfield] sensor reçu:", data, "— logique non implémentée");
           },
         };
+
+        const dispatchButton = (id: ButtonId, action: ButtonAction) => {
+          if (KEYBOARD_MODE === "disabled") return;
+          if (KEYBOARD_MODE === "simulate-esp32") {
+            simulateButton({ id, action });
+            return;
+          }
+          physicalInputsRef.current.onButton?.({ id, action });
+        };
+
+        const onKeyDown = (e: KeyboardEvent) => {
+          if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+          if (e.repeat) return;
+          // `H` reste TOUJOURS actif (debug), indépendant du KEYBOARD_MODE.
+          if (e.key === "h" || e.key === "H") {
+            debugCollidersOn = !debugCollidersOn;
+            rapierDebugLines.visible = debugCollidersOn;
+            if (leftFlipperDebug)  leftFlipperDebug.visible  = debugCollidersOn;
+            if (rightFlipperDebug) rightFlipperDebug.visible = debugCollidersOn;
+            return;
+          }
+          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton("LEFT", "DOWN");
+          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton("RIGHT", "DOWN");
+          if (e.key === " ") dispatchButton("PLUNGER", "DOWN");
+        };
+
+        const onKeyUp = (e: KeyboardEvent) => {
+          if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton("LEFT", "UP");
+          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton("RIGHT", "UP");
+          if (e.key === " ") dispatchButton("PLUNGER", "UP");
+        };
+
+        if (cancelled) return;
+
+        document.addEventListener("keydown", onKeyDown);
+        document.addEventListener("keyup", onKeyUp);
+
+        (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyDown = onKeyDown;
+        (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyUp = onKeyUp;
 
         if (ballMesh) ballMesh.visible = true;
         physicsReady = true;

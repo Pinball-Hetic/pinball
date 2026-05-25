@@ -6,6 +6,9 @@ export interface ServerToClientEvents {
   'input:button': (data: ButtonInput) => void
   'input:tilt': (data: TiltInput) => void
   'input:sensor': (data: SensorInput) => void
+  // Routé par le server uniquement à la room `input-bridge` (mode
+  // `simulate-esp32`). Pas un event broadcasté aux frontends.
+  'dev:simulate-button': (data: ButtonInput) => void
 }
 
 export interface ClientToServerEvents {
@@ -15,6 +18,10 @@ export interface ClientToServerEvents {
   'input:button': (data: ButtonInput) => void
   'input:tilt': (data: TiltInput) => void
   'input:sensor': (data: SensorInput) => void
+  // Émis uniquement par les frontends en mode `simulate-esp32` (clavier
+  // → réseau pour valider la chaîne sans hardware). Le server le
+  // retransforme en `input:button` broadcast à TOUS (y compris émetteur).
+  'dev:simulate-button': (data: ButtonInput) => void
 }
 
 export interface ScoreUpdate {
