@@ -9,6 +9,7 @@ apps/
 ├── playfield/      # Écran jeu 3D (Next.js + Three.js + Rapier)
 ├── dmd/            # Écran DMD — score temps réel (Next.js + Socket.io)
 ├── backglass/      # Écran backglass — classement (Next.js + Socket.io)
+├── input-bridge/   # Pont USB-Serial (ESP32) ↔ Socket.io (Bun, pas de HTTP)
 └── server/         # Backend API + WebSocket (Express + Prisma)
 
 packages/
@@ -59,6 +60,13 @@ Reçoit événements Socket.io du server, affiche score/combo live.
 ### `apps/backglass` — Écran backglass (classement)
 Fetch leaderboard via API REST + refresh Socket.io.
 
+### `apps/input-bridge` — Pont USB-Serial ↔ Socket.io
+Lit le port série de l'ESP32 boutons (USB-CDC), parse un protocole texte
+ligne par ligne, relaye les events au `server` en Socket.io. Pas de HTTP,
+pas de port exposé. Deux modes : `mock` (binding virtuel + scénario de
+démo, défaut en dev) et `serial` (port réel sur la borne). Voir
+`apps/input-bridge/README.md` pour le protocole et les vars d'env.
+
 ### `packages/shared-types` — Types partagés
 Types Socket.io (ServerToClientEvents, ClientToServerEvents), ScoreUpdate, LeaderboardEntry.
 
@@ -95,10 +103,104 @@ File: `apps/playfield/public/playfield/Pinballmap.glb`
 
 ## Ports
 
-| App | Port hôte | Port conteneur |
-|-----|-----------|----------------|
-| playfield | 3333 | 3000 |
-| server | 3334 | 3001 |
-| dmd | 3335 | 3000 |
-| backglass | 3336 | 3000 |
-| db | 5432 | 5432 |
+> ⚠️ Cette table décrit le dev **hors Fliphetic** (compose direct sur poste
+> de développeur). En **prod Fliphetic** les ports hôtes des écrans sont
+> dynamiques (`"0:3000"`, attribués par Docker, résolus par Fliphetic via
+> `docker compose port`). `server` et `db` n'ont **aucun** port hôte —
+> communication interne au réseau Docker uniquement.
+
+| App | Port hôte (dev local) | Port conteneur |
+|-----|-----------------------|----------------|
+| playfield | dynamique | 3000 |
+| dmd | dynamique | 3000 |
+| backglass | dynamique | 3000 |
+| server | (interne) | 3001 |
+| input-bridge | (aucun) | — |
+| db | (interne) | 5432 |
+
+## Intégration Fliphetic
+
+Cette app est packagée pour [Fliphetic](https://pandormedia.github.io/fliphetic/)
+(orchestrateur de borne pédagogique PANDOR Media). Voir `fliphetic.toml`
+à la racine pour le manifeste.
+
+### Cycle de chargement (côté borne)
+
+1. `git fetch` + checkout de la branche `[deploy].ref` (= `dev`).
+2. `docker compose down` de l'app précédente.
+3. Flash ESP32 (désactivé tant que le firmware n'existe pas).
+4. `docker compose up` + attente des healthchecks (`ready_timeout = 120`).
+5. Résolution des écrans via `docker compose port` → chaque kiosque
+   Chromium pointe sur `http://<host>:<port_dynamique>/`.
+
+### Règles d'or
+
+- **Pas de port hôte fixe** sur les services écrans : toujours `"0:3000"`.
+- **`db` et `server` ne s'exposent pas** sur l'hôte.
+- **Healthcheck obligatoire** sur tout service dont on dépend
+  (`condition: service_healthy`). Fliphetic se fie à `healthy` pour
+  basculer les kiosques.
+- **Ne jamais hardcoder `localhost:<port>`** dans les frontends :
+  Chromium tourne sur l'hôte avec un port dynamique. Utiliser des URLs
+  **same-origin** (cf. ci-dessous).
+
+### Socket.io same-origin
+
+`server` n'a pas de port hôte sous Fliphetic. Pour que les frontends
+puissent ouvrir une Socket.io vers lui :
+
+- Chaque `next.config.js` (playfield, dmd, backglass) **proxy** les
+  chemins `/socket.io/:path*` et `/api/:path*` vers
+  `${SERVER_INTERNAL_URL}` (défaut : `http://server:3001` = DNS Docker).
+- Les hooks Socket.io détectent `NEXT_PUBLIC_SOCKET_URL` :
+  - **défini** (dev, port serveur exposé `3334:3001`) → `io(url, {
+    transports: ['websocket'] })`, WS direct.
+  - **undefined** (prod Fliphetic, same-origin via rewrite) → `io(undefined,
+    { transports: ['polling'] })`, **polling pur**.
+- Pourquoi polling en Fliphetic : les rewrites Next.js ne proxient pas
+  les upgrades WebSocket (`HTTP/1.1 Upgrade` → 101 Switching Protocols
+  perd l'upgrade après le rewrite). Latence polling ~50–100 ms,
+  acceptable pour boutons/score.
+- Dev local hors Docker : surcharger
+  `SERVER_INTERNAL_URL=http://localhost:3001` (pour les rewrites) et/ou
+  `NEXT_PUBLIC_SOCKET_URL=http://localhost:3334` (pour les clients
+  Socket.io en WS direct).
+
+### Protocole ESP32 ↔ input-bridge
+
+**USB-Serial CDC**, texte UTF-8 ligne par ligne, baud 115200.
+
+```
+BTN:<ID>:<DOWN|UP>        # boutons (LEFT/RIGHT/PLUNGER/START/...)
+TILT:TRIGGERED            # capteur tilt
+SENSOR:<ID>:<VALUE>       # capteur générique
+```
+
+MQTT, WebSocket Wi-Fi et HID clavier ont été évalués et **rejetés**
+(latence, complexité broker, perte de contrôle des codes touche). Ne pas
+rouvrir ce débat sans raison nouvelle. Le serial-CDC est immédiat,
+debugable (`cu`/`screen`), tolère le reboot USB ESP32 après flash
+Fliphetic (l'`input-bridge` retente l'ouverture 60×500 ms).
+
+### TODO Fliphetic (hors session courante)
+
+- **Firmware ESP32** : tant que les specs hardware HETIC ne sont pas
+  reçues (variante ESP32, câblage boutons/LEDs/vibreur, nombre de
+  boutons, bandeau LED adressable), ne pas écrire de firmware.
+- **`.github/workflows/firmware.yml`** : build PlatformIO + `esptool
+  merge_bin` + commit du `.bin`. À faire en même temps que le firmware.
+- **Activer `[esp32.buttons]`** dans `fliphetic.toml` (décommenter)
+  quand le firmware existe + nom du device confirmé côté admin borne.
+- **Activer `devices:`** du service `input-bridge` quand un chemin
+  `/dev/serial/by-id/...` stable sera disponible. Passer
+  `INPUT_BRIDGE_MODE=serial`.
+- **Pré-build images Docker GHCR** : les builds Next.js prennent
+  plusieurs minutes au chargement Fliphetic. Optimisation perf à faire
+  en session dédiée (cf. Recette 4 de la doc Fliphetic).
+- **`[deploy].strategy = "tag"`** quand l'app est stable.
+- **Handlers Socket.io côté `apps/server`** pour traiter les events
+  `button`/`tilt`/`sensor` émis par `input-bridge`. Touche à la logique
+  de jeu → session dédiée.
+- **`fliphetic validate .`** en local (nécessite le CLI Fliphetic).
+- **Supprimer le scénario démo mock** d'`apps/input-bridge/src/index.ts`
+  dès qu'un firmware réel émet des events.

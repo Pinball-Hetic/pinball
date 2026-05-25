@@ -1,0 +1,36 @@
+[app]
+id          = "pinball-hetic"
+name        = "Pinball Hetic"
+authors     = ["Anthony", "Hugo", "Florian", "Imxran"]
+description = "Borne de flipper pédagogique HETIC — 3D playfield (Three.js + Rapier), DMD score temps réel, backglass leaderboard."
+
+[deploy]
+strategy = "branch"
+ref      = "dev"
+
+[screens]
+playfield = { service = "playfield", port = 3000 }
+backglass = { service = "backglass", port = 3000 }
+dmd       = { service = "dmd",       port = 3000 }
+
+[compose]
+file          = "docker-compose.yml"
+ready_timeout = 120
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ESP32 — désactivé tant que le firmware n'existe pas.
+#
+# Pour activer :
+#   1. Builder un binaire fusionné (esptool merge_bin) -> firmware/build/buttons.bin
+#   2. S'assurer que la borne expose un périphérique ESP32 enregistré sous le
+#      nom `buttons` (cf. dashboard Fliphetic, page System > ESP32).
+#   3. Décommenter le bloc ci-dessous.
+#   4. Garder `required = false` jusqu'à validation terrain ; passer à `true`
+#      ensuite pour bloquer le chargement si le flash échoue.
+#
+# [esp32.buttons]
+# firmware   = "firmware/build/buttons.bin"
+# chip       = "esp32"
+# flash_addr = "0x0"
+# required   = false
+# ─────────────────────────────────────────────────────────────────────────────

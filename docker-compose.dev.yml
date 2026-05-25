@@ -84,5 +84,24 @@ services:
       - server
     command: bun run dev
 
+  input-bridge:
+    build:
+      context: .
+      dockerfile: apps/input-bridge/Dockerfile
+    container_name: pinball-input-bridge-dev
+    working_dir: /app/apps/input-bridge
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      INPUT_BRIDGE_MODE: mock
+      SERIAL_PATH: /dev/MOCK_ESP32
+      SERIAL_BAUD: "115200"
+      SERVER_URL: http://server:3001
+    volumes:
+      - ./apps/input-bridge/src:/app/apps/input-bridge/src
+    depends_on:
+      - server
+    command: bun --watch src/index.ts
+
 volumes:
   postgres_dev_data:
