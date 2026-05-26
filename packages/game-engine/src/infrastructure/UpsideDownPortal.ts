@@ -13,7 +13,7 @@ import {
 import { findObjectByNormalizedName } from './GltfNodeNames';
 
 const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
-const REVEAL_DURATION = 0.55;
+const OPEN_POLISH_DURATION = 0.2;
 const PORTAL_PULSE_SPEED = 2.4;
 
 type SetupConfig = {
@@ -163,15 +163,12 @@ export class UpsideDownPortal {
   update(dt: number): void {
     this.pulseT += dt;
 
-    if (this.revealing && this.cover && this.coverMat) {
+    if (this.revealing && this.portalGroup) {
       this.revealT += dt;
-      const t = Math.min(1, this.revealT / REVEAL_DURATION);
-      const fade = t * t;
-      this.coverMat.transparent = true;
-      this.coverMat.opacity = 1 - fade;
-      this.cover.scale.setScalar(1 - fade * 0.35);
-      this.cover.position.y += dt * 0.012;
-      if (t >= 1) this.finishReveal();
+      const t = Math.min(1, this.revealT / OPEN_POLISH_DURATION);
+      const ease = 1 - Math.pow(1 - t, 3);
+      this.portalGroup.scale.setScalar(0.35 + ease * 0.65);
+      if (t >= 1) this.revealing = false;
     }
 
     if (!this.revealed || !this.portalGroup) return;
@@ -226,7 +223,10 @@ export class UpsideDownPortal {
     this.revealT = 0;
     this.suckBoost = 0;
 
-    if (this.portalGroup) this.portalGroup.visible = false;
+    if (this.portalGroup) {
+      this.portalGroup.visible = false;
+      this.portalGroup.scale.setScalar(1);
+    }
     this.removePortalSensor();
     this.onOpenChange?.(false);
 
@@ -403,15 +403,14 @@ export class UpsideDownPortal {
 
   private beginReveal(): void {
     this.revealing = true;
+    this.revealed = true;
     this.revealT = 0;
     this.removePhysicsCover();
-  }
-
-  private finishReveal(): void {
-    this.revealing = false;
-    this.revealed = true;
     if (this.cover) this.cover.visible = false;
-    if (this.portalGroup) this.portalGroup.visible = true;
+    if (this.portalGroup) {
+      this.portalGroup.visible = true;
+      this.portalGroup.scale.setScalar(0.35);
+    }
     this.createPortalSensor();
     this.onOpenChange?.(true);
   }
