@@ -196,9 +196,6 @@ export function useGameState() {
           tone: "target",
         });
       }
-      if (event.type === "PORTAL_TRANSITION_END") {
-        updateGameState("idle");
-      }
     };
 
   return {

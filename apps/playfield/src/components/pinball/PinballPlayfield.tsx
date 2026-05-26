@@ -664,8 +664,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               ballBody: ballPhysicsInst.body,
             },
             () => {
-              ballPhysicsInst?.resetToSpawn();
+              const portal = upsideDownPortal?.getAnchorPosition();
+              if (portal) ballPhysicsInst?.ejectFromPortal(portal);
               collisionProcessor?.resetPortalTrigger();
+              stuckDetector.reset();
               if (ballMesh) {
                 ballMesh.visible = true;
                 ballMesh.scale.setScalar(1);

@@ -6,6 +6,7 @@ import {
   BALL_ANGULAR_DAMPING,
   BALL_SPAWN_POSITION,
   BUMPER_EJECT_IMPULSE,
+  PORTAL_EJECT_IMPULSE,
   PLUNGER_IMPULSE_Z,
 } from '../domain/Ball';
 import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
@@ -63,6 +64,22 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.wakeUp();
+  }
+
+  ejectFromPortal(portal: { x: number; z: number }): void {
+    const y = ballCenterOnSurface(portal.z) + 0.004;
+    this.body.setTranslation({ x: portal.x, y, z: portal.z }, true);
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.wakeUp();
+    this.body.applyImpulse(
+      {
+        x: PORTAL_EJECT_IMPULSE.x,
+        y: PORTAL_EJECT_IMPULSE.y,
+        z: PORTAL_EJECT_IMPULSE.z,
+      },
+      true,
+    );
   }
 
   applyEjectionForce(bumperPos: { x: number; z: number }): void {
