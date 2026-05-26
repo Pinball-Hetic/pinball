@@ -1,5 +1,6 @@
 import { DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
-import type { DemogorgonHud } from "../../hooks/useGameState";
+import type { DemogorgonHud, ScorePop } from "../../hooks/useGameState";
+import ScorePopFeedback from "./ScorePopFeedback";
 
 interface GameOverlayProps {
   score: number;
@@ -7,6 +8,7 @@ interface GameOverlayProps {
   gameState: "idle" | "playing" | "game_over";
   initialLives: number;
   demogorgonHud: DemogorgonHud;
+  scorePops: ScorePop[];
   cabinetMode?: boolean;
 }
 
@@ -16,6 +18,7 @@ export default function GameOverlay({
   gameState,
   initialLives,
   demogorgonHud,
+  scorePops,
   cabinetMode = false,
 }: GameOverlayProps) {
   void cabinetMode;
@@ -31,6 +34,8 @@ export default function GameOverlay({
 
   return (
     <>
+      <ScorePopFeedback pops={scorePops} />
+
       <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-5 pt-4">
         <div className="font-mono space-y-1.5">
           <div className="text-3xl font-bold tabular-nums tracking-widest drop-shadow-[0_0_8px_rgba(255,180,0,0.6)]">
