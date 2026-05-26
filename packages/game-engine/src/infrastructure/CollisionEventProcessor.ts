@@ -8,11 +8,25 @@ export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
   private demogorgonTriggered = false;
   private demogorgonFightActive = false;
+  private demogorgonTargetArmed = false;
+  private demogorgonTargetBallInside = false;
+  private demogorgonTargetLatchIgnore = false;
   private demogorgonTargetHits = 0;
   private demogorgonTargetLastHitMs = 0;
 
   setDemogorgonFightActive(active: boolean): void {
     this.demogorgonFightActive = active;
+    if (!active) {
+      this.demogorgonTargetArmed = false;
+      this.demogorgonTargetLatchIgnore = false;
+    }
+  }
+
+  setDemogorgonTargetArmed(armed: boolean): void {
+    this.demogorgonTargetArmed = armed;
+    if (armed && this.demogorgonTargetBallInside) {
+      this.demogorgonTargetLatchIgnore = true;
+    }
   }
 
   constructor(
@@ -26,9 +40,15 @@ export class CollisionEventProcessor {
 
   process(eventQueue: RAPIER.EventQueue, gameState: string): void {
     eventQueue.drainCollisionEvents((h1, h2, started) => {
-      if (!started) return;
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
+
+      if (role === 'demogorgon_target') {
+        this.handleDemogorgonTargetSensor(started, gameState);
+        return;
+      }
+
+      if (!started) return;
 
       if (role.startsWith('bumper_')) {
         const idx = parseInt(role.split('_')[1], 10);
@@ -41,6 +61,8 @@ export class CollisionEventProcessor {
       if (role === 'drain' && gameState === 'playing') {
         this.demogorgonTriggered = false;
         this.demogorgonFightActive = false;
+        this.demogorgonTargetArmed = false;
+        this.demogorgonTargetLatchIgnore = false;
         this.demogorgonTargetHits = 0;
         this.drainBallUC.execute();
         this.resetDropTargets();
@@ -63,24 +85,11 @@ export class CollisionEventProcessor {
         if (!this.demogorgonTriggered) {
           this.demogorgonTriggered = true;
           this.demogorgonFightActive = true;
+          this.demogorgonTargetArmed = false;
+          this.demogorgonTargetLatchIgnore = false;
           this.demogorgonTargetHits = 0;
           this.demogorgonTargetLastHitMs = 0;
           this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: 150 });
-        }
-      }
-
-      if (role === 'demogorgon_target' && gameState === 'playing' && this.demogorgonFightActive) {
-        const now = performance.now();
-        if (now - this.demogorgonTargetLastHitMs < 450) return;
-        this.demogorgonTargetLastHitMs = now;
-        this.demogorgonTargetHits += 1;
-        this.emit({
-          type: 'DEMOGORGON_TARGET_HIT',
-          hitCount: this.demogorgonTargetHits,
-          scoreIncrement: 250,
-        });
-        if (this.demogorgonTargetHits >= DEMOGORGON_TARGET_HITS) {
-          this.demogorgonFightActive = false;
         }
       }
 
@@ -95,6 +104,32 @@ export class CollisionEventProcessor {
       this.dropTargetDown[dt.id] = false;
     }
     this.emit({ type: 'DROP_TARGET_RESET' });
+  }
+
+  private handleDemogorgonTargetSensor(started: boolean, gameState: string): void {
+    if (started) {
+      this.demogorgonTargetBallInside = true;
+      if (gameState !== 'playing' || !this.demogorgonFightActive || !this.demogorgonTargetArmed) return;
+      if (this.demogorgonTargetLatchIgnore) return;
+
+      const now = performance.now();
+      if (now - this.demogorgonTargetLastHitMs < 450) return;
+      this.demogorgonTargetLastHitMs = now;
+      this.demogorgonTargetHits += 1;
+      this.emit({
+        type: 'DEMOGORGON_TARGET_HIT',
+        hitCount: this.demogorgonTargetHits,
+        scoreIncrement: 250,
+      });
+      if (this.demogorgonTargetHits >= DEMOGORGON_TARGET_HITS) {
+        this.demogorgonFightActive = false;
+        this.demogorgonTargetArmed = false;
+      }
+      return;
+    }
+
+    this.demogorgonTargetBallInside = false;
+    this.demogorgonTargetLatchIgnore = false;
   }
 
   private handleDropTarget(role: string): void {

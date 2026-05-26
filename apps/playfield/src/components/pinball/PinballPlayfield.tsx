@@ -397,6 +397,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           garlandLights,
           bumperVisuals,
           onFightEnd: () => collisionProcessor?.setDemogorgonFightActive(false),
+          onTargetReady: () => collisionProcessor?.setDemogorgonTargetArmed(true),
         });
 
         // ── Ball mesh ────────────────────────────────────────────────────────

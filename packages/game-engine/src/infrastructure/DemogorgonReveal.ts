@@ -35,6 +35,7 @@ export type DemogorgonSetup = {
   garlandLights: GarlandLights | null;
   bumperVisuals: BumperVisuals | null;
   onFightEnd?: () => void;
+  onTargetReady?: () => void;
 };
 
 const _camPos = new THREE.Vector3();
@@ -57,6 +58,7 @@ export class DemogorgonReveal {
   private garlandLights: GarlandLights | null = null;
   private bumperVisuals: BumperVisuals | null = null;
   private onFightEnd: (() => void) | null = null;
+  private onTargetReady: (() => void) | null = null;
   private emit: GameEventListener | null = null;
 
   private playfieldShade: THREE.Mesh | null = null;
@@ -97,6 +99,7 @@ export class DemogorgonReveal {
     this.garlandLights = config.garlandLights;
     this.bumperVisuals = config.bumperVisuals;
     this.onFightEnd = config.onFightEnd ?? null;
+    this.onTargetReady = config.onTargetReady ?? null;
 
     this.playfieldShadeMat = new THREE.MeshBasicMaterial({
       color: 0x000000,
@@ -266,6 +269,7 @@ export class DemogorgonReveal {
         this.assistNextIn = ELEVEN_ASSIST_FIRST;
         this.setDemogorgonOpacity(0);
         if (this.demogorgonSprite) this.demogorgonSprite.visible = false;
+        this.onTargetReady?.();
       }
       return;
     }
@@ -334,6 +338,7 @@ export class DemogorgonReveal {
     this.garlandLights = null;
     this.bumperVisuals = null;
     this.onFightEnd = null;
+    this.onTargetReady = null;
     this.emit = null;
     this.playfieldShade = null;
     this.playfieldShadeMat = null;
