@@ -29,3 +29,4 @@ export * from './infrastructure/BumperVisuals';
 export * from './infrastructure/GarlandLights';
 export * from './infrastructure/DemogorgonReveal';
 export * from './infrastructure/UpsideDownPortal';
+export * from './infrastructure/UpsideDownTransition';

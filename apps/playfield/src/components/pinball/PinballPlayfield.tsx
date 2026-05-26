@@ -50,6 +50,7 @@ import {
   GarlandLights,
   DemogorgonReveal,
   UpsideDownPortal,
+  UpsideDownTransition,
 } from "@pinball/game-engine";
 import { useGameState } from "../../hooks/useGameState";
 import { unlockPinballAudio } from "../../audio/PinballSounds";
@@ -342,6 +343,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let garlandLights: GarlandLights | null = null;
     let demogorgonReveal: DemogorgonReveal | null = null;
     let upsideDownPortal: UpsideDownPortal | null = null;
+    let upsideDownTransition: UpsideDownTransition | null = null;
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
     let isChargingPlunger = false;
@@ -481,8 +483,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             : undefined,
         );
 
-        upsideDownPortal = new UpsideDownPortal();
-        upsideDownPortal.setup({ root: playfieldRoot, world });
+        upsideDownTransition = new UpsideDownTransition();
+        upsideDownTransition.setup(camera);
 
         ballPhysicsInst = new BallPhysics(world);
 
@@ -605,6 +607,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         // ── Use-cases ─────────────────────────────────────────────────────────
         const plunger = new Plunger();
+        let onPortalEnter: (() => void) | null = null;
 
         const baseEmit = buildEmit(() => { if (ballMesh) ballMesh.visible = false; });
         const emit: typeof baseEmit = (event) => {
@@ -613,6 +616,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           garlandLights?.onGameEvent(event);
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
+          if (event.type === "PORTAL_ENTER") onPortalEnter?.();
+          if (event.type === "BALL_LAUNCHED") collisionProcessor?.resetPortalTrigger();
           if (event.type === 'DROP_TARGET_HIT') {
             const meshName = event.targetId.replace('drop_', 'drop_target_');
             const mesh = playfieldRootRef?.getObjectByName(meshName);
@@ -635,6 +640,38 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           drainBallUC,
           emit,
         );
+
+        upsideDownPortal = new UpsideDownPortal();
+        upsideDownPortal.setup({
+          root: playfieldRoot,
+          world,
+          colliderMap,
+          onOpenChange: (open) => collisionProcessor?.setPortalOpen(open),
+        });
+
+        onPortalEnter = () => {
+          if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
+          if (upsideDownTransition.isActive()) return;
+          upsideDownPortal.setSuckBoost(2.5);
+          upsideDownTransition.start(
+            {
+              ballMesh,
+              ballBody: ballPhysicsInst.body,
+              portalPos: upsideDownPortal.getAnchorPosition(),
+            },
+            () => {
+              upsideDownPortal?.setSuckBoost(0);
+              ballPhysicsInst?.resetToSpawn();
+              collisionProcessor?.resetPortalTrigger();
+              if (ballMesh) {
+                ballMesh.visible = true;
+                ballMesh.scale.setScalar(1);
+              }
+              emit({ type: "PORTAL_TRANSITION_END" });
+            },
+          );
+        };
+
         demogorgonReveal?.setEmit(emit);
 
         // ── Input handling ────────────────────────────────────────────────────
@@ -725,6 +762,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       demogorgonReveal?.update(dt);
       upsideDownPortal?.update(dt);
 
+      const transitionActive = upsideDownTransition?.isActive() ?? false;
+      if (transitionActive) {
+        upsideDownTransition?.update(dt);
+      }
+
       prevLeftSwing = leftSwing;
       prevRightSwing = rightSwing;
       leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
@@ -748,13 +790,23 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         rightFlipperDebug.quaternion.copy(wq);
       }
 
-      if (physicsWorld) physicsWorld.update(time);
+      if (physicsWorld && !transitionActive) physicsWorld.update(time);
 
-      if (physicsWorld && collisionProcessor) {
+      if (physicsWorld && collisionProcessor && !transitionActive) {
         collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
       }
 
-      if (ballPhysicsInst && gameStateRef.current === "playing" && laneAnimSpeed <= 0) {
+      if (
+        ballPhysicsInst
+        && gameStateRef.current === "playing"
+        && laneAnimSpeed <= 0
+        && !transitionActive
+        && upsideDownPortal?.isOpen()
+      ) {
+        upsideDownPortal.applyMagnet(ballPhysicsInst.body);
+      }
+
+      if (ballPhysicsInst && gameStateRef.current === "playing" && laneAnimSpeed <= 0 && !transitionActive) {
         const bp = ballPhysicsInst.body.translation();
         const bv = ballPhysicsInst.body.linvel();
         const { result, leftHit, rightHit } = detectFlipperHit(
@@ -780,7 +832,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       }
 
       // Ball sync
-      if (ballMesh?.visible && ballPhysicsInst) {
+      if (ballMesh?.visible && ballPhysicsInst && !transitionActive) {
         if (gameStateRef.current === "idle" && physicsReady && laneAnimSpeed <= 0 && !isChargingPlunger) {
           const z = BALL_SPAWN_POSITION.z;
           ballPhysicsInst.body.setTranslation(
@@ -862,7 +914,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       }
 
       // ── OrbitControls update ─────────────────────────────────────────────
-      if (orbitControls) orbitControls.update();
+      if (orbitControls && !transitionActive) orbitControls.update();
 
       // ── Rapier debug render (tous colliders) ─────────────────────────────
       if (debugCollidersOn && physicsWorld) {
@@ -915,6 +967,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       garlandLights?.dispose();
       demogorgonReveal?.dispose();
       upsideDownPortal?.dispose();
+      upsideDownTransition?.dispose();
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();

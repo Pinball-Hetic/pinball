@@ -112,6 +112,19 @@ function playElevenAssist(): void {
   playNoise(0.14, 0.1, 900);
 }
 
+function playPortalEnter(): void {
+  playTone(90, 0.6, "sawtooth", 0.14, -180);
+  playTone(180, 0.5, "square", 0.08, 60);
+  playNoise(0.5, 0.22, 240);
+  window.setTimeout(() => playTone(55, 0.35, "sine", 0.12, -120), 180);
+  window.setTimeout(() => playNoise(0.25, 0.15, 600), 420);
+}
+
+function playPortalTransitionEnd(): void {
+  playTone(220, 0.18, "triangle", 0.1);
+  playNoise(0.12, 0.08, 1400);
+}
+
 export function handlePinballSoundEvent(event: GameEvent): void {
   switch (event.type) {
     case "BALL_LAUNCHED":
@@ -131,6 +144,12 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       break;
     case "ELEVEN_ASSIST":
       playElevenAssist();
+      break;
+    case "PORTAL_ENTER":
+      playPortalEnter();
+      break;
+    case "PORTAL_TRANSITION_END":
+      playPortalTransitionEnd();
       break;
     default:
       break;

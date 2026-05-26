@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEventListener } from '../domain/GameEvents';
-import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS } from '../domain/Ball';
+import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
 import type { BumperHit } from '../use-cases/BumperHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 
@@ -13,6 +13,17 @@ export class CollisionEventProcessor {
   private demogorgonTargetLatchIgnore = false;
   private demogorgonTargetHits = 0;
   private demogorgonTargetLastHitMs = 0;
+  private portalOpen = false;
+  private portalTriggered = false;
+
+  setPortalOpen(open: boolean): void {
+    this.portalOpen = open;
+    if (!open) this.portalTriggered = false;
+  }
+
+  resetPortalTrigger(): void {
+    this.portalTriggered = false;
+  }
 
   setDemogorgonFightActive(active: boolean): void {
     this.demogorgonFightActive = active;
@@ -45,6 +56,14 @@ export class CollisionEventProcessor {
 
       if (role === 'demogorgon_target') {
         this.handleDemogorgonTargetSensor(started, gameState);
+        return;
+      }
+
+      if (role === 'portal_enter') {
+        if (started && gameState === 'playing' && this.portalOpen && !this.portalTriggered) {
+          this.portalTriggered = true;
+          this.emit({ type: 'PORTAL_ENTER', scoreIncrement: PORTAL_ENTER_SCORE });
+        }
         return;
       }
 

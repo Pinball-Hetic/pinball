@@ -44,6 +44,11 @@ export const PORTAL_UPSIDE_DOWN = {
 
 export const PORTAL_HOLE_RADIUS = 0.02;
 export const PORTAL_COVER_RADIUS = 0.021;
+export const PORTAL_SENSOR_RADIUS = 0.017;
+export const PORTAL_MAGNET_RADIUS = 0.058;
+export const PORTAL_MAGNET_STRENGTH = 0.0055;
+export const PORTAL_ENTER_SCORE = 500;
+export const UPSIDE_DOWN_TRANSITION_DURATION = 4;
 
 export const ELEVEN_ASSIST_SCORE = 100;
 export const ELEVEN_ASSIST_INTERVAL = 3.2;

@@ -4,6 +4,7 @@ import {
   DEMOGORGON_TARGET_HITS,
   BUMPER_POSITIONS,
   DEMOGORGON_TARGET,
+  PORTAL_UPSIDE_DOWN,
 } from "@pinball/game-engine";
 import type { GameEventListener } from "@pinball/game-engine";
 import { handlePinballSoundEvent } from "../audio/PinballSounds";
@@ -182,6 +183,21 @@ export function useGameState() {
       }
       if (event.type === "BALL_LAUNCHED") {
         updateGameState("playing");
+      }
+      if (event.type === "PORTAL_ENTER") {
+        const point = jitterScreenPoint(
+          playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
+          3,
+        );
+        pushScorePop({
+          amount: event.scoreIncrement,
+          x: point.x,
+          y: point.y,
+          tone: "target",
+        });
+      }
+      if (event.type === "PORTAL_TRANSITION_END") {
+        updateGameState("idle");
       }
     };
 

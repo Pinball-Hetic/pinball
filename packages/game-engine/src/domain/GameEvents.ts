@@ -9,6 +9,8 @@ export type GameEvent =
   | { type: 'DEMOGORGON_REVEAL'; scoreIncrement: number }
   | { type: 'DEMOGORGON_TARGET_HIT'; hitCount: number; scoreIncrement: number }
   | { type: 'ELEVEN_ASSIST'; scoreIncrement: number }
+  | { type: 'PORTAL_ENTER'; scoreIncrement: number }
+  | { type: 'PORTAL_TRANSITION_END' }
   | { type: 'DRAIN' }
   | { type: 'BALL_LAUNCHED' };
 
