@@ -58,7 +58,7 @@ export default function GameOverlay({
 
       {showDemogorgonHud && demogorgonHud.elevenFlash && !demogorgonHud.victory && (
         <div className="pointer-events-none absolute inset-x-0 top-24 z-10 flex justify-center">
-          <p className="font-mono text-sm font-bold uppercase tracking-[0.25em] text-cyan-300 drop-shadow-[0_0_14px_rgba(100,220,255,0.9)] sm:text-base">
+          <p className="font-mono text-sm font-bold uppercase tracking-[0.25em] text-violet-300 drop-shadow-[0_0_14px_rgba(180,100,255,0.85)] sm:text-base">
             Eleven +100
           </p>
         </div>

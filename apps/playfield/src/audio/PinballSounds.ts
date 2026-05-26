@@ -107,9 +107,9 @@ function playVictory(): void {
 }
 
 function playElevenAssist(): void {
-  playTone(880, 0.12, "sine", 0.14, 200);
-  playTone(1320, 0.18, "triangle", 0.1, 100);
-  playNoise(0.08, 0.08, 2400);
+  playTone(140, 0.22, "sine", 0.16, -40);
+  playTone(420, 0.1, "triangle", 0.08, 80);
+  playNoise(0.14, 0.1, 900);
 }
 
 export function handlePinballSoundEvent(event: GameEvent): void {
