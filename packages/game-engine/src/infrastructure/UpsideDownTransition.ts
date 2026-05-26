@@ -1,132 +1,135 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { UPSIDE_DOWN_TRANSITION_DURATION } from '../domain/Ball';
+import { PORTAL_UPSIDE_DOWN, UPSIDE_DOWN_TRANSITION_DURATION } from '../domain/Ball';
+import type { GarlandLights } from './GarlandLights';
+import type { BumperVisuals } from './BumperVisuals';
 
-const DURATION = UPSIDE_DOWN_TRANSITION_DURATION;
+const TEXTURE_URL = '/playfield/upsidedown.jpg';
+
+const BLACKOUT = 0.12;
+const REVEAL = 0.55;
+const RESTORE = 0.35;
+const HOLD = UPSIDE_DOWN_TRANSITION_DURATION - BLACKOUT - REVEAL - RESTORE;
+
+const STROBE_HZ = 11;
+
+const PLAYFIELD_W = 0.58;
+const PLAYFIELD_D = 1.02;
+const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
+
+type Phase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore';
+
+type SetupConfig = {
+  root: THREE.Object3D;
+  scene: THREE.Scene;
+  camera: THREE.Camera;
+  garlandLights: GarlandLights | null;
+  bumperVisuals: BumperVisuals | null;
+};
 
 type StartConfig = {
   ballMesh: THREE.Object3D;
   ballBody: RAPIER.RigidBody;
-  portalPos: THREE.Vector3;
 };
 
 type CompleteHandler = () => void;
 
-const _ballPos = new THREE.Vector3();
-const _shake = new THREE.Vector3();
+const _camPos = new THREE.Vector3();
+const _lookTarget = new THREE.Vector3();
+
+function easeOut(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
 
 function easeIn(t: number): number {
   return t * t * t;
 }
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
-function makeTitleTexture(): THREE.CanvasTexture {
-  const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, size, size);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = 'bold 52px Georgia, serif';
-  ctx.fillStyle = 'rgba(180, 40, 60, 0.95)';
-  ctx.shadowColor = 'rgba(255, 80, 120, 0.9)';
-  ctx.shadowBlur = 28;
-  ctx.fillText('THE UPSIDE', size / 2, size / 2 - 28);
-  ctx.fillText('DOWN', size / 2, size / 2 + 32);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+function strobeOn(t: number): boolean {
+  return Math.sin(t * STROBE_HZ * Math.PI * 2) > 0;
 }
 
 export class UpsideDownTransition {
   private camera: THREE.Camera | null = null;
-  private overlayRoot: THREE.Group | null = null;
-  private voidPlane: THREE.Mesh | null = null;
-  private voidMat: THREE.MeshBasicMaterial | null = null;
-  private titleSprite: THREE.Sprite | null = null;
-  private titleMat: THREE.SpriteMaterial | null = null;
-  private sporePoints: THREE.Points | null = null;
-  private sporeGeo: THREE.BufferGeometry | null = null;
-  private sporeMat: THREE.PointsMaterial | null = null;
-  private sporeVel: Float32Array | null = null;
-  private ownedTextures: THREE.Texture[] = [];
-  private active = false;
+  private garlandLights: GarlandLights | null = null;
+  private bumperVisuals: BumperVisuals | null = null;
+
+  private playfieldShade: THREE.Mesh | null = null;
+  private playfieldShadeMat: THREE.MeshBasicMaterial | null = null;
+  private upsideDownSprite: THREE.Sprite | null = null;
+  private upsideDownMat: THREE.SpriteMaterial | null = null;
+  private flashLight: THREE.PointLight | null = null;
+
+  private phase: Phase = 'idle';
   private elapsed = 0;
+  private strobeT = 0;
+  private imageReady = false;
+  private active = false;
   private ballMesh: THREE.Object3D | null = null;
   private ballBody: RAPIER.RigidBody | null = null;
-  private portalPos = new THREE.Vector3();
-  private cameraBase = new THREE.Vector3();
   private onComplete: CompleteHandler | null = null;
 
-  setup(camera: THREE.Camera): void {
+  setup(config: SetupConfig): void {
     this.dispose();
-    this.camera = camera;
+    this.camera = config.camera;
+    this.garlandLights = config.garlandLights;
+    this.bumperVisuals = config.bumperVisuals;
 
-    this.overlayRoot = new THREE.Group();
-    this.overlayRoot.renderOrder = 2000;
-    camera.add(this.overlayRoot);
-
-    this.voidMat = new THREE.MeshBasicMaterial({
-      color: 0x0a0008,
+    this.playfieldShadeMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
       transparent: true,
       opacity: 0,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
     });
-    this.voidPlane = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2.4), this.voidMat);
-    this.voidPlane.position.z = -0.42;
-    this.voidPlane.renderOrder = 2001;
-    this.overlayRoot.add(this.voidPlane);
+    this.playfieldShade = new THREE.Mesh(
+      new THREE.PlaneGeometry(PLAYFIELD_W, PLAYFIELD_D),
+      this.playfieldShadeMat,
+    );
+    this.playfieldShade.rotation.x = -Math.PI / 2 + PLAYFIELD_TILT;
+    this.playfieldShade.position.set(0, 1.062, -0.067);
+    this.playfieldShade.renderOrder = 600;
+    this.playfieldShade.visible = false;
+    config.root.add(this.playfieldShade);
 
-    const titleTex = makeTitleTexture();
-    this.ownedTextures.push(titleTex);
-    this.titleMat = new THREE.SpriteMaterial({
-      map: titleTex,
+    this.upsideDownMat = new THREE.SpriteMaterial({
       transparent: true,
       opacity: 0,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
     });
-    this.titleSprite = new THREE.Sprite(this.titleMat);
-    this.titleSprite.center.set(0.5, 0.5);
-    this.titleSprite.scale.set(0.55, 0.28, 1);
-    this.titleSprite.position.z = -0.38;
-    this.titleSprite.renderOrder = 2003;
-    this.overlayRoot.add(this.titleSprite);
+    this.upsideDownSprite = new THREE.Sprite(this.upsideDownMat);
+    this.upsideDownSprite.center.set(0.5, 0.35);
+    this.upsideDownSprite.scale.set(0.55, 0.72, 1);
+    this.upsideDownSprite.renderOrder = 950;
+    this.upsideDownSprite.visible = false;
+    config.scene.add(this.upsideDownSprite);
 
-    const count = 280;
-    const positions = new Float32Array(count * 3);
-    this.sporeVel = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 2.4;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 1.8;
-      positions[i * 3 + 2] = -0.35 - Math.random() * 0.08;
-      this.sporeVel[i * 3] = (Math.random() - 0.5) * 0.35;
-      this.sporeVel[i * 3 + 1] = (Math.random() - 0.5) * 0.35;
-      this.sporeVel[i * 3 + 2] = (Math.random() - 0.5) * 0.05;
-    }
-    this.sporeGeo = new THREE.BufferGeometry();
-    this.sporeGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    this.sporeMat = new THREE.PointsMaterial({
-      color: 0xcc4466,
-      size: 0.012,
-      transparent: true,
-      opacity: 0,
-      depthTest: false,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      sizeAttenuation: true,
-    });
-    this.sporePoints = new THREE.Points(this.sporeGeo, this.sporeMat);
-    this.sporePoints.renderOrder = 2002;
-    this.overlayRoot.add(this.sporePoints);
+    this.flashLight = new THREE.PointLight(0x9933ff, 0, 0.55, 2);
+    this.flashLight.position.set(
+      PORTAL_UPSIDE_DOWN.x,
+      PORTAL_UPSIDE_DOWN.y + 0.12,
+      PORTAL_UPSIDE_DOWN.z,
+    );
+    config.root.add(this.flashLight);
+
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      TEXTURE_URL,
+      (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        if (this.upsideDownMat) {
+          this.upsideDownMat.map = tex;
+          this.upsideDownMat.needsUpdate = true;
+        }
+        this.imageReady = true;
+      },
+      undefined,
+      () => {
+        this.imageReady = true;
+      },
+    );
   }
 
   isActive(): boolean {
@@ -134,121 +137,174 @@ export class UpsideDownTransition {
   }
 
   start(config: StartConfig, onComplete: CompleteHandler): void {
-    if (!this.camera || !this.overlayRoot) return;
+    if (!this.camera) return;
 
     this.active = true;
+    this.phase = 'blackout';
     this.elapsed = 0;
+    this.strobeT = 0;
     this.ballMesh = config.ballMesh;
     this.ballBody = config.ballBody;
-    this.portalPos.copy(config.portalPos);
     this.onComplete = onComplete;
-    this.camera.getWorldPosition(this.cameraBase);
 
-    this.ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    this.ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    if (this.ballMesh) {
+      this.ballMesh.visible = false;
+      this.ballMesh.scale.setScalar(1);
+    }
+    if (this.ballBody) {
+      this.ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      this.ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
+    if (this.upsideDownSprite) this.upsideDownSprite.visible = true;
   }
 
   update(dt: number): void {
-    if (!this.active || !this.camera || !this.ballMesh || !this.ballBody) return;
+    if (!this.active || this.phase === 'idle') return;
 
+    this.syncSprite();
     this.elapsed += dt;
-    const t = Math.min(1, this.elapsed / DURATION);
+    this.strobeT += dt;
 
-    const suckEnd = 0.28;
-    const voidEnd = 0.72;
-    const titleEnd = 0.88;
+    const on = strobeOn(this.strobeT);
 
-    const suckT = smoothstep(0, suckEnd, t);
-    const voidT = smoothstep(suckEnd, voidEnd, t);
-    const titleT = smoothstep(voidEnd - 0.08, titleEnd, t);
-    const fadeOut = smoothstep(titleEnd, 1, t);
-
-    _ballPos.copy(this.portalPos);
-    _ballPos.y -= 0.008 * easeIn(suckT);
-    const scale = THREE.MathUtils.lerp(1, 0.05, easeIn(suckT));
-    this.ballMesh.position.lerp(_ballPos, 0.18 + suckT * 0.35);
-    this.ballMesh.scale.setScalar(scale);
-    this.ballBody.setTranslation(
-      { x: this.ballMesh.position.x, y: this.ballMesh.position.y, z: this.ballMesh.position.z },
-      true,
-    );
-
-    if (this.voidMat) {
-      this.voidMat.opacity = voidT * (1 - fadeOut) * 0.92;
-      const hue = 0.02 + Math.sin(this.elapsed * 8) * 0.01;
-      this.voidMat.color.setHSL(hue, 0.65, 0.04 + voidT * 0.06);
-    }
-
-    if (this.sporeMat && this.sporeGeo && this.sporeVel) {
-      this.sporeMat.opacity = voidT * (1 - fadeOut) * 0.85;
-      const pos = this.sporeGeo.attributes.position as THREE.BufferAttribute;
-      for (let i = 0; i < pos.count; i++) {
-        pos.setX(i, pos.getX(i) + this.sporeVel[i * 3]! * dt * (1 + voidT * 2));
-        pos.setY(i, pos.getY(i) + this.sporeVel[i * 3 + 1]! * dt * (1 + voidT * 2));
-        if (Math.abs(pos.getX(i)) > 1.4) this.sporeVel[i * 3]! *= -1;
-        if (Math.abs(pos.getY(i)) > 1.1) this.sporeVel[i * 3 + 1]! *= -1;
+    if (this.phase === 'blackout') {
+      this.applyPlayfieldStrobe(on, false, easeOut(Math.min(1, this.elapsed / BLACKOUT)));
+      this.setSpriteOpacity(0);
+      if (this.elapsed >= BLACKOUT) {
+        this.phase = 'reveal';
+        this.elapsed = 0;
+        this.strobeT = 0;
       }
-      pos.needsUpdate = true;
+      return;
     }
 
-    if (this.titleMat && this.titleSprite) {
-      this.titleMat.opacity = titleT * (1 - fadeOut);
-      const pulse = 1 + Math.sin(this.elapsed * 12) * 0.04 * titleT;
-      this.titleSprite.scale.set(0.55 * pulse, 0.28 * pulse, 1);
+    if (this.phase === 'reveal') {
+      const t = Math.min(1, this.elapsed / REVEAL);
+      this.applyPlayfieldStrobe(on, false, 1);
+      this.setSpriteOpacity(this.imageReady && on ? easeOut(t) * 0.95 : 0);
+      if (this.elapsed >= REVEAL) {
+        this.phase = 'hold';
+        this.elapsed = 0;
+        this.setSpriteOpacity(0.95);
+        this.applyPlayfieldStrobe(false, false, 0.72);
+        this.garlandLights?.setStrobe(false, false);
+        this.bumperVisuals?.setStrobe(false, false);
+        if (this.flashLight) this.flashLight.intensity = 0;
+      }
+      return;
     }
 
-    if (voidT > 0.05 && fadeOut < 0.95) {
-      const shakeAmp = 0.004 * voidT * (1 - fadeOut);
-      _shake.set(
-        (Math.random() - 0.5) * shakeAmp,
-        (Math.random() - 0.5) * shakeAmp,
-        (Math.random() - 0.5) * shakeAmp * 0.3,
-      );
-      this.camera.position.copy(this.cameraBase).add(_shake);
-    } else if (fadeOut >= 0.95) {
-      this.camera.position.copy(this.cameraBase);
+    if (this.phase === 'hold') {
+      this.setSpriteOpacity(0.95);
+      if (this.playfieldShadeMat) {
+        this.playfieldShadeMat.opacity = 0.72;
+        if (this.playfieldShade) this.playfieldShade.visible = true;
+      }
+      if (this.elapsed >= HOLD) {
+        this.phase = 'restore';
+        this.elapsed = 0;
+        this.strobeT = 0;
+      }
+      return;
     }
 
-    if (t >= 1) this.finish();
+    if (this.phase === 'restore') {
+      const darkMix = 1 - easeIn(Math.min(1, this.elapsed / RESTORE));
+      this.applyPlayfieldStrobe(on, false, darkMix * 0.5);
+      this.setSpriteOpacity(0.95 * darkMix);
+      if (darkMix <= 0) this.finish();
+    }
   }
 
   dispose(): void {
-    this.active = false;
-    this.elapsed = 0;
-    this.ballMesh = null;
-    this.ballBody = null;
-    this.onComplete = null;
+    this.resetAtmosphere();
 
-    if (this.voidPlane) this.voidPlane.geometry.dispose();
-    this.voidMat?.dispose();
-    this.titleMat?.dispose();
-    this.sporeGeo?.dispose();
-    this.sporeMat?.dispose();
-    for (const tex of this.ownedTextures) tex.dispose();
-    this.ownedTextures = [];
+    if (this.playfieldShade) {
+      this.playfieldShade.geometry.dispose();
+      this.playfieldShade.parent?.remove(this.playfieldShade);
+    }
+    this.playfieldShadeMat?.dispose();
 
-    if (this.overlayRoot && this.camera) {
-      this.camera.remove(this.overlayRoot);
+    if (this.upsideDownMat) {
+      this.upsideDownMat.map?.dispose();
+      this.upsideDownMat.dispose();
+    }
+    if (this.upsideDownSprite) this.upsideDownSprite.parent?.remove(this.upsideDownSprite);
+
+    if (this.flashLight) {
+      this.flashLight.dispose();
+      this.flashLight.parent?.remove(this.flashLight);
     }
 
     this.camera = null;
-    this.overlayRoot = null;
-    this.voidPlane = null;
-    this.voidMat = null;
-    this.titleSprite = null;
-    this.titleMat = null;
-    this.sporePoints = null;
-    this.sporeGeo = null;
-    this.sporeMat = null;
-    this.sporeVel = null;
+    this.garlandLights = null;
+    this.bumperVisuals = null;
+    this.playfieldShade = null;
+    this.playfieldShadeMat = null;
+    this.upsideDownSprite = null;
+    this.upsideDownMat = null;
+    this.flashLight = null;
     this.onComplete = null;
+    this.active = false;
+    this.phase = 'idle';
+    this.imageReady = false;
+  }
+
+  private syncSprite(): void {
+    if (!this.camera || !this.upsideDownSprite || !this.upsideDownSprite.visible) return;
+
+    this.camera.getWorldPosition(_camPos);
+    this.camera.getWorldDirection(_lookTarget);
+    _lookTarget.normalize();
+
+    this.upsideDownSprite.position.copy(_camPos).addScaledVector(_lookTarget, 0.38);
+    this.upsideDownSprite.position.y += 0.06;
+    this.upsideDownSprite.quaternion.copy(this.camera.quaternion);
+  }
+
+  private setSpriteOpacity(opacity: number): void {
+    if (this.upsideDownMat) {
+      this.upsideDownMat.opacity = THREE.MathUtils.clamp(opacity, 0, 1);
+    }
+  }
+
+  private applyPlayfieldStrobe(on: boolean, fullMap: boolean, mix: number): void {
+    if (!this.playfieldShadeMat) return;
+
+    const active = mix > 0.02;
+    const shadeOpacity = on
+      ? (fullMap ? 0 : 0.12) * mix
+      : 0.94 * mix;
+
+    this.playfieldShadeMat.opacity = THREE.MathUtils.clamp(shadeOpacity, 0, 0.96);
+    if (this.playfieldShade) this.playfieldShade.visible = active;
+
+    if (this.flashLight) {
+      this.flashLight.intensity = on && !fullMap ? 2.4 * mix : 0;
+    }
+
+    this.garlandLights?.setStrobe(active, on, fullMap);
+    this.bumperVisuals?.setStrobe(active, on, fullMap);
+  }
+
+  private resetAtmosphere(): void {
+    this.phase = 'idle';
+    this.elapsed = 0;
+    this.strobeT = 0;
+    this.active = false;
+
+    if (this.flashLight) this.flashLight.intensity = 0;
+    if (this.playfieldShade) this.playfieldShade.visible = false;
+    if (this.playfieldShadeMat) this.playfieldShadeMat.opacity = 0;
+    if (this.upsideDownSprite) this.upsideDownSprite.visible = false;
+    this.setSpriteOpacity(0);
+
+    this.garlandLights?.setStrobe(false, false);
+    this.bumperVisuals?.setStrobe(false, false);
   }
 
   private finish(): void {
     if (!this.active) return;
-
-    this.active = false;
-    this.elapsed = 0;
 
     if (this.ballMesh) {
       this.ballMesh.scale.setScalar(1);
@@ -258,10 +314,8 @@ export class UpsideDownTransition {
       this.ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
       this.ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
     }
-    if (this.voidMat) this.voidMat.opacity = 0;
-    if (this.sporeMat) this.sporeMat.opacity = 0;
-    if (this.titleMat) this.titleMat.opacity = 0;
-    if (this.camera) this.camera.position.copy(this.cameraBase);
+
+    this.resetAtmosphere();
 
     this.ballMesh = null;
     this.ballBody = null;

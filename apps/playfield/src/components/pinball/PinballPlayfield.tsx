@@ -484,7 +484,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         );
 
         upsideDownTransition = new UpsideDownTransition();
-        upsideDownTransition.setup(camera);
+        upsideDownTransition.setup({
+          root: playfieldRoot,
+          scene,
+          camera,
+          garlandLights,
+          bumperVisuals,
+        });
 
         ballPhysicsInst = new BallPhysics(world);
 
@@ -652,15 +658,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         onPortalEnter = () => {
           if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
           if (upsideDownTransition.isActive()) return;
-          upsideDownPortal.setSuckBoost(2.5);
           upsideDownTransition.start(
             {
               ballMesh,
               ballBody: ballPhysicsInst.body,
-              portalPos: upsideDownPortal.getAnchorPosition(),
             },
             () => {
-              upsideDownPortal?.setSuckBoost(0);
               ballPhysicsInst?.resetToSpawn();
               collisionProcessor?.resetPortalTrigger();
               if (ballMesh) {
@@ -765,25 +768,25 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const transitionActive = upsideDownTransition?.isActive() ?? false;
       if (transitionActive) {
         upsideDownTransition?.update(dt);
+      } else {
+        prevLeftSwing = leftSwing;
+        prevRightSwing = rightSwing;
+        leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
+        rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
+        if (leftFlipperPivot) applyFlipperSwing(leftFlipperPivot, leftSwing);
+        if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
+
+        syncFlipperBody(leftFlipperBody, leftFlipperObj);
+        syncFlipperBody(rightFlipperBody, rightFlipperObj);
       }
 
-      prevLeftSwing = leftSwing;
-      prevRightSwing = rightSwing;
-      leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
-      rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
-      if (leftFlipperPivot) applyFlipperSwing(leftFlipperPivot, leftSwing);
-      if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
-
-      syncFlipperBody(leftFlipperBody, leftFlipperObj);
-      syncFlipperBody(rightFlipperBody, rightFlipperObj);
-
-      if (leftFlipperDebug && leftFlipperObj) {
+      if (leftFlipperDebug && leftFlipperObj && !transitionActive) {
         const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
         leftFlipperObj.getWorldPosition(wp); leftFlipperObj.getWorldQuaternion(wq);
         leftFlipperDebug.position.copy(wp);
         leftFlipperDebug.quaternion.copy(wq);
       }
-      if (rightFlipperDebug && rightFlipperObj) {
+      if (rightFlipperDebug && rightFlipperObj && !transitionActive) {
         const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
         rightFlipperObj.getWorldPosition(wp); rightFlipperObj.getWorldQuaternion(wq);
         rightFlipperDebug.position.copy(wp);

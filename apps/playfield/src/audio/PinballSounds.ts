@@ -113,11 +113,10 @@ function playElevenAssist(): void {
 }
 
 function playPortalEnter(): void {
-  playTone(90, 0.6, "sawtooth", 0.14, -180);
-  playTone(180, 0.5, "square", 0.08, 60);
-  playNoise(0.5, 0.22, 240);
-  window.setTimeout(() => playTone(55, 0.35, "sine", 0.12, -120), 180);
-  window.setTimeout(() => playNoise(0.25, 0.15, 600), 420);
+  playTone(55, 0.55, "sawtooth", 0.18, -200);
+  playTone(110, 0.45, "square", 0.1, 100);
+  playNoise(0.35, 0.2, 180);
+  window.setTimeout(() => playTone(880, 0.2, "sawtooth", 0.08, -300), 120);
 }
 
 function playPortalTransitionEnd(): void {
