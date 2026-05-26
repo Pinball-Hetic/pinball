@@ -36,6 +36,15 @@ export const DEMOGORGON_TARGET = {
 
 export const DEMOGORGON_TARGET_HITS = 2;
 
+export const PORTAL_UPSIDE_DOWN = {
+  x: -0.000751,
+  y: 1.015191,
+  z: -0.064818,
+} as const;
+
+export const PORTAL_HOLE_RADIUS = 0.02;
+export const PORTAL_COVER_RADIUS = 0.021;
+
 export const ELEVEN_ASSIST_SCORE = 100;
 export const ELEVEN_ASSIST_INTERVAL = 3.2;
 

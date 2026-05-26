@@ -49,6 +49,7 @@ import {
   BumperVisuals,
   GarlandLights,
   DemogorgonReveal,
+  UpsideDownPortal,
 } from "@pinball/game-engine";
 import { useGameState } from "../../hooks/useGameState";
 import { unlockPinballAudio } from "../../audio/PinballSounds";
@@ -340,6 +341,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
     let demogorgonReveal: DemogorgonReveal | null = null;
+    let upsideDownPortal: UpsideDownPortal | null = null;
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
     let isChargingPlunger = false;
@@ -479,6 +481,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             : undefined,
         );
 
+        upsideDownPortal = new UpsideDownPortal();
+        upsideDownPortal.setup({ root: playfieldRoot, world });
+
         ballPhysicsInst = new BallPhysics(world);
 
         // ── Flipper kinematic bodies (ConvexHull) ─────────────────────────────
@@ -607,6 +612,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           bumperVisuals?.onGameEvent(event);
           garlandLights?.onGameEvent(event);
           demogorgonReveal?.onGameEvent(event);
+          upsideDownPortal?.onGameEvent(event);
           if (event.type === 'DROP_TARGET_HIT') {
             const meshName = event.targetId.replace('drop_', 'drop_target_');
             const mesh = playfieldRootRef?.getObjectByName(meshName);
@@ -647,6 +653,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (e.key === " ") {
             if (gameStateRef.current === "game_over") {
               resetGame();
+              upsideDownPortal?.reset();
               if (ballMesh) ballMesh.visible = true;
               return;
             }
@@ -716,6 +723,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       bumperVisuals?.update(dt);
       garlandLights?.update(dt);
       demogorgonReveal?.update(dt);
+      upsideDownPortal?.update(dt);
 
       prevLeftSwing = leftSwing;
       prevRightSwing = rightSwing;
@@ -906,6 +914,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       bumperVisuals?.dispose();
       garlandLights?.dispose();
       demogorgonReveal?.dispose();
+      upsideDownPortal?.dispose();
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();
