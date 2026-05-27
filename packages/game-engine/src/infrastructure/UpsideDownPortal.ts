@@ -15,6 +15,7 @@ import { findObjectByNormalizedName } from './GltfNodeNames';
 const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 const OPEN_POLISH_DURATION = 0.2;
 const PORTAL_PULSE_SPEED = 2.4;
+const PORTAL_VINE_COUNT = 5;
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -45,6 +46,13 @@ type PortalParticle = {
   yOffset: number;
 };
 
+type PortalVine = {
+  mesh: THREE.Mesh;
+  phase: number;
+};
+
+const _vinePoint = new THREE.Vector3();
+
 export class UpsideDownPortal {
   private cover: THREE.Mesh | null = null;
   private coverMat: THREE.MeshStandardMaterial | null = null;
@@ -62,6 +70,8 @@ export class UpsideDownPortal {
   private vortexMat: THREE.MeshBasicMaterial | null = null;
   private rimLight: THREE.PointLight | null = null;
   private coreLight: THREE.PointLight | null = null;
+  private vineMat: THREE.MeshStandardMaterial | null = null;
+  private vines: PortalVine[] = [];
   private particles: PortalParticle[] = [];
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
@@ -194,6 +204,15 @@ export class UpsideDownPortal {
     if (this.coreLight) {
       this.coreLight.intensity = 0.85 * pulse * (1 + this.suckBoost * 1.2);
     }
+    if (this.vineMat) {
+      this.vineMat.emissiveIntensity = 0.22 + pulse * 0.28 * (1 + this.suckBoost * 0.4);
+    }
+
+    for (const vine of this.vines) {
+      const sway = Math.sin(this.pulseT * 1.6 + vine.phase) * 0.0009;
+      vine.mesh.position.y = sway;
+      vine.mesh.rotation.z = Math.sin(this.pulseT * 1.1 + vine.phase * 1.3) * 0.06;
+    }
 
     this.portalGroup.children.forEach((child, i) => {
       if (child instanceof THREE.Mesh && child.geometry.type === 'TorusGeometry') {
@@ -226,6 +245,10 @@ export class UpsideDownPortal {
     if (this.portalGroup) {
       this.portalGroup.visible = false;
       this.portalGroup.scale.setScalar(1);
+    }
+    for (const vine of this.vines) {
+      vine.mesh.position.y = 0;
+      vine.mesh.rotation.z = 0;
     }
     this.removePortalSensor();
     this.onOpenChange?.(false);
@@ -276,6 +299,7 @@ export class UpsideDownPortal {
     this.ownedGeos = [];
     this.ownedMats = [];
     this.particles = [];
+    this.vines = [];
 
     this.cover = null;
     this.coverMat = null;
@@ -291,6 +315,7 @@ export class UpsideDownPortal {
     this.vortexMat = null;
     this.rimLight = null;
     this.coreLight = null;
+    this.vineMat = null;
     this.revealed = false;
     this.revealing = false;
     this.revealT = 0;
@@ -367,6 +392,8 @@ export class UpsideDownPortal {
     this.ownedGeos.push(innerRing.geometry);
     this.ownedMats.push(this.innerRingMat);
 
+    this.buildVines(group);
+
     const sparkMat = new THREE.MeshBasicMaterial({
       color: 0xff6688,
       transparent: true,
@@ -399,6 +426,47 @@ export class UpsideDownPortal {
     group.add(this.coreLight);
 
     return group;
+  }
+
+  private buildVines(group: THREE.Group): void {
+    this.vineMat = new THREE.MeshStandardMaterial({
+      color: 0x182818,
+      emissive: 0x661133,
+      emissiveIntensity: 0.35,
+      roughness: 0.94,
+      metalness: 0.03,
+    });
+    this.ownedMats.push(this.vineMat);
+
+    for (let i = 0; i < PORTAL_VINE_COUNT; i++) {
+      const startAngle = (i / PORTAL_VINE_COUNT) * Math.PI * 2 + 0.4;
+      const curl = i % 2 === 0 ? 1 : -1;
+      const points: THREE.Vector3[] = [];
+      const outerR = PORTAL_HOLE_RADIUS * 1.48;
+      const innerR = PORTAL_HOLE_RADIUS * 0.88;
+      const segments = 9;
+
+      for (let s = 0; s <= segments; s++) {
+        const t = s / segments;
+        const angle = startAngle + curl * t * 1.05;
+        const radius = THREE.MathUtils.lerp(outerR, innerR, t * t);
+        const lift = Math.sin(t * Math.PI) * 0.0035;
+        const wobble = Math.sin(t * Math.PI * 2.4 + i) * 0.0012;
+        points.push(_vinePoint.set(
+          Math.cos(angle) * radius + wobble,
+          0.0025 + lift,
+          Math.sin(angle) * radius - wobble * 0.6,
+        ).clone());
+      }
+
+      const curve = new THREE.CatmullRomCurve3(points);
+      const geo = new THREE.TubeGeometry(curve, 14, 0.00058, 4, false);
+      const mesh = new THREE.Mesh(geo, this.vineMat);
+      mesh.renderOrder = 9;
+      group.add(mesh);
+      this.ownedGeos.push(geo);
+      this.vines.push({ mesh, phase: i * 1.9 });
+    }
   }
 
   private beginReveal(): void {
