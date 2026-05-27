@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { GameEvent } from '../domain/GameEvents';
+import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
+import { normalizeGltfName } from './GltfNodeNames';
 
 const BLEND_DURATION = 2.8;
 const TARGET_BG = 0x0a0818;
@@ -11,6 +13,11 @@ const TARGET_AMBIENT_INTENSITY = 0.52;
 const TARGET_HEMI_INTENSITY = 0.32;
 const TARGET_DIR_INTENSITY = 1.05;
 const TARGET_FILL_INTENSITY = 0.38;
+const TARGET_SHADE_OPACITY = 0.46;
+
+const PLAYFIELD_W = 0.58;
+const PLAYFIELD_D = 1.02;
+const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 
 type MaterialSnapshot = {
   material: THREE.MeshStandardMaterial;
@@ -32,14 +39,26 @@ type SetupConfig = {
   root: THREE.Object3D;
   lighting: SceneLighting;
   garlandLights: GarlandLights | null;
+  bumperVisuals: BumperVisuals | null;
 };
 
 const _lerpColor = new THREE.Color();
+
+function skipAtmosphereTint(obj: THREE.Object3D): boolean {
+  const n = normalizeGltfName(obj.name);
+  if (/^guirlande-\d+$/.test(n)) return true;
+  if (/bumper-strangerthings/.test(n)) return true;
+  if (/^bumper_ring/.test(n)) return true;
+  return false;
+}
 
 export class UpsideDownAtmosphere {
   private materials: MaterialSnapshot[] = [];
   private lighting: SceneLighting | null = null;
   private garlandLights: GarlandLights | null = null;
+  private bumperVisuals: BumperVisuals | null = null;
+  private playfieldShade: THREE.Mesh | null = null;
+  private playfieldShadeMat: THREE.MeshBasicMaterial | null = null;
   private mix = 0;
   private targetMix = 0;
   private visited = false;
@@ -60,10 +79,12 @@ export class UpsideDownAtmosphere {
     this.dispose();
     this.lighting = config.lighting;
     this.garlandLights = config.garlandLights;
+    this.bumperVisuals = config.bumperVisuals;
     this.materials = [];
 
     config.root.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh)) return;
+      if (skipAtmosphereTint(obj)) return;
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       for (const mat of mats) {
         if (!(mat instanceof THREE.MeshStandardMaterial)) continue;
@@ -76,6 +97,23 @@ export class UpsideDownAtmosphere {
         });
       }
     });
+
+    this.playfieldShadeMat = new THREE.MeshBasicMaterial({
+      color: 0x180818,
+      transparent: true,
+      opacity: 0,
+      depthTest: true,
+      depthWrite: false,
+    });
+    this.playfieldShade = new THREE.Mesh(
+      new THREE.PlaneGeometry(PLAYFIELD_W, PLAYFIELD_D),
+      this.playfieldShadeMat,
+    );
+    this.playfieldShade.rotation.x = -Math.PI / 2 + PLAYFIELD_TILT;
+    this.playfieldShade.position.set(0, 1.062, -0.067);
+    this.playfieldShade.renderOrder = 550;
+    this.playfieldShade.visible = false;
+    config.root.add(this.playfieldShade);
 
     const bg = config.lighting.scene.background;
     if (bg instanceof THREE.Color) this.origBg.copy(bg);
@@ -125,9 +163,19 @@ export class UpsideDownAtmosphere {
 
   dispose(): void {
     this.applyMix(0);
+
+    if (this.playfieldShade) {
+      this.playfieldShade.geometry.dispose();
+      this.playfieldShade.parent?.remove(this.playfieldShade);
+    }
+    this.playfieldShadeMat?.dispose();
+
     this.materials = [];
     this.lighting = null;
     this.garlandLights = null;
+    this.bumperVisuals = null;
+    this.playfieldShade = null;
+    this.playfieldShadeMat = null;
     this.mix = 0;
     this.targetMix = 0;
     this.visited = false;
@@ -150,6 +198,14 @@ export class UpsideDownAtmosphere {
         entry.emissiveIntensity * 1.25 + 0.12,
         ease,
       );
+    }
+
+    if (this.playfieldShadeMat) {
+      const shadeOpacity = TARGET_SHADE_OPACITY * ease;
+      this.playfieldShadeMat.opacity = shadeOpacity;
+      if (this.playfieldShade) {
+        this.playfieldShade.visible = shadeOpacity > 0.01;
+      }
     }
 
     if (this.lighting) {
@@ -187,10 +243,10 @@ export class UpsideDownAtmosphere {
       fill.intensity = THREE.MathUtils.lerp(this.origFillIntensity, TARGET_FILL_INTENSITY, ease);
     }
 
-    if (this.garlandLights) {
-      const dim = THREE.MathUtils.lerp(1, 0.36, ease);
-      const strobe = THREE.MathUtils.lerp(0, 0.48, ease);
-      this.garlandLights.setAtmosphere(dim, strobe);
-    }
+    const dim = THREE.MathUtils.lerp(1, 0.36, ease);
+    const strobe = THREE.MathUtils.lerp(0, 0.48, ease);
+
+    this.garlandLights?.setAtmosphere(dim, strobe);
+    this.bumperVisuals?.setAtmosphere(dim, strobe);
   }
 }

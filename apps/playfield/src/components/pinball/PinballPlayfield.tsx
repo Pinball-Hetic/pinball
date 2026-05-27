@@ -662,6 +662,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         upsideDownAtmosphere.setup({
           root: playfieldRoot,
           garlandLights,
+          bumperVisuals,
           lighting: {
             scene,
             renderer,

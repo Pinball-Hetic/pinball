@@ -94,6 +94,13 @@ export class BumperVisuals {
   private strobeActive = false;
   private strobeOn = false;
   private strobeNormalWhenOn = false;
+  private atmosphereDim = 1;
+  private atmosphereStrobe = 0;
+
+  setAtmosphere(dim: number, strobe: number): void {
+    this.atmosphereDim = dim;
+    this.atmosphereStrobe = strobe;
+  }
 
   setStrobe(active: boolean, on: boolean, normalWhenOn = false): void {
     this.strobeActive = active;
@@ -222,6 +229,12 @@ export class BumperVisuals {
       }
     }
 
+    const strobeFlash = this.atmosphereStrobe > 0
+      ? (Math.sin(this.elapsed * 18) * 0.5 + 0.5) * this.atmosphereStrobe
+      : 0;
+    const moodMul = this.atmosphereDim + strobeFlash * (1 - this.atmosphereDim);
+    const upsideDown = this.atmosphereStrobe > 0.2;
+
     for (const part of this.parts) {
       const portal = PORTAL_BY_INDEX[part.bumperIndex] ?? PORTAL_BY_INDEX[0]!;
       const hitT = this.hitTimers.get(part.bumperIndex) ?? 0;
@@ -250,27 +263,44 @@ export class BumperVisuals {
         _emissiveB.setHex(portal.rim);
         part.material.emissive.copy(_emissiveA).lerp(_emissiveB, 0.35 + slowBreath * 0.25);
 
-        const intensity = part.baseIntensity * slowBreath * fastFlicker + hitFactor;
+        const intensity = (part.baseIntensity * slowBreath * fastFlicker + hitFactor) * moodMul;
         part.material.emissiveIntensity = intensity;
 
-        if (hitFactor > 0) {
+        if (upsideDown) {
+          const flashColor = strobeFlash > 0.45
+            ? 0xff1133
+            : part.bumperIndex === 1 ? 0x7722aa : 0x991133;
+          part.material.emissive.setHex(flashColor);
+        } else if (hitFactor > 0) {
           part.material.emissive.lerp(_emissiveB.setHex(0xff2244), Math.min(0.25, hitFactor * 0.12));
         }
 
         if (part.portalLight) {
-          _portalLightColor.setHex(portal.rim).lerp(_emissiveB.setHex(0xff3355), Math.min(0.2, hitFactor * 0.15));
-          part.portalLight.color.copy(_portalLightColor);
-          part.portalLight.intensity = 0.28 * slowBreath + hitFactor * 0.16;
+          if (upsideDown) {
+            const flashColor = strobeFlash > 0.45
+              ? 0xff2244
+              : part.bumperIndex === 1 ? 0x8844cc : 0xaa2244;
+            part.portalLight.color.setHex(flashColor);
+            part.portalLight.intensity = (0.28 * slowBreath + hitFactor * 0.16) * moodMul;
+          } else {
+            _portalLightColor.setHex(portal.rim).lerp(_emissiveB.setHex(0xff3355), Math.min(0.2, hitFactor * 0.15));
+            part.portalLight.color.copy(_portalLightColor);
+            part.portalLight.intensity = 0.28 * slowBreath + hitFactor * 0.16;
+          }
         }
       } else {
         part.material.emissive.setHex(RING_EMISSIVE);
-        if (hitFactor > 0) {
+        if (upsideDown) {
+          const flashColor = strobeFlash > 0.45 ? 0xff1133 : 0x6622aa;
+          part.material.emissive.setHex(flashColor);
+          part.material.emissiveIntensity = (0.55 + slowBreath * 0.25 + hitFactor * 0.22) * moodMul;
+        } else if (hitFactor > 0) {
           _emissiveA.setHex(RING_EMISSIVE);
           _emissiveB.setHex(portal.rim);
           part.material.emissive.copy(_emissiveA).lerp(_emissiveB, Math.min(0.3, hitFactor * 0.18));
           part.material.emissiveIntensity = 0.55 + hitFactor * 0.22;
         } else {
-          part.material.emissiveIntensity = 0.55 + slowBreath * 0.25;
+          part.material.emissiveIntensity = (0.55 + slowBreath * 0.25) * moodMul;
         }
       }
     }
@@ -290,5 +320,7 @@ export class BumperVisuals {
     this.vines = null;
     this.parts = [];
     this.hitTimers.clear();
+    this.atmosphereDim = 1;
+    this.atmosphereStrobe = 0;
   }
 }
