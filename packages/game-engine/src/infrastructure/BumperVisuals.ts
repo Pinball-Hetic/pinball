@@ -96,10 +96,12 @@ export class BumperVisuals {
   private strobeNormalWhenOn = false;
   private atmosphereDim = 1;
   private atmosphereStrobe = 0;
+  private atmosphereStrobeHz = 4;
 
-  setAtmosphere(dim: number, strobe: number): void {
+  setAtmosphere(dim: number, strobe: number, strobeHz = 4): void {
     this.atmosphereDim = dim;
     this.atmosphereStrobe = strobe;
+    this.atmosphereStrobeHz = strobeHz;
   }
 
   setStrobe(active: boolean, on: boolean, normalWhenOn = false): void {
@@ -230,7 +232,7 @@ export class BumperVisuals {
     }
 
     const strobeFlash = this.atmosphereStrobe > 0
-      ? (Math.sin(this.elapsed * 18) * 0.5 + 0.5) * this.atmosphereStrobe
+      ? (Math.sin(this.elapsed * this.atmosphereStrobeHz * Math.PI * 2) * 0.5 + 0.5) * this.atmosphereStrobe
       : 0;
     const moodMul = this.atmosphereDim + strobeFlash * (1 - this.atmosphereDim);
     const upsideDown = this.atmosphereStrobe > 0.2;
@@ -322,5 +324,6 @@ export class BumperVisuals {
     this.hitTimers.clear();
     this.atmosphereDim = 1;
     this.atmosphereStrobe = 0;
+    this.atmosphereStrobeHz = 4;
   }
 }

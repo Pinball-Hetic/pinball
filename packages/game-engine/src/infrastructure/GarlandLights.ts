@@ -77,13 +77,15 @@ export class GarlandLights {
   private elapsed = 0;
   private atmosphereDim = 1;
   private atmosphereStrobe = 0;
+  private atmosphereStrobeHz = 4;
   private strobeActive = false;
   private strobeOn = false;
   private strobeNormalWhenOn = false;
 
-  setAtmosphere(dim: number, strobe: number): void {
+  setAtmosphere(dim: number, strobe: number, strobeHz = 4): void {
     this.atmosphereDim = dim;
     this.atmosphereStrobe = strobe;
+    this.atmosphereStrobeHz = strobeHz;
   }
 
   setStrobe(active: boolean, on: boolean, normalWhenOn = false): void {
@@ -172,7 +174,7 @@ export class GarlandLights {
     }
 
     const strobeFlash = this.atmosphereStrobe > 0
-      ? (Math.sin(this.elapsed * 18) * 0.5 + 0.5) * this.atmosphereStrobe
+      ? (Math.sin(this.elapsed * this.atmosphereStrobeHz * Math.PI * 2) * 0.5 + 0.5) * this.atmosphereStrobe
       : 0;
     const moodMul = this.atmosphereDim + strobeFlash * (1 - this.atmosphereDim);
     const upsideDown = this.atmosphereStrobe > 0.2;
