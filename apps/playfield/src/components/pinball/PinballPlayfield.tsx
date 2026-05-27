@@ -51,6 +51,7 @@ import {
   DemogorgonReveal,
   UpsideDownPortal,
   UpsideDownTransition,
+  UpsideDownAtmosphere,
 } from "@pinball/game-engine";
 import { useGameState } from "../../hooks/useGameState";
 import { unlockPinballAudio } from "../../audio/PinballSounds";
@@ -344,6 +345,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let demogorgonReveal: DemogorgonReveal | null = null;
     let upsideDownPortal: UpsideDownPortal | null = null;
     let upsideDownTransition: UpsideDownTransition | null = null;
+    let upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
     let isChargingPlunger = false;
@@ -622,6 +624,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           garlandLights?.onGameEvent(event);
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
+          upsideDownAtmosphere?.onGameEvent(event);
           if (event.type === "PORTAL_ENTER") onPortalEnter?.();
           if (event.type === "BALL_LAUNCHED") collisionProcessor?.resetPortalTrigger();
           if (event.type === 'DROP_TARGET_HIT') {
@@ -653,6 +656,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           world,
           colliderMap,
           onOpenChange: (open) => collisionProcessor?.setPortalOpen(open),
+        });
+
+        upsideDownAtmosphere = new UpsideDownAtmosphere();
+        upsideDownAtmosphere.setup({
+          root: playfieldRoot,
+          garlandLights,
+          lighting: {
+            scene,
+            renderer,
+            ambient: ambientLight,
+            hemi: hemiLight,
+            dir: dirLight,
+            fill: fillLight,
+          },
         });
 
         onPortalEnter = () => {
@@ -696,6 +713,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             if (gameStateRef.current === "game_over") {
               resetGame();
               upsideDownPortal?.reset();
+              upsideDownAtmosphere?.reset();
               if (ballMesh) ballMesh.visible = true;
               return;
             }
@@ -765,6 +783,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       bumperVisuals?.update(dt);
       garlandLights?.update(dt);
       demogorgonReveal?.update(dt);
+      upsideDownAtmosphere?.update(dt);
       upsideDownPortal?.update(dt);
 
       const transitionActive = upsideDownTransition?.isActive() ?? false;
@@ -973,6 +992,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       demogorgonReveal?.dispose();
       upsideDownPortal?.dispose();
       upsideDownTransition?.dispose();
+      upsideDownAtmosphere?.dispose();
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();
