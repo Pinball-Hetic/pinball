@@ -9,6 +9,7 @@ const TEXTURE_URL = '/playfield/upsidedown.jpg';
 const BLACKOUT = 0.12;
 const REVEAL = 0.55;
 const RESTORE = 0.35;
+const TREMOR = 2.2;
 const HOLD = UPSIDE_DOWN_TRANSITION_DURATION - BLACKOUT - REVEAL - RESTORE;
 
 const STROBE_HZ = 11;
@@ -17,7 +18,7 @@ const PLAYFIELD_W = 0.58;
 const PLAYFIELD_D = 1.02;
 const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 
-type Phase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore';
+type Phase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore' | 'tremor';
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -51,6 +52,7 @@ function strobeOn(t: number): boolean {
 
 export class UpsideDownTransition {
   private camera: THREE.Camera | null = null;
+  private playfieldRoot: THREE.Object3D | null = null;
   private garlandLights: GarlandLights | null = null;
   private bumperVisuals: BumperVisuals | null = null;
 
@@ -68,10 +70,14 @@ export class UpsideDownTransition {
   private ballMesh: THREE.Object3D | null = null;
   private ballBody: RAPIER.RigidBody | null = null;
   private onComplete: CompleteHandler | null = null;
+  private baseCamPos = new THREE.Vector3();
+  private baseRootPos = new THREE.Vector3();
+  private baseRootRot = new THREE.Euler();
 
   setup(config: SetupConfig): void {
     this.dispose();
     this.camera = config.camera;
+    this.playfieldRoot = config.root;
     this.garlandLights = config.garlandLights;
     this.bumperVisuals = config.bumperVisuals;
 
@@ -212,7 +218,21 @@ export class UpsideDownTransition {
       const darkMix = 1 - easeIn(Math.min(1, this.elapsed / RESTORE));
       this.applyPlayfieldStrobe(on, false, darkMix * 0.5);
       this.setSpriteOpacity(0.95 * darkMix);
-      if (darkMix <= 0) this.finish();
+      if (darkMix <= 0) {
+        this.phase = 'tremor';
+        this.elapsed = 0;
+        this.captureShakeBases();
+        if (this.playfieldShade) this.playfieldShade.visible = false;
+        if (this.playfieldShadeMat) this.playfieldShadeMat.opacity = 0;
+        if (this.upsideDownSprite) this.upsideDownSprite.visible = false;
+        this.setSpriteOpacity(0);
+      }
+      return;
+    }
+
+    if (this.phase === 'tremor') {
+      this.applyTremor();
+      if (this.elapsed >= TREMOR) this.finish();
     }
   }
 
@@ -237,6 +257,7 @@ export class UpsideDownTransition {
     }
 
     this.camera = null;
+    this.playfieldRoot = null;
     this.garlandLights = null;
     this.bumperVisuals = null;
     this.playfieldShade = null;
@@ -288,6 +309,7 @@ export class UpsideDownTransition {
   }
 
   private resetAtmosphere(): void {
+    this.restoreShakeBases();
     this.phase = 'idle';
     this.elapsed = 0;
     this.strobeT = 0;
@@ -303,8 +325,45 @@ export class UpsideDownTransition {
     this.bumperVisuals?.setStrobe(false, false);
   }
 
+  private captureShakeBases(): void {
+    if (this.camera) this.baseCamPos.copy(this.camera.position);
+    if (this.playfieldRoot) {
+      this.baseRootPos.copy(this.playfieldRoot.position);
+      this.baseRootRot.copy(this.playfieldRoot.rotation);
+    }
+  }
+
+  private restoreShakeBases(): void {
+    if (this.camera) this.camera.position.copy(this.baseCamPos);
+    if (this.playfieldRoot) {
+      this.playfieldRoot.position.copy(this.baseRootPos);
+      this.playfieldRoot.rotation.copy(this.baseRootRot);
+    }
+  }
+
+  private applyTremor(): void {
+    const t = this.elapsed;
+    const ramp = Math.min(1, t / 0.45);
+    const amp = 0.0032 * ramp;
+
+    if (this.camera) {
+      this.camera.position.set(
+        this.baseCamPos.x + Math.sin(t * 41) * amp,
+        this.baseCamPos.y + Math.sin(t * 53 + 0.8) * amp,
+        this.baseCamPos.z + Math.sin(t * 37 + 1.6) * amp,
+      );
+    }
+
+    if (this.playfieldRoot) {
+      this.playfieldRoot.rotation.x = this.baseRootRot.x + Math.sin(t * 44) * amp * 0.4;
+      this.playfieldRoot.rotation.z = this.baseRootRot.z + Math.sin(t * 39 + 1.1) * amp * 0.5;
+    }
+  }
+
   private finish(): void {
     if (!this.active) return;
+
+    this.restoreShakeBases();
 
     if (this.ballMesh) {
       this.ballMesh.scale.setScalar(1);
