@@ -113,15 +113,29 @@ function playElevenAssist(): void {
 }
 
 function playPortalEnter(): void {
-  playTone(55, 0.55, "sawtooth", 0.18, -200);
-  playTone(110, 0.45, "square", 0.1, 100);
-  playNoise(0.35, 0.2, 180);
-  window.setTimeout(() => playTone(880, 0.2, "sawtooth", 0.08, -300), 120);
+  playTone(48, 0.62, "sawtooth", 0.16, -180);
+  playTone(96, 0.48, "sine", 0.08, 60);
+  playNoise(0.42, 0.17, 130);
+  window.setTimeout(() => playTone(620, 0.16, "triangle", 0.07, -220), 90);
+  window.setTimeout(() => playTone(310, 0.22, "sine", 0.05, 140), 210);
+}
+
+function playPortalTremor(): void {
+  playTone(40, 2.1, "sawtooth", 0.13, -140);
+  playTone(78, 1.9, "square", 0.05, 90);
+  playNoise(0.5, 0.11, 110);
+  window.setTimeout(() => playNoise(0.32, 0.09, 85), 360);
+  window.setTimeout(() => playNoise(0.26, 0.08, 65), 720);
+  window.setTimeout(() => playNoise(0.2, 0.07, 50), 1080);
+  window.setTimeout(() => playNoise(0.16, 0.06, 42), 1440);
 }
 
 function playPortalTransitionEnd(): void {
-  playTone(220, 0.18, "triangle", 0.1);
-  playNoise(0.12, 0.08, 1400);
+  playTone(180, 0.24, "triangle", 0.11);
+  playTone(360, 0.14, "sine", 0.06);
+  playTone(540, 0.08, "triangle", 0.04);
+  playNoise(0.14, 0.09, 1500);
+  playNoise(0.1, 0.06, 820);
 }
 
 export function handlePinballSoundEvent(event: GameEvent): void {
@@ -146,6 +160,9 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       break;
     case "PORTAL_ENTER":
       playPortalEnter();
+      break;
+    case "PORTAL_TREMOR":
+      playPortalTremor();
       break;
     case "PORTAL_TRANSITION_END":
       playPortalTransitionEnd();

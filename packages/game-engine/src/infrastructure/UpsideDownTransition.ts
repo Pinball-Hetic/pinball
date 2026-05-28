@@ -31,6 +31,7 @@ type SetupConfig = {
 type StartConfig = {
   ballMesh: THREE.Object3D;
   ballBody: RAPIER.RigidBody;
+  onTremorStart?: () => void;
 };
 
 type CompleteHandler = () => void;
@@ -70,6 +71,8 @@ export class UpsideDownTransition {
   private ballMesh: THREE.Object3D | null = null;
   private ballBody: RAPIER.RigidBody | null = null;
   private onComplete: CompleteHandler | null = null;
+  private onTremorStart: (() => void) | null = null;
+  private tremorStarted = false;
   private baseCamPos = new THREE.Vector3();
   private baseRootPos = new THREE.Vector3();
   private baseRootRot = new THREE.Euler();
@@ -152,6 +155,8 @@ export class UpsideDownTransition {
     this.ballMesh = config.ballMesh;
     this.ballBody = config.ballBody;
     this.onComplete = onComplete;
+    this.onTremorStart = config.onTremorStart ?? null;
+    this.tremorStarted = false;
 
     if (this.ballMesh) {
       this.ballMesh.visible = false;
@@ -226,6 +231,10 @@ export class UpsideDownTransition {
         if (this.playfieldShadeMat) this.playfieldShadeMat.opacity = 0;
         if (this.upsideDownSprite) this.upsideDownSprite.visible = false;
         this.setSpriteOpacity(0);
+        if (!this.tremorStarted) {
+          this.tremorStarted = true;
+          this.onTremorStart?.();
+        }
       }
       return;
     }
@@ -266,6 +275,8 @@ export class UpsideDownTransition {
     this.upsideDownMat = null;
     this.flashLight = null;
     this.onComplete = null;
+    this.onTremorStart = null;
+    this.tremorStarted = false;
     this.active = false;
     this.phase = 'idle';
     this.imageReady = false;
@@ -314,6 +325,7 @@ export class UpsideDownTransition {
     this.elapsed = 0;
     this.strobeT = 0;
     this.active = false;
+    this.tremorStarted = false;
 
     if (this.flashLight) this.flashLight.intensity = 0;
     if (this.playfieldShade) this.playfieldShade.visible = false;

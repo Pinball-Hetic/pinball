@@ -681,6 +681,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             {
               ballMesh,
               ballBody: ballPhysicsInst.body,
+              onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
             },
             () => {
               const portal = upsideDownPortal?.getAnchorPosition();
