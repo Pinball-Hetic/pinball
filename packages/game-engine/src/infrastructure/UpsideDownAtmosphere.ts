@@ -14,6 +14,8 @@ const TARGET_HEMI_INTENSITY = 0.32;
 const TARGET_DIR_INTENSITY = 1.05;
 const TARGET_FILL_INTENSITY = 0.38;
 const TARGET_SHADE_OPACITY = 0.46;
+const TARGET_FOG_COLOR = 0x1a0a20;
+const TARGET_FOG_DENSITY = 0.19;
 const PULSE_EXPOSURE_MIN = 0.95;
 const PULSE_EXPOSURE_MAX = 1.08;
 const PULSE_EXPOSURE_SPEED = 1.8;
@@ -96,6 +98,8 @@ export class UpsideDownAtmosphere {
   private origDirIntensity = 1;
   private origFillColor = new THREE.Color();
   private origFillIntensity = 1;
+  private savedFog: THREE.Fog | THREE.FogExp2 | null = null;
+  private upsideDownFog: THREE.FogExp2 | null = null;
 
   setup(config: SetupConfig): void {
     this.dispose();
@@ -153,6 +157,9 @@ export class UpsideDownAtmosphere {
     this.origFillColor.copy(config.lighting.fill.color);
     this.origFillIntensity = config.lighting.fill.intensity;
 
+    this.savedFog = config.lighting.scene.fog;
+    this.upsideDownFog = new THREE.FogExp2(TARGET_FOG_COLOR, 0);
+
     this.mix = 0;
     this.targetMix = 0;
     this.visited = false;
@@ -205,6 +212,7 @@ export class UpsideDownAtmosphere {
 
   dispose(): void {
     this.applyMix(0);
+    this.restoreFog();
     this.updateSpores(0, 0);
 
     if (this.playfieldShade) {
@@ -227,6 +235,8 @@ export class UpsideDownAtmosphere {
     this.spores = [];
     this.sporeMat = null;
     this.sporeGeos = [];
+    this.savedFog = null;
+    this.upsideDownFog = null;
     this.mix = 0;
     this.targetMix = 0;
     this.visited = false;
@@ -365,6 +375,8 @@ export class UpsideDownAtmosphere {
       _lerpColor.set(0x8866aa);
       fill.color.lerp(_lerpColor, ease * 0.4);
       fill.intensity = THREE.MathUtils.lerp(this.origFillIntensity, TARGET_FILL_INTENSITY, ease);
+
+      this.applyFog(ease);
     }
 
     const dim = THREE.MathUtils.lerp(1, 0.36, ease);
@@ -373,5 +385,23 @@ export class UpsideDownAtmosphere {
 
     this.garlandLights?.setAtmosphere(dim, strobe, strobeHz);
     this.bumperVisuals?.setAtmosphere(dim, strobe, strobeHz);
+  }
+
+  private applyFog(ease: number): void {
+    if (!this.lighting || !this.upsideDownFog) return;
+
+    const scene = this.lighting.scene;
+    if (ease <= 0) {
+      this.restoreFog();
+      return;
+    }
+
+    this.upsideDownFog.density = TARGET_FOG_DENSITY * ease;
+    if (scene.fog !== this.upsideDownFog) scene.fog = this.upsideDownFog;
+  }
+
+  private restoreFog(): void {
+    if (!this.lighting) return;
+    this.lighting.scene.fog = this.savedFog;
   }
 }
