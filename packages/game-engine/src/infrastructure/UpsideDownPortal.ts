@@ -15,6 +15,7 @@ import { findObjectByNormalizedName } from './GltfNodeNames';
 const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 const OPEN_POLISH_DURATION = 0.2;
 const PORTAL_PULSE_SPEED = 2.4;
+const PORTAL_ACCENT_PULSE_SPEED = 1.6;
 const PORTAL_VINE_COUNT = 5;
 
 type SetupConfig = {
@@ -70,6 +71,7 @@ export class UpsideDownPortal {
   private vortexMat: THREE.MeshBasicMaterial | null = null;
   private rimLight: THREE.PointLight | null = null;
   private coreLight: THREE.PointLight | null = null;
+  private accentLight: THREE.PointLight | null = null;
   private vineMat: THREE.MeshStandardMaterial | null = null;
   private vines: PortalVine[] = [];
   private particles: PortalParticle[] = [];
@@ -204,6 +206,10 @@ export class UpsideDownPortal {
     if (this.coreLight) {
       this.coreLight.intensity = 0.85 * pulse * (1 + this.suckBoost * 1.2);
     }
+    if (this.accentLight) {
+      const accentPulse = 0.55 + Math.sin(this.pulseT * PORTAL_ACCENT_PULSE_SPEED) * 0.45;
+      this.accentLight.intensity = 0.48 * accentPulse * (1 + this.suckBoost * 0.55);
+    }
     if (this.vineMat) {
       this.vineMat.emissiveIntensity = 0.22 + pulse * 0.28 * (1 + this.suckBoost * 0.4);
     }
@@ -294,6 +300,10 @@ export class UpsideDownPortal {
       this.coreLight.dispose();
       this.coreLight.parent?.remove(this.coreLight);
     }
+    if (this.accentLight) {
+      this.accentLight.dispose();
+      this.accentLight.parent?.remove(this.accentLight);
+    }
     for (const g of this.ownedGeos) g.dispose();
     for (const m of this.ownedMats) m.dispose();
     this.ownedGeos = [];
@@ -315,6 +325,7 @@ export class UpsideDownPortal {
     this.vortexMat = null;
     this.rimLight = null;
     this.coreLight = null;
+    this.accentLight = null;
     this.vineMat = null;
     this.revealed = false;
     this.revealing = false;
@@ -424,6 +435,11 @@ export class UpsideDownPortal {
     this.coreLight = new THREE.PointLight(0x7722cc, 0.85, 0.1, 2);
     this.coreLight.position.y = 0.004;
     group.add(this.coreLight);
+
+    this.accentLight = new THREE.PointLight(0x9955ee, 0, 0.22, 2);
+    this.accentLight.position.y = 0.016;
+    this.accentLight.castShadow = false;
+    group.add(this.accentLight);
 
     return group;
   }
