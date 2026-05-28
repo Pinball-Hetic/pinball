@@ -5,6 +5,7 @@ import {
   BUMPER_POSITIONS,
   DEMOGORGON_TARGET,
   PORTAL_UPSIDE_DOWN,
+  UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
 import type { GameEventListener } from "@pinball/game-engine";
 import { handlePinballSoundEvent } from "../audio/PinballSounds";
@@ -222,7 +223,7 @@ export function useGameState() {
         upsideDownHintTimerRef.current = window.setTimeout(() => {
           upsideDownHintTimerRef.current = null;
           setUpsideDownHint(false);
-        }, 4200);
+        }, UPSIDE_DOWN_HINT_MS);
       }
     };
 

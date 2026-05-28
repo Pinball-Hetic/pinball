@@ -1,22 +1,23 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { PORTAL_UPSIDE_DOWN, UPSIDE_DOWN_TRANSITION_DURATION } from '../domain/Ball';
+import { PORTAL_UPSIDE_DOWN } from '../domain/Ball';
+import {
+  UPSIDE_DOWN_PLAYFIELD_SHADE_D,
+  UPSIDE_DOWN_PLAYFIELD_SHADE_W,
+  UPSIDE_DOWN_PLAYFIELD_SHADE_Y,
+  UPSIDE_DOWN_PLAYFIELD_SHADE_Z,
+  UPSIDE_DOWN_PLAYFIELD_TILT,
+  UPSIDE_DOWN_TRANSITION_BLACKOUT,
+  UPSIDE_DOWN_TRANSITION_HOLD,
+  UPSIDE_DOWN_TRANSITION_RESTORE,
+  UPSIDE_DOWN_TRANSITION_REVEAL,
+  UPSIDE_DOWN_TRANSITION_STROBE_HZ,
+  UPSIDE_DOWN_TRANSITION_TREMOR,
+} from '../domain/UpsideDownConstants';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
 
 const TEXTURE_URL = '/playfield/upsidedown.jpg';
-
-const BLACKOUT = 0.12;
-const REVEAL = 0.55;
-const RESTORE = 0.35;
-const TREMOR = 2.2;
-const HOLD = UPSIDE_DOWN_TRANSITION_DURATION - BLACKOUT - REVEAL - RESTORE;
-
-const STROBE_HZ = 11;
-
-const PLAYFIELD_W = 0.58;
-const PLAYFIELD_D = 1.02;
-const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 
 type Phase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore' | 'tremor';
 
@@ -48,7 +49,7 @@ function easeIn(t: number): number {
 }
 
 function strobeOn(t: number): boolean {
-  return Math.sin(t * STROBE_HZ * Math.PI * 2) > 0;
+  return Math.sin(t * UPSIDE_DOWN_TRANSITION_STROBE_HZ * Math.PI * 2) > 0;
 }
 
 export class UpsideDownTransition {
@@ -92,11 +93,11 @@ export class UpsideDownTransition {
       depthWrite: false,
     });
     this.playfieldShade = new THREE.Mesh(
-      new THREE.PlaneGeometry(PLAYFIELD_W, PLAYFIELD_D),
+      new THREE.PlaneGeometry(UPSIDE_DOWN_PLAYFIELD_SHADE_W, UPSIDE_DOWN_PLAYFIELD_SHADE_D),
       this.playfieldShadeMat,
     );
-    this.playfieldShade.rotation.x = -Math.PI / 2 + PLAYFIELD_TILT;
-    this.playfieldShade.position.set(0, 1.062, -0.067);
+    this.playfieldShade.rotation.x = -Math.PI / 2 + UPSIDE_DOWN_PLAYFIELD_TILT;
+    this.playfieldShade.position.set(0, UPSIDE_DOWN_PLAYFIELD_SHADE_Y, UPSIDE_DOWN_PLAYFIELD_SHADE_Z);
     this.playfieldShade.renderOrder = 600;
     this.playfieldShade.visible = false;
     config.root.add(this.playfieldShade);
@@ -179,9 +180,9 @@ export class UpsideDownTransition {
     const on = strobeOn(this.strobeT);
 
     if (this.phase === 'blackout') {
-      this.applyPlayfieldStrobe(on, false, easeOut(Math.min(1, this.elapsed / BLACKOUT)));
+      this.applyPlayfieldStrobe(on, false, easeOut(Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_BLACKOUT)));
       this.setSpriteOpacity(0);
-      if (this.elapsed >= BLACKOUT) {
+      if (this.elapsed >= UPSIDE_DOWN_TRANSITION_BLACKOUT) {
         this.phase = 'reveal';
         this.elapsed = 0;
         this.strobeT = 0;
@@ -190,10 +191,10 @@ export class UpsideDownTransition {
     }
 
     if (this.phase === 'reveal') {
-      const t = Math.min(1, this.elapsed / REVEAL);
+      const t = Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_REVEAL);
       this.applyPlayfieldStrobe(on, false, 1);
       this.setSpriteOpacity(this.imageReady && on ? easeOut(t) * 0.95 : 0);
-      if (this.elapsed >= REVEAL) {
+      if (this.elapsed >= UPSIDE_DOWN_TRANSITION_REVEAL) {
         this.phase = 'hold';
         this.elapsed = 0;
         this.setSpriteOpacity(0.95);
@@ -211,7 +212,7 @@ export class UpsideDownTransition {
         this.playfieldShadeMat.opacity = 0.72;
         if (this.playfieldShade) this.playfieldShade.visible = true;
       }
-      if (this.elapsed >= HOLD) {
+      if (this.elapsed >= UPSIDE_DOWN_TRANSITION_HOLD) {
         this.phase = 'restore';
         this.elapsed = 0;
         this.strobeT = 0;
@@ -220,7 +221,7 @@ export class UpsideDownTransition {
     }
 
     if (this.phase === 'restore') {
-      const darkMix = 1 - easeIn(Math.min(1, this.elapsed / RESTORE));
+      const darkMix = 1 - easeIn(Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_RESTORE));
       this.applyPlayfieldStrobe(on, false, darkMix * 0.5);
       this.setSpriteOpacity(0.95 * darkMix);
       if (darkMix <= 0) {
@@ -241,7 +242,7 @@ export class UpsideDownTransition {
 
     if (this.phase === 'tremor') {
       this.applyTremor();
-      if (this.elapsed >= TREMOR) this.finish();
+      if (this.elapsed >= UPSIDE_DOWN_TRANSITION_TREMOR) this.finish();
     }
   }
 

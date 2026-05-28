@@ -1,35 +1,38 @@
 import * as THREE from 'three';
 import type { GameEvent } from '../domain/GameEvents';
+import {
+  UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_BG,
+  UPSIDE_DOWN_ATMOSPHERE_BLEND,
+  UPSIDE_DOWN_ATMOSPHERE_BLEND_STROBE_HZ,
+  UPSIDE_DOWN_ATMOSPHERE_DECOR_EMISSIVE,
+  UPSIDE_DOWN_ATMOSPHERE_DECOR_TINT,
+  UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_EMISSIVE,
+  UPSIDE_DOWN_ATMOSPHERE_EXPOSURE,
+  UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR,
+  UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MAX,
+  UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MIN,
+  UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED,
+  UPSIDE_DOWN_ATMOSPHERE_SHADE_COLOR,
+  UPSIDE_DOWN_ATMOSPHERE_SHADE_OPACITY,
+  UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT,
+  UPSIDE_DOWN_ATMOSPHERE_STROBE_HZ,
+  UPSIDE_DOWN_ATMOSPHERE_SURFACE_TINT,
+  UPSIDE_DOWN_ATMOSPHERE_TINT,
+  UPSIDE_DOWN_ATMOSPHERE_WALL_TINT,
+  UPSIDE_DOWN_PLAYFIELD_SHADE_D,
+  UPSIDE_DOWN_PLAYFIELD_SHADE_W,
+  UPSIDE_DOWN_PLAYFIELD_SHADE_Y,
+  UPSIDE_DOWN_PLAYFIELD_SHADE_Z,
+  UPSIDE_DOWN_PLAYFIELD_TILT,
+} from '../domain/UpsideDownConstants';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
 import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from './GltfNodeNames';
-
-const BLEND_DURATION = 2.8;
-const TARGET_BG = 0x0a0818;
-const TARGET_TINT = 0x2a1835;
-const SURFACE_TINT = 0x1a1220;
-const WALL_TINT = 0x1a2048;
-const DECOR_TINT = 0x3a1848;
-const TARGET_EMISSIVE = 0x551133;
-const DECOR_EMISSIVE = 0x772244;
-const TARGET_EXPOSURE = 1.05;
-const TARGET_AMBIENT_INTENSITY = 0.52;
-const TARGET_HEMI_INTENSITY = 0.32;
-const TARGET_DIR_INTENSITY = 1.05;
-const TARGET_FILL_INTENSITY = 0.38;
-const TARGET_SHADE_OPACITY = 0.46;
-const TARGET_FOG_COLOR = 0x1a0a20;
-const TARGET_FOG_DENSITY = 0.19;
-const PULSE_EXPOSURE_MIN = 0.95;
-const PULSE_EXPOSURE_MAX = 1.08;
-const PULSE_EXPOSURE_SPEED = 1.8;
-const ATMOSPHERE_STROBE_HZ = 4;
-const BLEND_STROBE_HZ = 11;
-const SPORE_COUNT = 28;
-
-const PLAYFIELD_W = 0.58;
-const PLAYFIELD_D = 1.02;
-const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 
 type MaterialKind = 'surface' | 'wall' | 'decor' | 'default';
 
@@ -121,33 +124,33 @@ function materialTintTargets(kind: MaterialKind): {
   switch (kind) {
     case 'surface':
       return {
-        tint: SURFACE_TINT,
+        tint: UPSIDE_DOWN_ATMOSPHERE_SURFACE_TINT,
         darken: 0.42,
-        emissive: TARGET_EMISSIVE,
+        emissive: UPSIDE_DOWN_ATMOSPHERE_EMISSIVE,
         emissiveMul: 1.05,
         emissiveAdd: 0.04,
       };
     case 'wall':
       return {
-        tint: WALL_TINT,
+        tint: UPSIDE_DOWN_ATMOSPHERE_WALL_TINT,
         darken: 0.34,
-        emissive: TARGET_EMISSIVE,
+        emissive: UPSIDE_DOWN_ATMOSPHERE_EMISSIVE,
         emissiveMul: 1.15,
         emissiveAdd: 0.08,
       };
     case 'decor':
       return {
-        tint: DECOR_TINT,
+        tint: UPSIDE_DOWN_ATMOSPHERE_DECOR_TINT,
         darken: 0.22,
-        emissive: DECOR_EMISSIVE,
+        emissive: UPSIDE_DOWN_ATMOSPHERE_DECOR_EMISSIVE,
         emissiveMul: 1.45,
         emissiveAdd: 0.18,
       };
     default:
       return {
-        tint: TARGET_TINT,
+        tint: UPSIDE_DOWN_ATMOSPHERE_TINT,
         darken: 0.38,
-        emissive: TARGET_EMISSIVE,
+        emissive: UPSIDE_DOWN_ATMOSPHERE_EMISSIVE,
         emissiveMul: 1.25,
         emissiveAdd: 0.12,
       };
@@ -209,18 +212,18 @@ export class UpsideDownAtmosphere {
     });
 
     this.playfieldShadeMat = new THREE.MeshBasicMaterial({
-      color: 0x180818,
+      color: UPSIDE_DOWN_ATMOSPHERE_SHADE_COLOR,
       transparent: true,
       opacity: 0,
       depthTest: true,
       depthWrite: false,
     });
     this.playfieldShade = new THREE.Mesh(
-      new THREE.PlaneGeometry(PLAYFIELD_W, PLAYFIELD_D),
+      new THREE.PlaneGeometry(UPSIDE_DOWN_PLAYFIELD_SHADE_W, UPSIDE_DOWN_PLAYFIELD_SHADE_D),
       this.playfieldShadeMat,
     );
-    this.playfieldShade.rotation.x = -Math.PI / 2 + PLAYFIELD_TILT;
-    this.playfieldShade.position.set(0, 1.062, -0.067);
+    this.playfieldShade.rotation.x = -Math.PI / 2 + UPSIDE_DOWN_PLAYFIELD_TILT;
+    this.playfieldShade.position.set(0, UPSIDE_DOWN_PLAYFIELD_SHADE_Y, UPSIDE_DOWN_PLAYFIELD_SHADE_Z);
     this.playfieldShade.renderOrder = 550;
     this.playfieldShade.visible = false;
     config.root.add(this.playfieldShade);
@@ -242,7 +245,7 @@ export class UpsideDownAtmosphere {
     this.origFillIntensity = config.lighting.fill.intensity;
 
     this.savedFog = config.lighting.scene.fog;
-    this.upsideDownFog = new THREE.FogExp2(TARGET_FOG_COLOR, 0);
+    this.upsideDownFog = new THREE.FogExp2(UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR, 0);
 
     this.mix = 0;
     this.targetMix = 0;
@@ -262,7 +265,7 @@ export class UpsideDownAtmosphere {
 
     this.pulseT += dt;
 
-    const step = dt / BLEND_DURATION;
+    const step = dt / UPSIDE_DOWN_ATMOSPHERE_BLEND;
     if (this.mix < this.targetMix) {
       this.mix = Math.min(this.targetMix, this.mix + step);
     } else if (this.mix > this.targetMix) {
@@ -337,7 +340,7 @@ export class UpsideDownAtmosphere {
       blending: THREE.AdditiveBlending,
     });
 
-    for (let i = 0; i < SPORE_COUNT; i++) {
+    for (let i = 0; i < UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT; i++) {
       const geo = new THREE.SphereGeometry(0.0016 + (i % 3) * 0.0005, 6, 6);
       const mesh = new THREE.Mesh(geo, this.sporeMat);
       mesh.visible = false;
@@ -350,7 +353,7 @@ export class UpsideDownAtmosphere {
         anchorX: THREE.MathUtils.lerp(-0.22, 0.22, ((i * 0.37) % 1)),
         anchorZ: THREE.MathUtils.lerp(-0.48, 0.32, ((i * 0.53 + 0.11) % 1)),
         baseY: 1.035 + (i % 6) * 0.009,
-        angle: (i / SPORE_COUNT) * Math.PI * 2,
+        angle: (i / UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT) * Math.PI * 2,
         radius: 0.014 + (i % 5) * 0.006,
         speed: 0.32 + (i % 7) * 0.1,
         drift: 0.55 + (i % 4) * 0.18,
@@ -388,10 +391,10 @@ export class UpsideDownAtmosphere {
 
   private applyLivePulse(): void {
     if (!this.lighting) return;
-    const wave = 0.5 + Math.sin(this.pulseT * PULSE_EXPOSURE_SPEED) * 0.5;
+    const wave = 0.5 + Math.sin(this.pulseT * UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED) * 0.5;
     this.lighting.renderer.toneMappingExposure = THREE.MathUtils.lerp(
-      PULSE_EXPOSURE_MIN,
-      PULSE_EXPOSURE_MAX,
+      UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MIN,
+      UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MAX,
       wave,
     );
   }
@@ -419,7 +422,7 @@ export class UpsideDownAtmosphere {
     }
 
     if (this.playfieldShadeMat) {
-      const shadeOpacity = TARGET_SHADE_OPACITY * ease;
+      const shadeOpacity = UPSIDE_DOWN_ATMOSPHERE_SHADE_OPACITY * ease;
       this.playfieldShadeMat.opacity = shadeOpacity;
       if (this.playfieldShade) {
         this.playfieldShade.visible = shadeOpacity > 0.01;
@@ -431,18 +434,18 @@ export class UpsideDownAtmosphere {
 
       if (scene.background instanceof THREE.Color) {
         scene.background.copy(this.origBg);
-        _lerpColor.set(TARGET_BG);
+        _lerpColor.set(UPSIDE_DOWN_ATMOSPHERE_BG);
         (scene.background as THREE.Color).lerp(_lerpColor, ease);
       }
 
       if (!fullyActive) {
-        renderer.toneMappingExposure = THREE.MathUtils.lerp(this.origExposure, TARGET_EXPOSURE, ease);
+        renderer.toneMappingExposure = THREE.MathUtils.lerp(this.origExposure, UPSIDE_DOWN_ATMOSPHERE_EXPOSURE, ease);
       }
 
       ambient.color.copy(this.origAmbientColor);
       _lerpColor.set(0xccb8d8);
       ambient.color.lerp(_lerpColor, ease * 0.45);
-      ambient.intensity = THREE.MathUtils.lerp(this.origAmbientIntensity, TARGET_AMBIENT_INTENSITY, ease);
+      ambient.intensity = THREE.MathUtils.lerp(this.origAmbientIntensity, UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY, ease);
 
       hemi.color.copy(this.origHemiSky);
       _lerpColor.set(0x443366);
@@ -450,24 +453,24 @@ export class UpsideDownAtmosphere {
       hemi.groundColor.copy(this.origHemiGround);
       _lerpColor.set(0x1a0a14);
       hemi.groundColor.lerp(_lerpColor, ease * 0.65);
-      hemi.intensity = THREE.MathUtils.lerp(this.origHemiIntensity, TARGET_HEMI_INTENSITY, ease);
+      hemi.intensity = THREE.MathUtils.lerp(this.origHemiIntensity, UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY, ease);
 
       dir.color.copy(this.origDirColor);
       _lerpColor.set(0xd8c8e8);
       dir.color.lerp(_lerpColor, ease * 0.35);
-      dir.intensity = THREE.MathUtils.lerp(this.origDirIntensity, TARGET_DIR_INTENSITY, ease);
+      dir.intensity = THREE.MathUtils.lerp(this.origDirIntensity, UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY, ease);
 
       fill.color.copy(this.origFillColor);
       _lerpColor.set(0x8866aa);
       fill.color.lerp(_lerpColor, ease * 0.4);
-      fill.intensity = THREE.MathUtils.lerp(this.origFillIntensity, TARGET_FILL_INTENSITY, ease);
+      fill.intensity = THREE.MathUtils.lerp(this.origFillIntensity, UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY, ease);
 
       this.applyFog(ease);
     }
 
     const dim = THREE.MathUtils.lerp(1, 0.36, ease);
     const strobe = THREE.MathUtils.lerp(0, 0.48, ease);
-    const strobeHz = fullyActive ? ATMOSPHERE_STROBE_HZ : BLEND_STROBE_HZ;
+    const strobeHz = fullyActive ? UPSIDE_DOWN_ATMOSPHERE_STROBE_HZ : UPSIDE_DOWN_ATMOSPHERE_BLEND_STROBE_HZ;
 
     this.garlandLights?.setAtmosphere(dim, strobe, strobeHz);
     this.bumperVisuals?.setAtmosphere(dim, strobe, strobeHz);
@@ -482,7 +485,7 @@ export class UpsideDownAtmosphere {
       return;
     }
 
-    this.upsideDownFog.density = TARGET_FOG_DENSITY * ease;
+    this.upsideDownFog.density = UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY * ease;
     if (scene.fog !== this.upsideDownFog) scene.fog = this.upsideDownFog;
   }
 

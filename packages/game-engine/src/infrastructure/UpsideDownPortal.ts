@@ -10,13 +10,14 @@ import {
   PORTAL_SENSOR_RADIUS,
   PORTAL_UPSIDE_DOWN,
 } from '../domain/Ball';
+import {
+  UPSIDE_DOWN_PLAYFIELD_TILT,
+  UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
+  UPSIDE_DOWN_PORTAL_OPEN_POLISH,
+  UPSIDE_DOWN_PORTAL_PULSE_SPEED,
+  UPSIDE_DOWN_PORTAL_VINE_COUNT,
+} from '../domain/UpsideDownConstants';
 import { findObjectByNormalizedName } from './GltfNodeNames';
-
-const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
-const OPEN_POLISH_DURATION = 0.2;
-const PORTAL_PULSE_SPEED = 2.4;
-const PORTAL_ACCENT_PULSE_SPEED = 1.6;
-const PORTAL_VINE_COUNT = 5;
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -106,12 +107,12 @@ export class UpsideDownPortal {
     this.cover = new THREE.Mesh(geo, this.coverMat);
     this.cover.position.copy(this.anchorPos);
     this.cover.position.y = this.baseY;
-    this.cover.rotation.x = -PLAYFIELD_TILT;
+    this.cover.rotation.x = -UPSIDE_DOWN_PLAYFIELD_TILT;
     this.cover.renderOrder = 2;
     config.root.add(this.cover);
 
-    const qx = Math.sin(PLAYFIELD_TILT / 2);
-    const qw = Math.cos(PLAYFIELD_TILT / 2);
+    const qx = Math.sin(UPSIDE_DOWN_PLAYFIELD_TILT / 2);
+    const qw = Math.cos(UPSIDE_DOWN_PLAYFIELD_TILT / 2);
     this.coverBody = config.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed()
         .setTranslation(this.anchorPos.x, this.baseY, this.anchorPos.z)
@@ -127,7 +128,7 @@ export class UpsideDownPortal {
     this.portalGroup = this.buildPortalVisuals();
     this.portalGroup.position.copy(this.anchorPos);
     this.portalGroup.position.y = this.baseY - 0.0005;
-    this.portalGroup.rotation.x = -PLAYFIELD_TILT;
+    this.portalGroup.rotation.x = -UPSIDE_DOWN_PLAYFIELD_TILT;
     this.portalGroup.visible = false;
     config.root.add(this.portalGroup);
   }
@@ -177,7 +178,7 @@ export class UpsideDownPortal {
 
     if (this.revealing && this.portalGroup) {
       this.revealT += dt;
-      const t = Math.min(1, this.revealT / OPEN_POLISH_DURATION);
+      const t = Math.min(1, this.revealT / UPSIDE_DOWN_PORTAL_OPEN_POLISH);
       const ease = 1 - Math.pow(1 - t, 3);
       this.portalGroup.scale.setScalar(0.35 + ease * 0.65);
       if (t >= 1) this.revealing = false;
@@ -185,7 +186,7 @@ export class UpsideDownPortal {
 
     if (!this.revealed || !this.portalGroup) return;
 
-    const pulse = 0.65 + Math.sin(this.pulseT * PORTAL_PULSE_SPEED) * 0.35;
+    const pulse = 0.65 + Math.sin(this.pulseT * UPSIDE_DOWN_PORTAL_PULSE_SPEED) * 0.35;
     const fast = this.pulseT * 4.2;
 
     if (this.outerRingMat) {
@@ -207,7 +208,7 @@ export class UpsideDownPortal {
       this.coreLight.intensity = 0.85 * pulse * (1 + this.suckBoost * 1.2);
     }
     if (this.accentLight) {
-      const accentPulse = 0.55 + Math.sin(this.pulseT * PORTAL_ACCENT_PULSE_SPEED) * 0.45;
+      const accentPulse = 0.55 + Math.sin(this.pulseT * UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED) * 0.45;
       this.accentLight.intensity = 0.48 * accentPulse * (1 + this.suckBoost * 0.55);
     }
     if (this.vineMat) {
@@ -268,8 +269,8 @@ export class UpsideDownPortal {
 
     this.removePhysicsCover();
 
-    const qx = Math.sin(PLAYFIELD_TILT / 2);
-    const qw = Math.cos(PLAYFIELD_TILT / 2);
+    const qx = Math.sin(UPSIDE_DOWN_PLAYFIELD_TILT / 2);
+    const qw = Math.cos(UPSIDE_DOWN_PLAYFIELD_TILT / 2);
     this.coverBody = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed()
         .setTranslation(this.anchorPos.x, this.baseY, this.anchorPos.z)
@@ -454,8 +455,8 @@ export class UpsideDownPortal {
     });
     this.ownedMats.push(this.vineMat);
 
-    for (let i = 0; i < PORTAL_VINE_COUNT; i++) {
-      const startAngle = (i / PORTAL_VINE_COUNT) * Math.PI * 2 + 0.4;
+    for (let i = 0; i < UPSIDE_DOWN_PORTAL_VINE_COUNT; i++) {
+      const startAngle = (i / UPSIDE_DOWN_PORTAL_VINE_COUNT) * Math.PI * 2 + 0.4;
       const curl = i % 2 === 0 ? 1 : -1;
       const points: THREE.Vector3[] = [];
       const outerR = PORTAL_HOLE_RADIUS * 1.48;

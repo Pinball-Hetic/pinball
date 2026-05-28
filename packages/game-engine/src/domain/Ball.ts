@@ -48,7 +48,6 @@ export const PORTAL_SENSOR_RADIUS = 0.017;
 export const PORTAL_MAGNET_RADIUS = 0.058;
 export const PORTAL_MAGNET_STRENGTH = 0.0055;
 export const PORTAL_ENTER_SCORE = 500;
-export const UPSIDE_DOWN_TRANSITION_DURATION = 4;
 export const PORTAL_EJECT_IMPULSE = { x: 0, y: 0.11, z: -0.095 } as const;
 
 export const ELEVEN_ASSIST_SCORE = 100;
