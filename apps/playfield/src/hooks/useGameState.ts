@@ -79,6 +79,11 @@ export function useGameState() {
     setUpsideDownHint(false);
   }, []);
 
+  const clearUpsideDownSession = useCallback(() => {
+    clearUpsideDownHint();
+    setUpsideDownActive(false);
+  }, [clearUpsideDownHint]);
+
   const clearDemogorgonHud = useCallback(() => {
     if (victoryTimerRef.current !== null) {
       window.clearTimeout(victoryTimerRef.current);
@@ -115,8 +120,7 @@ export function useGameState() {
     setLives(INITIAL_LIVES);
     clearDemogorgonHud();
     clearScorePops();
-    clearUpsideDownHint();
-    setUpsideDownActive(false);
+    clearUpsideDownSession();
     updateGameState("idle");
   };
 
@@ -231,6 +235,7 @@ export function useGameState() {
     scorePops,
     upsideDownActive,
     upsideDownHint,
+    clearUpsideDownSession,
     resetGame,
     buildEmit,
   };

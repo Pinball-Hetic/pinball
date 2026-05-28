@@ -59,6 +59,9 @@ import GameOverlay from "./GameOverlay";
 
 const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
 
+type UpsideDownPersistence = "until_game_over" | "until_drain";
+const UPSIDE_DOWN_PERSISTENCE: UpsideDownPersistence = "until_game_over";
+
 /**
  * Vue cabine fixe : joueur côté +Z (flippers), regarde vers le haut du tapis (-Z).
  * Direction depuis la cible vers la caméra (haut + avant).
@@ -262,6 +265,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     scorePops,
     upsideDownActive,
     upsideDownHint,
+    clearUpsideDownSession,
     resetGame,
     buildEmit,
   } = useGameState();
@@ -620,6 +624,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         let onPortalEnter: (() => void) | null = null;
 
         const baseEmit = buildEmit(() => { if (ballMesh) ballMesh.visible = false; });
+        const releaseUpsideDownWorld = () => {
+          upsideDownAtmosphere?.reset();
+          clearUpsideDownSession();
+        };
         const emit: typeof baseEmit = (event) => {
           baseEmit(event);
           bumperVisuals?.onGameEvent(event);
@@ -627,6 +635,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
+          if (event.type === "DRAIN" && UPSIDE_DOWN_PERSISTENCE === "until_drain") {
+            releaseUpsideDownWorld();
+          }
           if (event.type === "PORTAL_ENTER") onPortalEnter?.();
           if (event.type === "BALL_LAUNCHED") collisionProcessor?.resetPortalTrigger();
           if (event.type === 'DROP_TARGET_HIT') {
