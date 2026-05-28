@@ -2,12 +2,16 @@ import * as THREE from 'three';
 import type { GameEvent } from '../domain/GameEvents';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
-import { normalizeGltfName } from './GltfNodeNames';
+import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from './GltfNodeNames';
 
 const BLEND_DURATION = 2.8;
 const TARGET_BG = 0x0a0818;
 const TARGET_TINT = 0x2a1835;
+const SURFACE_TINT = 0x1a1220;
+const WALL_TINT = 0x1a2048;
+const DECOR_TINT = 0x3a1848;
 const TARGET_EMISSIVE = 0x551133;
+const DECOR_EMISSIVE = 0x772244;
 const TARGET_EXPOSURE = 1.05;
 const TARGET_AMBIENT_INTENSITY = 0.52;
 const TARGET_HEMI_INTENSITY = 0.32;
@@ -27,11 +31,14 @@ const PLAYFIELD_W = 0.58;
 const PLAYFIELD_D = 1.02;
 const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 
+type MaterialKind = 'surface' | 'wall' | 'decor' | 'default';
+
 type MaterialSnapshot = {
   material: THREE.MeshStandardMaterial;
   color: THREE.Color;
   emissive: THREE.Color;
   emissiveIntensity: number;
+  kind: MaterialKind;
 };
 
 type SceneLighting = {
@@ -64,11 +71,87 @@ type SporeParticle = {
 const _lerpColor = new THREE.Color();
 
 function skipAtmosphereTint(obj: THREE.Object3D): boolean {
+  if (obj instanceof THREE.Mesh && isFlipperGltfMesh(obj)) return true;
   const n = normalizeGltfName(obj.name);
   if (/^guirlande-\d+$/.test(n)) return true;
   if (/bumper-strangerthings/.test(n)) return true;
   if (/^bumper_ring/.test(n)) return true;
   return false;
+}
+
+function atmosphereMaterialKind(obj: THREE.Object3D): MaterialKind {
+  if (!(obj instanceof THREE.Mesh)) return 'default';
+
+  const n = canonicalGltfName(obj.name);
+  if (
+    n === 'playfield'
+    || /^table(\.\d+)?$/.test(n)
+    || n === 'pinballmap'
+  ) {
+    return 'surface';
+  }
+
+  if (
+    n === 'playfield_sides'
+    || n === 'shoulder'
+    || n === 'slingshot'
+    || n === 'plastic'
+    || n.startsWith('plastic_')
+    || n.startsWith('separator_')
+    || n === 'plunger_panel'
+    || isPinballmapRailMesh(obj)
+  ) {
+    return 'wall';
+  }
+
+  if (n.startsWith('vis_') || /logo|sign|art|dec|text|letter/.test(n)) {
+    return 'decor';
+  }
+
+  return 'default';
+}
+
+function materialTintTargets(kind: MaterialKind): {
+  tint: number;
+  darken: number;
+  emissive: number;
+  emissiveMul: number;
+  emissiveAdd: number;
+} {
+  switch (kind) {
+    case 'surface':
+      return {
+        tint: SURFACE_TINT,
+        darken: 0.42,
+        emissive: TARGET_EMISSIVE,
+        emissiveMul: 1.05,
+        emissiveAdd: 0.04,
+      };
+    case 'wall':
+      return {
+        tint: WALL_TINT,
+        darken: 0.34,
+        emissive: TARGET_EMISSIVE,
+        emissiveMul: 1.15,
+        emissiveAdd: 0.08,
+      };
+    case 'decor':
+      return {
+        tint: DECOR_TINT,
+        darken: 0.22,
+        emissive: DECOR_EMISSIVE,
+        emissiveMul: 1.45,
+        emissiveAdd: 0.18,
+      };
+    default:
+      return {
+        tint: TARGET_TINT,
+        darken: 0.38,
+        emissive: TARGET_EMISSIVE,
+        emissiveMul: 1.25,
+        emissiveAdd: 0.12,
+      };
+  }
 }
 
 export class UpsideDownAtmosphere {
@@ -120,6 +203,7 @@ export class UpsideDownAtmosphere {
           color: mat.color.clone(),
           emissive: mat.emissive.clone(),
           emissiveIntensity: mat.emissiveIntensity,
+          kind: atmosphereMaterialKind(obj),
         });
       }
     });
@@ -317,17 +401,19 @@ export class UpsideDownAtmosphere {
     const fullyActive = t >= 1 && this.targetMix >= 1;
 
     for (const entry of this.materials) {
+      const targets = materialTintTargets(entry.kind);
+
       entry.material.color.copy(entry.color);
-      _lerpColor.set(TARGET_TINT);
+      _lerpColor.set(targets.tint);
       entry.material.color.lerp(_lerpColor, ease * 0.5);
-      entry.material.color.multiplyScalar(1 - ease * 0.38);
+      entry.material.color.multiplyScalar(1 - ease * targets.darken);
 
       entry.material.emissive.copy(entry.emissive);
-      _lerpColor.set(TARGET_EMISSIVE);
+      _lerpColor.set(targets.emissive);
       entry.material.emissive.lerp(_lerpColor, ease * 0.35);
       entry.material.emissiveIntensity = THREE.MathUtils.lerp(
         entry.emissiveIntensity,
-        entry.emissiveIntensity * 1.25 + 0.12,
+        entry.emissiveIntensity * targets.emissiveMul + targets.emissiveAdd,
         ease,
       );
     }
