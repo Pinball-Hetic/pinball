@@ -10,6 +10,7 @@ interface GameOverlayProps {
   demogorgonHud: DemogorgonHud;
   scorePops: ScorePop[];
   upsideDownActive: boolean;
+  upsideDownHint: boolean;
   cabinetMode?: boolean;
 }
 
@@ -21,6 +22,7 @@ export default function GameOverlay({
   demogorgonHud,
   scorePops,
   upsideDownActive,
+  upsideDownHint,
   cabinetMode = false,
 }: GameOverlayProps) {
   void cabinetMode;
@@ -36,6 +38,9 @@ export default function GameOverlay({
 
   const showUpsideDownBanner =
     gameState === "playing" && upsideDownActive;
+
+  const showUpsideDownHint =
+    gameState === "playing" && upsideDownHint;
 
   return (
     <>
@@ -73,6 +78,14 @@ export default function GameOverlay({
               Upside Down
             </p>
           </div>
+        </div>
+      )}
+
+      {showUpsideDownHint && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center px-6">
+          <p className="animate-pulse text-center font-mono text-xs uppercase tracking-[0.22em] text-violet-200/75 drop-shadow-[0_0_12px_rgba(150,90,220,0.55)] sm:text-sm">
+            Le monde s&apos;est inversé…
+          </p>
         </div>
       )}
 

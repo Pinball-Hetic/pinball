@@ -261,6 +261,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     demogorgonHud,
     scorePops,
     upsideDownActive,
+    upsideDownHint,
     resetGame,
     buildEmit,
   } = useGameState();
@@ -1034,6 +1035,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           demogorgonHud={demogorgonHud}
           scorePops={scorePops}
           upsideDownActive={upsideDownActive}
+          upsideDownHint={upsideDownHint}
           cabinetMode={cabinetMode}
         />
 

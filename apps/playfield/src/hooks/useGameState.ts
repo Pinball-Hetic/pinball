@@ -41,6 +41,7 @@ export function useGameState() {
   const [demogorgonHud, setDemogorgonHud] = useState<DemogorgonHud>(initialDemogorgonHud);
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
   const [upsideDownActive, setUpsideDownActive] = useState(false);
+  const [upsideDownHint, setUpsideDownHint] = useState(false);
 
   const scoreRef = useRef(0);
   const livesRef = useRef(INITIAL_LIVES);
@@ -49,6 +50,7 @@ export function useGameState() {
   const elevenTimerRef = useRef<number | null>(null);
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
+  const upsideDownHintTimerRef = useRef<number | null>(null);
 
   const clearScorePops = useCallback(() => {
     for (const timer of scorePopTimersRef.current.values()) {
@@ -67,6 +69,14 @@ export function useGameState() {
       setScorePops((prev) => prev.filter((entry) => entry.id !== id));
     }, 900);
     scorePopTimersRef.current.set(id, timer);
+  }, []);
+
+  const clearUpsideDownHint = useCallback(() => {
+    if (upsideDownHintTimerRef.current !== null) {
+      window.clearTimeout(upsideDownHintTimerRef.current);
+      upsideDownHintTimerRef.current = null;
+    }
+    setUpsideDownHint(false);
   }, []);
 
   const clearDemogorgonHud = useCallback(() => {
@@ -105,6 +115,7 @@ export function useGameState() {
     setLives(INITIAL_LIVES);
     clearDemogorgonHud();
     clearScorePops();
+    clearUpsideDownHint();
     setUpsideDownActive(false);
     updateGameState("idle");
   };
@@ -200,6 +211,14 @@ export function useGameState() {
       }
       if (event.type === "PORTAL_TRANSITION_END") {
         setUpsideDownActive(true);
+        setUpsideDownHint(true);
+        if (upsideDownHintTimerRef.current !== null) {
+          window.clearTimeout(upsideDownHintTimerRef.current);
+        }
+        upsideDownHintTimerRef.current = window.setTimeout(() => {
+          upsideDownHintTimerRef.current = null;
+          setUpsideDownHint(false);
+        }, 4200);
       }
     };
 
@@ -211,6 +230,7 @@ export function useGameState() {
     demogorgonHud,
     scorePops,
     upsideDownActive,
+    upsideDownHint,
     resetGame,
     buildEmit,
   };
