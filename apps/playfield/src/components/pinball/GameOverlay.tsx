@@ -9,6 +9,7 @@ interface GameOverlayProps {
   initialLives: number;
   demogorgonHud: DemogorgonHud;
   scorePops: ScorePop[];
+  upsideDownActive: boolean;
   cabinetMode?: boolean;
 }
 
@@ -19,6 +20,7 @@ export default function GameOverlay({
   initialLives,
   demogorgonHud,
   scorePops,
+  upsideDownActive,
   cabinetMode = false,
 }: GameOverlayProps) {
   void cabinetMode;
@@ -31,6 +33,9 @@ export default function GameOverlay({
 
   const showDemogorgonHud =
     gameState === "playing" && demogorgonHud.active;
+
+  const showUpsideDownBanner =
+    gameState === "playing" && upsideDownActive;
 
   return (
     <>
@@ -60,6 +65,16 @@ export default function GameOverlay({
           <div>H — Debug colliders</div>
         </div>
       </header>
+
+      {showUpsideDownBanner && (
+        <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-10 flex justify-center">
+          <div className="rounded border border-violet-500/25 bg-black/45 px-3 py-1 font-mono backdrop-blur-sm">
+            <p className="text-[10px] uppercase tracking-[0.45em] text-violet-300/80 drop-shadow-[0_0_10px_rgba(140,80,200,0.45)]">
+              Upside Down
+            </p>
+          </div>
+        </div>
+      )}
 
       {showDemogorgonHud && demogorgonHud.elevenFlash && !demogorgonHud.victory && (
         <div className="pointer-events-none absolute inset-x-0 top-24 z-10 flex justify-center">

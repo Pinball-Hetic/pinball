@@ -40,6 +40,7 @@ export function useGameState() {
   const [gameState, setGameState] = useState<GameState>("idle");
   const [demogorgonHud, setDemogorgonHud] = useState<DemogorgonHud>(initialDemogorgonHud);
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
+  const [upsideDownActive, setUpsideDownActive] = useState(false);
 
   const scoreRef = useRef(0);
   const livesRef = useRef(INITIAL_LIVES);
@@ -104,6 +105,7 @@ export function useGameState() {
     setLives(INITIAL_LIVES);
     clearDemogorgonHud();
     clearScorePops();
+    setUpsideDownActive(false);
     updateGameState("idle");
   };
 
@@ -196,6 +198,9 @@ export function useGameState() {
           tone: "target",
         });
       }
+      if (event.type === "PORTAL_TRANSITION_END") {
+        setUpsideDownActive(true);
+      }
     };
 
   return {
@@ -205,6 +210,7 @@ export function useGameState() {
     gameStateRef,
     demogorgonHud,
     scorePops,
+    upsideDownActive,
     resetGame,
     buildEmit,
   };
