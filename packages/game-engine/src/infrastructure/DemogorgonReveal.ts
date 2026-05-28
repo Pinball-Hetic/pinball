@@ -7,8 +7,10 @@ import {
   ELEVEN_ASSIST_SCORE,
   ELEVEN_ASSIST_INTERVAL,
 } from '../domain/Ball';
+import { PLAYFIELD_TILT } from '../domain/PlayfieldGeometry';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
+import { PlayfieldShadeOverlay, playfieldShadeStrobeOpacity } from './PlayfieldShadeOverlay';
 
 const TEXTURE_URL = '/playfield/demogorgon.png';
 
@@ -21,10 +23,6 @@ const ELEVEN_ASSIST_ANIM = 0.85;
 const ELEVEN_ASSIST_FIRST = 0.55;
 
 const STROBE_HZ = 11;
-
-const PLAYFIELD_W = 0.58;
-const PLAYFIELD_D = 1.02;
-const PLAYFIELD_TILT = Math.atan2(0.110, 0.970);
 
 type Phase = 'idle' | 'blackout' | 'reveal' | 'flicker' | 'victory' | 'restore';
 
@@ -61,8 +59,7 @@ export class DemogorgonReveal {
   private onTargetReady: (() => void) | null = null;
   private emit: GameEventListener | null = null;
 
-  private playfieldShade: THREE.Mesh | null = null;
-  private playfieldShadeMat: THREE.MeshBasicMaterial | null = null;
+  private playfieldShade = new PlayfieldShadeOverlay();
   private demogorgonSprite: THREE.Sprite | null = null;
   private demogorgonMat: THREE.SpriteMaterial | null = null;
   private flashLight: THREE.PointLight | null = null;
@@ -102,22 +99,7 @@ export class DemogorgonReveal {
     this.onFightEnd = config.onFightEnd ?? null;
     this.onTargetReady = config.onTargetReady ?? null;
 
-    this.playfieldShadeMat = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      opacity: 0,
-      depthTest: true,
-      depthWrite: false,
-    });
-    this.playfieldShade = new THREE.Mesh(
-      new THREE.PlaneGeometry(PLAYFIELD_W, PLAYFIELD_D),
-      this.playfieldShadeMat,
-    );
-    this.playfieldShade.rotation.x = -Math.PI / 2 + PLAYFIELD_TILT;
-    this.playfieldShade.position.set(0, 1.062, -0.067);
-    this.playfieldShade.renderOrder = 600;
-    this.playfieldShade.visible = false;
-    config.root.add(this.playfieldShade);
+    this.playfieldShade.mount(config.root, { color: 0x000000, renderOrder: 600 });
 
     this.demogorgonMat = new THREE.SpriteMaterial({
       transparent: true,
@@ -221,7 +203,6 @@ export class DemogorgonReveal {
       this.assistNextIn = ELEVEN_ASSIST_FIRST;
       this.elevenAssistActive = false;
       this.elevenAssistT = 0;
-      if (this.playfieldShade) this.playfieldShade.visible = true;
       if (this.demogorgonSprite) this.demogorgonSprite.visible = true;
       if (this.targetGroup) this.targetGroup.visible = true;
       return;
@@ -317,11 +298,7 @@ export class DemogorgonReveal {
   dispose(): void {
     this.resetAtmosphere();
 
-    if (this.playfieldShade) {
-      this.playfieldShade.geometry.dispose();
-      this.playfieldShade.parent?.remove(this.playfieldShade);
-    }
-    if (this.playfieldShadeMat) this.playfieldShadeMat.dispose();
+    this.playfieldShade.dispose();
 
     if (this.demogorgonMat) {
       this.demogorgonMat.map?.dispose();
@@ -353,8 +330,7 @@ export class DemogorgonReveal {
     this.onFightEnd = null;
     this.onTargetReady = null;
     this.emit = null;
-    this.playfieldShade = null;
-    this.playfieldShadeMat = null;
+    this.playfieldShade = new PlayfieldShadeOverlay();
     this.demogorgonSprite = null;
     this.demogorgonMat = null;
     this.flashLight = null;
@@ -528,8 +504,7 @@ export class DemogorgonReveal {
   }
 
   private applyVictoryLight(): void {
-    if (this.playfieldShadeMat) this.playfieldShadeMat.opacity = 0;
-    if (this.playfieldShade) this.playfieldShade.visible = false;
+    this.playfieldShade.hide();
     if (this.flashLight) this.flashLight.intensity = 0;
     this.garlandLights?.setStrobe(false, false);
     this.bumperVisuals?.setStrobe(false, false);
@@ -596,16 +571,9 @@ export class DemogorgonReveal {
   }
 
   private applyPlayfieldStrobe(on: boolean, fullMap: boolean, mix: number): void {
-    if (!this.playfieldShadeMat) return;
+    this.playfieldShade.setOpacity(playfieldShadeStrobeOpacity(on, fullMap, mix));
 
     const active = mix > 0.02;
-    const shadeOpacity = on
-      ? (fullMap ? 0 : 0.12) * mix
-      : 0.94 * mix;
-
-    this.playfieldShadeMat.opacity = THREE.MathUtils.clamp(shadeOpacity, 0, 0.96);
-    if (this.playfieldShade) this.playfieldShade.visible = active;
-
     if (this.flashLight) {
       this.flashLight.intensity = on && !fullMap ? 2.8 * mix : 0;
     }
@@ -632,8 +600,7 @@ export class DemogorgonReveal {
 
     if (this.flashLight) this.flashLight.intensity = 0;
 
-    if (this.playfieldShade) this.playfieldShade.visible = false;
-    if (this.playfieldShadeMat) this.playfieldShadeMat.opacity = 0;
+    this.playfieldShade.hide();
 
     if (this.demogorgonSprite) this.demogorgonSprite.visible = false;
     if (this.demogorgonMat) this.demogorgonMat.opacity = 0;

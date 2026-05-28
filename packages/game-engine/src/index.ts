@@ -29,6 +29,7 @@ export * from './infrastructure/GltfDisplay';
 export * from './infrastructure/BumperVisuals';
 export * from './infrastructure/GarlandLights';
 export * from './infrastructure/DemogorgonReveal';
+export * from './infrastructure/PlayfieldShadeOverlay';
 export * from './infrastructure/UpsideDownPortal';
 export * from './infrastructure/UpsideDownTransition';
 export * from './infrastructure/UpsideDownAtmosphere';

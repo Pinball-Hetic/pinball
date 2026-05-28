@@ -2,11 +2,6 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { PORTAL_UPSIDE_DOWN } from '../domain/Ball';
 import {
-  UPSIDE_DOWN_PLAYFIELD_SHADE_D,
-  UPSIDE_DOWN_PLAYFIELD_SHADE_W,
-  UPSIDE_DOWN_PLAYFIELD_SHADE_Y,
-  UPSIDE_DOWN_PLAYFIELD_SHADE_Z,
-  UPSIDE_DOWN_PLAYFIELD_TILT,
   UPSIDE_DOWN_TRANSITION_BLACKOUT,
   UPSIDE_DOWN_TRANSITION_HOLD,
   UPSIDE_DOWN_TRANSITION_RESTORE,
@@ -16,6 +11,7 @@ import {
 } from '../domain/UpsideDownConstants';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
+import { PlayfieldShadeOverlay, playfieldShadeStrobeOpacity } from './PlayfieldShadeOverlay';
 
 const TEXTURE_URL = '/playfield/upsidedown.jpg';
 
@@ -58,8 +54,7 @@ export class UpsideDownTransition {
   private garlandLights: GarlandLights | null = null;
   private bumperVisuals: BumperVisuals | null = null;
 
-  private playfieldShade: THREE.Mesh | null = null;
-  private playfieldShadeMat: THREE.MeshBasicMaterial | null = null;
+  private playfieldShade = new PlayfieldShadeOverlay();
   private upsideDownSprite: THREE.Sprite | null = null;
   private upsideDownMat: THREE.SpriteMaterial | null = null;
   private flashLight: THREE.PointLight | null = null;
@@ -85,22 +80,7 @@ export class UpsideDownTransition {
     this.garlandLights = config.garlandLights;
     this.bumperVisuals = config.bumperVisuals;
 
-    this.playfieldShadeMat = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      opacity: 0,
-      depthTest: true,
-      depthWrite: false,
-    });
-    this.playfieldShade = new THREE.Mesh(
-      new THREE.PlaneGeometry(UPSIDE_DOWN_PLAYFIELD_SHADE_W, UPSIDE_DOWN_PLAYFIELD_SHADE_D),
-      this.playfieldShadeMat,
-    );
-    this.playfieldShade.rotation.x = -Math.PI / 2 + UPSIDE_DOWN_PLAYFIELD_TILT;
-    this.playfieldShade.position.set(0, UPSIDE_DOWN_PLAYFIELD_SHADE_Y, UPSIDE_DOWN_PLAYFIELD_SHADE_Z);
-    this.playfieldShade.renderOrder = 600;
-    this.playfieldShade.visible = false;
-    config.root.add(this.playfieldShade);
+    this.playfieldShade.mount(config.root, { color: 0x000000, renderOrder: 600 });
 
     this.upsideDownMat = new THREE.SpriteMaterial({
       transparent: true,
@@ -208,10 +188,7 @@ export class UpsideDownTransition {
 
     if (this.phase === 'hold') {
       this.setSpriteOpacity(0.95);
-      if (this.playfieldShadeMat) {
-        this.playfieldShadeMat.opacity = 0.72;
-        if (this.playfieldShade) this.playfieldShade.visible = true;
-      }
+      this.playfieldShade.setOpacity(0.72);
       if (this.elapsed >= UPSIDE_DOWN_TRANSITION_HOLD) {
         this.phase = 'restore';
         this.elapsed = 0;
@@ -228,8 +205,7 @@ export class UpsideDownTransition {
         this.phase = 'tremor';
         this.elapsed = 0;
         this.captureShakeBases();
-        if (this.playfieldShade) this.playfieldShade.visible = false;
-        if (this.playfieldShadeMat) this.playfieldShadeMat.opacity = 0;
+        this.playfieldShade.hide();
         if (this.upsideDownSprite) this.upsideDownSprite.visible = false;
         this.setSpriteOpacity(0);
         if (!this.tremorStarted) {
@@ -249,11 +225,7 @@ export class UpsideDownTransition {
   dispose(): void {
     this.resetAtmosphere();
 
-    if (this.playfieldShade) {
-      this.playfieldShade.geometry.dispose();
-      this.playfieldShade.parent?.remove(this.playfieldShade);
-    }
-    this.playfieldShadeMat?.dispose();
+    this.playfieldShade.dispose();
 
     if (this.upsideDownMat) {
       this.upsideDownMat.map?.dispose();
@@ -270,8 +242,7 @@ export class UpsideDownTransition {
     this.playfieldRoot = null;
     this.garlandLights = null;
     this.bumperVisuals = null;
-    this.playfieldShade = null;
-    this.playfieldShadeMat = null;
+    this.playfieldShade = new PlayfieldShadeOverlay();
     this.upsideDownSprite = null;
     this.upsideDownMat = null;
     this.flashLight = null;
@@ -302,16 +273,9 @@ export class UpsideDownTransition {
   }
 
   private applyPlayfieldStrobe(on: boolean, fullMap: boolean, mix: number): void {
-    if (!this.playfieldShadeMat) return;
+    this.playfieldShade.setOpacity(playfieldShadeStrobeOpacity(on, fullMap, mix));
 
     const active = mix > 0.02;
-    const shadeOpacity = on
-      ? (fullMap ? 0 : 0.12) * mix
-      : 0.94 * mix;
-
-    this.playfieldShadeMat.opacity = THREE.MathUtils.clamp(shadeOpacity, 0, 0.96);
-    if (this.playfieldShade) this.playfieldShade.visible = active;
-
     if (this.flashLight) {
       this.flashLight.intensity = on && !fullMap ? 2.4 * mix : 0;
     }
@@ -329,8 +293,7 @@ export class UpsideDownTransition {
     this.tremorStarted = false;
 
     if (this.flashLight) this.flashLight.intensity = 0;
-    if (this.playfieldShade) this.playfieldShade.visible = false;
-    if (this.playfieldShadeMat) this.playfieldShadeMat.opacity = 0;
+    this.playfieldShade.hide();
     if (this.upsideDownSprite) this.upsideDownSprite.visible = false;
     this.setSpriteOpacity(0);
 

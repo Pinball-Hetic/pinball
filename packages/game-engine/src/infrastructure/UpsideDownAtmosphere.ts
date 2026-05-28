@@ -24,14 +24,10 @@ import {
   UPSIDE_DOWN_ATMOSPHERE_SURFACE_TINT,
   UPSIDE_DOWN_ATMOSPHERE_TINT,
   UPSIDE_DOWN_ATMOSPHERE_WALL_TINT,
-  UPSIDE_DOWN_PLAYFIELD_SHADE_D,
-  UPSIDE_DOWN_PLAYFIELD_SHADE_W,
-  UPSIDE_DOWN_PLAYFIELD_SHADE_Y,
-  UPSIDE_DOWN_PLAYFIELD_SHADE_Z,
-  UPSIDE_DOWN_PLAYFIELD_TILT,
 } from '../domain/UpsideDownConstants';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
+import { PlayfieldShadeOverlay } from './PlayfieldShadeOverlay';
 import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from './GltfNodeNames';
 
 type MaterialKind = 'surface' | 'wall' | 'decor' | 'default';
@@ -162,8 +158,7 @@ export class UpsideDownAtmosphere {
   private lighting: SceneLighting | null = null;
   private garlandLights: GarlandLights | null = null;
   private bumperVisuals: BumperVisuals | null = null;
-  private playfieldShade: THREE.Mesh | null = null;
-  private playfieldShadeMat: THREE.MeshBasicMaterial | null = null;
+  private playfieldShade = new PlayfieldShadeOverlay();
   private sporeGroup: THREE.Group | null = null;
   private spores: SporeParticle[] = [];
   private sporeMat: THREE.MeshBasicMaterial | null = null;
@@ -211,22 +206,10 @@ export class UpsideDownAtmosphere {
       }
     });
 
-    this.playfieldShadeMat = new THREE.MeshBasicMaterial({
+    this.playfieldShade.mount(config.root, {
       color: UPSIDE_DOWN_ATMOSPHERE_SHADE_COLOR,
-      transparent: true,
-      opacity: 0,
-      depthTest: true,
-      depthWrite: false,
+      renderOrder: 550,
     });
-    this.playfieldShade = new THREE.Mesh(
-      new THREE.PlaneGeometry(UPSIDE_DOWN_PLAYFIELD_SHADE_W, UPSIDE_DOWN_PLAYFIELD_SHADE_D),
-      this.playfieldShadeMat,
-    );
-    this.playfieldShade.rotation.x = -Math.PI / 2 + UPSIDE_DOWN_PLAYFIELD_TILT;
-    this.playfieldShade.position.set(0, UPSIDE_DOWN_PLAYFIELD_SHADE_Y, UPSIDE_DOWN_PLAYFIELD_SHADE_Z);
-    this.playfieldShade.renderOrder = 550;
-    this.playfieldShade.visible = false;
-    config.root.add(this.playfieldShade);
 
     this.buildSpores(config.root);
 
@@ -302,11 +285,7 @@ export class UpsideDownAtmosphere {
     this.restoreFog();
     this.updateSpores(0, 0);
 
-    if (this.playfieldShade) {
-      this.playfieldShade.geometry.dispose();
-      this.playfieldShade.parent?.remove(this.playfieldShade);
-    }
-    this.playfieldShadeMat?.dispose();
+    this.playfieldShade.dispose();
 
     if (this.sporeGroup) this.sporeGroup.parent?.remove(this.sporeGroup);
     for (const geo of this.sporeGeos) geo.dispose();
@@ -316,8 +295,7 @@ export class UpsideDownAtmosphere {
     this.lighting = null;
     this.garlandLights = null;
     this.bumperVisuals = null;
-    this.playfieldShade = null;
-    this.playfieldShadeMat = null;
+    this.playfieldShade = new PlayfieldShadeOverlay();
     this.sporeGroup = null;
     this.spores = [];
     this.sporeMat = null;
@@ -421,13 +399,7 @@ export class UpsideDownAtmosphere {
       );
     }
 
-    if (this.playfieldShadeMat) {
-      const shadeOpacity = UPSIDE_DOWN_ATMOSPHERE_SHADE_OPACITY * ease;
-      this.playfieldShadeMat.opacity = shadeOpacity;
-      if (this.playfieldShade) {
-        this.playfieldShade.visible = shadeOpacity > 0.01;
-      }
-    }
+    this.playfieldShade.setOpacity(UPSIDE_DOWN_ATMOSPHERE_SHADE_OPACITY * ease);
 
     if (this.lighting) {
       const { scene, renderer, ambient, hemi, dir, fill } = this.lighting;

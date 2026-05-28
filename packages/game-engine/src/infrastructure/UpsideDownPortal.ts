@@ -10,8 +10,8 @@ import {
   PORTAL_SENSOR_RADIUS,
   PORTAL_UPSIDE_DOWN,
 } from '../domain/Ball';
+import { PLAYFIELD_TILT } from '../domain/PlayfieldGeometry';
 import {
-  UPSIDE_DOWN_PLAYFIELD_TILT,
   UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
@@ -107,12 +107,12 @@ export class UpsideDownPortal {
     this.cover = new THREE.Mesh(geo, this.coverMat);
     this.cover.position.copy(this.anchorPos);
     this.cover.position.y = this.baseY;
-    this.cover.rotation.x = -UPSIDE_DOWN_PLAYFIELD_TILT;
+    this.cover.rotation.x = -PLAYFIELD_TILT;
     this.cover.renderOrder = 2;
     config.root.add(this.cover);
 
-    const qx = Math.sin(UPSIDE_DOWN_PLAYFIELD_TILT / 2);
-    const qw = Math.cos(UPSIDE_DOWN_PLAYFIELD_TILT / 2);
+    const qx = Math.sin(PLAYFIELD_TILT / 2);
+    const qw = Math.cos(PLAYFIELD_TILT / 2);
     this.coverBody = config.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed()
         .setTranslation(this.anchorPos.x, this.baseY, this.anchorPos.z)
@@ -128,7 +128,7 @@ export class UpsideDownPortal {
     this.portalGroup = this.buildPortalVisuals();
     this.portalGroup.position.copy(this.anchorPos);
     this.portalGroup.position.y = this.baseY - 0.0005;
-    this.portalGroup.rotation.x = -UPSIDE_DOWN_PLAYFIELD_TILT;
+    this.portalGroup.rotation.x = -PLAYFIELD_TILT;
     this.portalGroup.visible = false;
     config.root.add(this.portalGroup);
   }
@@ -269,8 +269,8 @@ export class UpsideDownPortal {
 
     this.removePhysicsCover();
 
-    const qx = Math.sin(UPSIDE_DOWN_PLAYFIELD_TILT / 2);
-    const qw = Math.cos(UPSIDE_DOWN_PLAYFIELD_TILT / 2);
+    const qx = Math.sin(PLAYFIELD_TILT / 2);
+    const qw = Math.cos(PLAYFIELD_TILT / 2);
     this.coverBody = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed()
         .setTranslation(this.anchorPos.x, this.baseY, this.anchorPos.z)
