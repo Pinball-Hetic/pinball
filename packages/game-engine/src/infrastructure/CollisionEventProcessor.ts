@@ -3,6 +3,7 @@ import type { GameEventListener } from '../domain/GameEvents';
 import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
 import type { BumperHit } from '../use-cases/BumperHit';
 import type { DrainBall } from '../use-cases/DrainBall';
+import type { BottomOutBall } from '../use-cases/BottomOutBall';
 
 export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
@@ -44,6 +45,7 @@ export class CollisionEventProcessor {
     private readonly colliderMap: Map<number, string>,
     private readonly bumperHitUC: BumperHit,
     private readonly drainBallUC: DrainBall,
+    private readonly bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
   ) {
     for (const dt of DROP_TARGETS) this.dropTargetDown[dt.id] = false;
@@ -75,6 +77,16 @@ export class CollisionEventProcessor {
         if (pos) {
           this.bumperHitUC.execute(idx, pos);
         }
+      }
+
+      if (role === 'bottom_out' && gameState === 'playing') {
+        this.demogorgonTriggered = false;
+        this.demogorgonFightActive = false;
+        this.demogorgonTargetArmed = false;
+        this.demogorgonTargetLatchIgnore = false;
+        this.demogorgonTargetHits = 0;
+        this.bottomOutBallUC.execute();
+        this.resetDropTargets();
       }
 
       if (role === 'drain' && gameState === 'playing') {
