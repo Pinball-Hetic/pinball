@@ -13,6 +13,7 @@ export type GameEvent =
   | { type: 'PORTAL_TREMOR' }
   | { type: 'PORTAL_TRANSITION_END' }
   | { type: 'DRAIN' }
+  | { type: 'BOTTOM_OUT' }
   | { type: 'BALL_LAUNCHED' };
 
 export type GameEventListener = (event: GameEvent) => void;
