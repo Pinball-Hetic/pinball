@@ -10,6 +10,7 @@ export * from './domain/PlayfieldGeometry';
 export * from './use-cases/LaunchBall';
 export * from './use-cases/BumperHit';
 export * from './use-cases/DrainBall';
+export * from './use-cases/BottomOutBall';
 export * from './use-cases/DetectFlipperHit';
 export * from './use-cases/AnimateLauncherLane';
 export * from './use-cases/DetectStuckBall';
