@@ -13,6 +13,7 @@ export * from './use-cases/DrainBall';
 export * from './use-cases/DetectFlipperHit';
 export * from './use-cases/AnimateLauncherLane';
 export * from './use-cases/DetectStuckBall';
+export * from './use-cases/DetectBottomOut';
 
 // Infrastructure
 export * from './infrastructure/PhysicsWorld';
