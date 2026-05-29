@@ -170,7 +170,7 @@ export class DemogorgonReveal {
       }
       return;
     }
-    if (event.type === 'DRAIN') {
+    if (event.type === 'DRAIN' || event.type === 'BOTTOM_OUT') {
       this.resetAtmosphere();
     }
   }

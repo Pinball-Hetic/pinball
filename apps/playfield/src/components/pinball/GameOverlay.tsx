@@ -125,6 +125,11 @@ export default function GameOverlay({
               Game Over
             </p>
           )}
+          {gameState === "idle" && lives < initialLives && (
+            <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">
+              Bille perdue — {lives} vie{lives > 1 ? "s" : ""} restante{lives > 1 ? "s" : ""}
+            </p>
+          )}
           {hintLine && (
             <p className="animate-pulse font-mono text-sm uppercase tracking-[0.3em] text-zinc-400">
               {hintLine}

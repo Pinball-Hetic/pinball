@@ -194,7 +194,7 @@ export function useGameState() {
           setDemogorgonHud((prev) => ({ ...prev, elevenFlash: false }));
         }, 900);
       }
-      if (event.type === "DRAIN") {
+      if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
         clearDemogorgonHud();
         clearScorePops();
         handleDrain(hideBall);

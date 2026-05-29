@@ -130,6 +130,12 @@ function playPortalTremor(): void {
   window.setTimeout(() => playNoise(0.16, 0.06, 42), 1440);
 }
 
+function playBottomOut(): void {
+  playTone(120, 0.28, "sawtooth", 0.14);
+  playTone(80, 0.35, "triangle", 0.1);
+  playNoise(0.22, 0.12, 320);
+}
+
 function playPortalTransitionEnd(): void {
   playTone(180, 0.24, "triangle", 0.11);
   playTone(360, 0.14, "sine", 0.06);
@@ -166,6 +172,9 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       break;
     case "PORTAL_TRANSITION_END":
       playPortalTransitionEnd();
+      break;
+    case "BOTTOM_OUT":
+      playBottomOut();
       break;
     default:
       break;
