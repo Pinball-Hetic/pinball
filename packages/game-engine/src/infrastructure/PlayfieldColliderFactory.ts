@@ -2,6 +2,7 @@ import type * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
   BUMPER_POSITIONS,
+  WALL_LEFT_X,
   BALL_RADIUS,
   BALL_SPAWN_POSITION,
   SLINGSHOT_LEFT_CENTER,
@@ -12,7 +13,7 @@ import {
   DEMOGORGON_TARGET,
   DROP_TARGETS,
 } from '../domain/Ball';
-import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { surfaceYAtZ, BOTTOM_OUT_LANE_SEP_X, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
 import { hasPinballmapRoot } from './GltfNodeNames';
 
@@ -68,7 +69,7 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createDemogorgonSensor(world, colliderMap);
     PlayfieldColliderFactory.createDemogorgonTarget(world, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, colliderMap);
-    PlayfieldColliderFactory.createDrainSensor(world, colliderMap);
+    PlayfieldColliderFactory.createBottomOutSensor(world, colliderMap);
   }
 
   private static createPlayfieldFloor(world: RAPIER.World): void {
@@ -265,17 +266,18 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createDrainSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    const drainZ = 0.40;
-    const drainBody = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(0.0, surfaceYAtZ(drainZ), drainZ),
+  private static createBottomOutSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {
+    const centerX = (WALL_LEFT_X + BOTTOM_OUT_LANE_SEP_X) / 2;
+    const halfX = (BOTTOM_OUT_LANE_SEP_X - WALL_LEFT_X) / 2;
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(centerX, surfaceYAtZ(BOTTOM_OUT_Z), BOTTOM_OUT_Z),
     );
-    const drainCol = world.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.25, 0.03, 0.01)
+    const col = world.createCollider(
+      RAPIER.ColliderDesc.cuboid(halfX, 0.03, 0.01)
         .setSensor(true)
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
-      drainBody,
+      body,
     );
-    colliderMap.set(drainCol.handle, 'drain');
+    colliderMap.set(col.handle, 'bottom_out');
   }
 }
