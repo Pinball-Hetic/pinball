@@ -10,6 +10,8 @@ import {
   LaunchBall,
   BumperHit,
   DrainBall,
+  BottomOutBall,
+  DetectBottomOut,
   BALL_RADIUS,
   BALL_SPAWN_POSITION,
   WALL_LEFT_X,
@@ -345,6 +347,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let launchBallUC: LaunchBall | null = null;
     let bumperHitUC: BumperHit | null = null;
     let drainBallUC: DrainBall | null = null;
+    let bottomOutBallUC: BottomOutBall | null = null;
     let collisionProcessor: CollisionEventProcessor | null = null;
     let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
@@ -379,6 +382,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
     const laneAnimator = new LauncherLaneAnimator();
     const stuckDetector = new StuckBallDetector();
+    const bottomOutDetector = new DetectBottomOut();
 
     // ── Plunger kinematic ────────────────────────────────────────────────────
     let plungerBody: RAPIER.RigidBody | null = null;
@@ -638,8 +642,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (event.type === "DRAIN" && UPSIDE_DOWN_PERSISTENCE === "until_drain") {
             releaseUpsideDownWorld();
           }
+          if (event.type === "BOTTOM_OUT" && UPSIDE_DOWN_PERSISTENCE === "until_drain") {
+            releaseUpsideDownWorld();
+          }
           if (event.type === "PORTAL_ENTER") onPortalEnter?.();
-          if (event.type === "BALL_LAUNCHED") collisionProcessor?.resetPortalTrigger();
+          if (event.type === "BALL_LAUNCHED") {
+            collisionProcessor?.resetPortalTrigger();
+            bottomOutBallUC?.resetLatch();
+          }
           if (event.type === 'DROP_TARGET_HIT') {
             const meshName = event.targetId.replace('drop_', 'drop_target_');
             const mesh = playfieldRootRef?.getObjectByName(meshName);
@@ -655,11 +665,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
         bumperHitUC = new BumperHit(ballPhysicsInst, emit);
         drainBallUC = new DrainBall(ballPhysicsInst, emit);
+        bottomOutBallUC = new BottomOutBall(ballPhysicsInst, emit);
 
         collisionProcessor = new CollisionEventProcessor(
           colliderMap,
           bumperHitUC,
           drainBallUC,
+          bottomOutBallUC,
           emit,
         );
 
@@ -915,7 +927,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           const stuckResult = stuckDetector.update(bSpd, bPos, dt);
           if (stuckResult) {
             if (stuckResult.type === 'force_drain') {
-              drainBallUC?.execute();
+              bottomOutBallUC?.execute();
             } else if (stuckResult.impulse) {
               ballPhysicsInst.body.applyImpulse(stuckResult.impulse, true);
             }
@@ -924,8 +936,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           stuckDetector.reset();
         }
 
-        // Drain géré uniquement par le sensor Rapier (CollisionEventProcessor)
-        // → pas de drain-par-position qui tue la balle avant que les flippers aient pu agir
+        // Bottom-out fallback — zone sous les flippers hors lane de lancement
+        if (
+          gameStateRef.current === "playing"
+          && laneAnimSpeed <= 0
+          && bottomOutDetector.check(bPos)
+        ) {
+          bottomOutBallUC?.execute();
+        }
+
+        // Drain géré par le capteur Rapier bottom_out (CollisionEventProcessor)
       }
 
       // Plunger animation
