@@ -167,10 +167,3 @@ export function applyFlipperSwing(flipper: FlipperPivot, angle: number): void {
   else flipper.pivot.rotation.y = signed;
   flipper.pivot.updateMatrixWorld(true);
 }
-
-export function splitFlipperIntoTwo(
-  _flipperObj: THREE.Object3D,
-  _attachParent?: THREE.Object3D,
-): [THREE.Mesh | null, THREE.Mesh | null] {
-  return [null, null];
-}

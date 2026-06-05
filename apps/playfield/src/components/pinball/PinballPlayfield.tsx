@@ -45,7 +45,6 @@ import {
   configureGltfRenderer,
   createGltfLoader,
   ballCenterOnSurface,
-  surfaceYAtZ,
   DROP_TARGETS,
   PlungerPhysics,
   BumperVisuals,
@@ -339,7 +338,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let prevLeftSwing = 0, prevRightSwing = 0;
 
     // ── Physics / game objects ───────────────────────────────────────────────
-    let fieldBoundsLaneSepX = BALL_SPAWN_POSITION.x - BALL_RADIUS * 2;
     let ballMesh: THREE.Object3D | null = null;
     let playfieldRootRef: THREE.Object3D | null = null;
     let physicsWorld: PhysicsWorld | null = null;
@@ -478,8 +476,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const world = physicsWorld.world;
 
         modelRoot.updateMatrixWorld(true);
-        const playfieldViewBox = boundingBoxPlayfieldSurface(playfieldRoot);
-        fieldBoundsLaneSepX = playfieldViewBox.min.x;
 
         const colliderMap = new Map<number, string>();
 
