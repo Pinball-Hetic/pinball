@@ -4,6 +4,7 @@ export * from './domain/Plunger';
 export * from './domain/GameEvents';
 export * from './domain/FlipperConstants';
 export * from './domain/UpsideDownConstants';
+export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
 
 // Use-cases
