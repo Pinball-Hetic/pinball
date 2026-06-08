@@ -1,13 +1,5 @@
 import * as THREE from 'three';
 
-/**
- * Noms GLB normalisés pour la physique / la recherche de nœuds.
- *
- * Export Blender (`Pinballmap.glb`) :
- * - `pf_*`  : visuel gameplay
- * - `coll_*`: collision seule (trimesh si au moins un mesh `coll_*` est présent)
- * - `vis_*` : visuel uniquement (exclu du trimesh)
- */
 export function normalizeGltfName(name: string): string {
   return name
     .toLowerCase()
@@ -51,7 +43,73 @@ export function findObjectByNormalizedName(
   return found;
 }
 
-/** Au moins un mesh `coll_*` → trimesh limité à ces meshes. */
+export function hasNamedAncestor(obj: THREE.Object3D, ...names: string[]): boolean {
+  const wanted = new Set(names.map(normalizeGltfName));
+  let current: THREE.Object3D | null = obj;
+  while (current) {
+    if (wanted.has(normalizeGltfName(current.name))) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+export function isPinballmapGameplayMesh(mesh: THREE.Mesh): boolean {
+  return hasNamedAncestor(mesh, 'Pinballmap');
+}
+
+export function isFlipperGltfMesh(mesh: THREE.Mesh): boolean {
+  let current: THREE.Object3D | null = mesh;
+  while (current) {
+    const n = normalizeGltfName(current.name);
+    if (n === 'pinballmap') return false;
+    if (n === 'flipper' || n.startsWith('flipper.')) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+export function isPinballmapRailMesh(mesh: THREE.Mesh): boolean {
+  const self = normalizeGltfName(mesh.name);
+  if (/^circle\.\d+$/.test(self) || /^plane\.\d+$/.test(self)) return true;
+  let current: THREE.Object3D | null = mesh.parent;
+  while (current) {
+    const n = normalizeGltfName(current.name);
+    if (n === 'pinballmap') return false;
+    if (/^circle\.\d+$/.test(n) || /^plane\.\d+$/.test(n)) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+export function hasPinballmapRoot(root: THREE.Object3D): boolean {
+  return !!findObjectByNormalizedName(root, 'Pinballmap', 'pinballmap');
+}
+
+export function removePinballmapUnusedMeshes(root: THREE.Object3D): void {
+  const toRemove: THREE.Object3D[] = [];
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const c = canonicalGltfName(obj.name);
+    const n = normalizeGltfName(obj.name);
+    if (c === 'ball' || c === 'ball_metal' || c === 'icosphere_001' || c === 'sphere_001') {
+      toRemove.push(obj);
+      return;
+    }
+    if (isPinballmapGameplayMesh(obj) && /^sphere\.\d+$/.test(n)) {
+      toRemove.push(obj);
+    }
+  });
+  for (const obj of toRemove) {
+    obj.parent?.remove(obj);
+    if (obj instanceof THREE.Mesh) {
+      obj.geometry?.dispose();
+      const mat = obj.material;
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+      else mat?.dispose();
+    }
+  }
+}
+
 export function playfieldUsesCollOnlyCollision(root: THREE.Object3D): boolean {
   let found = false;
   root.traverse((obj) => {
@@ -62,20 +120,6 @@ export function playfieldUsesCollOnlyCollision(root: THREE.Object3D): boolean {
   return found;
 }
 
-export function hideGltfDecorativeBall(root: THREE.Object3D): void {
-  const hideNames = new Set(['ball', 'ball_metal', 'icosphere_001', 'sphere_001']);
-  root.traverse((obj) => {
-    const n = canonicalGltfName(obj.name);
-    if (hideNames.has(n) || n === 'ball' || /^sphere(\.\d+)?$/.test(n)) {
-      obj.visible = false;
-      obj.traverse((child) => {
-        child.visible = false;
-      });
-    }
-  });
-}
-
-/** Nœuds parasites (formes orphelines Sketchfab / Blender) — exclus du trimesh. */
 export function isJunkGltfMeshName(name: string): boolean {
   const n = normalizeGltfName(name);
   if (n.startsWith('circle')) return true;

@@ -2,25 +2,24 @@ import type * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
   BUMPER_POSITIONS,
+  WALL_LEFT_X,
   BALL_RADIUS,
   BALL_SPAWN_POSITION,
   SLINGSHOT_LEFT_CENTER,
   SLINGSHOT_RIGHT_CENTER,
   POP_ZONE_SENSORS,
   ROCKET_SENSOR,
+  DEMOGORGON_SENSOR,
+  DEMOGORGON_TARGET,
   DROP_TARGETS,
 } from '../domain/Ball';
-import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { surfaceYAtZ, BOTTOM_OUT_LANE_SEP_X, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
+import { hasPinballmapRoot } from './GltfNodeNames';
 
 export type AnalyticalColliderOptions = {
-  /** Sol incliné du couloir plongeur (souvent en double avec le GLB). */
   laneFloor?: boolean;
-  /** Murs latéraux / haut / séparateur lane (souvent en double avec le trimesh). */
   walls?: boolean;
-  /** Outlanes, poteaux, murets analytiques. */
-  barriers?: boolean;
-  /** Cylindres bumpers (restent utiles si les bumpers sont exclus du trimesh). */
   bumpers?: boolean;
 };
 
@@ -28,13 +27,17 @@ export class PlayfieldColliderFactory {
   static createAll(
     world: RAPIER.World,
     colliderMap: Map<number, string>,
-    analytical?: AnalyticalColliderOptions,
     playfieldRoot?: THREE.Object3D,
+    analytical?: AnalyticalColliderOptions,
   ): void {
+    if (playfieldRoot && hasPinballmapRoot(playfieldRoot)) {
+      PlayfieldColliderFactory.createPinballmap(world, colliderMap);
+      return;
+    }
+
     const a = {
       laneFloor: analytical?.laneFloor ?? true,
       walls: analytical?.walls ?? true,
-      barriers: analytical?.barriers ?? true,
       bumpers: analytical?.bumpers ?? true,
     };
 
@@ -48,20 +51,27 @@ export class PlayfieldColliderFactory {
     }
     if (a.walls) PlayfieldColliderFactory.createWalls(world);
     if (a.bumpers) PlayfieldColliderFactory.createBumpers(world, colliderMap);
-    if (a.barriers) PlayfieldColliderFactory.createBarriers(world);
+    PlayfieldColliderFactory.createSensors(world, colliderMap);
+  }
+
+  private static createPinballmap(
+    world: RAPIER.World,
+    colliderMap: Map<number, string>,
+  ): void {
+    PlayfieldColliderFactory.createBumpers(world, colliderMap);
+    PlayfieldColliderFactory.createSensors(world, colliderMap);
+  }
+
+  private static createSensors(world: RAPIER.World, colliderMap: Map<number, string>): void {
     PlayfieldColliderFactory.createSlingshotSensors(world, colliderMap);
     PlayfieldColliderFactory.createPopZoneSensors(world, colliderMap);
     PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
+    PlayfieldColliderFactory.createDemogorgonSensor(world, colliderMap);
+    PlayfieldColliderFactory.createDemogorgonTarget(world, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, colliderMap);
-    PlayfieldColliderFactory.createDrainSensor(world, colliderMap);
+    PlayfieldColliderFactory.createBottomOutSensor(world, colliderMap);
   }
 
-  /**
-   * Plan incliné lisse qui remplace le trimesh `playfield` du GLB.
-   * Une seule face parfaitement plane → la balle roule sans accrocher.
-   * Dimensions : X [-0.265, 0.265], Z [-0.552, 0.418] (surface jouable complète).
-   * Pente : dY/dZ = -0.110/0.970 ≈ -6.5° autour de l'axe X.
-   */
   private static createPlayfieldFloor(world: RAPIER.World): void {
     const zMin = -0.552, zMax = 0.418;
     const midZ = (zMin + zMax) / 2;
@@ -134,7 +144,6 @@ export class PlayfieldColliderFactory {
       { hx: HT, hy: HH, hz: 0.485, px:  0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
       { hx: 0.265, hy: HH, hz: HT, px: 0.0, py: surfaceYAtZ(-0.552) + HH, pz: -0.552 },
       { hx: HT, hy: HH, hz: 0.50, px: laneSepX, py: surfaceYAtZ(-0.05) + HH, pz: -0.05 },
-      // Bottom wall removed — ball falls through to drain
     ];
 
     for (const w of walls) {
@@ -165,46 +174,6 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createBarriers(world: RAPIER.World): void {
-    const surfY = surfaceYAtZ;
-
-    type BarrierDef = {
-      type: 'cyl' | 'box';
-      px: number;
-      pz: number;
-      hAbove: number;
-      r?: number;
-      hh?: number;
-      hx?: number;
-      hy?: number;
-      hz?: number;
-      rest?: number;
-    };
-
-    const barriers: BarrierDef[] = [];
-
-    for (const b of barriers) {
-      const py = surfY(b.pz) + b.hAbove;
-      const body = world.createRigidBody(
-        RAPIER.RigidBodyDesc.fixed().setTranslation(b.px, py, b.pz),
-      );
-
-      if (b.type === 'cyl') {
-        world.createCollider(
-          RAPIER.ColliderDesc.cylinder(b.hh!, b.r!)
-            .setRestitution(b.rest ?? 0.4).setFriction(0.1),
-          body,
-        );
-      } else {
-        world.createCollider(
-          RAPIER.ColliderDesc.cuboid(b.hx!, b.hy!, b.hz!)
-            .setRestitution(b.rest ?? 0.4).setFriction(0.1),
-          body,
-        );
-      }
-    }
-  }
-
   private static createSlingshotSensors(world: RAPIER.World, colliderMap: Map<number, string>): void {
     const slings = [
       { pos: SLINGSHOT_LEFT_CENTER,  role: 'slingshot_left' },
@@ -214,7 +183,6 @@ export class PlayfieldColliderFactory {
       const b = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(s.pos.x, s.pos.y, s.pos.z),
       );
-      // Sensor only — trimesh slingshot handles physical bounce
       const col = world.createCollider(
         RAPIER.ColliderDesc.cuboid(0.06, 0.015, 0.03)
           .setSensor(true)
@@ -239,6 +207,34 @@ export class PlayfieldColliderFactory {
       );
       colliderMap.set(col.handle, `pop_zone_${i}`);
     }
+  }
+
+  private static createDemogorgonTarget(world: RAPIER.World, colliderMap: Map<number, string>): void {
+    const p = DEMOGORGON_TARGET;
+    const b = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
+    );
+    const col = world.createCollider(
+      RAPIER.ColliderDesc.ball(0.034)
+        .setSensor(true)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+      b,
+    );
+    colliderMap.set(col.handle, 'demogorgon_target');
+  }
+
+  private static createDemogorgonSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {
+    const p = DEMOGORGON_SENSOR;
+    const b = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
+    );
+    const col = world.createCollider(
+      RAPIER.ColliderDesc.cuboid(0.045, 0.012, 0.045)
+        .setSensor(true)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+      b,
+    );
+    colliderMap.set(col.handle, 'demogorgon_center');
   }
 
   private static createRocketSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {
@@ -270,17 +266,18 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createDrainSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    const drainZ = 0.40;
-    const drainBody = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(0.0, surfaceYAtZ(drainZ), drainZ),
+  private static createBottomOutSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {
+    const centerX = (WALL_LEFT_X + BOTTOM_OUT_LANE_SEP_X) / 2;
+    const halfX = (BOTTOM_OUT_LANE_SEP_X - WALL_LEFT_X) / 2;
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(centerX, surfaceYAtZ(BOTTOM_OUT_Z), BOTTOM_OUT_Z),
     );
-    const drainCol = world.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.25, 0.03, 0.01)
+    const col = world.createCollider(
+      RAPIER.ColliderDesc.cuboid(halfX, 0.03, 0.01)
         .setSensor(true)
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
-      drainBody,
+      body,
     );
-    colliderMap.set(drainCol.handle, 'drain');
+    colliderMap.set(col.handle, 'bottom_out');
   }
 }

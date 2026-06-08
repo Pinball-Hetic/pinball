@@ -17,3 +17,22 @@ body {
   color: var(--foreground);
   font-family: system-ui, sans-serif;
 }
+
+@keyframes score-pop-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.55);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 52px)) scale(0.92);
+  }
+}
+
+.score-pop-rise {
+  animation: score-pop-rise 0.88s ease-out forwards;
+}
