@@ -16,5 +16,7 @@ export const FLIPPER_RIGHT_X_MAX = 0.055;
 export const FLIPPER_RIGHT_MID_X = 0.020;
 export const INITIAL_LIVES = 3;
 export const PLUNGER_CHARGE_MS = 1800;
-export const PLUNGER_MIN_FACTOR = 0.32;
+// Min relevé : à pleine masse, 0.22*0.6/0.08 ≈ 1.65 m/s, assez pour franchir
+// la courbe de sortie. Max = tir complet (~2.75 m/s).
+export const PLUNGER_MIN_FACTOR = 0.6;
 export const PLUNGER_MAX_FACTOR = 1.0;

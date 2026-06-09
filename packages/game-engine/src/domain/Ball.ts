@@ -6,11 +6,43 @@ export const BALL_FRICTION        = 0.1;
 export const BALL_LINEAR_DAMPING  = 0.02;
 export const BALL_ANGULAR_DAMPING = 0.02;
 
-// Spawn — lane: left sep X≈0.208, right wall X=0.265, center≈0.236
-export const BALL_SPAWN_POSITION = { x: 0.235, y: 1.010, z: 0.1610 } as const;
+// Spawn — centre géométrique du couloir : (X_MIN 0.206 + X_MAX 0.265) / 2 =
+// 0.2355. La balle est tenue sur cette ligne par le verrou latéral (charge +
+// montée), donc parfaitement centrée entre les deux murs du couloir.
+export const BALL_SPAWN_POSITION = { x: 0.2355, y: 1.010, z: 0.1610 } as const;
 
-// Plunger
-export const PLUNGER_IMPULSE_Z = -2.4;
+// Plunger — impulsion = masse * Δv. À pleine charge : 0.22/0.08 ≈ 2.75 m/s,
+// juste sous le clamp de vitesse (2.8) pour éviter le tunneling dans le couloir.
+export const PLUNGER_IMPULSE_Z = -0.22;
+
+// ── Couloir plongeur (shooter lane) — vrai lancement physique ────────────────
+// X min = 0.206 : mur gauche analytique HORS du chemin de la balle (canal large
+// pour que la balle, diamètre ~0.0295, ne soit jamais coincée). La balle est
+// maintenue à droite par le spawn ; les arcs GLB bordent le côté gauche.
+export const SHOOTER_LANE_X_MIN = 0.206;
+export const SHOOTER_LANE_X_MAX = 0.265;
+// Z : bas = côté joueur, haut = début de la courbe de sortie (Z négatif).
+export const SHOOTER_LANE_BOTTOM_Z = 0.42;
+export const SHOOTER_LANE_TOP_Z = -0.49;
+export const SHOOTER_LANE_WALL_HEIGHT = 0.05;
+// Épais pour empêcher le tunneling de la balle rapide au lancement.
+export const SHOOTER_LANE_WALL_THICKNESS = 0.012;
+export const SHOOTER_LANE_RESTITUTION = 0.2;
+export const SHOOTER_LANE_FRICTION = 0.08;
+// Le mur gauche (séparateur) s'arrête ici : ouverture en haut-gauche par
+// laquelle la balle déviée sort dans le terrain.
+export const SHOOTER_LANE_LEFT_WALL_TOP_Z = -0.28;
+
+// Guide courbe de sortie = mur EXTÉRIEUR (droite + haut) qui s'incurve.
+// Centre au coin haut-gauche du couloir : la balle montante (-Z) longe la face
+// concave et est renvoyée vers la gauche (-X) en redescendant (+Z) → arc
+// classique de flipper. Quart de cercle balayé de 270° (haut-gauche) à 360°
+// (sommet du mur droit).
+export const SHOOTER_GUIDE_CENTER = { x: SHOOTER_LANE_X_MIN, z: -0.40 } as const;
+export const SHOOTER_GUIDE_RADIUS = SHOOTER_LANE_X_MAX - SHOOTER_LANE_X_MIN;
+export const SHOOTER_GUIDE_SEGMENTS = 10;
+export const SHOOTER_GUIDE_ANGLE_START = Math.PI * 1.5;
+export const SHOOTER_GUIDE_ANGLE_END = Math.PI * 2;
 
 // Playfield — GLB: center=[0,1.0171,-0.0671] size=[0.53,0.1019,0.9697]
 // Surface is already tilted in GLB geometry → gravity stays straight down

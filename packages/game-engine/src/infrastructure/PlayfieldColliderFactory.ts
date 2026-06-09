@@ -12,6 +12,20 @@ import {
   DEMOGORGON_SENSOR,
   DEMOGORGON_TARGET,
   DROP_TARGETS,
+  SHOOTER_LANE_X_MIN,
+  SHOOTER_LANE_X_MAX,
+  SHOOTER_LANE_BOTTOM_Z,
+  SHOOTER_LANE_TOP_Z,
+  SHOOTER_LANE_WALL_HEIGHT,
+  SHOOTER_LANE_WALL_THICKNESS,
+  SHOOTER_LANE_RESTITUTION,
+  SHOOTER_LANE_FRICTION,
+  SHOOTER_LANE_LEFT_WALL_TOP_Z,
+  SHOOTER_GUIDE_CENTER,
+  SHOOTER_GUIDE_RADIUS,
+  SHOOTER_GUIDE_SEGMENTS,
+  SHOOTER_GUIDE_ANGLE_START,
+  SHOOTER_GUIDE_ANGLE_END,
 } from '../domain/Ball';
 import { surfaceYAtZ, BOTTOM_OUT_LANE_SEP_X, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
@@ -58,8 +72,166 @@ export class PlayfieldColliderFactory {
     world: RAPIER.World,
     colliderMap: Map<number, string>,
   ): void {
+    // Sol analytique lisse (cuboïde incliné) qui remplace le trimesh bosselé du
+    // GLB (Mesh_0, exclu côté PlayfieldTrimeshBuilder). Une primitive boîte n'a
+    // aucune facette → la balle glisse sans accrocher les arêtes internes du
+    // trimesh (« ghost collisions » Rapier) qui la ralentissaient.
+    PlayfieldColliderFactory.createPlayfieldFloor(world);
     PlayfieldColliderFactory.createBumpers(world, colliderMap);
     PlayfieldColliderFactory.createSensors(world, colliderMap);
+    // Pas de sol couloir ici : createPlayfieldFloor couvre déjà le couloir.
+    // Un 2e cuboïde + trimesh GLB Mesh_1…4 créaient des contacts multiples →
+    // la balle perdait ~95 % de vitesse dès les premiers centimètres.
+    PlayfieldColliderFactory.createShooterLane(world, { includeFloor: false });
+  }
+
+  /**
+   * Couloir plongeur analytique : murs + guide (+ sol optionnel).
+   * Sur Pinballmap le sol est déjà fourni par createPlayfieldFloor.
+   */
+  static createShooterLane(
+    world: RAPIER.World,
+    options: { includeFloor?: boolean } = {},
+  ): void {
+    if (options.includeFloor !== false) {
+      PlayfieldColliderFactory.createShooterLaneFloor(world);
+    }
+    // Mur droit : pleine hauteur, contient la balle côté +X jusqu'au sommet.
+    PlayfieldColliderFactory.createTiltedLaneWall(
+      world,
+      SHOOTER_LANE_X_MAX,
+      SHOOTER_LANE_TOP_Z,
+      SHOOTER_LANE_BOTTOM_Z,
+    );
+    // Mur gauche : s'arrête avant le sommet → ouverture de sortie en haut-gauche.
+    PlayfieldColliderFactory.createTiltedLaneWall(
+      world,
+      SHOOTER_LANE_X_MIN,
+      SHOOTER_LANE_LEFT_WALL_TOP_Z,
+      SHOOTER_LANE_BOTTOM_Z,
+    );
+    PlayfieldColliderFactory.createShooterGuide(world);
+    PlayfieldColliderFactory.createShooterBackWall(world);
+  }
+
+  /** Filet de sécurité : mur de fond en haut du couloir → la balle ne peut
+   *  jamais s'échapper de la table, même si le guide la rate. */
+  private static createShooterBackWall(world: RAPIER.World): void {
+    const z = SHOOTER_LANE_TOP_Z;
+    const midX = (SHOOTER_LANE_X_MIN + SHOOTER_LANE_X_MAX) / 2;
+    const halfX = (SHOOTER_LANE_X_MAX - SHOOTER_LANE_X_MIN) / 2;
+    const y = surfaceYAtZ(z) + SHOOTER_LANE_WALL_HEIGHT / 2;
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(midX, y, z),
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(
+        halfX,
+        SHOOTER_LANE_WALL_HEIGHT / 2,
+        SHOOTER_LANE_WALL_THICKNESS / 2,
+      )
+        .setRestitution(SHOOTER_LANE_RESTITUTION)
+        .setFriction(SHOOTER_LANE_FRICTION),
+      body,
+    );
+  }
+
+  private static createShooterLaneFloor(world: RAPIER.World): void {
+    const zTop = SHOOTER_LANE_TOP_Z;
+    const zBot = SHOOTER_LANE_BOTTOM_Z;
+    const midZ = (zTop + zBot) / 2;
+    const halfZ = (zBot - zTop) / 2;
+    const midX = (SHOOTER_LANE_X_MIN + SHOOTER_LANE_X_MAX) / 2;
+    const halfX = (SHOOTER_LANE_X_MAX - SHOOTER_LANE_X_MIN) / 2;
+    const yTop = surfaceYAtZ(zTop);
+    const yBot = surfaceYAtZ(zBot);
+    const midY = (yTop + yBot) / 2;
+    const tilt = Math.atan2(yTop - yBot, zBot - zTop);
+
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed()
+        .setTranslation(midX, midY, midZ)
+        .setRotation({ x: Math.sin(tilt / 2), y: 0, z: 0, w: Math.cos(tilt / 2) }),
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(halfX, 0.003, halfZ)
+        .setRestitution(0.3)
+        .setFriction(0.12),
+      body,
+    );
+  }
+
+  /** Mur droit le long de Z (suit l'inclinaison du tapis), épaisseur sur X. */
+  private static createTiltedLaneWall(
+    world: RAPIER.World,
+    x: number,
+    zTop: number,
+    zBot: number,
+  ): void {
+    const midZ = (zTop + zBot) / 2;
+    const halfZ = (zBot - zTop) / 2;
+    const yTop = surfaceYAtZ(zTop);
+    const yBot = surfaceYAtZ(zBot);
+    const midY = (yTop + yBot) / 2 + SHOOTER_LANE_WALL_HEIGHT / 2;
+    const tilt = Math.atan2(yTop - yBot, zBot - zTop);
+
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed()
+        .setTranslation(x, midY, midZ)
+        .setRotation({ x: Math.sin(tilt / 2), y: 0, z: 0, w: Math.cos(tilt / 2) }),
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(
+        SHOOTER_LANE_WALL_THICKNESS / 2,
+        SHOOTER_LANE_WALL_HEIGHT / 2,
+        halfZ,
+      )
+        .setRestitution(SHOOTER_LANE_RESTITUTION)
+        .setFriction(SHOOTER_LANE_FRICTION),
+      body,
+    );
+  }
+
+  /**
+   * Guide courbe : quart de cercle approximé par N cuboïdes tangents.
+   * La normale concave pousse la balle montante (-Z) vers le terrain (-X).
+   */
+  private static createShooterGuide(world: RAPIER.World): void {
+    const C = SHOOTER_GUIDE_CENTER;
+    const R = SHOOTER_GUIDE_RADIUS;
+    const N = SHOOTER_GUIDE_SEGMENTS;
+    const dA = (SHOOTER_GUIDE_ANGLE_END - SHOOTER_GUIDE_ANGLE_START) / N;
+    const halfLen = (R * Math.abs(dA)) / 2 + SHOOTER_LANE_WALL_THICKNESS;
+
+    for (let i = 0; i < N; i++) {
+      const aMid = SHOOTER_GUIDE_ANGLE_START + dA * (i + 0.5);
+      const x = C.x + R * Math.cos(aMid);
+      const z = C.z + R * Math.sin(aMid);
+      const y = surfaceYAtZ(z) + SHOOTER_LANE_WALL_HEIGHT / 2;
+
+      // Tangente à l'arc dans le plan XZ → axe local +X du cuboïde.
+      const tx = -Math.sin(aMid);
+      const tz = Math.cos(aMid);
+      const alpha = Math.atan2(-tz, tx);
+      const qy = Math.sin(alpha / 2);
+      const qw = Math.cos(alpha / 2);
+
+      const body = world.createRigidBody(
+        RAPIER.RigidBodyDesc.fixed()
+          .setTranslation(x, y, z)
+          .setRotation({ x: 0, y: qy, z: 0, w: qw }),
+      );
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(
+          halfLen,
+          SHOOTER_LANE_WALL_HEIGHT / 2,
+          SHOOTER_LANE_WALL_THICKNESS / 2,
+        )
+          .setRestitution(SHOOTER_LANE_RESTITUTION)
+          .setFriction(SHOOTER_LANE_FRICTION),
+        body,
+      );
+    }
   }
 
   private static createSensors(world: RAPIER.World, colliderMap: Map<number, string>): void {
@@ -91,7 +263,7 @@ export class PlayfieldColliderFactory {
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(halfX, 0.003, halfZ)
-        .setRestitution(0.35).setFriction(0.15),
+        .setRestitution(0.35).setFriction(0.12),
       floorBody,
     );
   }

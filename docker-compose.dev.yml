@@ -40,7 +40,8 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
-      NEXT_PUBLIC_KEYBOARD_MODE: "simulate-esp32"
+      # direct = clavier local immédiat (debug physique). simulate-esp32 pour tester FlipHetic.
+      NEXT_PUBLIC_KEYBOARD_MODE: "direct"
     ports:
       - "3333:3000"
     volumes:

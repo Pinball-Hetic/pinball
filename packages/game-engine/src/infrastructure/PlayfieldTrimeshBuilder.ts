@@ -11,8 +11,10 @@ import {
   isVisualOnlyGltfName,
   normalizeGltfName,
   playfieldUsesCollOnlyCollision,
+  isPinballmapNonPhysicalFloorMesh,
 } from './GltfNodeNames';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { SHOOTER_LANE_X_MIN, SHOOTER_LANE_X_MAX } from '../domain/Ball';
 
 const COLLISION_SOLIDS = new Set([
   'flipper',
@@ -232,10 +234,22 @@ export class PlayfieldTrimeshBuilder {
   }
 
   private static buildPinballmap(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
+    PlayfieldTrimeshBuilder.logLaneObstacles(playfieldRoot);
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       if (!isPinballmapGameplayMesh(child)) return;
       if (isFlipperGltfMesh(child)) return;
+      // Mesh_0 (surface de jeu) : visible mais SANS collision. La physique est
+      // assurée par le cuboïde analytique lisse (createPlayfieldFloor) → la
+      // balle glisse sans accrocher les arêtes du trimesh. Mesh_1…4 (cadre bois,
+      // structure haute) gardent leur collision.
+      if (isPinballmapNonPhysicalFloorMesh(child)) {
+        // eslint-disable-next-line no-console
+        console.info(
+          `[PlayfieldFloor] "${child.name}" gardé VISIBLE mais sans collision (sol analytique lisse actif).`,
+        );
+        return;
+      }
 
       if (isPinballmapRailMesh(child)) {
         PlayfieldTrimeshBuilder.createRailColliders(
@@ -256,6 +270,52 @@ export class PlayfieldTrimeshBuilder {
         true,
       );
     });
+  }
+
+  /**
+   * DIAGNOSTIC : liste les meshes de collision qui chevauchent le couloir
+   * plongeur (X du couloir) avec leur bbox Z, pour identifier ce qui bloque la
+   * balle au lancement. Trié par Z croissant (du plus proche du joueur au fond).
+   */
+  private static logLaneObstacles(playfieldRoot: THREE.Object3D): void {
+    const margin = 0.02;
+    const xMin = SHOOTER_LANE_X_MIN - margin;
+    const xMax = SHOOTER_LANE_X_MAX + margin;
+    const rows: { name: string; zMin: number; zMax: number; xMin: number; xMax: number }[] = [];
+    const box = new THREE.Box3();
+
+    playfieldRoot.updateMatrixWorld(true);
+    playfieldRoot.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      if (!isPinballmapGameplayMesh(child)) return;
+      if (isFlipperGltfMesh(child)) return;
+      if (isPinballmapNonPhysicalFloorMesh(child)) return;
+      box.setFromObject(child);
+      if (box.isEmpty()) return;
+      // Chevauche la bande X du couloir ?
+      if (box.max.x < xMin || box.min.x > xMax) return;
+      rows.push({
+        name: child.name || '(sans nom)',
+        zMin: box.min.z,
+        zMax: box.max.z,
+        xMin: box.min.x,
+        xMax: box.max.x,
+      });
+    });
+
+    rows.sort((a, b) => a.zMin - b.zMin);
+    // eslint-disable-next-line no-console
+    console.info(
+      `[LaneObstacles] ${rows.length} mesh(es) de collision dans la bande X du couloir [${xMin.toFixed(3)}, ${xMax.toFixed(3)}] :`,
+    );
+    for (const r of rows) {
+      // eslint-disable-next-line no-console
+      console.info(
+        `  • ${r.name} : Z[${r.zMin.toFixed(3)}, ${r.zMax.toFixed(3)}]  X[${r.xMin.toFixed(3)}, ${r.xMax.toFixed(3)}]`,
+      );
+    }
+    // eslint-disable-next-line no-console
+    console.info('[LaneObstacles] La balle cale vers Z ≈ -0.39 (X≈0.20) → cherche le mesh dont la plage Z/X contient ce point.');
   }
 
   private static createRailColliders(
