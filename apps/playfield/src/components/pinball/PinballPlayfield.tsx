@@ -34,7 +34,6 @@ import {
   resolvePlayfieldFlippers,
   attachFlipperAtHinge,
   applyFlipperSwing,
-  prepareFlipperMesh,
   type FlipperPivot,
   CollisionEventProcessor,
   detectFlipperHit,
@@ -492,8 +491,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         if (flipperSetup) {
           leftFlipper = flipperSetup.left;
           rightFlipper = flipperSetup.right;
-          prepareFlipperMesh(flipperSetup.left);
-          prepareFlipperMesh(flipperSetup.right);
         }
 
         leftFlipper?.updateMatrixWorld(true);
