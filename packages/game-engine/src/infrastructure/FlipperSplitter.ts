@@ -246,7 +246,9 @@ function hingeLocalPosition(
   const box = new THREE.Box3().setFromObject(flipper);
   const { min, max } = box;
   const inset = (max.x - min.x) * HINGE_INSET_FROM_EDGE;
-  const hingeX = side === 'left' ? max.x - inset : min.x + inset;
+  // Convention pinball : hinge au far-X (côté bord playfield), tip au center.
+  // LEFT → hinge à min.x (far left). RIGHT → hinge à max.x (far right).
+  const hingeX = side === 'left' ? min.x + inset : max.x - inset;
   const hingeWorld = new THREE.Vector3(
     hingeX,
     (min.y + max.y) / 2 + 0.012,
@@ -255,24 +257,6 @@ function hingeLocalPosition(
   const hingeLocal = hingeWorld.clone();
   parent.worldToLocal(hingeLocal);
   return hingeLocal;
-}
-
-function tipLiftForAxis(pivot: THREE.Object3D, mesh: THREE.Object3D, axis: 'x' | 'y'): number {
-  pivot.rotation.set(0, 0, 0);
-  pivot.rotation[axis] = 0.65;
-  pivot.updateMatrixWorld(true);
-  mesh.updateMatrixWorld(true);
-  const top = new THREE.Box3().setFromObject(mesh).max.y;
-  pivot.rotation.set(0, 0, 0);
-  return top;
-}
-
-function detectPivotAxis(pivot: THREE.Object3D, mesh: THREE.Object3D): 'x' | 'y' {
-  mesh.updateMatrixWorld(true);
-  const restTop = new THREE.Box3().setFromObject(mesh).max.y;
-  const liftX = tipLiftForAxis(pivot, mesh, 'x') - restTop;
-  const liftY = tipLiftForAxis(pivot, mesh, 'y') - restTop;
-  return liftX > liftY ? 'x' : 'y';
 }
 
 export function attachFlipperAtHinge(
@@ -291,9 +275,12 @@ export function attachFlipperAtHinge(
   parent.add(pivot);
   pivot.attach(flipper);
 
-  const axis = detectPivotAxis(pivot, flipper);
+  // Pinball : swing horizontal autour d'un axe perpendiculaire au playfield.
+  // Y est suffisamment proche du normal du tapis (tilt ~6.5°) pour le rendu
+  // visuel. L'ancien `detectPivotAxis` mesurait le lift Y et picked X pour un
+  // flipper plat — ce qui donnait un tilt vertical au lieu d'un swing.
   pivot.rotation.set(0, 0, 0);
-  return { pivot, mesh: flipper, side, axis };
+  return { pivot, mesh: flipper, side, axis: 'y' };
 }
 
 export function applyFlipperSwing(flipper: FlipperPivot, angle: number): void {
