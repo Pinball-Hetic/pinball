@@ -223,19 +223,6 @@ function finalizeFlipperPair(
   return pair;
 }
 
-export function prepareFlipperMesh(mesh: THREE.Mesh): void {
-  mesh.renderOrder = 999;
-  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-  for (const material of materials) {
-    if (!(material instanceof THREE.MeshStandardMaterial)) continue;
-    material.emissive = new THREE.Color(0xff6600);
-    material.emissiveIntensity = 0.85;
-    material.depthTest = false;
-    material.transparent = true;
-    material.opacity = 0.98;
-  }
-}
-
 function hingeLocalPosition(
   flipper: THREE.Object3D,
   side: 'left' | 'right',
