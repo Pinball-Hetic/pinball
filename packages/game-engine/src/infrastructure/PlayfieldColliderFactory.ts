@@ -58,8 +58,42 @@ export class PlayfieldColliderFactory {
     world: RAPIER.World,
     colliderMap: Map<number, string>,
   ): void {
+    // Couche lisse positionnée 8 mm au-dessus de la surface moyenne —
+    // garantit que la balle roule sur une surface uniforme (pas d'arêtes de
+    // polygones de Mesh_0/Mesh_1), même après lissage Laplacien du trimesh.
+    PlayfieldColliderFactory.createSmoothPlayfieldSurface(world);
     PlayfieldColliderFactory.createBumpers(world, colliderMap);
     PlayfieldColliderFactory.createSensors(world, colliderMap);
+  }
+
+  /**
+   * Plan incliné lisse couvrant toute l'aire jouable, positionné 8 mm au-dessus
+   * de surfaceYAtZ pour que la balle roule sur ce plan plutôt que sur les arêtes
+   * du trimesh GLB Mesh_0/Mesh_1.
+   */
+  private static createSmoothPlayfieldSurface(world: RAPIER.World): void {
+    const zMin = -0.552, zMax = 0.418;
+    const midZ = (zMin + zMax) / 2;
+    // +0.008 : marge pour que les pics résiduels du trimesh Mesh_0 ne percent pas
+    const midY = surfaceYAtZ(midZ) + 0.008;
+    const halfX = 0.272;
+    const halfZ = (zMax - zMin) / 2;
+    const tiltAngle = Math.atan2(
+      surfaceYAtZ(zMin) - surfaceYAtZ(zMax),
+      zMax - zMin,
+    );
+    const qx = Math.sin(tiltAngle / 2);
+    const qw = Math.cos(tiltAngle / 2);
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed()
+        .setTranslation(0, midY, midZ)
+        .setRotation({ x: qx, y: 0, z: 0, w: qw }),
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(halfX, 0.002, halfZ)
+        .setRestitution(0.35).setFriction(0.14),
+      body,
+    );
   }
 
   private static createSensors(world: RAPIER.World, colliderMap: Map<number, string>): void {

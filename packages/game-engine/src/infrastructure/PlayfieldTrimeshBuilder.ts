@@ -247,12 +247,16 @@ export class PlayfieldTrimeshBuilder {
         return;
       }
 
+      // smooth=true : lissage Laplacien (4 iter, factor 0.25) qui arrondit les
+      // arêtes de polygones de Mesh_0/Mesh_1 avant la création du collider Rapier.
+      // Le plan lisse ajouté dans createPinballmap reste la surface principale pour
+      // la balle ; ce lissage empêche les pics résiduels de percer ce plan.
       PlayfieldTrimeshBuilder.createTrimeshCollider(
         world,
         [extractWorldGeometry(child)],
         PINBALLMAP_TRIMESH_RESTITUTION,
         PINBALLMAP_TRIMESH_FRICTION,
-        false,
+        true,
         true,
       );
     });

@@ -314,16 +314,21 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     renderer.shadowMap.enabled = true;
     mountEl.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xfff4ee, 0.95);
+    // Lumière ambiante — éclaire les faces latérales des bumpers métalliques
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
     scene.add(ambientLight);
-    const hemiLight = new THREE.HemisphereLight(0xaabbff, 0x553344, 0.55);
+    // HemiLight gardé à 0 pour compatibilité UpsideDownAtmosphere (transition Upside Down)
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
     scene.add(hemiLight);
-    const dirLight = new THREE.DirectionalLight(0xfff8f0, 1.75);
-    dirLight.position.set(2, 5, 3);
+    // Lumière principale blanche depuis la position caméra (PLAYFIELD_VIEW_DIR : y=0.48, z=0.88)
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    dirLight.position.set(0, 0.48, 0.88);
     dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(2048, 2048);
     scene.add(dirLight);
-    const fillLight = new THREE.DirectionalLight(0xffeedd, 0.65);
-    fillLight.position.set(-1.5, 3, -2);
+    // Fill arrière léger — illumine le dos et le dessus des bumpers, bords du tapis
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(0, 1.5, -1);
     scene.add(fillLight);
 
     const modelRoot = new THREE.Group();
