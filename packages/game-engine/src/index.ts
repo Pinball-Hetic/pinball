@@ -13,7 +13,6 @@ export * from './use-cases/BumperHit';
 export * from './use-cases/DrainBall';
 export * from './use-cases/BottomOutBall';
 export * from './use-cases/DetectFlipperHit';
-export * from './use-cases/AnimateLauncherLane';
 export * from './use-cases/DetectStuckBall';
 export * from './use-cases/DetectBottomOut';
 
@@ -25,6 +24,7 @@ export * from './infrastructure/PlayfieldColliderFactory';
 export * from './infrastructure/LauncherLaneBounds';
 export * from './infrastructure/FlipperSplitter';
 export * from './infrastructure/CollisionEventProcessor';
+export * from './infrastructure/BallDiagnostics';
 export * from './infrastructure/GltfNodeNames';
 export * from './infrastructure/FlipperPhysics';
 export * from './infrastructure/PlungerPhysics';

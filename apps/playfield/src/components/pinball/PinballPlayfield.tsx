@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
@@ -13,7 +13,10 @@ import {
   BottomOutBall,
   DetectBottomOut,
   BALL_RADIUS,
+  BALL_MAX_SPEED,
   BALL_SPAWN_POSITION,
+  SHOOTER_LANE_LEFT_WALL_TOP_Z,
+  SHOOTER_LANE_LOCK_X,
   WALL_LEFT_X,
   WALL_RIGHT_X,
   WALL_BOTTOM_Z,
@@ -33,12 +36,12 @@ import {
   resolvePlayfieldFlippers,
   attachFlipperAtHinge,
   applyFlipperSwing,
-  prepareFlipperMesh,
   type FlipperPivot,
   CollisionEventProcessor,
   detectFlipperHit,
-  LauncherLaneAnimator,
   StuckBallDetector,
+  BallDiagnostics,
+  type BallDiagnosticsSnapshot,
   findObjectByNormalizedName,
   removePinballmapUnusedMeshes,
   prepareGltfMaterialsForDisplay,
@@ -59,6 +62,7 @@ import { useGameState } from "@/hooks/useGameState";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import { unlockPinballAudio } from "@/audio/PinballSounds";
 import GameOverlay from "./GameOverlay";
+import BallDebugOverlay from "./BallDebugOverlay";
 
 const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
 
@@ -271,6 +275,10 @@ type PinballPlayfieldProps = {
 export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfieldProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
+  const [debugSnapshot, setDebugSnapshot] = useState<BallDiagnosticsSnapshot | null>(null);
+  const [debugVisible, setDebugVisible] = useState(false);
+  const debugVisibleRef = useRef(false);
+
   const {
     score,
     lives,
@@ -285,7 +293,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     buildEmit,
   } = useGameState();
 
-  const { callbacksRef: physicalInputsRef, simulateButton } = usePhysicalInputs();
+  const { callbacksRef: physicalInputsRef, simulateButton, isConnectedRef } = usePhysicalInputs();
 
   useEffect(() => {
     let cancelled = false;
@@ -375,7 +383,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let chargeStartTime = 0;
     let physicsReady = false;
     let prevFrameTime = 0;
-    let laneAnimSpeed = 0;
 
     let leftFlipperHit = false;
     let rightFlipperHit = false;
@@ -394,9 +401,17 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     disposableMats.push(rapierDebugMat);
     let debugCollidersOn = false;
 
-    const laneAnimator = new LauncherLaneAnimator();
     const stuckDetector = new StuckBallDetector();
     const bottomOutDetector = new DetectBottomOut();
+    const diag = new BallDiagnostics();
+    let lastDebugPush = 0;
+
+    // Logs de diagnostic gérés par le toggle HUD `[J]` → silence total en prod.
+    const debugLog = (...args: unknown[]) => {
+      if (!debugVisibleRef.current) return;
+      // eslint-disable-next-line no-console
+      console.info(...args);
+    };
 
     // ── Plunger kinematic ────────────────────────────────────────────────────
     let plungerBody: RAPIER.RigidBody | null = null;
@@ -405,10 +420,24 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let plungerState: PlungerState = "idle";
     let plungerRestZ = 0;
 
+    const loadPlayfieldGlb = async () => {
+      const maxAttempts = 3;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          return await loader.loadAsync(PLAYFIELD_URL);
+        } catch (err) {
+          console.warn(`[Playfield] GLB load attempt ${attempt}/${maxAttempts} failed`, err);
+          if (attempt === maxAttempts) throw err;
+          await new Promise((r) => setTimeout(r, 1500 * attempt));
+        }
+      }
+      throw new Error('[Playfield] GLB load failed');
+    };
+
     // ── GLTF + Physics setup ─────────────────────────────────────────────────
     const init = async () => {
       try {
-        const gltf = await loader.loadAsync(PLAYFIELD_URL);
+        const gltf = await loadPlayfieldGlb();
         const playfieldRoot = gltf.scene;
         playfieldRootRef = playfieldRoot;
         collectDisposables(playfieldRoot);
@@ -471,8 +500,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         if (flipperSetup) {
           leftFlipper = flipperSetup.left;
           rightFlipper = flipperSetup.right;
-          prepareFlipperMesh(flipperSetup.left);
-          prepareFlipperMesh(flipperSetup.right);
         }
 
         leftFlipper?.updateMatrixWorld(true);
@@ -639,13 +666,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const plunger = new Plunger();
         let onPortalEnter: (() => void) | null = null;
 
-        const baseEmit = buildEmit(() => { if (ballMesh) ballMesh.visible = false; });
+        const baseEmit = buildEmit(() => {
+          if (ballMesh) ballMesh.visible = false;
+          diag.noteReset("game_over_hide");
+        });
         const releaseUpsideDownWorld = () => {
           upsideDownAtmosphere?.reset();
           clearUpsideDownSession();
         };
         const emit: typeof baseEmit = (event) => {
           baseEmit(event);
+          diag.noteEvent(event.type);
+          if (event.type === "DRAIN") diag.noteReset("drain");
+          if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
+          if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
           bumperVisuals?.onGameEvent(event);
           garlandLights?.onGameEvent(event);
           demogorgonReveal?.onGameEvent(event);
@@ -756,6 +790,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             }
             if (data.id === "PLUNGER") {
               if (data.action === "DOWN") {
+                debugLog(
+                  `[Plunger] DOWN — gameState=${gameStateRef.current} physicsReady=${physicsReady} charging=${isChargingPlunger}`,
+                );
                 if (gameStateRef.current === "game_over") {
                   resetGame();
                   upsideDownPortal?.reset();
@@ -767,14 +804,24 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                   plunger.startCharge(performance.now());
                   isChargingPlunger = true;
                   chargeStartTime = performance.now();
+                } else {
+                  debugLog(
+                    `[Plunger] DOWN ignoré — charge impossible (idle requis + physicsReady). ` +
+                      `gameState=${gameStateRef.current} physicsReady=${physicsReady}`,
+                  );
                 }
               } else if (isChargingPlunger && gameStateRef.current === "idle") {
                 isChargingPlunger = false;
                 plungerState = "releasing";
                 const t = Math.min(1, (performance.now() - chargeStartTime) / PLUNGER_CHARGE_MS) ** 1.15;
                 const factor = PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t;
+                debugLog(`[Plunger] RELEASE — factor=${factor.toFixed(2)} → lancement`);
                 launchBallUC?.execute(factor);
-                laneAnimSpeed = 1.0 + factor * 3.0;
+              } else {
+                debugLog(
+                  `[Plunger] UP ignoré — pas en charge ou pas idle. ` +
+                    `charging=${isChargingPlunger} gameState=${gameStateRef.current}`,
+                );
               }
               return;
             }
@@ -798,7 +845,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const dispatchButton = (id: ButtonId, action: ButtonAction) => {
           if (KEYBOARD_MODE === "disabled") return;
           if (KEYBOARD_MODE === "simulate-esp32") {
-            simulateButton({ id, action });
+            if (isConnectedRef.current) {
+              simulateButton({ id, action });
+            } else {
+              // Fallback si le socket n'est pas prêt (évite un plongeur mort).
+              physicalInputsRef.current.onButton?.({ id, action });
+            }
             return;
           }
           physicalInputsRef.current.onButton?.({ id, action });
@@ -814,6 +866,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             rapierDebugLines.visible = debugCollidersOn;
             if (leftFlipperDebug)  leftFlipperDebug.visible  = debugCollidersOn;
             if (rightFlipperDebug) rightFlipperDebug.visible = debugCollidersOn;
+            return;
+          }
+          if (e.key === "j" || e.key === "J") {
+            debugVisibleRef.current = !debugVisibleRef.current;
+            setDebugVisible(debugVisibleRef.current);
             return;
           }
           if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton("LEFT", "DOWN");
@@ -838,6 +895,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         if (ballMesh) ballMesh.visible = true;
         physicsReady = true;
+        debugLog("[PinballPlayfield] physicsReady = true (init terminée, plunger actif)");
         mountEl.focus();
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
@@ -909,17 +967,30 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
       }
 
+      // ── Diagnostic balle : pourquoi disparaît/sort + reset de secours ────
+      if (ballPhysicsInst && !transitionActive) {
+        diag.verbose = debugVisibleRef.current;
+        const lost = diag.update(ballPhysicsInst.body, gameStateRef.current);
+        if (lost && gameStateRef.current === "playing") {
+          bottomOutBallUC?.execute();
+          diag.noteReset("lost_recovery");
+        }
+        if (debugVisibleRef.current && time - lastDebugPush > 100) {
+          lastDebugPush = time;
+          setDebugSnapshot({ ...diag.getSnapshot() });
+        }
+      }
+
       if (
         ballPhysicsInst
         && gameStateRef.current === "playing"
-        && laneAnimSpeed <= 0
         && !transitionActive
         && upsideDownPortal?.isOpen()
       ) {
         upsideDownPortal.applyMagnet(ballPhysicsInst.body);
       }
 
-      if (ballPhysicsInst && gameStateRef.current === "playing" && laneAnimSpeed <= 0 && !transitionActive) {
+      if (ballPhysicsInst && gameStateRef.current === "playing" && !transitionActive) {
         const bp = ballPhysicsInst.body.translation();
         const bv = ballPhysicsInst.body.linvel();
         const { result, leftHit, rightHit } = detectFlipperHit(
@@ -946,7 +1017,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
       // Ball sync
       if (ballMesh?.visible && ballPhysicsInst && !transitionActive) {
-        if (gameStateRef.current === "idle" && physicsReady && laneAnimSpeed <= 0 && !isChargingPlunger) {
+        // Balle figée au spawn tant qu'on est idle, Y COMPRIS pendant la charge
+        // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
+        // mur droit (frottement → ralentissement au lancement).
+        if (gameStateRef.current === "idle" && physicsReady) {
           const z = BALL_SPAWN_POSITION.z;
           ballPhysicsInst.body.setTranslation(
             { x: BALL_SPAWN_POSITION.x, y: ballCenterOnSurface(z), z },
@@ -956,10 +1030,26 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         }
 
-        // Lane animation
-        if (laneAnimSpeed > 0) {
-          const { done } = laneAnimator.update(ballPhysicsInst.body, laneAnimSpeed, dt);
-          if (done) laneAnimSpeed = 0;
+        // Verrouillage latéral du couloir : pendant la montée (partie droite du
+        // couloir, avant l'ouverture de sortie), on fige X sur la ligne de spawn
+        // et on annule la vitesse latérale → lancement parfaitement droit, sans
+        // dépendre de la géométrie GLB. La balle est libérée dès qu'elle atteint
+        // la zone de sortie (Z <= SHOOTER_LANE_LEFT_WALL_TOP_Z) pour partir
+        // naturellement dans le terrain.
+        if (gameStateRef.current === "playing") {
+          const lp = ballPhysicsInst.body.translation();
+          const inLaneStraight =
+            lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > SHOOTER_LANE_LOCK_X;
+          if (inLaneStraight) {
+            ballPhysicsInst.body.setTranslation(
+              { x: BALL_SPAWN_POSITION.x, y: lp.y, z: lp.z },
+              true,
+            );
+            const lv = ballPhysicsInst.body.linvel();
+            ballPhysicsInst.body.setLinvel({ x: 0, y: lv.y, z: lv.z }, true);
+            const av = ballPhysicsInst.body.angvel();
+            ballPhysicsInst.body.setAngvel({ x: av.x, y: 0, z: 0 }, true);
+          }
         }
 
         ballPhysicsInst.syncToMesh(ballMesh);
@@ -967,9 +1057,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // Clamp ball speed
         const bVelClamp = ballPhysicsInst.body.linvel();
         const speed = Math.sqrt(bVelClamp.x ** 2 + bVelClamp.y ** 2 + bVelClamp.z ** 2);
-        const MAX_SPEED = 2.8;
-        if (speed > MAX_SPEED) {
-          const scale = MAX_SPEED / speed;
+        if (speed > BALL_MAX_SPEED) {
+          const scale = BALL_MAX_SPEED / speed;
           ballPhysicsInst.body.setLinvel(
             { x: bVelClamp.x * scale, y: bVelClamp.y * scale, z: bVelClamp.z * scale },
             true,
@@ -985,11 +1074,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         // Stuck ball detection
         // Stuck detector — only when NOT in drain zone (Z<0.22)
-        if (gameStateRef.current === "playing" && laneAnimSpeed <= 0 && bPos.z < 0.22) {
+        if (gameStateRef.current === "playing" && bPos.z < 0.22) {
           const stuckResult = stuckDetector.update(bSpd, bPos, dt);
           if (stuckResult) {
             if (stuckResult.type === 'force_drain') {
               bottomOutBallUC?.execute();
+              diag.noteReset('stuck_force_drain');
             } else if (stuckResult.impulse) {
               ballPhysicsInst.body.applyImpulse(stuckResult.impulse, true);
             }
@@ -1001,10 +1091,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // Bottom-out fallback — zone sous les flippers hors lane de lancement
         if (
           gameStateRef.current === "playing"
-          && laneAnimSpeed <= 0
           && bottomOutDetector.check(bPos)
         ) {
           bottomOutBallUC?.execute();
+          diag.noteReset('bottom_out_zone');
         }
 
         // Drain géré par le capteur Rapier bottom_out (CollisionEventProcessor)
@@ -1043,6 +1133,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const rgb = new Float32Array(vertices.length);
         for (let i = 0, j = 0; i < colors.length; i += 4, j += 3) {
           rgb[j] = colors[i]; rgb[j + 1] = colors[i + 1]; rgb[j + 2] = colors[i + 2];
+        }
+        // Certains colliders renvoient des sommets non finis (NaN/Infinity) :
+        // on les écrase à 0 pour éviter les pics parasites + l'erreur
+        // computeBoundingSphere (radius NaN).
+        for (let i = 0; i < vertices.length; i++) {
+          if (!Number.isFinite(vertices[i])) vertices[i] = 0;
         }
         rapierDebugGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
         rapierDebugGeo.setAttribute('color',    new THREE.BufferAttribute(rgb, 3));
@@ -1131,6 +1227,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           upsideDownHint={upsideDownHint}
           cabinetMode={cabinetMode}
         />
+
+        <BallDebugOverlay snapshot={debugSnapshot} visible={debugVisible} />
 
         <main
           ref={mountRef}

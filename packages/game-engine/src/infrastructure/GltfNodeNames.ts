@@ -85,6 +85,37 @@ export function hasPinballmapRoot(root: THREE.Object3D): boolean {
   return !!findObjectByNormalizedName(root, 'Pinballmap', 'pinballmap');
 }
 
+/**
+ * Sols GLB plats remplacés, POUR LA COLLISION UNIQUEMENT, par le cuboïde
+ * analytique lisse (PlayfieldColliderFactory.createPlayfieldFloor). Les meshes
+ * restent VISIBLES : on n'enlève que leur physique (trimesh bosselé qui freinait
+ * la balle).
+ *
+ * - Mesh_0 : surface de jeu (plein plateau).
+ * - Mesh_1 : 2ᵉ couche de surface (moitié basse + couloir) → faisait caler la
+ *   balle à Z≈0.01 au lancement (double sol avec le cuboïde analytique).
+ *
+ * Mesh_2/3/4 (structure haute, zone bumpers) GARDENT leur collision : ils
+ * rattrapent la balle en fin de lancement et l'empêchent de tomber dans le vide.
+ */
+export const PINBALLMAP_NONPHYSICAL_FLOOR_MESHES = new Set([
+  'mesh_0',
+  'mesh.0',
+  'mesh0',
+  'mesh_1',
+  'mesh.1',
+  'mesh1',
+]);
+
+export function isPinballmapNonPhysicalFloorMesh(mesh: THREE.Mesh): boolean {
+  const n = normalizeGltfName(mesh.name);
+  const c = canonicalGltfName(mesh.name);
+  return (
+    PINBALLMAP_NONPHYSICAL_FLOOR_MESHES.has(n) ||
+    PINBALLMAP_NONPHYSICAL_FLOOR_MESHES.has(c)
+  );
+}
+
 export function removePinballmapUnusedMeshes(root: THREE.Object3D): void {
   const toRemove: THREE.Object3D[] = [];
   root.traverse((obj) => {
