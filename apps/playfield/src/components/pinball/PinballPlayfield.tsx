@@ -13,8 +13,10 @@ import {
   BottomOutBall,
   DetectBottomOut,
   BALL_RADIUS,
+  BALL_MAX_SPEED,
   BALL_SPAWN_POSITION,
   SHOOTER_LANE_LEFT_WALL_TOP_Z,
+  SHOOTER_LANE_LOCK_X,
   WALL_LEFT_X,
   WALL_RIGHT_X,
   WALL_BOTTOM_Z,
@@ -404,6 +406,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     const diag = new BallDiagnostics();
     let lastDebugPush = 0;
 
+    // Logs de diagnostic gérés par le toggle HUD `[J]` → silence total en prod.
+    const debugLog = (...args: unknown[]) => {
+      if (!debugVisibleRef.current) return;
+      // eslint-disable-next-line no-console
+      console.info(...args);
+    };
+
     // ── Plunger kinematic ────────────────────────────────────────────────────
     let plungerBody: RAPIER.RigidBody | null = null;
     let plungerMesh: THREE.Mesh | null = null;
@@ -781,8 +790,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             }
             if (data.id === "PLUNGER") {
               if (data.action === "DOWN") {
-                // eslint-disable-next-line no-console
-                console.info(
+                debugLog(
                   `[Plunger] DOWN — gameState=${gameStateRef.current} physicsReady=${physicsReady} charging=${isChargingPlunger}`,
                 );
                 if (gameStateRef.current === "game_over") {
@@ -797,8 +805,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                   isChargingPlunger = true;
                   chargeStartTime = performance.now();
                 } else {
-                  // eslint-disable-next-line no-console
-                  console.warn(
+                  debugLog(
                     `[Plunger] DOWN ignoré — charge impossible (idle requis + physicsReady). ` +
                       `gameState=${gameStateRef.current} physicsReady=${physicsReady}`,
                   );
@@ -808,12 +815,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 plungerState = "releasing";
                 const t = Math.min(1, (performance.now() - chargeStartTime) / PLUNGER_CHARGE_MS) ** 1.15;
                 const factor = PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t;
-                // eslint-disable-next-line no-console
-                console.info(`[Plunger] RELEASE — factor=${factor.toFixed(2)} → lancement`);
+                debugLog(`[Plunger] RELEASE — factor=${factor.toFixed(2)} → lancement`);
                 launchBallUC?.execute(factor);
               } else {
-                // eslint-disable-next-line no-console
-                console.warn(
+                debugLog(
                   `[Plunger] UP ignoré — pas en charge ou pas idle. ` +
                     `charging=${isChargingPlunger} gameState=${gameStateRef.current}`,
                 );
@@ -890,8 +895,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         if (ballMesh) ballMesh.visible = true;
         physicsReady = true;
-        // eslint-disable-next-line no-console
-        console.info("[PinballPlayfield] physicsReady = true (init terminée, plunger actif)");
+        debugLog("[PinballPlayfield] physicsReady = true (init terminée, plunger actif)");
         mountEl.focus();
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
@@ -965,6 +969,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
       // ── Diagnostic balle : pourquoi disparaît/sort + reset de secours ────
       if (ballPhysicsInst && !transitionActive) {
+        diag.verbose = debugVisibleRef.current;
         const lost = diag.update(ballPhysicsInst.body, gameStateRef.current);
         if (lost && gameStateRef.current === "playing") {
           bottomOutBallUC?.execute();
@@ -1034,7 +1039,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         if (gameStateRef.current === "playing") {
           const lp = ballPhysicsInst.body.translation();
           const inLaneStraight =
-            lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > 0.19;
+            lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > SHOOTER_LANE_LOCK_X;
           if (inLaneStraight) {
             ballPhysicsInst.body.setTranslation(
               { x: BALL_SPAWN_POSITION.x, y: lp.y, z: lp.z },
@@ -1052,9 +1057,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // Clamp ball speed
         const bVelClamp = ballPhysicsInst.body.linvel();
         const speed = Math.sqrt(bVelClamp.x ** 2 + bVelClamp.y ** 2 + bVelClamp.z ** 2);
-        const MAX_SPEED = 2.8;
-        if (speed > MAX_SPEED) {
-          const scale = MAX_SPEED / speed;
+        if (speed > BALL_MAX_SPEED) {
+          const scale = BALL_MAX_SPEED / speed;
           ballPhysicsInst.body.setLinvel(
             { x: bVelClamp.x * scale, y: bVelClamp.y * scale, z: bVelClamp.z * scale },
             true,

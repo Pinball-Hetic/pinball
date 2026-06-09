@@ -3,6 +3,8 @@ import {
   SHOOTER_LANE_X_MAX,
   SHOOTER_LANE_TOP_Z,
   SHOOTER_LANE_BOTTOM_Z,
+  SHOOTER_LANE_EXIT_X,
+  SHOOTER_LANE_FAIL_Z,
 } from '../domain/Ball';
 import {
   BALL_LOST_Y_THRESHOLD,
@@ -59,7 +61,8 @@ interface DiagBody {
   linvel(): Vec3;
 }
 
-const RESET_LABELS: Record<BallResetReason, string> = {
+// Source de vérité unique des libellés (réutilisée par le HUD BallDebugOverlay).
+export const RESET_LABELS: Record<BallResetReason, string> = {
   launch: 'Lancement',
   drain: 'Drain (capteur)',
   bottom_out: 'Bottom-out (capteur)',
@@ -69,7 +72,7 @@ const RESET_LABELS: Record<BallResetReason, string> = {
   game_over_hide: 'Game over (balle masquée)',
 };
 
-const LOST_LABELS: Record<BallLostReason, string> = {
+export const LOST_LABELS: Record<BallLostReason, string> = {
   escaped_below_floor: 'Tombée sous le tapis (a traversé le sol)',
   escaped_out_of_bounds: 'Sortie hors des limites du terrain (X/Z)',
 };
@@ -80,6 +83,10 @@ const LOST_LABELS: Record<BallLostReason, string> = {
  * hors limites) et journal des causes de reset. Lecture seule du corps Rapier.
  */
 export class BallDiagnostics {
+  /** Active les logs console (trace LaneFlight, apogée, pertes, resets).
+   *  Piloté par le toggle HUD `[J]` côté playfield → silence total en prod. */
+  verbose = false;
+
   private snapshot: BallDiagnosticsSnapshot = {
     pos: { x: 0, y: 0, z: 0 },
     vel: { x: 0, y: 0, z: 0 },
@@ -141,12 +148,14 @@ export class BallDiagnostics {
       Number.isFinite(this.apexZ)
     ) {
       this.apexLogged = true;
-      // eslint-disable-next-line no-console
-      console.info(
-        `[BallDiagnostics] Apogée atteinte — Z min = ${this.apexZ.toFixed(3)} (X = ${this.snapshot.apexX.toFixed(3)}), ` +
-          `vitesse de pointe = ${this.peakSpeed.toFixed(2)} m/s. ` +
-          'Guide de sortie attendu vers Z ≈ -0.40 à -0.49.',
-      );
+      if (this.verbose) {
+        // eslint-disable-next-line no-console
+        console.info(
+          `[BallDiagnostics] Apogée atteinte — Z min = ${this.apexZ.toFixed(3)} (X = ${this.snapshot.apexX.toFixed(3)}), ` +
+            `vitesse de pointe = ${this.peakSpeed.toFixed(2)} m/s. ` +
+            'Guide de sortie attendu vers Z ≈ -0.40 à -0.49.',
+        );
+      }
     }
 
     this.snapshot = {
@@ -173,17 +182,19 @@ export class BallDiagnostics {
       lostCount: this.snapshot.lostCount + 1,
     };
 
-    // eslint-disable-next-line no-console
-    console.error(
-      `[BallDiagnostics] BALLE PERDUE — ${LOST_LABELS[reason]}`,
-      {
-        reason,
-        pos: this.snapshot.pos,
-        vel: this.snapshot.vel,
-        speed: this.snapshot.speed,
-        gameState,
-      },
-    );
+    if (this.verbose) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[BallDiagnostics] BALLE PERDUE — ${LOST_LABELS[reason]}`,
+        {
+          reason,
+          pos: this.snapshot.pos,
+          vel: this.snapshot.vel,
+          speed: this.snapshot.speed,
+          gameState,
+        },
+      );
+    }
 
     return { reason, pos: this.snapshot.pos, vel: this.snapshot.vel, speed };
   }
@@ -198,25 +209,29 @@ export class BallDiagnostics {
     this.traceFrame++;
 
     // Sortie réussie du couloir : la balle est passée dans le terrain (X bas).
-    if (p.x < 0.18) {
+    if (p.x < SHOOTER_LANE_EXIT_X) {
       this.traceActive = false;
-      // eslint-disable-next-line no-console
-      console.info(
-        `[LaneFlight] ✅ SORTIE couloir — la balle a rejoint le terrain à ` +
-          `Z=${p.z.toFixed(3)} X=${p.x.toFixed(3)} (v=${speed.toFixed(2)} m/s, vx=${v.x.toFixed(2)}).`,
-      );
+      if (this.verbose) {
+        // eslint-disable-next-line no-console
+        console.info(
+          `[LaneFlight] ✅ SORTIE couloir — la balle a rejoint le terrain à ` +
+            `Z=${p.z.toFixed(3)} X=${p.x.toFixed(3)} (v=${speed.toFixed(2)} m/s, vx=${v.x.toFixed(2)}).`,
+        );
+      }
       return;
     }
 
     // Retombée en bas du couloir sans être sortie → échec de lancement.
-    if (p.z > 0.30 && this.traceSampleCount > 3) {
+    if (p.z > SHOOTER_LANE_FAIL_Z && this.traceSampleCount > 3) {
       this.traceActive = false;
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[LaneFlight] ⛔ ÉCHEC — la balle est retombée en bas du couloir ` +
-          `(Z=${p.z.toFixed(3)} X=${p.x.toFixed(3)}) sans rejoindre le terrain. ` +
-          `Apogée=${this.apexZ.toFixed(3)}. Elle a calé puis glissé en arrière.`,
-      );
+      if (this.verbose) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[LaneFlight] ⛔ ÉCHEC — la balle est retombée en bas du couloir ` +
+            `(Z=${p.z.toFixed(3)} X=${p.x.toFixed(3)}) sans rejoindre le terrain. ` +
+            `Apogée=${this.apexZ.toFixed(3)}. Elle a calé puis glissé en arrière.`,
+        );
+      }
       return;
     }
 
@@ -229,6 +244,7 @@ export class BallDiagnostics {
     if (this.traceSampleCount >= this.traceMaxSamples) return;
     this.traceSampleCount++;
 
+    if (!this.verbose) return;
     const tag = reversedZ ? ' ⤴ APOGÉE (inversion Z)' : '';
     // eslint-disable-next-line no-console
     console.info(
@@ -257,11 +273,15 @@ export class BallDiagnostics {
       this.traceFrame = 0;
       this.traceSampleCount = 0;
       this.prevTraceVz = 0;
-      // eslint-disable-next-line no-console
-      console.info('[LaneFlight] ▶ Traçage du vol de lancement démarré.');
+      if (this.verbose) {
+        // eslint-disable-next-line no-console
+        console.info('[LaneFlight] ▶ Traçage du vol de lancement démarré.');
+      }
     }
-    // eslint-disable-next-line no-console
-    console.info(`[BallDiagnostics] Reset balle — ${RESET_LABELS[reason]}`);
+    if (this.verbose) {
+      // eslint-disable-next-line no-console
+      console.info(`[BallDiagnostics] Reset balle — ${RESET_LABELS[reason]}`);
+    }
   }
 
   getSnapshot(): Readonly<BallDiagnosticsSnapshot> {

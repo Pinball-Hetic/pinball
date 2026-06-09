@@ -1,8 +1,8 @@
-import type {
-  BallDiagnosticsSnapshot,
-  BallZone,
-  BallLostReason,
-  BallResetReason,
+import {
+  RESET_LABELS,
+  LOST_LABELS,
+  type BallDiagnosticsSnapshot,
+  type BallZone,
 } from "@pinball/game-engine";
 
 interface BallDebugOverlayProps {
@@ -22,21 +22,6 @@ const ZONE_COLORS: Record<BallZone, string> = {
   playfield: "#4ade80",
   drain_zone: "#fbbf24",
   out_of_bounds: "#f87171",
-};
-
-const LOST_LABELS: Record<BallLostReason, string> = {
-  escaped_below_floor: "Tombée sous le tapis (a traversé le sol)",
-  escaped_out_of_bounds: "Sortie hors des limites (X/Z)",
-};
-
-const RESET_LABELS: Record<BallResetReason, string> = {
-  launch: "Lancement",
-  drain: "Drain (capteur)",
-  bottom_out: "Bottom-out (capteur)",
-  bottom_out_zone: "Bottom-out (zone)",
-  stuck_force_drain: "Bloquée → drain forcé",
-  lost_recovery: "Perdue → reset de secours",
-  game_over_hide: "Game over (masquée)",
 };
 
 function fmt(n: number, digits = 3): string {

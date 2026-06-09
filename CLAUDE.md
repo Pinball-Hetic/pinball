@@ -35,14 +35,19 @@ Clean architecture: domain / infrastructure / use-cases.
 - `PlayfieldColliderFactory.ts` — ALL collider creation: walls, lane floor, barriers, bumpers, sensors, drain, drop targets + optional debug meshes
 - `FlipperSplitter.ts` — split single GLB flipper mesh into left/right halves + pivot hinge setup
 - `CollisionEventProcessor.ts` — Rapier collision event dispatch: bumpers, drain, slingshots, pop zones, rocket ramp, drop targets (state machine)
+- `BallDiagnostics.ts` — read-only ball tracker: zone classification, lost detection (below floor / out of bounds), reset cause log, launch-flight trace. `verbose` gates console output (HUD `[J]`)
 
 **Use-cases** (game actions, pure logic):
 - `LaunchBall.ts` — plunger release + emit BALL_LAUNCHED
 - `BumperHit.ts` — radial ejection impulse + emit BUMPER_HIT
 - `DrainBall.ts` — emit DRAIN + reset ball to spawn
 - `DetectFlipperHit.ts` — rising-edge detection, zone check, directional impulse calculation
-- `AnimateLauncherLane.ts` — 3-phase scripted lane animation (straight, curve, release)
 - `DetectStuckBall.ts` — stuck timer + nudge impulse when ball stationary
+
+Le couloir plongeur est désormais **physique réelle** (murs + guide courbe
+analytiques dans `PlayfieldColliderFactory.createShooterLane`), plus un verrou
+latéral côté `PinballPlayfield.tsx` ; l'ancien `AnimateLauncherLane.ts` (animation
+scriptée) a été supprimé.
 
 ### `apps/playfield` — Next.js frontend, jeu 3D
 
@@ -79,7 +84,7 @@ Each file has ONE responsibility. When modifying:
 - **Tuning flipper zones/power** → `FlipperConstants.ts` + `DetectFlipperHit.ts`
 - **Tuning bumper/ball physics** → `Ball.ts` (constants) + `BumperHit.ts` (impulse logic)
 - **Adding new sensors/targets** → `Ball.ts` (positions) + `PlayfieldColliderFactory.ts` (colliders) + `CollisionEventProcessor.ts` (event handling) + `GameEvents.ts` (event type)
-- **Changing lane animation** → `AnimateLauncherLane.ts`
+- **Tuning shooter lane (couloir plongeur)** → `Ball.ts` (`SHOOTER_LANE_*` / `SHOOTER_GUIDE_*` constants) + `PlayfieldColliderFactory.ts` (`createShooterLane`)
 - **Changing UI layout** → `GameOverlay.tsx` or `DebugPanel.tsx`
 - **Changing game state (lives, score)** → `useGameState.ts`
 

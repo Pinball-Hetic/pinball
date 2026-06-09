@@ -6,13 +6,18 @@ export const BALL_FRICTION        = 0.1;
 export const BALL_LINEAR_DAMPING  = 0.02;
 export const BALL_ANGULAR_DAMPING = 0.02;
 
+// Plafond de vitesse balle (m/s). Le sim est ~1:1 réel (masse 80g, Ø27mm, g,
+// tilt 6.5°) → ces valeurs sont en m/s réels. Pinball réel : roulis 0.5–1.5,
+// lancement 2.5–4.5, jeu actif 4–8, pics ~10. 6 = jeu vivant sans tunneling.
+export const BALL_MAX_SPEED = 6.0;
+
 // Spawn — centre géométrique du couloir : (X_MIN 0.206 + X_MAX 0.265) / 2 =
 // 0.2355. La balle est tenue sur cette ligne par le verrou latéral (charge +
 // montée), donc parfaitement centrée entre les deux murs du couloir.
 export const BALL_SPAWN_POSITION = { x: 0.2355, y: 1.010, z: 0.1610 } as const;
 
-// Plunger — impulsion = masse * Δv. À pleine charge : 0.22/0.08 ≈ 2.75 m/s,
-// juste sous le clamp de vitesse (2.8) pour éviter le tunneling dans le couloir.
+// Plunger — impulsion = masse * Δv. À pleine charge : 0.22/0.08 ≈ 2.75 m/s
+// (plunge moyen réaliste, sous le clamp BALL_MAX_SPEED).
 export const PLUNGER_IMPULSE_Z = -0.22;
 
 // ── Couloir plongeur (shooter lane) — vrai lancement physique ────────────────
@@ -25,13 +30,21 @@ export const SHOOTER_LANE_X_MAX = 0.265;
 export const SHOOTER_LANE_BOTTOM_Z = 0.42;
 export const SHOOTER_LANE_TOP_Z = -0.49;
 export const SHOOTER_LANE_WALL_HEIGHT = 0.05;
-// Épais pour empêcher le tunneling de la balle rapide au lancement.
-export const SHOOTER_LANE_WALL_THICKNESS = 0.012;
+// Épais pour empêcher le tunneling de la balle rapide (clamp 6 m/s) au lancement.
+export const SHOOTER_LANE_WALL_THICKNESS = 0.02;
 export const SHOOTER_LANE_RESTITUTION = 0.2;
 export const SHOOTER_LANE_FRICTION = 0.08;
 // Le mur gauche (séparateur) s'arrête ici : ouverture en haut-gauche par
 // laquelle la balle déviée sort dans le terrain.
 export const SHOOTER_LANE_LEFT_WALL_TOP_Z = -0.28;
+
+// Verrou latéral : tant que la balle monte la partie droite du couloir
+// (X au-dessus de ce seuil), on la fige sur la ligne de spawn → lancement droit.
+export const SHOOTER_LANE_LOCK_X = 0.19;
+// Diagnostic LaneFlight : la balle est considérée sortie dans le terrain sous ce X.
+export const SHOOTER_LANE_EXIT_X = 0.18;
+// Diagnostic LaneFlight : retombée en bas du couloir (échec de lancement) au-delà de ce Z.
+export const SHOOTER_LANE_FAIL_Z = 0.30;
 
 // Guide courbe de sortie = mur EXTÉRIEUR (droite + haut) qui s'incurve.
 // Centre au coin haut-gauche du couloir : la balle montante (-Z) longe la face
