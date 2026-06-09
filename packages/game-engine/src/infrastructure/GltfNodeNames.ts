@@ -68,6 +68,13 @@ export function isFlipperGltfMesh(mesh: THREE.Mesh): boolean {
   return false;
 }
 
+export function isPinballmapFloorMesh(mesh: THREE.Mesh): boolean {
+  const n = normalizeGltfName(mesh.name);
+  if (/^table\.\d+$/.test(n)) return true;
+  if (/^sphere\.\d+$/.test(n)) return true;
+  return false;
+}
+
 export function isPinballmapRailMesh(mesh: THREE.Mesh): boolean {
   const self = normalizeGltfName(mesh.name);
   if (/^circle\.\d+$/.test(self) || /^plane\.\d+$/.test(self)) return true;
