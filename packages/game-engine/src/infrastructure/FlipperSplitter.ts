@@ -45,6 +45,15 @@ function resolveStrangerThingsFlippers(root: THREE.Object3D): PlayfieldFlipperPa
   return finalizeFlipperPair(root, { left, right, hide: root });
 }
 
+const PLAYFIELD_CENTER_X = 0;
+const SPAN_TOLERANCE = 0.015;
+
+function meshSpansPlayfieldCenter(mesh: THREE.Mesh): boolean {
+  mesh.updateMatrixWorld(true);
+  const { min, max } = new THREE.Box3().setFromObject(mesh);
+  return min.x < PLAYFIELD_CENTER_X - SPAN_TOLERANCE && max.x > PLAYFIELD_CENTER_X + SPAN_TOLERANCE;
+}
+
 export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipperPair | null {
   const stPair = resolveStrangerThingsFlippers(root);
   if (stPair) return stPair;
@@ -57,6 +66,26 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
       if (mesh) meshes.push(mesh);
     }
   }
+  if (meshes.length === 0) return null;
+
+  // Cas Strangerthings.glb : 2+ meshes qui couvrent CHACUN toute la largeur
+  // du playfield (base + plastique du même couple de flippers). On découpe
+  // géométriquement le plus dense au X=0 pour obtenir 2 demi-meshes
+  // gauche/droit, et on masque les autres.
+  const spanning = meshes.filter(meshSpansPlayfieldCenter);
+  if (spanning.length >= 1 && (meshes.length === 1 || spanning.length === meshes.length)) {
+    const primary = spanning.reduce((a, b) =>
+      (b.geometry.attributes.position?.count ?? 0) > (a.geometry.attributes.position?.count ?? 0) ? b : a,
+    );
+    const [leftHalf, rightHalf] = splitFlipperIntoTwo(primary);
+    if (!leftHalf || !rightHalf) return null;
+    const parent = primary.parent ?? root;
+    parent.add(leftHalf);
+    parent.add(rightHalf);
+    for (const mesh of meshes) mesh.visible = false;
+    return finalizeFlipperPair(root, { left: leftHalf, right: rightHalf, hide: root });
+  }
+
   if (meshes.length < 2) return null;
   meshes.sort((a, b) => meshCenterX(a) - meshCenterX(b));
   return finalizeFlipperPair(root, {
@@ -64,6 +93,89 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
     right: meshes[meshes.length - 1]!,
     hide: root,
   });
+}
+
+export function splitFlipperIntoTwo(
+  flipperObj: THREE.Object3D,
+): [THREE.Mesh | null, THREE.Mesh | null] {
+  let src: THREE.Mesh | null = null;
+  if (flipperObj instanceof THREE.Mesh) {
+    src = flipperObj;
+  } else {
+    flipperObj.traverse((c) => {
+      if (!src && c instanceof THREE.Mesh) src = c as THREE.Mesh;
+    });
+  }
+  if (!src || !flipperObj.parent) return [null, null];
+
+  src.updateMatrixWorld(true);
+  flipperObj.parent.updateMatrixWorld(true);
+
+  const worldMat = src.matrixWorld;
+  const toParent = flipperObj.parent.matrixWorld.clone().invert();
+  const geom = src.geometry as THREE.BufferGeometry;
+  const posAttr = geom.attributes.position as THREE.BufferAttribute;
+  const uvAttr = geom.attributes.uv as THREE.BufferAttribute | undefined;
+  const vertCount = posAttr.count;
+
+  const wX: number[] = new Array(vertCount);
+  const localVerts: number[][] = new Array(vertCount);
+  const tmp = new THREE.Vector3();
+
+  for (let i = 0; i < vertCount; i++) {
+    tmp.fromBufferAttribute(posAttr, i).applyMatrix4(worldMat);
+    wX[i] = tmp.x;
+    tmp.applyMatrix4(toParent);
+    localVerts[i] = [tmp.x, tmp.y, tmp.z];
+  }
+
+  const idxArr: number[] = geom.index
+    ? Array.from(geom.index.array as ArrayLike<number>)
+    : Array.from({ length: vertCount }, (_, i) => i);
+
+  const leftTris: number[] = [];
+  const rightTris: number[] = [];
+  for (let t = 0; t < idxArr.length; t += 3) {
+    const a = idxArr[t]!, b = idxArr[t + 1]!, c = idxArr[t + 2]!;
+    const cx = (wX[a]! + wX[b]! + wX[c]!) / 3;
+    (cx <= PLAYFIELD_CENTER_X ? leftTris : rightTris).push(a, b, c);
+  }
+
+  const buildGeom = (tris: number[]): THREE.BufferGeometry | null => {
+    if (tris.length === 0) return null;
+    const remap = new Map<number, number>();
+    const pos: number[] = [], uvs: number[] = [], idx: number[] = [];
+    for (const old of tris) {
+      if (!remap.has(old)) {
+        remap.set(old, pos.length / 3);
+        const v = localVerts[old]!;
+        pos.push(v[0]!, v[1]!, v[2]!);
+        if (uvAttr) uvs.push(uvAttr.getX(old), uvAttr.getY(old));
+      }
+      idx.push(remap.get(old)!);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    if (uvs.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  };
+
+  const baseMat = src.material as THREE.MeshStandardMaterial;
+  const makeMesh = (tris: number[], name: string): THREE.Mesh | null => {
+    const g = buildGeom(tris);
+    if (!g) return null;
+    const m = new THREE.Mesh(g, baseMat.clone());
+    m.name = name;
+    m.castShadow = m.receiveShadow = true;
+    return m;
+  };
+
+  return [
+    makeMesh(leftTris, 'flipper_left_split'),
+    makeMesh(rightTris, 'flipper_right_split'),
+  ];
 }
 
 function hideUnusedFlipperMeshes(root: THREE.Object3D, left: THREE.Mesh, right: THREE.Mesh): void {
