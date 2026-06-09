@@ -20,3 +20,13 @@ export const PLUNGER_CHARGE_MS = 1800;
 // la courbe de sortie. Max = tir complet (~2.75 m/s).
 export const PLUNGER_MIN_FACTOR = 0.6;
 export const PLUNGER_MAX_FACTOR = 1.0;
+
+/** Progression de charge normalisée [0, 1] (courbe identique au lancement). */
+export function plungerChargeProgress(nowMs: number, chargeStartMs: number): number {
+  return Math.min(1, (nowMs - chargeStartMs) / PLUNGER_CHARGE_MS) ** 1.15;
+}
+
+/** Facteur d'impulsion dérivé de la progression de charge. */
+export function plungerLaunchFactor(chargeProgress: number): number {
+  return PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * chargeProgress;
+}
