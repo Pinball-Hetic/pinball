@@ -35,8 +35,9 @@ function meshCenterX(mesh: THREE.Mesh): number {
 }
 
 function resolveStrangerThingsFlippers(root: THREE.Object3D): PlayfieldFlipperPair | null {
-  const meshA = flipperMeshFrom(findObjectByNormalizedName(root, 'flipper.002'));
-  const meshB = flipperMeshFrom(findObjectByNormalizedName(root, 'flipper.003'));
+  // Three.js GLTFLoader sanitize les dots dans les node names. Tente les 2 formes.
+  const meshA = flipperMeshFrom(findObjectByNormalizedName(root, 'flipper.002', 'flipper002'));
+  const meshB = flipperMeshFrom(findObjectByNormalizedName(root, 'flipper.003', 'flipper003'));
   if (!meshA || !meshB) return null;
 
   const left = meshCenterX(meshA) <= meshCenterX(meshB) ? meshA : meshB;
@@ -58,7 +59,8 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
   const stPair = resolveStrangerThingsFlippers(root);
   if (stPair) return stPair;
 
-  const group = findObjectByNormalizedName(root, 'flipper.001', 'flipper') ?? null;
+  // Three.js GLTFLoader sanitize les dots → flipper.001 devient flipper001 dans la scène.
+  const group = findObjectByNormalizedName(root, 'flipper.001', 'flipper001', 'flipper') ?? null;
   const meshes: THREE.Mesh[] = [];
   if (group) {
     for (const child of group.children) {
