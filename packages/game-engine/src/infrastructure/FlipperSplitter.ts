@@ -76,14 +76,28 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
   // gauche/droit, et on masque les autres.
   const spanning = meshes.filter(meshSpansPlayfieldCenter);
   if (spanning.length >= 1 && (meshes.length === 1 || spanning.length === meshes.length)) {
-    const primary = spanning.reduce((a, b) =>
-      (b.geometry.attributes.position?.count ?? 0) > (a.geometry.attributes.position?.count ?? 0) ? b : a,
+    // Tri par vertex count décroissant : primary = mesh le plus dense
+    // (généralement la couche structurelle principale). Les autres sont
+    // splitées aussi et attachées comme enfants des demi-meshes primaires
+    // pour préserver le multi-layer (ex : red rubber + white plastic).
+    const ordered = [...spanning].sort(
+      (a, b) =>
+        (b.geometry.attributes.position?.count ?? 0) -
+        (a.geometry.attributes.position?.count ?? 0),
     );
+    const primary = ordered[0]!;
     const [leftHalf, rightHalf] = splitFlipperIntoTwo(primary);
     if (!leftHalf || !rightHalf) return null;
     const parent = primary.parent ?? root;
     parent.add(leftHalf);
     parent.add(rightHalf);
+
+    for (let i = 1; i < ordered.length; i++) {
+      const [secLeft, secRight] = splitFlipperIntoTwo(ordered[i]!);
+      if (secLeft) leftHalf.add(secLeft);
+      if (secRight) rightHalf.add(secRight);
+    }
+
     for (const mesh of meshes) mesh.visible = false;
     return finalizeFlipperPair(root, { left: leftHalf, right: rightHalf, hide: root });
   }
@@ -182,11 +196,19 @@ export function splitFlipperIntoTwo(
 
 function hideUnusedFlipperMeshes(root: THREE.Object3D, left: THREE.Mesh, right: THREE.Mesh): void {
   const keep = new Set<THREE.Object3D>([left, right]);
+  const isDescendantOfKept = (obj: THREE.Object3D): boolean => {
+    let current: THREE.Object3D | null = obj.parent;
+    while (current) {
+      if (keep.has(current)) return true;
+      current = current.parent;
+    }
+    return false;
+  };
   root.traverse((obj) => {
     if (!isRenderableMesh(obj)) return;
     const n = normalizeGltfName(obj.name);
     if (!n.startsWith('flipper')) return;
-    if (keep.has(obj)) return;
+    if (keep.has(obj) || isDescendantOfKept(obj)) return;
     obj.visible = false;
   });
 }
