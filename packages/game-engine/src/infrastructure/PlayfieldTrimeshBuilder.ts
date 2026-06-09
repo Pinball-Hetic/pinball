@@ -11,6 +11,7 @@ import {
   isVisualOnlyGltfName,
   normalizeGltfName,
   playfieldUsesCollOnlyCollision,
+  isPinballmapNonPhysicalFloorMesh,
 } from './GltfNodeNames';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
@@ -236,6 +237,11 @@ export class PlayfieldTrimeshBuilder {
       if (!(child instanceof THREE.Mesh)) return;
       if (!isPinballmapGameplayMesh(child)) return;
       if (isFlipperGltfMesh(child)) return;
+      // Mesh_0 (surface de jeu) : visible mais SANS collision. La physique est
+      // assurée par le cuboïde analytique lisse (createPlayfieldFloor) → la
+      // balle glisse sans accrocher les arêtes du trimesh. Mesh_1…4 (cadre bois,
+      // structure haute) gardent leur collision.
+      if (isPinballmapNonPhysicalFloorMesh(child)) return;
 
       if (isPinballmapRailMesh(child)) {
         PlayfieldTrimeshBuilder.createRailColliders(
