@@ -35,6 +35,11 @@ services:
     build:
       context: .
       dockerfile: apps/playfield/Dockerfile
+    # Tant que le firmware ESP32 n'existe pas, le clavier doit dispatcher
+    # via le réseau (clavier → server → input-bridge mock → broadcast).
+    # Passer à `disabled` une fois l'ESP32 réel branché.
+    environment:
+      NEXT_PUBLIC_KEYBOARD_MODE: "simulate-esp32"
     ports:
       - "0:3000"
     depends_on:
@@ -85,6 +90,9 @@ services:
       dockerfile: apps/input-bridge/Dockerfile
     restart: unless-stopped
     environment:
+      # Mode mock tant que le firmware ESP32 n'existe pas. Passer à `serial`
+      # uniquement après avoir décommenté `devices:` et fourni un chemin
+      # réel /dev/serial/by-id/usb-... (cf. instructions ci-dessous).
       INPUT_BRIDGE_MODE: mock
       SERIAL_PATH: /dev/MOCK_ESP32
       SERIAL_BAUD: "115200"
