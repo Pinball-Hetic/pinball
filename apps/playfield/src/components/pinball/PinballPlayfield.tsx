@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {
   PhysicsWorld,
   BallPhysics,
@@ -82,13 +81,21 @@ const KEYBOARD_MODE: KeyboardMode =
   (process.env.NEXT_PUBLIC_KEYBOARD_MODE as KeyboardMode) || "direct";
 
 /**
- * Vue cabine fixe : joueur côté +Z (flippers), regarde vers le haut du tapis (-Z).
- * Direction depuis la cible vers la caméra (haut + avant).
+ * Vue cabine fixe : joueur devant les flippers (+Z), regarde le tapis incliné vers le fond (-Z).
  */
-const PLAYFIELD_VIEW_DIR = new THREE.Vector3(0, 0.48, 0.88).normalize();
-/** Marge NDC : plus bas = plus de bande autour du tapis. */
-const PLAYFIELD_VIEW_NDC_MARGIN = 0.78;
-const PLAYFIELD_CAM_DISTANCE_SCALE = 1.05;
+const PLAYFIELD_VIEW_DIR = new THREE.Vector3(0, 0.47, 0.885).normalize();
+const PLAYFIELD_VIEW_NDC_MARGIN = 0.73;
+const PLAYFIELD_CAM_DISTANCE_SCALE = 0.99;
+const PLAYFIELD_CAM_FOV = 44;
+const _camSizeScratch = new THREE.Vector3();
+
+function playfieldCameraLookTarget(box: THREE.Box3, out: THREE.Vector3): THREE.Vector3 {
+  box.getCenter(out);
+  box.getSize(_camSizeScratch);
+  out.y += _camSizeScratch.y * 0.04;
+  out.z += _camSizeScratch.z * 0.18;
+  return out;
+}
 
 type PlayfieldCamFit = {
   target: THREE.Vector3;
@@ -306,14 +313,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     const loader = createGltfLoader();
 
     const { clientWidth, clientHeight } = mountEl;
-    const camera = new THREE.PerspectiveCamera(50, clientWidth / clientHeight, 0.001, 100);
+    const camera = new THREE.PerspectiveCamera(PLAYFIELD_CAM_FOV, clientWidth / clientHeight, 0.001, 100);
     const cameraTarget = new THREE.Vector3();
     let playfieldCamFit: {
       fit: PlayfieldCamFit;
       camera: THREE.PerspectiveCamera;
       cameraTarget: THREE.Vector3;
     } | null = null;
-    let orbitControls: OrbitControls | null = null;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     configureGltfRenderer(renderer);
@@ -635,7 +641,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // ── Caméra cabine fixe (non rotatable) — tapis jouable uniquement ───────
         modelRoot.updateMatrixWorld(true);
         const camFrameBox = boundingBoxPlayableArea(playfieldRoot);
-        camFrameBox.getCenter(cameraTarget);
+        playfieldCameraLookTarget(camFrameBox, cameraTarget);
         const camCorners: THREE.Vector3[] = [];
         fillPlayfieldBoxCorners(camFrameBox, camCorners);
         const fit: PlayfieldCamFit = {
@@ -651,16 +657,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         fitPlayfieldCamera(camera, fit, cameraTarget);
         playfieldCamFit = { fit, camera, cameraTarget };
-
-        // ── OrbitControls — caméra libre ─────────────────────────────────────
-        orbitControls = new OrbitControls(camera, renderer.domElement);
-        orbitControls.target.copy(cameraTarget);
-        orbitControls.enableDamping = true;
-        orbitControls.dampingFactor = 0.08;
-        orbitControls.screenSpacePanning = true;
-        orbitControls.minDistance = 0.05;
-        orbitControls.maxDistance = 5;
-        orbitControls.update();
 
         // ── Use-cases ─────────────────────────────────────────────────────────
         const plunger = new Plunger();
@@ -1124,9 +1120,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         }
       }
 
-      // ── OrbitControls update ─────────────────────────────────────────────
-      if (orbitControls && !transitionActive) orbitControls.update();
-
       // ── Rapier debug render (tous colliders) ─────────────────────────────
       if (debugCollidersOn && physicsWorld) {
         const { vertices, colors } = physicsWorld.world.debugRender();
@@ -1175,7 +1168,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       cancelled = true;
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", handleResize);
-      orbitControls?.dispose();
       const pw = physicsWorld as (PhysicsWorld & { _onKeyDown?: (e: KeyboardEvent) => void; _onKeyUp?: (e: KeyboardEvent) => void }) | null;
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
       if (pw?._onKeyUp) document.removeEventListener("keyup", pw._onKeyUp);

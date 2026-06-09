@@ -7,19 +7,18 @@ import {
   ELEVEN_ASSIST_SCORE,
   ELEVEN_ASSIST_INTERVAL,
 } from '../domain/Ball';
-import { PLAYFIELD_TILT } from '../domain/PlayfieldGeometry';
 import { easeIn, easeOut, strobeOn } from './CinematicEasing';
 import { CameraBillboardSprite } from './CameraBillboardSprite';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
+import { DemogorgonTargetVisual } from './DemogorgonTargetVisual';
 
 const TEXTURE_URL = '/playfield/demogorgon.png';
 
 const BLACKOUT = 0.12;
 const REVEAL = 0.5;
 const RESTORE = 0.3;
-const TARGET_HIT_FLASH = 0.18;
 const VICTORY = 0.65;
 const ELEVEN_ASSIST_ANIM = 0.85;
 const ELEVEN_ASSIST_FIRST = 0.55;
@@ -48,12 +47,7 @@ export class DemogorgonReveal {
 
   private cinematicStrobe = new PlayfieldCinematicStrobe();
   private billboard = new CameraBillboardSprite();
-  private targetGroup: THREE.Group | null = null;
-  private targetRingMat: THREE.MeshStandardMaterial | null = null;
-  private targetCoreMat: THREE.MeshStandardMaterial | null = null;
-  private targetLight: THREE.PointLight | null = null;
-  private victoryBurst: THREE.Mesh | null = null;
-  private victoryBurstMat: THREE.MeshBasicMaterial | null = null;
+  private targetVisual = new DemogorgonTargetVisual();
   private elevenShockOuter: THREE.Mesh | null = null;
   private elevenShockOuterMat: THREE.MeshBasicMaterial | null = null;
   private elevenShockInner: THREE.Mesh | null = null;
@@ -65,8 +59,6 @@ export class DemogorgonReveal {
   private phase: Phase = 'idle';
   private elapsed = 0;
   private strobeT = 0;
-  private pulseT = 0;
-  private targetHitFlash = 0;
   private assistNextIn = ELEVEN_ASSIST_FIRST;
   private elevenAssistActive = false;
   private elevenAssistT = 0;
@@ -95,15 +87,7 @@ export class DemogorgonReveal {
 
     this.billboard.mount(config.scene, config.camera, { textureUrl: TEXTURE_URL });
 
-    this.targetGroup = this.buildTargetMesh();
-    this.targetGroup.position.set(
-      DEMOGORGON_TARGET.x,
-      DEMOGORGON_TARGET.y + 0.018,
-      DEMOGORGON_TARGET.z,
-    );
-    this.targetGroup.rotation.x = PLAYFIELD_TILT;
-    this.targetGroup.visible = false;
-    config.root.add(this.targetGroup);
+    this.targetVisual.mount(config.root, config.camera);
 
     const assistY = DEMOGORGON_TARGET.y + 0.021;
 
@@ -154,17 +138,15 @@ export class DemogorgonReveal {
       this.phase = 'blackout';
       this.elapsed = 0;
       this.strobeT = 0;
-      this.pulseT = 0;
       this.assistNextIn = ELEVEN_ASSIST_FIRST;
       this.elevenAssistActive = false;
       this.elevenAssistT = 0;
       this.billboard.show();
-      if (this.targetGroup) this.targetGroup.visible = true;
       return;
     }
     if (event.type === 'DEMOGORGON_TARGET_HIT') {
       if (this.phase === 'idle' || this.phase === 'restore' || this.phase === 'victory') return;
-      this.targetHitFlash = TARGET_HIT_FLASH;
+      this.targetVisual.playHit();
       if (event.hitCount >= DEMOGORGON_TARGET_HITS) {
         this.beginVictory();
       }
@@ -177,8 +159,7 @@ export class DemogorgonReveal {
 
   update(dt: number): void {
     this.billboard.sync();
-    if (this.targetHitFlash > 0) this.targetHitFlash = Math.max(0, this.targetHitFlash - dt);
-    this.updateTargetPulse(dt);
+    this.targetVisual.update(dt);
 
     if (this.phase === 'idle') {
       this.garlandLights?.setStrobe(false, false);
@@ -214,6 +195,7 @@ export class DemogorgonReveal {
         this.assistNextIn = ELEVEN_ASSIST_FIRST;
         this.billboard.setOpacity(0);
         this.billboard.hide();
+        this.targetVisual.show();
         this.onTargetReady?.();
       }
       return;
@@ -263,7 +245,8 @@ export class DemogorgonReveal {
       this.elevenAssistLight.parent?.remove(this.elevenAssistLight);
     }
 
-    if (this.targetGroup) this.targetGroup.parent?.remove(this.targetGroup);
+    this.targetVisual.dispose();
+    this.targetVisual = new DemogorgonTargetVisual();
     for (const g of this.ownedGeos) g.dispose();
     for (const m of this.ownedMats) m.dispose();
     this.ownedGeos = [];
@@ -277,12 +260,6 @@ export class DemogorgonReveal {
     this.emit = null;
     this.cinematicStrobe = new PlayfieldCinematicStrobe();
     this.billboard = new CameraBillboardSprite();
-    this.targetGroup = null;
-    this.targetRingMat = null;
-    this.targetCoreMat = null;
-    this.targetLight = null;
-    this.victoryBurst = null;
-    this.victoryBurstMat = null;
     this.elevenShockOuter = null;
     this.elevenShockOuterMat = null;
     this.elevenShockInner = null;
@@ -292,78 +269,11 @@ export class DemogorgonReveal {
     this.elapsed = 0;
   }
 
-  private buildTargetMesh(): THREE.Group {
-    const group = new THREE.Group();
-
-    const ringGeo = new THREE.TorusGeometry(0.032, 0.004, 8, 24);
-    this.targetRingMat = new THREE.MeshStandardMaterial({
-      color: 0xff2244,
-      emissive: 0xff1133,
-      emissiveIntensity: 1.6,
-      metalness: 0.4,
-      roughness: 0.35,
-    });
-    const ring = new THREE.Mesh(ringGeo, this.targetRingMat);
-    ring.rotation.x = Math.PI / 2;
-    group.add(ring);
-    this.ownedGeos.push(ringGeo);
-    this.ownedMats.push(this.targetRingMat);
-
-    const coreGeo = new THREE.CircleGeometry(0.014, 16);
-    this.targetCoreMat = new THREE.MeshStandardMaterial({
-      color: 0xffeedd,
-      emissive: 0xff4422,
-      emissiveIntensity: 1.2,
-      metalness: 0.2,
-      roughness: 0.4,
-      side: THREE.DoubleSide,
-    });
-    const core = new THREE.Mesh(coreGeo, this.targetCoreMat);
-    core.rotation.x = -Math.PI / 2;
-    group.add(core);
-    this.ownedGeos.push(coreGeo);
-    this.ownedMats.push(this.targetCoreMat);
-
-    this.targetLight = new THREE.PointLight(0xff2244, 0.45, 0.18, 2);
-    this.targetLight.position.y = 0.02;
-    group.add(this.targetLight);
-
-    const burstGeo = new THREE.RingGeometry(0.02, 0.038, 24);
-    this.victoryBurstMat = new THREE.MeshBasicMaterial({
-      color: 0xffee55,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      toneMapped: false,
-    });
-    this.victoryBurst = new THREE.Mesh(burstGeo, this.victoryBurstMat);
-    this.victoryBurst.rotation.x = -Math.PI / 2;
-    group.add(this.victoryBurst);
-    this.ownedGeos.push(burstGeo);
-    this.ownedMats.push(this.victoryBurstMat);
-
-    return group;
-  }
-
-  private updateTargetPulse(dt: number): void {
-    if (!this.targetGroup?.visible || this.phase === 'victory') return;
-    this.pulseT += dt;
-    const hitBoost = this.targetHitFlash > 0 ? 1.8 : 1;
-    const pulse = (0.75 + Math.sin(this.pulseT * 8) * 0.25) * hitBoost;
-    if (this.targetRingMat) this.targetRingMat.emissiveIntensity = 1.6 * pulse;
-    if (this.targetCoreMat) this.targetCoreMat.emissiveIntensity = 1.2 * pulse;
-    if (this.targetLight) this.targetLight.intensity = 0.45 * pulse;
-    this.targetGroup.rotation.z = Math.sin(this.pulseT * 3) * 0.08;
-    const scale = 1 + (this.targetHitFlash / TARGET_HIT_FLASH) * 0.25;
-    this.targetGroup.scale.setScalar(scale);
-  }
-
   private triggerElevenAssist(): void {
     this.elevenAssistActive = true;
     this.elevenAssistT = 0;
     this.assistNextIn = ELEVEN_ASSIST_INTERVAL;
-    this.targetHitFlash = TARGET_HIT_FLASH;
+    this.targetVisual.playHit();
     if (this.elevenShockOuter) this.elevenShockOuter.visible = true;
     if (this.elevenShockInner) this.elevenShockInner.visible = true;
     this.emit?.({ type: 'ELEVEN_ASSIST', scoreIncrement: ELEVEN_ASSIST_SCORE });
@@ -404,9 +314,7 @@ export class DemogorgonReveal {
       this.elevenAssistLight.intensity = rise * burst * 2.8;
     }
 
-    if (this.targetGroup && t < 0.45) {
-      this.targetGroup.rotation.z = Math.sin(this.elevenAssistT * 32) * 0.1 * (1 - t / 0.45);
-    }
+    this.targetVisual.applyAssistShake(t, this.elevenAssistT);
 
     if (t >= 1) this.hideElevenAssist();
   }
@@ -416,79 +324,20 @@ export class DemogorgonReveal {
     this.phase = 'victory';
     this.elapsed = 0;
     this.billboard.hide();
-    if (this.targetGroup) this.targetGroup.visible = true;
+    this.targetVisual.playVictory();
   }
 
   private beginRestore(): void {
     this.phase = 'restore';
     this.elapsed = 0;
     this.billboard.hide();
-    if (this.targetGroup) {
-      this.targetGroup.visible = false;
-      this.targetGroup.scale.setScalar(1);
-      this.targetGroup.rotation.z = 0;
-    }
-    this.resetTargetMaterials();
+    this.targetVisual.hide();
+    this.targetVisual.resetMotion();
   }
 
   private updateVictoryAnim(t: number): void {
-    const pop = easeOut(t);
-    const fade = easeIn(t);
-
-    if (this.targetGroup) {
-      this.targetGroup.scale.setScalar(1 + pop * 2.2);
-      this.targetGroup.rotation.z = pop * Math.PI * 2;
-    }
-
-    if (this.targetRingMat) {
-      this.targetRingMat.transparent = true;
-      this.targetRingMat.opacity = 1 - fade;
-      this.targetRingMat.emissive.setHex(0xffdd44);
-      this.targetRingMat.emissiveIntensity = 3.5 * (1 - fade * 0.6);
-      this.targetRingMat.color.setHex(0xffeeaa);
-    }
-
-    if (this.targetCoreMat) {
-      this.targetCoreMat.transparent = true;
-      this.targetCoreMat.opacity = 1 - fade;
-      this.targetCoreMat.emissive.setHex(0xffffff);
-      this.targetCoreMat.emissiveIntensity = 4 * (1 - fade * 0.5);
-    }
-
-    if (this.targetLight) {
-      this.targetLight.color.setHex(0xffee88);
-      this.targetLight.intensity = 1.6 * (1 - fade);
-    }
-
-    if (this.victoryBurst && this.victoryBurstMat) {
-      const burstT = Math.min(1, t * 1.35);
-      const burstFade = easeIn(burstT);
-      this.victoryBurst.scale.setScalar(1 + burstFade * 4.5);
-      this.victoryBurstMat.opacity = (1 - burstFade) * 0.95;
-    }
-  }
-
-  private resetTargetMaterials(): void {
-    if (this.targetRingMat) {
-      this.targetRingMat.transparent = false;
-      this.targetRingMat.opacity = 1;
-      this.targetRingMat.emissive.setHex(0xff1133);
-      this.targetRingMat.emissiveIntensity = 1.6;
-      this.targetRingMat.color.setHex(0xff2244);
-    }
-    if (this.targetCoreMat) {
-      this.targetCoreMat.transparent = false;
-      this.targetCoreMat.opacity = 1;
-      this.targetCoreMat.emissive.setHex(0xff4422);
-      this.targetCoreMat.emissiveIntensity = 1.2;
-      this.targetCoreMat.color.setHex(0xffeedd);
-    }
-    if (this.targetLight) {
-      this.targetLight.color.setHex(0xff2244);
-      this.targetLight.intensity = 0.45;
-    }
-    if (this.victoryBurst) this.victoryBurst.scale.setScalar(1);
-    if (this.victoryBurstMat) this.victoryBurstMat.opacity = 0;
+    this.targetVisual.applyVictoryMotion(t);
+    this.targetVisual.updateVictoryBurst(t);
   }
 
   private resetAtmosphere(): void {
@@ -496,20 +345,14 @@ export class DemogorgonReveal {
     this.phase = 'idle';
     this.elapsed = 0;
     this.strobeT = 0;
-    this.pulseT = 0;
     this.assistNextIn = ELEVEN_ASSIST_FIRST;
     this.hideElevenAssist();
     this.elevenAssistT = 0;
 
     this.cinematicStrobe.stop();
     this.billboard.hide();
-
-    if (this.targetGroup) {
-      this.targetGroup.visible = false;
-      this.targetGroup.scale.setScalar(1);
-      this.targetGroup.rotation.z = 0;
-    }
-    this.resetTargetMaterials();
+    this.targetVisual.hide();
+    this.targetVisual.resetMotion();
 
     if (wasActive) this.onFightEnd?.();
   }

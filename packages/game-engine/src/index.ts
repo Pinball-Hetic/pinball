@@ -4,6 +4,7 @@ export * from './domain/Plunger';
 export * from './domain/GameEvents';
 export * from './domain/FlipperConstants';
 export * from './domain/UpsideDownConstants';
+export * from './domain/DemogorgonConstants';
 export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
 
@@ -32,6 +33,7 @@ export * from './infrastructure/GltfDisplay';
 export * from './infrastructure/BumperVisuals';
 export * from './infrastructure/GarlandLights';
 export * from './infrastructure/DemogorgonReveal';
+export * from './infrastructure/DemogorgonTargetVisual';
 export * from './infrastructure/CinematicEasing';
 export * from './infrastructure/CameraBillboardSprite';
 export * from './infrastructure/PlayfieldCinematicStrobe';
