@@ -17,13 +17,43 @@ export const PLUNGER_IMPULSE_Z = -2.4;
 export const PLAYFIELD_TILT_DEG  = 6.5;
 export const PLAYFIELD_SURFACE_Y = 1.0681; // top of playfield mesh = 1.0171 + 0.1019/2
 
-// Bumpers — exact GLB centers
 export const BUMPER_POSITIONS = [
-  { x: -0.0225, y: 1.0334, z: -0.1975 }, // center (pop bumper)
-  { x:  0.0555, y: 1.0451, z: -0.3062 }, // left
-  { x: -0.1045, y: 1.0451, z: -0.3062 }, // right
+  { x: -0.020586, y: 1.0482, z: -0.1967 },
+  { x: -0.097406, y: 1.0621, z: -0.30509 },
+  { x:  0.059483, y: 1.0621, z: -0.30509 },
 ] as const;
-export const BUMPER_RADIUS       = 0.0345; // GLB size X=0.069 → radius 0.0345
+export const DEMOGORGON_SENSOR = {
+  x: -0.0195,
+  y: 1.0575,
+  z: -0.269,
+} as const;
+
+export const DEMOGORGON_TARGET = {
+  x: 0,
+  y: 1.012,
+  z: -0.02,
+} as const;
+
+export const DEMOGORGON_TARGET_HITS = 2;
+
+export const PORTAL_UPSIDE_DOWN = {
+  x: -0.000751,
+  y: 1.015191,
+  z: -0.064818,
+} as const;
+
+export const PORTAL_HOLE_RADIUS = 0.02;
+export const PORTAL_COVER_RADIUS = 0.021;
+export const PORTAL_SENSOR_RADIUS = 0.017;
+export const PORTAL_MAGNET_RADIUS = 0.058;
+export const PORTAL_MAGNET_STRENGTH = 0.0055;
+export const PORTAL_ENTER_SCORE = 500;
+export const PORTAL_EJECT_IMPULSE = { x: 0, y: 0.11, z: -0.095 } as const;
+
+export const ELEVEN_ASSIST_SCORE = 100;
+export const ELEVEN_ASSIST_INTERVAL = 3.2;
+
+export const BUMPER_RADIUS       = 0.038;
 export const BUMPER_RESTITUTION  = 0.3;
 export const BUMPER_EJECT_IMPULSE = 0.09;
 
