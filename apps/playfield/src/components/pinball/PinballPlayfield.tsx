@@ -59,6 +59,7 @@ import {
 } from "@pinball/game-engine";
 import type { ButtonAction, ButtonId } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
+import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import { unlockPinballAudio } from "@/audio/PinballSounds";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
@@ -305,8 +306,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       ? "attract"
       : "in_game";
 
+  const dmd = useDmdOrchestrator();
+
   const {
-    score,
     lives,
     gameState,
     gameStateRef,
@@ -314,10 +316,84 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     scorePops,
     upsideDownActive,
     upsideDownHint,
+    scoreRef,
+    livesRef,
+    comboRef,
+    multiplierRef,
+    playerRef,
     clearUpsideDownSession,
     resetGame,
     buildEmit,
-  } = useGameState();
+  } = useGameState({
+    onScoreEvent: ({ event, finalPoints, previousMultiplier, newMultiplier }) => {
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: comboRef.current,
+        multiplier: multiplierRef.current,
+        lives: livesRef.current,
+      };
+
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushScore(snap);
+
+      // Chaque event fait switcher l'affichage. Exclusif, par priorité
+      // décroissante : event labellisé → EVENT ; nouveau multiplier →
+      // MULTI ; sinon combo en cours → COMBO.
+      const label = eventLabel(event);
+      if (label) {
+        dmd.pushEvent(label, finalPoints, snap);
+      } else if (previousMultiplier !== newMultiplier) {
+        dmd.pushMultiFlash(newMultiplier, snap.combo, snap);
+      } else if (snap.combo > 1) {
+        dmd.pushComboFlash(snap.combo, snap.multiplier, snap);
+      }
+    },
+    onLifeLost: (livesRemaining) => {
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: 0,
+        multiplier: 1,
+        lives: livesRemaining,
+      };
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
+    },
+    onGameOver: (finalScore) => {
+      dmd.emitGameOver(playerRef.current, finalScore);
+      dmd.pushGameOver(playerRef.current, finalScore);
+    },
+    onGameStart: () => {
+      dmd.emitGameStart(playerRef.current);
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: 0,
+        multiplier: 1,
+        lives: livesRef.current,
+      };
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushScore(snap);
+    },
+    onIdleReset: () => {
+      dmd.pushIntro(playerRef.current);
+      dmd.emitScoreSnapshot({
+        player: playerRef.current,
+        score: 0,
+        combo: 0,
+        multiplier: 1,
+        lives: 3,
+      });
+    },
+    onAtmosphereChange: (upsideDownActive) => {
+      dmd.setAtmosphere(upsideDownActive);
+    },
+  });
+
+  useEffect(() => {
+    dmd.pushIntro(playerRef.current);
+  }, []);
 
   const resetBallRef = useRef<(() => void) | null>(null);
   const handleResetBall = useCallback(() => {
@@ -1303,7 +1379,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         style={cabinetFrameStyle}
       >
         <GameOverlay
-          score={score}
           lives={lives}
           gameState={gameState}
           bootPhase={bootPhase}

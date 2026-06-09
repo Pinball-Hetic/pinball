@@ -2,14 +2,14 @@
 export const BALL_RADIUS          = 0.01474;
 export const BALL_MASS            = 0.09;
 export const BALL_RESTITUTION     = 0.4;
-export const BALL_FRICTION        = 0.1;
-export const BALL_LINEAR_DAMPING  = 0.02;
-export const BALL_ANGULAR_DAMPING = 0.02;
+export const BALL_FRICTION        = 0.05;
+export const BALL_LINEAR_DAMPING  = 0;
+export const BALL_ANGULAR_DAMPING = 0.0;
 
 // Plafond de vitesse balle (m/s). Le sim est ~1:1 réel (masse 80g, Ø27mm, g,
 // tilt 6.5°) → ces valeurs sont en m/s réels. Pinball réel : roulis 0.5–1.5,
 // lancement 2.5–4.5, jeu actif 4–8, pics ~10. 6 = jeu vivant sans tunneling.
-export const BALL_MAX_SPEED = 3.0;
+export const BALL_MAX_SPEED = 8.0;
 
 // Spawn — centre géométrique du couloir : (X_MIN 0.206 + X_MAX 0.265) / 2 =
 // 0.2355. La balle est tenue sur cette ligne par le verrou latéral (charge +

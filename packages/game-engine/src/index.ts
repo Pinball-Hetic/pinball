@@ -6,6 +6,8 @@ export * from './domain/FlipperConstants';
 export * from './domain/UpsideDownConstants';
 export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
+export * from './domain/ScoringConstants';
+export * from './domain/LiveGameSnapshot';
 
 // Use-cases
 export * from './use-cases/LaunchBall';
