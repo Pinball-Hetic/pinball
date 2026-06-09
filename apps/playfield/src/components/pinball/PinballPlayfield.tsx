@@ -317,21 +317,30 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     configureGltfRenderer(renderer);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    // Plafond à 2 : sur écran Retina/HiDPI, devicePixelRatio peut être 3×
+    // ce qui triple le nombre de pixels et multiplie le coût du shader par 9
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(clientWidth, clientHeight);
-    renderer.shadowMap.enabled = true;
+    // Shadows désactivées : avec 13+ PointLights (guirlandes + bumpers) dans
+    // le shader, chaque pixel paie déjà lourd. La shadow map (cast + receive
+    // sur tous les meshes GLB) ajoutait un pass de rendu entier + lookups PCF.
+    renderer.shadowMap.enabled = false;
     mountEl.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xfff4ee, 0.95);
+    // Lumière ambiante minimale pour éviter les noirs purs dans les ombres
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
     scene.add(ambientLight);
-    const hemiLight = new THREE.HemisphereLight(0xaabbff, 0x553344, 0.55);
+    // HemiLight à 0 — conservé uniquement pour la compatibilité UpsideDownAtmosphere
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
     scene.add(hemiLight);
-    const dirLight = new THREE.DirectionalLight(0xfff8f0, 1.75);
-    dirLight.position.set(2, 5, 3);
-    dirLight.castShadow = true;
+    // Spot blanc principal depuis la position caméra (PLAYFIELD_VIEW_DIR : y=0.48, z=0.88)
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
+    dirLight.position.set(0, 0.48, 0.88);
+    dirLight.castShadow = false;
     scene.add(dirLight);
-    const fillLight = new THREE.DirectionalLight(0xffeedd, 0.65);
-    fillLight.position.set(-1.5, 3, -2);
+    // FillLight à 0 — conservé pour UpsideDownAtmosphere
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0);
+    fillLight.position.set(0, 1, -1);
     scene.add(fillLight);
 
     const modelRoot = new THREE.Group();
