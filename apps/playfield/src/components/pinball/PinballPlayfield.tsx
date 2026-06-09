@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
@@ -24,8 +24,8 @@ import {
   PLAYFIELD_SURFACE_Y,
   INITIAL_LIVES,
   PLUNGER_CHARGE_MS,
-  PLUNGER_MIN_FACTOR,
-  PLUNGER_MAX_FACTOR,
+  plungerChargeProgress,
+  plungerLaunchFactor,
   SWING_RAD,
   SWING_SMOOTH,
   FLIPPER_RESTITUTION,
@@ -61,7 +61,7 @@ import type { ButtonAction, ButtonId } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import { unlockPinballAudio } from "@/audio/PinballSounds";
-import GameOverlay from "./GameOverlay";
+import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 
 const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
@@ -279,6 +279,32 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   const [debugVisible, setDebugVisible] = useState(false);
   const debugVisibleRef = useRef(false);
 
+  const [physicsReady, setPhysicsReady] = useState(false);
+  const [sessionStarted, setSessionStarted] = useState(false);
+  const [plungerCharge, setPlungerCharge] = useState<number | null>(null);
+  const physicsReadyRef = useRef(false);
+  const sessionStartedRef = useRef(false);
+  /** Appelé depuis le game loop quand la session démarre (affiche la balle). */
+  const onSessionStartRef = useRef<(() => void) | null>(null);
+
+  const beginSession = useCallback(() => {
+    if (!physicsReadyRef.current || sessionStartedRef.current) return;
+    sessionStartedRef.current = true;
+    setSessionStarted(true);
+    unlockPinballAudio();
+    onSessionStartRef.current?.();
+    mountRef.current?.focus();
+  }, []);
+
+  const beginSessionRef = useRef(beginSession);
+  beginSessionRef.current = beginSession;
+
+  const bootPhase: PlayfieldBootPhase = !physicsReady
+    ? "loading"
+    : !sessionStarted
+      ? "attract"
+      : "in_game";
+
   const {
     score,
     lives,
@@ -292,6 +318,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     resetGame,
     buildEmit,
   } = useGameState();
+
+  const resetBallRef = useRef<(() => void) | null>(null);
+  const handleResetBall = useCallback(() => {
+    resetBallRef.current?.();
+  }, []);
 
   const { callbacksRef: physicalInputsRef, simulateButton, isConnectedRef } = usePhysicalInputs();
 
@@ -317,21 +348,30 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     configureGltfRenderer(renderer);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    // Plafond à 2 : sur écran Retina/HiDPI, devicePixelRatio peut être 3×
+    // ce qui triple le nombre de pixels et multiplie le coût du shader par 9
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(clientWidth, clientHeight);
-    renderer.shadowMap.enabled = true;
+    // Shadows désactivées : avec 13+ PointLights (guirlandes + bumpers) dans
+    // le shader, chaque pixel paie déjà lourd. La shadow map (cast + receive
+    // sur tous les meshes GLB) ajoutait un pass de rendu entier + lookups PCF.
+    renderer.shadowMap.enabled = false;
     mountEl.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xfff4ee, 0.95);
+    // Lumière ambiante minimale pour éviter les noirs purs dans les ombres
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
     scene.add(ambientLight);
-    const hemiLight = new THREE.HemisphereLight(0xaabbff, 0x553344, 0.55);
+    // HemiLight à 0 — conservé uniquement pour la compatibilité UpsideDownAtmosphere
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
     scene.add(hemiLight);
-    const dirLight = new THREE.DirectionalLight(0xfff8f0, 1.75);
-    dirLight.position.set(2, 5, 3);
-    dirLight.castShadow = true;
+    // Spot blanc principal depuis la position caméra (PLAYFIELD_VIEW_DIR : y=0.48, z=0.88)
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
+    dirLight.position.set(0, 0.48, 0.88);
+    dirLight.castShadow = false;
     scene.add(dirLight);
-    const fillLight = new THREE.DirectionalLight(0xffeedd, 0.65);
-    fillLight.position.set(-1.5, 3, -2);
+    // FillLight à 0 — conservé pour UpsideDownAtmosphere
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0);
+    fillLight.position.set(0, 1, -1);
     scene.add(fillLight);
 
     const modelRoot = new THREE.Group();
@@ -383,6 +423,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let chargeStartTime = 0;
     let physicsReady = false;
     let prevFrameTime = 0;
+    let lastPlungerChargeUiPush = 0;
+    let plungerChargeUiActive = false;
 
     let leftFlipperHit = false;
     let rightFlipperHit = false;
@@ -767,6 +809,18 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           );
         };
 
+        resetBallRef.current = () => {
+          if (!drainBallUC || !sessionStartedRef.current) return;
+          if (gameStateRef.current === "game_over") return;
+          isChargingPlunger = false;
+          plungerState = "idle";
+          setPlungerCharge(null);
+          stuckDetector.reset();
+          bottomOutBallUC?.resetLatch();
+          if (ballMesh) ballMesh.visible = true;
+          drainBallUC.execute();
+        };
+
         demogorgonReveal?.setEmit(emit);
 
         // ── Input handling ────────────────────────────────────────────────────
@@ -780,6 +834,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // callback via socket.on('input:button').
         physicalInputsRef.current = {
           onButton: (data) => {
+            if (!sessionStartedRef.current) {
+              if (
+                data.action === "DOWN"
+                && (data.id === "PLUNGER" || data.id === "START")
+                && physicsReady
+              ) {
+                beginSessionRef.current();
+              }
+              return;
+            }
             if (data.id === "LEFT") {
               leftTarget = data.action === "DOWN" ? 1 : 0;
               return;
@@ -813,8 +877,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               } else if (isChargingPlunger && gameStateRef.current === "idle") {
                 isChargingPlunger = false;
                 plungerState = "releasing";
-                const t = Math.min(1, (performance.now() - chargeStartTime) / PLUNGER_CHARGE_MS) ** 1.15;
-                const factor = PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t;
+                const t = plungerChargeProgress(performance.now(), chargeStartTime);
+                const factor = plungerLaunchFactor(t);
+                setPlungerCharge(null);
                 debugLog(`[Plunger] RELEASE — factor=${factor.toFixed(2)} → lancement`);
                 launchBallUC?.execute(factor);
               } else {
@@ -873,6 +938,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             setDebugVisible(debugVisibleRef.current);
             return;
           }
+          if (e.key === "r" || e.key === "R") {
+            resetBallRef.current?.();
+            return;
+          }
           if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton("LEFT", "DOWN");
           if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton("RIGHT", "DOWN");
           if (e.key === " ") dispatchButton("PLUNGER", "DOWN");
@@ -885,6 +954,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (e.key === " ") dispatchButton("PLUNGER", "UP");
         };
 
+        onSessionStartRef.current = () => {
+          if (ballMesh) ballMesh.visible = true;
+        };
+
         if (cancelled) return;
 
         document.addEventListener("keydown", onKeyDown);
@@ -893,10 +966,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyDown = onKeyDown;
         (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyUp = onKeyUp;
 
-        if (ballMesh) ballMesh.visible = true;
+        if (ballMesh) ballMesh.visible = false;
         physicsReady = true;
-        debugLog("[PinballPlayfield] physicsReady = true (init terminée, plunger actif)");
-        mountEl.focus();
+        physicsReadyRef.current = true;
+        setPhysicsReady(true);
+        debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
       }
@@ -1100,12 +1174,24 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // Drain géré par le capteur Rapier bottom_out (CollisionEventProcessor)
       }
 
-      // Plunger animation
+      // Plunger animation + jauge UI
+      if (isChargingPlunger) {
+        const t = plungerChargeProgress(time, chargeStartTime);
+        plungerChargeUiActive = true;
+        if (time - lastPlungerChargeUiPush > 40) {
+          lastPlungerChargeUiPush = time;
+          setPlungerCharge(t);
+        }
+      } else if (plungerChargeUiActive) {
+        plungerChargeUiActive = false;
+        setPlungerCharge(null);
+      }
+
       if (plungerMesh && plungerRestZ > 0) {
         let plungerZ = plungerRestZ;
         if (isChargingPlunger) {
-          const t = Math.min(1, (time - chargeStartTime) / PLUNGER_CHARGE_MS) ** 1.15;
-          const pullback = (PLUNGER_MIN_FACTOR + (PLUNGER_MAX_FACTOR - PLUNGER_MIN_FACTOR) * t) * 0.08;
+          const t = plungerChargeProgress(time, chargeStartTime);
+          const pullback = plungerLaunchFactor(t) * 0.08;
           plungerZ = plungerRestZ + pullback;
         } else if (plungerState === "releasing") {
           plungerZ = plungerRestZ - 0.015;
@@ -1220,6 +1306,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           score={score}
           lives={lives}
           gameState={gameState}
+          bootPhase={bootPhase}
+          plungerCharge={plungerCharge}
+          onResetBall={handleResetBall}
           initialLives={INITIAL_LIVES}
           demogorgonHud={demogorgonHud}
           scorePops={scorePops}
@@ -1232,6 +1321,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         <main
           ref={mountRef}
+          onPointerDown={() => {
+            if (physicsReady && !sessionStarted) beginSession();
+          }}
           className={
             cabinetMode
               ? "absolute inset-0 h-full w-full touch-none outline-none focus:outline-none"

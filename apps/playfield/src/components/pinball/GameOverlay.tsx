@@ -1,11 +1,19 @@
 import { DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
 import type { DemogorgonHud, ScorePop } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
+import PlungerPowerBar from "./PlungerPowerBar";
+
+/** Phase d'amorçage avant / pendant la session de jeu. */
+export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
 
 interface GameOverlayProps {
   score: number;
   lives: number;
   gameState: "idle" | "playing" | "game_over";
+  bootPhase: PlayfieldBootPhase;
+  /** Progression charge plongeur [0,1] ou null si inactive. */
+  plungerCharge: number | null;
+  onResetBall?: () => void;
   initialLives: number;
   demogorgonHud: DemogorgonHud;
   scorePops: ScorePop[];
@@ -18,6 +26,9 @@ export default function GameOverlay({
   score,
   lives,
   gameState,
+  bootPhase,
+  plungerCharge,
+  onResetBall,
   initialLives,
   demogorgonHud,
   scorePops,
@@ -26,50 +37,66 @@ export default function GameOverlay({
   cabinetMode = false,
 }: GameOverlayProps) {
   void cabinetMode;
-  const hintLine =
-    gameState === "idle"
-      ? "▶  Maintenir ESPACE — relâcher pour lancer"
-      : gameState === "game_over"
-        ? "ESPACE pour rejouer"
-        : null;
+
+  const showHud = bootPhase === "in_game";
+  const showLaunchHint =
+    bootPhase === "in_game" && gameState === "idle" && plungerCharge === null;
+  const showPowerBar =
+    bootPhase === "in_game" && gameState === "idle" && plungerCharge !== null;
+  const showGameOver = bootPhase === "in_game" && gameState === "game_over";
+
+  const showResetBall =
+    bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
 
   const showDemogorgonHud =
-    gameState === "playing" && demogorgonHud.active;
+    bootPhase === "in_game" && gameState === "playing" && demogorgonHud.active;
 
   const showUpsideDownBanner =
-    gameState === "playing" && upsideDownActive;
+    bootPhase === "in_game" && gameState === "playing" && upsideDownActive;
 
   const showUpsideDownHint =
-    gameState === "playing" && upsideDownHint;
+    bootPhase === "in_game" && gameState === "playing" && upsideDownHint;
 
   return (
     <>
       <ScorePopFeedback pops={scorePops} />
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-5 pt-4">
-        <div className="font-mono space-y-1.5">
-          <div className="text-3xl font-bold tabular-nums tracking-widest drop-shadow-[0_0_8px_rgba(255,180,0,0.6)]">
-            {String(score).padStart(7, "0")}
-          </div>
-          <div className="flex gap-1.5 text-lg">
-            {Array.from({ length: initialLives }).map((_, i) => (
-              <span
-                key={i}
-                className="transition-opacity duration-300"
-                style={{ opacity: i < lives ? 1 : 0.2 }}
+      {showHud && (
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-5 pt-4">
+          <div className="font-mono space-y-1.5">
+            <div className="text-3xl font-bold tabular-nums tracking-widest drop-shadow-[0_0_8px_rgba(255,180,0,0.6)]">
+              {String(score).padStart(7, "0")}
+            </div>
+            <div className="flex gap-1.5 text-lg">
+              {Array.from({ length: initialLives }).map((_, i) => (
+                <span
+                  key={i}
+                  className="transition-opacity duration-300"
+                  style={{ opacity: i < lives ? 1 : 0.2 }}
+                >
+                  ●
+                </span>
+              ))}
+            </div>
+            {showResetBall && onResetBall && (
+              <button
+                type="button"
+                onClick={onResetBall}
+                className="pointer-events-auto mt-2 rounded border border-red-500/35 bg-black/60 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-red-300/90 backdrop-blur-sm transition hover:border-red-400/50 hover:bg-black/80 hover:text-red-200 active:scale-[0.98]"
               >
-                ●
-              </span>
-            ))}
+                Reset balle — R (−1 vie)
+              </button>
+            )}
           </div>
-        </div>
-        <div className="text-right font-mono text-[10px] text-zinc-500 space-y-0.5 leading-relaxed">
-          <div>Q / ← — Flipper gauche</div>
-          <div>D / → — Flipper droit</div>
-          <div>ESPACE — Charger / lancer</div>
-          <div>H — Debug colliders</div>
-        </div>
-      </header>
+          <div className="text-right font-mono text-[10px] text-zinc-500 space-y-0.5 leading-relaxed">
+            <div>Q / ← — Flipper gauche</div>
+            <div>D / → — Flipper droit</div>
+            <div>ESPACE — Charger / lancer</div>
+            <div>R — Reset balle (−1 vie)</div>
+            <div>H — Debug colliders</div>
+          </div>
+        </header>
+      )}
 
       {showUpsideDownBanner && (
         <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-10 flex justify-center">
@@ -118,23 +145,93 @@ export default function GameOverlay({
         </div>
       )}
 
-      {(gameState === "idle" || gameState === "game_over") && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4">
-          {gameState === "game_over" && (
-            <p className="font-mono text-4xl font-bold uppercase tracking-[0.25em] text-red-400 drop-shadow-[0_0_16px_rgba(239,68,68,0.8)]">
-              Game Over
+      {/* ── Écran de chargement ── */}
+      {bootPhase === "loading" && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-[#0a0e18]/92 backdrop-blur-sm">
+          <div
+            className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-amber-400/90"
+            aria-hidden
+          />
+          <div className="text-center font-mono">
+            <p className="text-xs uppercase tracking-[0.45em] text-zinc-500">
+              Chargement
             </p>
-          )}
-          {gameState === "idle" && lives < initialLives && (
-            <p className="font-mono text-xs uppercase tracking-[0.28em] text-zinc-500">
+            <p className="mt-2 text-sm text-zinc-400">
+              Préparation du plateau…
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Écran d'accueil (attract mode) ── */}
+      {bootPhase === "attract" && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#0a0e18]/75 via-[#0a0e18]/55 to-[#0a0e18]/85 px-6 backdrop-blur-[2px]">
+          <div className="text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.55em] text-red-400/80">
+              Hawkins National Laboratory
+            </p>
+            <h1 className="mt-3 font-mono text-4xl font-bold uppercase tracking-[0.18em] text-zinc-100 drop-shadow-[0_0_24px_rgba(255,180,0,0.35)] sm:text-5xl">
+              Pinball
+            </h1>
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-zinc-400">
+              Le plateau est prêt. Entrez dans la partie pour lancer la balle.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <div className="rounded-full border border-amber-500/30 bg-black/50 px-6 py-3 font-mono backdrop-blur-sm">
+              <p className="animate-pulse text-sm uppercase tracking-[0.28em] text-amber-200/90">
+                ESPACE ou START pour jouer
+              </p>
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-600">
+              ou cliquez sur le plateau
+            </p>
+          </div>
+
+          <div className="absolute bottom-8 text-center font-mono text-[10px] text-zinc-600 space-y-1 leading-relaxed">
+            <p>Q / D — Flippers</p>
+            <p>ESPACE (en jeu) — Charger puis relâcher pour lancer</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Game over (plein écran) ── */}
+      {showGameOver && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur-[1px]">
+          <p className="font-mono text-4xl font-bold uppercase tracking-[0.25em] text-red-400 drop-shadow-[0_0_16px_rgba(239,68,68,0.8)]">
+            Game Over
+          </p>
+          <p className="animate-pulse font-mono text-sm uppercase tracking-[0.3em] text-zinc-400">
+            ESPACE pour rejouer
+          </p>
+        </div>
+      )}
+
+      {/* ── Jauge de puissance plongeur ── */}
+      {showPowerBar && <PlungerPowerBar charge={plungerCharge} />}
+
+      {showPowerBar && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
+          <p className="animate-pulse font-mono text-[11px] uppercase tracking-[0.22em] text-amber-200/80">
+            Relâcher ESPACE pour lancer
+          </p>
+        </div>
+      )}
+
+      {/* ── Hint lancement discret (bas) — masqué pendant la charge ── */}
+      {showLaunchHint && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex flex-col items-center gap-2 px-4">
+          {lives < initialLives && (
+            <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
               Bille perdue — {lives} vie{lives > 1 ? "s" : ""} restante{lives > 1 ? "s" : ""}
             </p>
           )}
-          {hintLine && (
-            <p className="animate-pulse font-mono text-sm uppercase tracking-[0.3em] text-zinc-400">
-              {hintLine}
+          <div className="rounded-full border border-zinc-700/60 bg-black/55 px-5 py-2 font-mono backdrop-blur-sm">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-300">
+              Maintenir <span className="text-amber-300/90">ESPACE</span> — relâcher pour lancer
             </p>
-          )}
+          </div>
         </div>
       )}
     </>
