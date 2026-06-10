@@ -1,13 +1,9 @@
-import { MASTER_GAIN } from "./pinballAudioConfig";
 import type { SamplePlayer } from "./SamplePlayer";
 
 export class SfxEngine {
   private contextUnlocked = false;
 
-  constructor(private readonly samples: SamplePlayer) {
-    const master = this.samples.getMaster();
-    if (master) master.gain.value = MASTER_GAIN;
-  }
+  constructor(private readonly samples: SamplePlayer) {}
 
   markContextUnlocked(): void {
     this.contextUnlocked = true;
@@ -70,6 +66,18 @@ export class SfxEngine {
     });
   }
 
+  playCinematicImpact(): void {
+    this.playNow(() => {
+      this.playToneOnBus(this.samples.getCinematicBus(), 28, 1.1, "sine", 0.55);
+      this.playToneOnBus(this.samples.getCinematicBus(), 52, 0.7, "sawtooth", 0.35, -50);
+      this.playNoiseOnBus(this.samples.getCinematicBus(), 0.45, 0.3, 70);
+      window.setTimeout(
+        () => this.playNoiseOnBus(this.samples.getCinematicBus(), 0.3, 0.2, 45),
+        90,
+      );
+    });
+  }
+
   playPortalEnter(): void {
     this.playNow(() => {
       this.playTone(48, 0.62, "sawtooth", 0.16, -180);
@@ -117,9 +125,19 @@ export class SfxEngine {
     gain: number,
     detune = 0,
   ): void {
+    this.playToneOnBus(this.samples.getSfxBus(), freq, duration, type, gain, detune);
+  }
+
+  private playToneOnBus(
+    bus: GainNode | null,
+    freq: number,
+    duration: number,
+    type: OscillatorType,
+    gain: number,
+    detune = 0,
+  ): void {
     const ctx = this.samples.ensureContext();
-    const master = this.samples.getMaster();
-    if (!ctx || !master) return;
+    if (!ctx || !bus) return;
 
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
@@ -130,15 +148,23 @@ export class SfxEngine {
     g.gain.exponentialRampToValueAtTime(gain, ctx.currentTime + 0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
     osc.connect(g);
-    g.connect(master);
+    g.connect(bus);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + duration + 0.02);
   }
 
   private playNoise(duration: number, gain: number, freq = 900): void {
+    this.playNoiseOnBus(this.samples.getSfxBus(), duration, gain, freq);
+  }
+
+  private playNoiseOnBus(
+    bus: GainNode | null,
+    duration: number,
+    gain: number,
+    freq = 900,
+  ): void {
     const ctx = this.samples.ensureContext();
-    const master = this.samples.getMaster();
-    if (!ctx || !master) return;
+    if (!ctx || !bus) return;
 
     const bufferSize = Math.floor(ctx.sampleRate * duration);
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -157,7 +183,7 @@ export class SfxEngine {
     g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
     source.connect(filter);
     filter.connect(g);
-    g.connect(master);
+    g.connect(bus);
     source.start(ctx.currentTime);
     source.stop(ctx.currentTime + duration + 0.02);
   }

@@ -1,9 +1,9 @@
 import {
   EARLY_SOUND_FADE_OUT_S,
-  EARLY_SOUND_GAIN,
   EARLY_SOUND_LOOP_SILENCE_THRESHOLD,
   EARLY_SOUND_URL,
 } from "./pinballAudioConfig";
+import { soundLevel } from "./pinballAudioVolumes";
 import type { SamplePlayer } from "./SamplePlayer";
 
 export type EarlySoundPhase = "off" | "armed" | "playing" | "released";
@@ -35,7 +35,7 @@ export class EarlySoundController {
     if (this.phase !== "armed" && this.phase !== "off") return;
 
     await this.samples.resumeContext();
-    const started = await this.samples.playGaplessLoop(EARLY_SOUND_URL, EARLY_SOUND_GAIN);
+    const started = await this.samples.playGaplessLoop(EARLY_SOUND_URL, soundLevel("earlySound"));
     if (started) {
       this.phase = "playing";
     }
@@ -55,7 +55,7 @@ export class EarlySoundController {
       void this.engage();
       return;
     }
-    const started = this.samples.playGaplessLoopInGesture(EARLY_SOUND_URL, EARLY_SOUND_GAIN);
+    const started = this.samples.playGaplessLoopInGesture(EARLY_SOUND_URL, soundLevel("earlySound"));
     if (started) {
       this.phase = "playing";
     }
