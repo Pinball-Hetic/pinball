@@ -38,7 +38,7 @@ import {
   FLIPPER_RIGHT_X_MAX,
   FLIPPER_MIN_LAUNCH_VZ,
   FLIPPER_MIN_LAUNCH_ANGVEL,
-  SURFACE_SNAP_THRESHOLD,
+  computeSurfaceSnap,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   playfieldUsesCollOnlyCollision,
@@ -1340,37 +1340,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           }
         }
 
-        // ── Surface snap : colle la balle à Mesh_0 (sol incliné) ────────────
-        // Si la balle décolle de plus de SNAP_THRESHOLD au-dessus du tapis,
-        // on la repose sur ballCenterOnSurface(z) et on annule la vélocité Y
-        // montante. La vélocité XZ n'est pas touchée → vitesse de jeu conservée.
-        // Actif uniquement dans la zone de jeu (hors couloir de lancement et
-        // hors limites du plateau).
+        // ── Surface snap : recolle la balle au sol incliné (logique en
+        // game-engine, cf. computeSurfaceSnap). On lit pos/vel et on applique.
         if (gameStateRef.current === "playing" && !ballMoveMode) {
-          const sp = ballPhysicsInst.body.translation();
-          const inLaneStraight2 =
-            sp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && sp.x > SHOOTER_LANE_LOCK_X;
-          const inPlayfield =
-            sp.x > WALL_LEFT_X  && sp.x < WALL_RIGHT_X &&
-            sp.z > WALL_TOP_Z   && sp.z < WALL_BOTTOM_Z;
-          if (!inLaneStraight2 && inPlayfield) {
-            const surfaceY = ballCenterOnSurface(sp.z);
-            if (sp.y > surfaceY + SURFACE_SNAP_THRESHOLD) {
-              const sv = ballPhysicsInst.body.linvel();
-              ballPhysicsInst.body.setTranslation(
-                { x: sp.x, y: surfaceY, z: sp.z },
-                true,
-              );
-              // Annule seulement la vélocité Y positive (décollage).
-              // Ne pas toucher un Y négatif : ça serait la gravité qui ramène
-              // la balle, on ne veut pas l'en empêcher.
-              if (sv.y > 0) {
-                ballPhysicsInst.body.setLinvel(
-                  { x: sv.x, y: 0, z: sv.z },
-                  true,
-                );
-              }
-            }
+          const snap = computeSurfaceSnap(
+            ballPhysicsInst.body.translation(),
+            ballPhysicsInst.body.linvel(),
+          );
+          if (snap) {
+            ballPhysicsInst.body.setTranslation(snap.translation, true);
+            if (snap.linvel) ballPhysicsInst.body.setLinvel(snap.linvel, true);
           }
         }
 
