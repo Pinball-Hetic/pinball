@@ -1,4 +1,3 @@
-import { EARLY_SOUND_URL } from "./pinballAudioConfig";
 import type { SamplePlayer } from "./SamplePlayer";
 
 type BootstrapDeps = {
