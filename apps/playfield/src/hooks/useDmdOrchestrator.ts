@@ -131,7 +131,19 @@ export function useDmdOrchestrator(): DmdOrchestrator {
     emitScoreSnapshot: (s) => socketRef.current?.emit('score:update', s),
     emitGameStart: (player) => socketRef.current?.emit('game:start', { player }),
     emitGameOver: (player, finalScore) =>
-      socketRef.current?.emit('game:over', { player, finalScore }),
+      // Stats placeholder (zéros) — branché aux vrais compteurs en P4.
+      socketRef.current?.emit('game:over', {
+        player,
+        finalScore,
+        stats: {
+          maxCombo: 0,
+          maxMultiplier: 1,
+          demogorgons: 0,
+          portals: 0,
+          hetic: 0,
+          durationS: 0,
+        },
+      }),
 
     pushIntro: (player) => {
       // Reset complet : l'INTRO ne s'affiche qu'au repos (ball non lancée),
