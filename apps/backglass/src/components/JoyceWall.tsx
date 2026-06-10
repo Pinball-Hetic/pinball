@@ -21,9 +21,10 @@ const OFF: Glow = new Array(26).fill(0)
 
 interface JoyceWallProps {
   message: string | null
+  messageId?: number // change → ré-enfile même si le texte est identique
 }
 
-export default function JoyceWall({ message }: JoyceWallProps) {
+export default function JoyceWall({ message, messageId }: JoyceWallProps) {
   const [glow, setGlow] = useState<Glow>(OFF)
   const queueRef = useRef<string[]>([])
   const busyRef = useRef(false)
@@ -70,7 +71,7 @@ export default function JoyceWall({ message }: JoyceWallProps) {
     if (!message) return
     queueRef.current.push(message)
     if (!busyRef.current) runNext()
-  }, [message])
+  }, [messageId, message])
 
   const runNext = () => {
     const msg = queueRef.current.shift()

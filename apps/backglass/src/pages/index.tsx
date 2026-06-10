@@ -1,12 +1,19 @@
 import { useEffect, useRef } from 'react'
 import { useBackglassData } from '@/hooks/useBackglassData'
+import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import JoyceWall from '@/components/JoyceWall'
 import SideArt from '@/components/SideArt'
 import HallOfFame from '@/components/HallOfFame'
 import StatsBanner from '@/components/StatsBanner'
+import HighScoreTakeover from '@/components/takeovers/HighScoreTakeover'
+import RecapTakeover from '@/components/takeovers/RecapTakeover'
+import DemogorgonTakeover from '@/components/takeovers/DemogorgonTakeover'
+import AttractScene from '@/components/takeovers/AttractScene'
 
 export default function BackglassPage() {
   const { entries, stats, connected } = useBackglassData()
+  const { takeover, upsideDown, highlightRank, agitation, joyce } =
+    useBackglassTakeover(entries)
   const stageRef = useRef<HTMLDivElement>(null)
 
   // Scale-to-fit : la borne est en 1920×1080 exact (scale 1), mais on
@@ -21,26 +28,47 @@ export default function BackglassPage() {
     return () => window.removeEventListener('resize', fit)
   }, [])
 
+  const sideAgitation = upsideDown ? 1 : Math.max(0.15, agitation)
+
   return (
-    <div className="stage-fit">
+    <div className={`stage-fit ${upsideDown ? 'upside-down' : ''}`}>
       <main className="stage" ref={stageRef}>
-        <div className="vignette" />
+        <div className="vignette" style={{ opacity: 1 + agitation * 0.8 }} />
 
         <header className="zone-header">
-          <JoyceWall message={null} />
+          <JoyceWall message={joyce.text} messageId={joyce.id} />
         </header>
 
         <section className="zone-side">
-          <SideArt mood="normal" agitation={0.15} />
+          <SideArt mood={upsideDown ? 'upsideDown' : 'normal'} agitation={sideAgitation} />
         </section>
 
         <section className="zone-hof">
-          <HallOfFame entries={entries} />
+          <HallOfFame
+            entries={entries}
+            highlightRank={highlightRank}
+            inverted={upsideDown}
+          />
         </section>
 
         <footer className="zone-banner">
           <StatsBanner stats={stats} entries={entries} />
         </footer>
+
+        {takeover && (
+          <div className="takeover-layer">
+            {takeover.scene === 'HIGH_SCORE' && takeover.payload && (
+              <HighScoreTakeover payload={takeover.payload} />
+            )}
+            {takeover.scene === 'RECAP' && takeover.payload && (
+              <RecapTakeover payload={takeover.payload} />
+            )}
+            {takeover.scene === 'DEMOGORGON' && <DemogorgonTakeover />}
+            {takeover.scene === 'ATTRACT' && (
+              <AttractScene entries={entries} stats={stats} />
+            )}
+          </div>
+        )}
 
         {!connected && <div className="disconnected">Disconnected</div>}
       </main>
