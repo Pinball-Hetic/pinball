@@ -87,24 +87,20 @@ export function hasPinballmapRoot(root: THREE.Object3D): boolean {
 
 /**
  * Sols GLB plats remplacés, POUR LA COLLISION UNIQUEMENT, par le cuboïde
- * analytique lisse (PlayfieldColliderFactory.createPlayfieldFloor). Les meshes
- * restent VISIBLES : on n'enlève que leur physique (trimesh bosselé qui freinait
- * la balle).
+ * analytique lisse (PlayfieldColliderFactory.createPlayfieldFloor). Les
+ * meshes restent VISIBLES : on n'enlève que leur physique (trimesh
+ * bosselé qui freinait la balle).
  *
- * - Mesh_0 : surface de jeu (plein plateau).
- * - Mesh_1 : 2ᵉ couche de surface (moitié basse + couloir) → faisait caler la
- *   balle à Z≈0.01 au lancement (double sol avec le cuboïde analytique).
+ * - Mesh_0 : surface de jeu (plein plateau) — vérifié dans Blender.
  *
- * Mesh_2/3/4 (structure haute, zone bumpers) GARDENT leur collision : ils
- * rattrapent la balle en fin de lancement et l'empêchent de tomber dans le vide.
+ * ATTENTION : Mesh_1 = les MURS moulés (vérifié dans Blender). Il a été
+ * exclu ici par erreur par le passé ("2ᵉ couche de surface") → les murs
+ * du bas ne stoppaient plus la bille. Il DOIT garder sa collision.
  */
 export const PINBALLMAP_NONPHYSICAL_FLOOR_MESHES = new Set([
   'mesh_0',
   'mesh.0',
   'mesh0',
-  'mesh_1',
-  'mesh.1',
-  'mesh1',
 ]);
 
 export function isPinballmapNonPhysicalFloorMesh(mesh: THREE.Mesh): boolean {
