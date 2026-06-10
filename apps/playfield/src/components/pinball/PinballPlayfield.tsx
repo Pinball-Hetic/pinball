@@ -900,6 +900,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             }
           }
           if (event.type === "PORTAL_ENTER") onPortalEnter?.();
+          if (event.type === "PORTAL_TRANSITION_END") {
+            upsideDownPortal?.reset();
+            collisionProcessor?.resetPortalTrigger();
+          }
           if (event.type === "BALL_LAUNCHED") {
             collisionProcessor?.resetPortalTrigger();
             bottomOutBallUC?.resetLatch();
