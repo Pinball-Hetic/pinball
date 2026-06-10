@@ -62,7 +62,16 @@ export function isFlipperGltfMesh(mesh: THREE.Mesh): boolean {
   while (current) {
     const n = normalizeGltfName(current.name);
     if (n === 'pinballmap') return false;
-    if (n === 'flipper' || n.startsWith('flipper.')) return true;
+    // Ancienne convention : nœud unique "flipper" ou "flipper.001"
+    // Nouvelle convention : sous-modèles séparés "flipper-left" / "flipper-right"
+    if (
+      n === 'flipper' ||
+      n.startsWith('flipper.') ||
+      n === 'flipper-left' ||
+      n === 'flipper-right' ||
+      n === 'flipper_left' ||
+      n === 'flipper_right'
+    ) return true;
     current = current.parent;
   }
   return false;
