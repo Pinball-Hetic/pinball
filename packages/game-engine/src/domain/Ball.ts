@@ -1,5 +1,5 @@
 // Bille — GLB ball size=[0.0269] → radius 0.01345. Réduite à 0.010 (~20 mm Ø).
-export const BALL_RADIUS          = 0.01274;
+export const BALL_RADIUS          = 0.01374;
 export const BALL_MASS            = 0.08;   // 80 g — standard officiel
 export const BALL_RESTITUTION     = 0.4;    // acier sur bois verni : rebond faible
 export const BALL_FRICTION        = 0.05;   // acier poli, très glissant
