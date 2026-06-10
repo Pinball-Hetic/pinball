@@ -38,6 +38,7 @@ export class DemogorgonTargetVisual {
   private pendingFit: THREE.Object3D | null = null;
   private glowLight: THREE.PointLight | null = null;
   private loadPromise: Promise<void> | null = null;
+  private fitted = false;
 
   mount(parent: THREE.Object3D, camera: THREE.Camera): void {
     this.dispose();
@@ -70,11 +71,21 @@ export class DemogorgonTargetVisual {
   }
 
   async warmup(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    if (!this.anchor) return;
-    await renderer.compileAsync(this.anchor, camera, scene);
+    if (!this.anchor || !this.fitted) return;
+    await new Promise<void>((resolve) => {
+      const run = () => {
+        renderer.compileAsync(this.anchor!, camera, scene).then(() => resolve()).catch(() => resolve());
+      };
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(run, { timeout: 4000 });
+      } else {
+        setTimeout(run, 0);
+      }
+    });
   }
 
   show(): void {
+    if (!this.fitted) return;
     if (this.anchor) this.anchor.visible = true;
     this.playIdle();
   }
@@ -143,6 +154,7 @@ export class DemogorgonTargetVisual {
     this.rig = null;
     this.offset = null;
     this.pendingFit = null;
+    this.fitted = false;
     this.animState = 'idle';
     this.hitFlash = 0;
     this.pulseT = 0;
@@ -155,20 +167,23 @@ export class DemogorgonTargetVisual {
       if (!this.anchor) return;
       this.fitModel(gltf.scene, gltf.animations);
       this.syncFacing();
-      this.resolveFit();
-      if (this.pendingFit) {
+      for (let i = 0; i < 10; i++) {
+        this.mixer?.update(0);
+        if (this.resolveFit()) break;
         await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
         if (!this.anchor) return;
-        this.resolveFit();
       }
+      if (this.pendingFit) this.applyFallbackFit();
+      this.fitted = true;
       if (this.anchor.visible) this.playIdle();
     } catch (err) {
       console.error('[Demogorgon] load error:', err);
     }
   }
 
-  private resolveFit(): void {
+  private resolveFit(): boolean {
     if (this.pendingFit) this.tryApplyFit();
+    return !this.pendingFit;
   }
 
   private syncFacing(): void {
@@ -211,6 +226,25 @@ export class DemogorgonTargetVisual {
     const center = box.getCenter(new THREE.Vector3());
     if (Math.max(Math.abs(center.x), Math.abs(center.y), Math.abs(center.z)) > 4) return;
 
+    const height = Math.max(size.y, 1e-4);
+    this.offset.position.set(-center.x, -box.min.y + 0.006, -center.z);
+    this.rig.scale.setScalar(DEMOGORGON_MODEL_HEIGHT / height);
+    this.pendingFit = null;
+  }
+
+  private applyFallbackFit(): void {
+    const model = this.pendingFit;
+    if (!model || !this.rig || !this.offset) return;
+
+    model.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(model);
+    if (box.isEmpty()) {
+      this.pendingFit = null;
+      return;
+    }
+
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
     const height = Math.max(size.y, 1e-4);
     this.offset.position.set(-center.x, -box.min.y + 0.006, -center.z);
     this.rig.scale.setScalar(DEMOGORGON_MODEL_HEIGHT / height);
@@ -276,8 +310,6 @@ export class DemogorgonTargetVisual {
         this.playIdle();
       }
     });
-
-    this.playIdle();
   }
 
   private playIdle(): void {
