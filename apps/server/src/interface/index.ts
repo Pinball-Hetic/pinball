@@ -5,6 +5,8 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@pinball/shared-types';
+import { topTen, globalStats } from '../use-cases/Leaderboard';
+import { recordGame } from '../use-cases/RecordGame';
 
 const app = express();
 const httpServer = createServer(app);
@@ -16,6 +18,24 @@ const INPUT_BRIDGE_ROOM = 'input-bridge';
 
 app.get('/', (req, res) => {
   res.send('Pinball Server is running');
+});
+
+app.get('/api/leaderboard', async (_req, res) => {
+  try {
+    res.json(await topTen());
+  } catch (err) {
+    console.error('[server] /api/leaderboard failed:', err);
+    res.status(500).json({ error: 'leaderboard unavailable' });
+  }
+});
+
+app.get('/api/stats', async (_req, res) => {
+  try {
+    res.json(await globalStats());
+  } catch (err) {
+    console.error('[server] /api/stats failed:', err);
+    res.status(500).json({ error: 'stats unavailable' });
+  }
 });
 
 io.on('connection', (socket) => {
@@ -60,9 +80,16 @@ io.on('connection', (socket) => {
     io.emit('game:start', data);
   });
 
-  socket.on('game:over', (data) => {
+  socket.on('game:over', async (data) => {
     console.log('[server] game:over', data.player, 'final=', data.finalScore);
-    io.emit('game:over', data);
+    io.emit('game:over', data); // relay inchangé (DMD, backglass)
+    try {
+      await recordGame(data);
+      io.emit('leaderboard:refresh', await topTen());
+    } catch (err) {
+      // le jeu continue — la persistence ne doit JAMAIS bloquer le relay
+      console.error('[server] game:over persist failed:', err);
+    }
   });
 
   socket.on('dmd:display', (data) => {
