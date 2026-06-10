@@ -1,5 +1,8 @@
-import type { ReactElement } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
+import { useRouter } from 'next/router'
 import { useDmdState } from '@/hooks/useDmdState'
+import DmdCanvas from '@/components/DmdCanvas'
+import NeonBand from '@/components/NeonBand'
 import type { DmdDisplay } from '@pinball/shared-types'
 
 const TOTAL_LIVES = 3
@@ -88,18 +91,52 @@ function renderDisplay(d: DmdDisplay): ReactElement {
   }
 }
 
+const disconnectedStyle: CSSProperties = {
+  position: 'absolute',
+  top: 16,
+  right: 16,
+  color: '#ef4444',
+  fontSize: 14,
+  fontFamily: 'monospace',
+}
+
 export default function ScoreboardPage() {
-  const { display, connected } = useDmdState()
+  const router = useRouter()
+  const { display, upsideDown, connected } = useDmdState()
+
+  // ?flat : ancien rendu JSX plat (debug). Attendre router.isReady pour
+  // éviter de monter le canvas puis de basculer en flat.
+  if (!router.isReady) {
+    return <main style={{ minHeight: '100vh', background: '#000' }} />
+  }
+
+  if ('flat' in router.query) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white">
+        {renderDisplay(display)}
+        {!connected && (
+          <div className="absolute top-4 right-4 text-red-500 text-sm font-mono">
+            Disconnected
+          </div>
+        )}
+      </main>
+    )
+  }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white">
-      {renderDisplay(display)}
-
-      {!connected && (
-        <div className="absolute top-4 right-4 text-red-500 text-sm font-mono">
-          Disconnected
-        </div>
-      )}
+    <main
+      style={{
+        minHeight: '100vh',
+        background: '#000',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+      }}
+    >
+      <NeonBand text="STRANGER THINGS" position="top" />
+      <DmdCanvas display={display} upsideDown={upsideDown} />
+      <NeonBand text="PINBALL HETIC" position="bottom" />
+      {!connected && <div style={disconnectedStyle}>Disconnected</div>}
     </main>
   )
 }

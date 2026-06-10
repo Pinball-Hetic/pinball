@@ -78,7 +78,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
   const [upsideDownActive, setUpsideDownActive] = useState(false);
   const [upsideDownHint, setUpsideDownHint] = useState(false);
+  const [hetic, setHetic] = useState(0);
 
+  const heticRef = useRef(0);
   const scoreRef = useRef(0);
   const livesRef = useRef(INITIAL_LIVES);
   const gameStateRef = useRef<GameState>("idle");
@@ -199,6 +201,8 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     multiplierRef.current = 1;
     setCombo(0);
     setMultiplier(1);
+    heticRef.current = 0;
+    setHetic(0);
     lastEventTimeRef.current = 0;
     const newName = generatePlayerName();
     setPlayer(newName);
@@ -303,6 +307,12 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           clearDemogorgonHud();
         }
       }
+      if (event.type === "DROP_TARGET_COMPLETE") {
+        if (heticRef.current < 5) {
+          heticRef.current += 1;
+          setHetic(heticRef.current);
+        }
+      }
       if (event.type === "BALL_LAUNCHED") {
         if (gameStateRef.current === "idle") callbacks?.onGameStart?.();
         updateGameState("playing");
@@ -350,6 +360,8 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     scorePops,
     upsideDownActive,
     upsideDownHint,
+    hetic,
+    heticRef,
     clearUpsideDownSession,
     resetGame,
     buildEmit,
