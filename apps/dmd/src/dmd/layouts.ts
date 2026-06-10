@@ -25,8 +25,30 @@ function drawCentered(
   font: typeof FONT_5X7,
   color: number,
   spacing = 1,
+  scale = 1,
 ): void {
-  drawText(grid, GRID_W, centerX(measureText(text, font, spacing)), y, text, font, color, spacing)
+  const x = centerX(measureText(text, font, spacing, scale))
+  drawText(grid, GRID_W, x, y, text, font, color, spacing, scale)
+}
+
+// Plus grand scale ≤ max dont le texte tient dans la largeur.
+function fitScale(text: string, max: number): number {
+  for (let s = max; s > 1; s--) {
+    if (measureText(text, FONT_5X7, 1, s) <= GRID_W) return s
+  }
+  return 1
+}
+
+// Flash plein cadre scale 2 : une ligne si ça tient (≤ 8 chars), sinon
+// label + valeur sur deux lignes.
+function drawFlash(grid: Uint8Array, label: string, value: string, color: number): void {
+  const oneLine = `${label} ${value}`
+  if (measureText(oneLine, FONT_5X7, 1, 2) <= GRID_W) {
+    drawCentered(grid, oneLine, 9, FONT_5X7, color, 1, 2)
+  } else {
+    drawCentered(grid, label, 2, FONT_5X7, color, 1, 2)
+    drawCentered(grid, value, 17, FONT_5X7, color, 1, 2)
+  }
 }
 
 // Vies (gauche) + HETIC (droite) sur les rows basses.
@@ -54,76 +76,61 @@ function layoutScore(grid: Uint8Array, display: DmdDisplay): void {
 
 function layoutIntro(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'INTRO'>
-  const text = 'PINBALL HETIC - PRESS START'
-  const textW = measureText(text, FONT_5X7)
-  const offset = Math.floor(clockMs / 30) % (textW + GRID_W)
-  drawText(grid, GRID_W, GRID_W - offset, 8, text, FONT_5X7, DOT.marquee)
-  if (d.player && d.player !== '—') {
-    drawCentered(grid, d.player, 24, FONT_5X7, DOT.marquee)
+  // Alterne toutes les 3s entre le marquee défilant et l'écran joueur.
+  if (Math.floor(clockMs / 3000) % 2 === 0) {
+    const text = 'PINBALL HETIC - PRESS START'
+    const textW = measureText(text, FONT_5X7, 1, 3)
+    const offset = Math.floor(clockMs / 30) % (textW + GRID_W)
+    drawText(grid, GRID_W, GRID_W - offset, 5, text, FONT_5X7, DOT.marquee, 1, 3)
+    return
   }
+
+  const name = d.player && d.player !== '—' ? d.player : 'PLAYER'
+  const press = 'PRESS START'
+  const nameScale = fitScale(name, 2)
+  const pressScale = fitScale(press, 2)
+  const nameH = FONT_5X7.height * nameScale
+  const pressH = FONT_5X7.height * pressScale
+  const startY = Math.round((32 - (nameH + 4 + pressH)) / 2)
+  drawCentered(grid, name, startY, FONT_5X7, DOT.marquee, 1, nameScale)
+  drawCentered(grid, press, startY + nameH + 4, FONT_5X7, DOT.score, 1, pressScale)
 }
 
 function layoutEvent(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'EVENT'>
   if (flickerSkip(clockMs, 60, -0.7)) return
-  drawCentered(grid, d.label, 2, FONT_5X7, DOT.event)
-  drawAmount(grid, d.points, 10, DOT.event)
-}
-
-// "+N" : '+' en 5×7 (absent du 12×22) collé aux chiffres épais.
-function drawAmount(grid: Uint8Array, points: number, y: number, color: number): void {
-  const num = String(points)
-  const plusW = FONT_5X7.width
-  const gap = 2
-  const total = plusW + gap + measureText(num, FONT_12X22)
-  const x = centerX(total)
-  drawText(grid, GRID_W, x, y + 7, '+', FONT_5X7, color)
-  drawText(grid, GRID_W, x + plusW + gap, y, num, FONT_12X22, color)
-}
-
-// "x{n}" : 'x' en 5×7 (absent du 12×22) collé au chiffre épais.
-function drawTimes(grid: Uint8Array, n: number, y: number, color: number): void {
-  const num = String(n)
-  const xW = FONT_5X7.width
-  const gap = 2
-  const total = xW + gap + measureText(num, FONT_12X22)
-  const x = centerX(total)
-  drawText(grid, GRID_W, x, y + 7, 'x', FONT_5X7, color)
-  drawText(grid, GRID_W, x + xW + gap, y, num, FONT_12X22, color)
+  drawFlash(grid, d.label, `+${d.points}`, DOT.event)
 }
 
 function layoutComboFlash(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'COMBO_FLASH'>
   if (flickerSkip(clockMs, 90, -0.85)) return
-  drawCentered(grid, 'COMBO', 2, FONT_5X7, DOT.combo)
-  drawTimes(grid, d.combo, 10, DOT.combo)
+  drawFlash(grid, 'COMBO', `X${d.combo}`, DOT.combo)
 }
 
 function layoutMultiFlash(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'MULTI_FLASH'>
   if (flickerSkip(clockMs, 90, -0.85)) return
-  drawCentered(grid, 'MULTI', 2, FONT_5X7, DOT.multi)
-  drawTimes(grid, d.multiplier, 10, DOT.multi)
+  drawFlash(grid, 'MULTI', `X${d.multiplier}`, DOT.multi)
 }
 
 function layoutLifeLost(grid: Uint8Array, display: DmdDisplay): void {
-  const d = display as Variant<'LIFE_LOST'>
-  drawCentered(grid, 'BALL LOST', 5, FONT_5X7, DOT.lives)
-  const dots = '●'.repeat(TOTAL_LIVES)
-  const w = measureText(dots, FONT_5X7)
-  let x = centerX(w)
-  for (let i = 0; i < TOTAL_LIVES; i++) {
-    const color = i < d.livesRemaining ? DOT.lives : DOT.heticOff
-    drawText(grid, GRID_W, x, 18, '●', FONT_5X7, color)
-    x += FONT_5X7.width + 1
-  }
+  // 'BALL LOST' (9 chars) ne tient pas scale 2 sur une ligne → 2 lignes.
+  // Les vies sont réaffichées par le pushScore suivant (status row).
+  void display
+  drawCentered(grid, 'BALL', 2, FONT_5X7, DOT.lives, 1, 2)
+  drawCentered(grid, 'LOST', 16, FONT_5X7, DOT.lives, 1, 2)
 }
 
-function layoutGameOver(grid: Uint8Array, display: DmdDisplay): void {
+function layoutGameOver(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'GAME_OVER'>
-  // Player name affiché par layoutIntro au reset, pas ici.
-  drawCentered(grid, 'GAME OVER', 2, FONT_5X7, DOT.gameOver)
-  drawCentered(grid, String(d.finalScore), 10, FONT_12X22, DOT.gameOver)
+  // 'GAME OVER' (9 chars) dépasse en scale 2 → cycle 2s GAME/OVER ↔ score.
+  if (Math.floor(clockMs / 2000) % 2 === 0) {
+    drawCentered(grid, 'GAME', 1, FONT_5X7, DOT.gameOver, 1, 2)
+    drawCentered(grid, 'OVER', 17, FONT_5X7, DOT.gameOver, 1, 2)
+  } else {
+    drawCentered(grid, String(d.finalScore), 5, FONT_12X22, DOT.gameOver)
+  }
 }
 
 export const layouts: Record<DmdDisplay['mode'], LayoutFn> = {

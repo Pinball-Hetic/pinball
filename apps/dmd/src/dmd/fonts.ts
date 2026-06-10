@@ -77,11 +77,13 @@ const GLYPHS_12X22: Record<string, number[]> = {
 
 export const FONT_12X22: BitmapFont = { width: 12, height: 22, glyphs: GLYPHS_12X22 }
 
-export function measureText(text: string, font: BitmapFont, spacing = 1): number {
+export function measureText(text: string, font: BitmapFont, spacing = 1, scale = 1): number {
   if (text.length === 0) return 0
-  return text.length * font.width + (text.length - 1) * spacing
+  return (text.length * font.width + (text.length - 1) * spacing) * scale
 }
 
+// `scale` : chaque dot du glyphe est dessiné en bloc scale×scale ; l'advance
+// par caractère = (width + spacing) × scale.
 export function drawText(
   grid: Uint8Array,
   gridW: number,
@@ -91,6 +93,7 @@ export function drawText(
   font: BitmapFont,
   colorIndex: number,
   spacing = 1,
+  scale = 1,
 ): void {
   const gridH = grid.length / gridW
   let cursor = x
@@ -99,17 +102,22 @@ export function drawText(
     if (glyph) {
       for (let row = 0; row < font.height; row++) {
         const bits = glyph[row]
-        const py = y + row
-        if (py < 0 || py >= gridH) continue
         for (let col = 0; col < font.width; col++) {
-          if ((bits >> (font.width - 1 - col)) & 1) {
-            const px = cursor + col
-            if (px < 0 || px >= gridW) continue
-            grid[py * gridW + px] = colorIndex
+          if (!((bits >> (font.width - 1 - col)) & 1)) continue
+          const px0 = cursor + col * scale
+          const py0 = y + row * scale
+          for (let sy = 0; sy < scale; sy++) {
+            const py = py0 + sy
+            if (py < 0 || py >= gridH) continue
+            for (let sx = 0; sx < scale; sx++) {
+              const px = px0 + sx
+              if (px < 0 || px >= gridW) continue
+              grid[py * gridW + px] = colorIndex
+            }
           }
         }
       }
     }
-    cursor += font.width + spacing
+    cursor += (font.width + spacing) * scale
   }
 }
