@@ -1,8 +1,13 @@
 import type { GameEvent } from "@pinball/game-engine";
 import { DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
 
+const GAME_OVER_URL = "/audio/sound-lost.mp3";
+
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+
+const sampleCache = new Map<string, AudioBuffer>();
+const sampleLoads = new Map<string, Promise<AudioBuffer | null>>();
 
 function ensureAudio(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -15,10 +20,71 @@ function ensureAudio(): AudioContext | null {
   return ctx;
 }
 
+async function loadSample(url: string): Promise<AudioBuffer | null> {
+  const audio = ensureAudio();
+  if (!audio) return null;
+
+  const cached = sampleCache.get(url);
+  if (cached) return cached;
+
+  const pending = sampleLoads.get(url);
+  if (pending) return pending;
+
+  const load = fetch(url)
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.arrayBuffer();
+    })
+    .then((data) => audio.decodeAudioData(data))
+    .then((buffer) => {
+      sampleCache.set(url, buffer);
+      return buffer;
+    })
+    .catch((err) => {
+      console.warn(`[PinballSounds] Failed to load ${url}`, err);
+      return null;
+    });
+
+  sampleLoads.set(url, load);
+  return load;
+}
+
+function preloadSamples(): void {
+  void loadSample(GAME_OVER_URL);
+}
+
+function playSample(url: string, gain = 0.8): void {
+  void (async () => {
+    const audio = ensureAudio();
+    if (!audio || !master) return;
+    unlockPinballAudio();
+
+    const buffer = await loadSample(url);
+    if (!buffer) return;
+
+    const source = audio.createBufferSource();
+    source.buffer = buffer;
+
+    const g = audio.createGain();
+    const now = audio.currentTime;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(gain, now + 0.04);
+
+    source.connect(g);
+    g.connect(master);
+    source.start();
+  })();
+}
+
 export function unlockPinballAudio(): void {
   const audio = ensureAudio();
   if (!audio) return;
   if (audio.state === "suspended") void audio.resume();
+  preloadSamples();
+}
+
+export function playGameOverSound(): void {
+  playSample(GAME_OVER_URL, 0.85);
 }
 
 function playTone(
