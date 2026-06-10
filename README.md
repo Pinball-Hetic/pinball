@@ -99,6 +99,15 @@ bun run lint
 Raccourcis Docker dans `Taskfile.yml` (`task docker:dev:up`,
 `docker:prod:up`, `clean`, …).
 
+Sauvegarde/restauration du leaderboard (volume Docker local) :
+
+```bash
+task db:dump                     # dump prod → backups/pinball-<date>.dump
+task db:restore -- <file>        # restaure prod depuis un .dump
+```
+
+Variantes dev : `task db:dump:dev` / `task db:restore:dev -- <file>`.
+
 ## Documentation
 
 | Sujet | Fichier |
