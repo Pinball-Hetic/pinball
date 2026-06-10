@@ -637,7 +637,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           onFightEnd: () => collisionProcessor?.setDemogorgonFightActive(false),
           onTargetReady: () => collisionProcessor?.setDemogorgonTargetArmed(true),
         });
-        await demogorgonReveal.preload(renderer, scene, camera);
+        await demogorgonReveal.preload(renderer, scene, camera).catch((err) => {
+          console.warn("[Demogorgon] preload failed:", err);
+        });
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
@@ -996,10 +998,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             if (!sessionStartedRef.current) {
               if (
                 data.action === "DOWN"
+                && physicsReadyRef.current
                 && (data.id === "PLUNGER" || data.id === "START")
-                && physicsReady
               ) {
                 beginSessionRef.current();
+                if (data.id === "PLUNGER" && gameStateRef.current === "idle") {
+                  plunger.startCharge(performance.now());
+                  isChargingPlunger = true;
+                  chargeStartTime = performance.now();
+                }
               }
               return;
             }
@@ -1025,7 +1032,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                   if (ballMesh) ballMesh.visible = true;
                   return;
                 }
-                if (gameStateRef.current === "idle" && physicsReady) {
+                if (gameStateRef.current === "idle" && physicsReadyRef.current) {
                   plunger.startCharge(performance.now());
                   isChargingPlunger = true;
                   chargeStartTime = performance.now();
