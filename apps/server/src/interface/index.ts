@@ -50,6 +50,31 @@ io.on('connection', (socket) => {
     io.to(INPUT_BRIDGE_ROOM).emit('dev:simulate-button', data);
   });
 
+  socket.on('score:update', (data) => {
+    console.log('[server] score:update', data.player, data.score, 'combo=', data.combo, 'x', data.multiplier);
+    io.emit('score:update', data);
+  });
+
+  socket.on('game:start', (data) => {
+    console.log('[server] game:start', data.player);
+    io.emit('game:start', data);
+  });
+
+  socket.on('game:over', (data) => {
+    console.log('[server] game:over', data.player, 'final=', data.finalScore);
+    io.emit('game:over', data);
+  });
+
+  socket.on('dmd:display', (data) => {
+    console.log('[server] dmd:display', data.mode);
+    io.emit('dmd:display', data);
+  });
+
+  socket.on('dmd:atmosphere', (data) => {
+    console.log('[server] dmd:atmosphere upsideDown=', data.upsideDownActive);
+    io.emit('dmd:atmosphere', data);
+  });
+
   socket.on('disconnect', () => {
     console.log('[server] client disconnected:', socket.id);
   });

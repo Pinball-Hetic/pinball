@@ -2,6 +2,8 @@ export type {
   ServerToClientEvents,
   ClientToServerEvents,
   ScoreUpdate,
+  DmdDisplay,
+  DmdAtmosphere,
   GameStart,
   GameOver,
   LeaderboardEntry,

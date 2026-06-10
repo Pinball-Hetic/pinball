@@ -7,7 +7,6 @@ import PlungerPowerBar from "./PlungerPowerBar";
 export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
 
 interface GameOverlayProps {
-  score: number;
   lives: number;
   gameState: "idle" | "playing" | "game_over";
   bootPhase: PlayfieldBootPhase;
@@ -23,7 +22,6 @@ interface GameOverlayProps {
 }
 
 export default function GameOverlay({
-  score,
   lives,
   gameState,
   bootPhase,
@@ -64,9 +62,6 @@ export default function GameOverlay({
       {showHud && (
         <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-5 pt-4">
           <div className="font-mono space-y-1.5">
-            <div className="text-3xl font-bold tabular-nums tracking-widest drop-shadow-[0_0_8px_rgba(255,180,0,0.6)]">
-              {String(score).padStart(7, "0")}
-            </div>
             <div className="flex gap-1.5 text-lg">
               {Array.from({ length: initialLives }).map((_, i) => (
                 <span

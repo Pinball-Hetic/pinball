@@ -1,24 +1,27 @@
 // Bille — GLB ball size=[0.0269] → radius 0.01345, +10% margin
 export const BALL_RADIUS          = 0.01474;
-export const BALL_MASS            = 0.08;
-export const BALL_RESTITUTION     = 0.4;
-export const BALL_FRICTION        = 0.1;
-export const BALL_LINEAR_DAMPING  = 0.02;
-export const BALL_ANGULAR_DAMPING = 0.02;
+export const BALL_MASS            = 0.08;   // 80 g — standard officiel
+export const BALL_RESTITUTION     = 0.4;    // acier sur bois verni : rebond faible
+export const BALL_FRICTION        = 0.05;   // acier poli, très glissant
+// Résistance au roulement : décélération ≈ damping × v. 0.04 × 2 m/s ≈
+// 0.08 m/s², cohérent avec une bille acier sur bois ciré.
+export const BALL_LINEAR_DAMPING  = 0.04;
+export const BALL_ANGULAR_DAMPING = 0.05;
 
 // Plafond de vitesse balle (m/s). Le sim est ~1:1 réel (masse 80g, Ø27mm, g,
 // tilt 6.5°) → ces valeurs sont en m/s réels. Pinball réel : roulis 0.5–1.5,
-// lancement 2.5–4.5, jeu actif 4–8, pics ~10. 6 = jeu vivant sans tunneling.
-export const BALL_MAX_SPEED = 6.0;
+// lancement 2.5–4.5, jeu actif 4–8, pics ~10. 7 = jeu vivant sans tunneling
+// (CCD on + murs shooter lane 0.02 d'épaisseur).
+export const BALL_MAX_SPEED = 7.0;
 
 // Spawn — centre géométrique du couloir : (X_MIN 0.206 + X_MAX 0.265) / 2 =
 // 0.2355. La balle est tenue sur cette ligne par le verrou latéral (charge +
 // montée), donc parfaitement centrée entre les deux murs du couloir.
 export const BALL_SPAWN_POSITION = { x: 0.2355, y: 1.010, z: 0.1610 } as const;
 
-// Plunger — impulsion = masse * Δv. À pleine charge : 0.22/0.08 ≈ 2.75 m/s
-// (plunge moyen réaliste, sous le clamp BALL_MAX_SPEED).
-export const PLUNGER_IMPULSE_Z = -0.22;
+// Plunger — impulsion = masse * Δv. À pleine charge : 0.26/0.08 = 3.25 m/s
+// (plunge full réaliste, sous le clamp BALL_MAX_SPEED).
+export const PLUNGER_IMPULSE_Z = -0.26;
 
 // ── Couloir plongeur (shooter lane) — vrai lancement physique ────────────────
 // X min = 0.206 : mur gauche analytique HORS du chemin de la balle (canal large
@@ -30,7 +33,7 @@ export const SHOOTER_LANE_X_MAX = 0.265;
 export const SHOOTER_LANE_BOTTOM_Z = 0.42;
 export const SHOOTER_LANE_TOP_Z = -0.49;
 export const SHOOTER_LANE_WALL_HEIGHT = 0.05;
-// Épais pour empêcher le tunneling de la balle rapide (clamp 6 m/s) au lancement.
+// Épais pour empêcher le tunneling de la balle rapide (clamp BALL_MAX_SPEED, 7 m/s) au lancement.
 export const SHOOTER_LANE_WALL_THICKNESS = 0.02;
 export const SHOOTER_LANE_RESTITUTION = 0.2;
 export const SHOOTER_LANE_FRICTION = 0.08;
@@ -100,7 +103,8 @@ export const ELEVEN_ASSIST_INTERVAL = 3.2;
 
 export const BUMPER_RADIUS       = 0.038;
 export const BUMPER_RESTITUTION  = 0.3;
-export const BUMPER_EJECT_IMPULSE = 0.09;
+// Kick pop bumper : Δv = impulse/masse = 0.18/0.08 = 2.25 m/s (réel : 2–2.5).
+export const BUMPER_EJECT_IMPULSE = 0.18;
 
 // Walls — from GLB playfield mesh extents
 export const WALL_LEFT_X    = -0.265;

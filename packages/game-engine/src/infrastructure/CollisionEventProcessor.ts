@@ -1,6 +1,15 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEventListener } from '../domain/GameEvents';
 import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
+import {
+  SCORE_SLINGSHOT,
+  SCORE_POP_ZONE,
+  SCORE_RAMP,
+  SCORE_DEMOGORGON_REVEAL,
+  SCORE_DEMOGORGON_TARGET,
+  SCORE_DROP_TARGET,
+  SCORE_DROP_COMPLETE,
+} from '../domain/ScoringConstants';
 import type { BumperHit } from '../use-cases/BumperHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
@@ -101,15 +110,15 @@ export class CollisionEventProcessor {
 
       if ((role === 'slingshot_left' || role === 'slingshot_right') && gameState === 'playing') {
         const side = role === 'slingshot_left' ? 'left' as const : 'right' as const;
-        this.emit({ type: 'SLINGSHOT_HIT', side, scoreIncrement: 10 });
+        this.emit({ type: 'SLINGSHOT_HIT', side, scoreIncrement: SCORE_SLINGSHOT });
       }
 
       if (role.startsWith('pop_zone_') && gameState === 'playing') {
-        this.emit({ type: 'ZONE_HIT', zone: role, scoreIncrement: 50 });
+        this.emit({ type: 'ZONE_HIT', zone: role, scoreIncrement: SCORE_POP_ZONE });
       }
 
       if (role === 'rocket_ramp' && gameState === 'playing') {
-        this.emit({ type: 'RAMP_HIT', scoreIncrement: 200 });
+        this.emit({ type: 'RAMP_HIT', scoreIncrement: SCORE_RAMP });
       }
 
       if (role === 'demogorgon_center' && gameState === 'playing') {
@@ -120,7 +129,7 @@ export class CollisionEventProcessor {
           this.demogorgonTargetLatchIgnore = false;
           this.demogorgonTargetHits = 0;
           this.demogorgonTargetLastHitMs = 0;
-          this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: 150 });
+          this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: SCORE_DEMOGORGON_REVEAL });
         }
       }
 
@@ -150,7 +159,7 @@ export class CollisionEventProcessor {
       this.emit({
         type: 'DEMOGORGON_TARGET_HIT',
         hitCount: this.demogorgonTargetHits,
-        scoreIncrement: 250,
+        scoreIncrement: SCORE_DEMOGORGON_TARGET,
       });
       if (this.demogorgonTargetHits >= DEMOGORGON_TARGET_HITS) {
         this.demogorgonFightActive = false;
@@ -167,7 +176,7 @@ export class CollisionEventProcessor {
     if (this.dropTargetDown[role]) return;
 
     this.dropTargetDown[role] = true;
-    this.emit({ type: 'DROP_TARGET_HIT', targetId: role, scoreIncrement: 75 });
+    this.emit({ type: 'DROP_TARGET_HIT', targetId: role, scoreIncrement: SCORE_DROP_TARGET });
 
     const target = DROP_TARGETS.find((t) => t.id === role);
     if (!target) return;
@@ -176,7 +185,7 @@ export class CollisionEventProcessor {
     const allDown = sideTargets.every((t) => this.dropTargetDown[t.id]);
     if (!allDown) return;
 
-    this.emit({ type: 'DROP_TARGET_COMPLETE', side: target.side, scoreIncrement: 500 });
+    this.emit({ type: 'DROP_TARGET_COMPLETE', side: target.side, scoreIncrement: SCORE_DROP_COMPLETE });
 
     for (const t of sideTargets) {
       this.dropTargetDown[t.id] = false;

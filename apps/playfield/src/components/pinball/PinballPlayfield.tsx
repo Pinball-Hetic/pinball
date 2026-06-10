@@ -59,6 +59,7 @@ import {
 } from "@pinball/game-engine";
 import type { ButtonAction, ButtonId } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
+import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import { unlockPinballAudio } from "@/audio/PinballSounds";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
@@ -305,8 +306,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       ? "attract"
       : "in_game";
 
+  const dmd = useDmdOrchestrator();
+
   const {
-    score,
     lives,
     gameState,
     gameStateRef,
@@ -314,10 +316,85 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     scorePops,
     upsideDownActive,
     upsideDownHint,
+    scoreRef,
+    livesRef,
+    comboRef,
+    multiplierRef,
+    playerRef,
     clearUpsideDownSession,
     resetGame,
     buildEmit,
-  } = useGameState();
+  } = useGameState({
+    onScoreEvent: ({ event, finalPoints, previousMultiplier, newMultiplier }) => {
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: comboRef.current,
+        multiplier: multiplierRef.current,
+        lives: livesRef.current,
+      };
+
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushScore(snap);
+
+      // Chaque event fait switcher l'affichage. Exclusif, par priorité
+      // décroissante : event labellisé → EVENT ; nouveau multiplier →
+      // MULTI ; sinon combo en cours → COMBO.
+      const label = eventLabel(event);
+      if (label) {
+        dmd.pushEvent(label, finalPoints, snap);
+      } else if (previousMultiplier !== newMultiplier) {
+        dmd.pushMultiFlash(newMultiplier, snap.combo, snap);
+      } else if (snap.combo > 1) {
+        dmd.pushComboFlash(snap.combo, snap.multiplier, snap);
+      }
+    },
+    onLifeLost: (livesRemaining) => {
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: 0,
+        multiplier: 1,
+        lives: livesRemaining,
+      };
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
+    },
+    onGameOver: (finalScore) => {
+      // Pas d'affichage GAME_OVER sur le DMD : on garde le dernier SCORE
+      // jusqu'au reset (INTRO). emitGameOver sert au backglass/leaderboard.
+      dmd.emitGameOver(playerRef.current, finalScore);
+    },
+    onGameStart: () => {
+      dmd.emitGameStart(playerRef.current);
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: 0,
+        multiplier: 1,
+        lives: livesRef.current,
+      };
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushScore(snap);
+    },
+    onIdleReset: () => {
+      dmd.pushIntro(playerRef.current);
+      dmd.emitScoreSnapshot({
+        player: playerRef.current,
+        score: 0,
+        combo: 0,
+        multiplier: 1,
+        lives: 3,
+      });
+    },
+    onAtmosphereChange: (upsideDownActive) => {
+      dmd.setAtmosphere(upsideDownActive);
+    },
+  });
+
+  useEffect(() => {
+    dmd.pushIntro(playerRef.current);
+  }, []);
 
   const resetBallRef = useRef<(() => void) | null>(null);
   const handleResetBall = useCallback(() => {
@@ -447,6 +524,52 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     const bottomOutDetector = new DetectBottomOut();
     const diag = new BallDiagnostics();
     let lastDebugPush = 0;
+
+    // ── Debug : déplacer la bille à la souris (toggle `M`) ───────────────────
+    // Drag la bille n'importe où sur le tapis pour tester les coincements.
+    // Pendant le drag : orbit désactivé, vitesse forcée à 0 (suit le curseur),
+    // locks du couloir bypassés. Au relâché : la physique reprend.
+    let ballMoveMode = false;
+    let ballDragging = false;
+    const dragRaycaster = new THREE.Raycaster();
+    const dragPointer = new THREE.Vector2();
+
+    const moveBallToPointer = (clientX: number, clientY: number) => {
+      if (!ballPhysicsInst || !playfieldRootRef) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      dragPointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      dragPointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      dragRaycaster.setFromCamera(dragPointer, camera);
+      const hits = dragRaycaster.intersectObject(playfieldRootRef, true);
+      if (!hits.length) return;
+      const p = hits[0].point;
+      ballPhysicsInst.body.setTranslation(
+        { x: p.x, y: ballCenterOnSurface(p.z), z: p.z },
+        true,
+      );
+      ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      if (ballMesh) ballMesh.visible = true;
+    };
+
+    const onBallDragDown = (e: PointerEvent) => {
+      if (!ballMoveMode) return;
+      ballDragging = true;
+      if (orbitControls) orbitControls.enabled = false;
+      moveBallToPointer(e.clientX, e.clientY);
+    };
+    const onBallDragMove = (e: PointerEvent) => {
+      if (!ballDragging) return;
+      moveBallToPointer(e.clientX, e.clientY);
+    };
+    const onBallDragUp = () => {
+      if (!ballDragging) return;
+      ballDragging = false;
+      if (orbitControls) orbitControls.enabled = true;
+    };
+    renderer.domElement.addEventListener("pointerdown", onBallDragDown);
+    window.addEventListener("pointermove", onBallDragMove);
+    window.addEventListener("pointerup", onBallDragUp);
 
     // Logs de diagnostic gérés par le toggle HUD `[J]` → silence total en prod.
     const debugLog = (...args: unknown[]) => {
@@ -938,6 +1061,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             setDebugVisible(debugVisibleRef.current);
             return;
           }
+          if (e.key === "m" || e.key === "M") {
+            ballMoveMode = !ballMoveMode;
+            if (!ballMoveMode && ballDragging) {
+              ballDragging = false;
+              if (orbitControls) orbitControls.enabled = true;
+            }
+            return;
+          }
           if (e.key === "r" || e.key === "R") {
             resetBallRef.current?.();
             return;
@@ -1094,7 +1225,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // Balle figée au spawn tant qu'on est idle, Y COMPRIS pendant la charge
         // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
         // mur droit (frottement → ralentissement au lancement).
-        if (gameStateRef.current === "idle" && physicsReady) {
+        if (gameStateRef.current === "idle" && physicsReady && !ballMoveMode) {
           const z = BALL_SPAWN_POSITION.z;
           ballPhysicsInst.body.setTranslation(
             { x: BALL_SPAWN_POSITION.x, y: ballCenterOnSurface(z), z },
@@ -1110,7 +1241,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // dépendre de la géométrie GLB. La balle est libérée dès qu'elle atteint
         // la zone de sortie (Z <= SHOOTER_LANE_LEFT_WALL_TOP_Z) pour partir
         // naturellement dans le terrain.
-        if (gameStateRef.current === "playing") {
+        if (gameStateRef.current === "playing" && !ballMoveMode) {
           const lp = ballPhysicsInst.body.translation();
           const inLaneStraight =
             lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > SHOOTER_LANE_LOCK_X;
@@ -1261,6 +1392,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       cancelled = true;
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", handleResize);
+      renderer.domElement.removeEventListener("pointerdown", onBallDragDown);
+      window.removeEventListener("pointermove", onBallDragMove);
+      window.removeEventListener("pointerup", onBallDragUp);
       orbitControls?.dispose();
       const pw = physicsWorld as (PhysicsWorld & { _onKeyDown?: (e: KeyboardEvent) => void; _onKeyUp?: (e: KeyboardEvent) => void }) | null;
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
@@ -1303,7 +1437,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         style={cabinetFrameStyle}
       >
         <GameOverlay
-          score={score}
           lives={lives}
           gameState={gameState}
           bootPhase={bootPhase}

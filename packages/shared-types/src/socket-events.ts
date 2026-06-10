@@ -9,6 +9,8 @@ export interface ServerToClientEvents {
   // Routé par le server uniquement à la room `input-bridge` (mode
   // `simulate-esp32`). Pas un event broadcasté aux frontends.
   'dev:simulate-button': (data: ButtonInput) => void
+  'dmd:display': (data: DmdDisplay) => void
+  'dmd:atmosphere': (data: DmdAtmosphere) => void
 }
 
 export interface ClientToServerEvents {
@@ -22,6 +24,8 @@ export interface ClientToServerEvents {
   // → réseau pour valider la chaîne sans hardware). Le server le
   // retransforme en `input:button` broadcast à TOUS (y compris émetteur).
   'dev:simulate-button': (data: ButtonInput) => void
+  'dmd:display': (data: DmdDisplay) => void
+  'dmd:atmosphere': (data: DmdAtmosphere) => void
 }
 
 export interface ScoreUpdate {
@@ -29,6 +33,20 @@ export interface ScoreUpdate {
   score: number
   combo: number
   multiplier: number
+  lives: number
+}
+
+export type DmdDisplay =
+  | { mode: 'INTRO'; player: string }
+  | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number }
+  | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string }
+  | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string }
+  | { mode: 'MULTI_FLASH'; multiplier: number; combo: number; score: number; lives: number; player: string }
+  | { mode: 'LIFE_LOST'; livesRemaining: number; score: number; player: string }
+  | { mode: 'GAME_OVER'; player: string; finalScore: number }
+
+export interface DmdAtmosphere {
+  upsideDownActive: boolean
 }
 
 export interface GameStart {

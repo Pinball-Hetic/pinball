@@ -49,6 +49,10 @@ export default function BallDebugOverlay({ snapshot, visible }: BallDebugOverlay
         <span className="text-[9px] text-zinc-500">[J]</span>
       </div>
 
+      <div className="mb-1 text-[9px] leading-tight text-amber-400/70">
+        M : déplacer la bille à la souris (drag)
+      </div>
+
       {!snapshot ? (
         <div className="text-zinc-500">En attente de la physique…</div>
       ) : (
