@@ -112,6 +112,28 @@ export function isPinballmapNonPhysicalFloorMesh(mesh: THREE.Mesh): boolean {
   );
 }
 
+/**
+ * Meshes purement décoratifs sous la hiérarchie Pinballmap : visibles,
+ * mais SANS collision — la balle passe à travers.
+ *
+ * Ajouter ici tout mesh GLB qui crée un collider parasite (rig, armature,
+ * ornement 3D) sans jamais devoir bloquer la balle.
+ *
+ * Noms normalisés (lowercase, espaces → underscores, parenthèses conservées).
+ */
+export const PINBALLMAP_NO_COLLISION_MESHES = new Set([
+  'demogorgon_portal_rig_(1)',
+]);
+
+export function isPinballmapNoCollisionMesh(mesh: THREE.Mesh): boolean {
+  const n = normalizeGltfName(mesh.name);
+  const c = canonicalGltfName(mesh.name);
+  return (
+    PINBALLMAP_NO_COLLISION_MESHES.has(n) ||
+    PINBALLMAP_NO_COLLISION_MESHES.has(c)
+  );
+}
+
 export function removePinballmapUnusedMeshes(root: THREE.Object3D): void {
   const toRemove: THREE.Object3D[] = [];
   root.traverse((obj) => {

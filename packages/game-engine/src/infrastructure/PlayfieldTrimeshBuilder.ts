@@ -12,6 +12,7 @@ import {
   normalizeGltfName,
   playfieldUsesCollOnlyCollision,
   isPinballmapNonPhysicalFloorMesh,
+  isPinballmapNoCollisionMesh,
 } from './GltfNodeNames';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
@@ -260,6 +261,8 @@ export class PlayfieldTrimeshBuilder {
       // balle glisse sans accrocher les arêtes du trimesh. Mesh_1…4 (cadre bois,
       // structure haute) gardent leur collision.
       if (isPinballmapNonPhysicalFloorMesh(child)) return;
+      // Meshes décoratifs : visibles mais sans collision (balle passe à travers).
+      if (isPinballmapNoCollisionMesh(child)) return;
 
       if (isPinballmapRailMesh(child)) {
         PlayfieldTrimeshBuilder.createRailColliders(
