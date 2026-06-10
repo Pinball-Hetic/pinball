@@ -327,6 +327,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     comboRef,
     multiplierRef,
     playerRef,
+    heticRef,
     clearUpsideDownSession,
     resetGame,
     buildEmit,
@@ -338,6 +339,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: comboRef.current,
         multiplier: multiplierRef.current,
         lives: livesRef.current,
+        hetic: heticRef.current,
       };
 
       dmd.emitScoreSnapshot(snap);
@@ -362,6 +364,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: livesRemaining,
+        hetic: heticRef.current,
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
@@ -379,6 +382,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: livesRef.current,
+        hetic: heticRef.current,
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
@@ -391,6 +395,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: 3,
+        hetic: heticRef.current,
       });
     },
     onAtmosphereChange: (upsideDownActive) => {
@@ -869,11 +874,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
-          if (event.type === "DRAIN" && UPSIDE_DOWN_PERSISTENCE === "until_drain") {
-            releaseUpsideDownWorld();
-          }
-          if (event.type === "BOTTOM_OUT" && UPSIDE_DOWN_PERSISTENCE === "until_drain") {
-            releaseUpsideDownWorld();
+          // Retour au monde initial : à chaque drain en mode until_drain,
+          // ou au game over (baseEmit a déjà mis gameStateRef à jour) quel
+          // que soit le mode — sinon le violet persistait jusqu'au restart.
+          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
+            if (
+              UPSIDE_DOWN_PERSISTENCE === "until_drain" ||
+              gameStateRef.current === "game_over"
+            ) {
+              releaseUpsideDownWorld();
+            }
           }
           if (event.type === "PORTAL_ENTER") onPortalEnter?.();
           if (event.type === "BALL_LAUNCHED") {

@@ -10,7 +10,6 @@ export interface ServerToClientEvents {
   // `simulate-esp32`). Pas un event broadcasté aux frontends.
   'dev:simulate-button': (data: ButtonInput) => void
   'dmd:display': (data: DmdDisplay) => void
-  'dmd:atmosphere': (data: DmdAtmosphere) => void
 }
 
 export interface ClientToServerEvents {
@@ -25,7 +24,6 @@ export interface ClientToServerEvents {
   // retransforme en `input:button` broadcast à TOUS (y compris émetteur).
   'dev:simulate-button': (data: ButtonInput) => void
   'dmd:display': (data: DmdDisplay) => void
-  'dmd:atmosphere': (data: DmdAtmosphere) => void
 }
 
 export interface ScoreUpdate {
@@ -34,20 +32,17 @@ export interface ScoreUpdate {
   combo: number
   multiplier: number
   lives: number
+  hetic: number
 }
 
 export type DmdDisplay =
-  | { mode: 'INTRO'; player: string }
-  | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number }
-  | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string }
-  | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string }
-  | { mode: 'MULTI_FLASH'; multiplier: number; combo: number; score: number; lives: number; player: string }
-  | { mode: 'LIFE_LOST'; livesRemaining: number; score: number; player: string }
-  | { mode: 'GAME_OVER'; player: string; finalScore: number }
-
-export interface DmdAtmosphere {
-  upsideDownActive: boolean
-}
+  | { mode: 'INTRO'; player: string; upsideDown: boolean }
+  | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number; hetic: number; upsideDown: boolean }
+  | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string; hetic: number; upsideDown: boolean }
+  | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string; hetic: number; upsideDown: boolean }
+  | { mode: 'MULTI_FLASH'; multiplier: number; combo: number; score: number; lives: number; player: string; hetic: number; upsideDown: boolean }
+  | { mode: 'LIFE_LOST'; livesRemaining: number; score: number; player: string; upsideDown: boolean }
+  | { mode: 'GAME_OVER'; player: string; finalScore: number; upsideDown: boolean }
 
 export interface GameStart {
   player: string

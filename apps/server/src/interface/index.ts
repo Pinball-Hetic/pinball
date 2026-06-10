@@ -70,11 +70,6 @@ io.on('connection', (socket) => {
     io.emit('dmd:display', data);
   });
 
-  socket.on('dmd:atmosphere', (data) => {
-    console.log('[server] dmd:atmosphere upsideDown=', data.upsideDownActive);
-    io.emit('dmd:atmosphere', data);
-  });
-
   socket.on('disconnect', () => {
     console.log('[server] client disconnected:', socket.id);
   });
