@@ -58,6 +58,17 @@ const TRIMESH_DEDICATED = new Set([
   ...TRIMESH_MISC,
 ]);
 
+/**
+ * Meshes racines de scène (pas sous Pinballmap ni Strangerthings) qui doivent
+ * recevoir un collider trimesh. Typiquement : petites plaques/guides ajoutés
+ * pour lisser une paroi où la balle se bloquait.
+ * Noms normalisés (lowercase, espaces → underscores).
+ */
+const STANDALONE_WALL_MESHES = new Set([
+  'mesh1.0',   // plaque-guide pour lisser la paroi haute gauche
+  'fix-start', // guide de lancement : lisse la paroi du couloir au démarrage
+]);
+
 const HIDDEN_NODES = new Set([
   'switch_left_pop_bumper_zone', 'switch left pop bumper zone',
   'switch_center_pop_bumper_zone', 'switch center pop bumper zone',
@@ -108,6 +119,9 @@ function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
   if (isPinballmapGameplayMesh(node)) {
     if (collOnly && !selfNorm.startsWith('coll_')) return true;
     if (isFlipperGltfMesh(node)) return true;
+    // flipper_left_split / flipper_right_split ont des underscores (pas de points)
+    // → isFlipperGltfMesh ne les détecte pas. COLLISION_ANALYTIC couvre ces noms.
+    if (meshMatchesSet(node, COLLISION_ANALYTIC)) return true;
     return false;
   }
 
@@ -211,6 +225,9 @@ export class PlayfieldTrimeshBuilder {
 
     if (hasPinballmapRoot(playfieldRoot)) {
       PlayfieldTrimeshBuilder.buildPinballmap(playfieldRoot, world);
+      // Les meshes hors-hiérarchie Pinballmap (ex : plaques-guide standalone)
+      // ne sont pas couverts par buildPinballmap — on les traite séparément.
+      PlayfieldTrimeshBuilder.buildStandaloneWalls(playfieldRoot, world);
       return;
     }
 
@@ -237,6 +254,7 @@ export class PlayfieldTrimeshBuilder {
       if (!(child instanceof THREE.Mesh)) return;
       if (!isPinballmapGameplayMesh(child)) return;
       if (isFlipperGltfMesh(child)) return;
+      if (meshMatchesSet(child, COLLISION_ANALYTIC)) return;
       // Mesh_0 (surface de jeu) : visible mais SANS collision. La physique est
       // assurée par le cuboïde analytique lisse (createPlayfieldFloor) → la
       // balle glisse sans accrocher les arêtes du trimesh. Mesh_1…4 (cadre bois,
@@ -260,6 +278,29 @@ export class PlayfieldTrimeshBuilder {
         PINBALLMAP_TRIMESH_FRICTION,
         false,
         true,
+      );
+    });
+  }
+
+  /**
+   * Crée des colliders trimesh pour les meshes standalone listés dans
+   * STANDALONE_WALL_MESHES (nœuds racines de scène, hors hiérarchie Pinballmap).
+   * Double-sided + pas de lissage : ces meshes sont déjà fins et plans,
+   * le lissage Laplacien les déformerait.
+   */
+  private static buildStandaloneWalls(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
+    playfieldRoot.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const n = normalizeGltfName(child.name);
+      if (!STANDALONE_WALL_MESHES.has(n)) return;
+      child.updateMatrixWorld(true);
+      PlayfieldTrimeshBuilder.createTrimeshCollider(
+        world,
+        [extractWorldGeometry(child)],
+        0.2,   // restitution : légère — la balle glisse sans rebond marqué
+        0.15,  // friction modérée
+        false, // pas de lissage Laplacien (plaque fine déjà plane)
+        true,  // double-sided : la balle peut toucher les deux faces
       );
     });
   }
