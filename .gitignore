@@ -9,6 +9,10 @@ coverage
 # Next.js
 .next/
 out/
+next-env.d.ts
+
+# TypeScript build artifacts
+*.tsbuildinfo
 
 # Production
 build/
