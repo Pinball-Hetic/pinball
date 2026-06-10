@@ -6,7 +6,8 @@ export const APPARITION_UPSIDE_DOWN_URL = "/audio/apparitionUpsideDown.mp3";
 export const MASTER_GAIN = 0.55;
 export const EARLY_SOUND_GAIN = 0.7;
 export const GAME_OVER_GAIN = 0.85;
-export const SPAWN_DG_GAIN = 0.85;
+/** Au-dessus de EARLY_SOUND_GAIN (0.7) pour percer la musique de fond. */
+export const SPAWN_DG_GAIN = 1.35;
 export const APPARITION_UPSIDE_DOWN_GAIN = 0.85;
 export const EARLY_SOUND_FADE_OUT_S = 0.3;
 /** Seuil peak (abs-max) pour détecter le silence en début/fin de boucle MP3. */
