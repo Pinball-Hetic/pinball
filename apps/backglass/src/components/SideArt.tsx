@@ -1,10 +1,27 @@
+import { useEffect, useRef } from 'react'
+import type { Reactor } from '@/hooks/useIngameReactor'
+
 interface SideArtProps {
   mood: 'normal' | 'upsideDown'
   agitation: number // 0..1 — vitesse/amplitude des animations
+  reactor?: Reactor
 }
 
-export default function SideArt({ mood, agitation }: SideArtProps) {
+export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
   const upside = mood === 'upsideDown'
+  const beamRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!reactor) return
+    return reactor.on((r) => {
+      if (r.kind === 'event' && r.label === 'RAMP' && beamRef.current) {
+        const el = beamRef.current
+        el.classList.remove('ramp-beam-on')
+        void el.offsetWidth // reflow → relance l'animation
+        el.classList.add('ramp-beam-on')
+      }
+    })
+  }, [reactor])
   const swayDur = 6 - agitation * 4 // plus agité = plus rapide
   const glow = upside ? '#b14dff' : '#ff2d2d'
   const amp = 2 + agitation * 6
@@ -20,6 +37,7 @@ export default function SideArt({ mood, agitation }: SideArtProps) {
         } as React.CSSProperties
       }
     >
+      <div ref={beamRef} className="ramp-beam" />
       <svg viewBox="0 0 320 660" preserveAspectRatio="xMidYMid slice" className="side-art-svg">
         <defs>
           <radialGradient id="demoGrad" cx="50%" cy="40%" r="70%">

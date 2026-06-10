@@ -1,9 +1,12 @@
+import { useEffect, useRef } from 'react'
 import type { LeaderboardEntry } from '@pinball/shared-types'
+import type { Reactor } from '@/hooks/useIngameReactor'
 
 interface HallOfFameProps {
   entries: LeaderboardEntry[]
   highlightRank?: number
   inverted?: boolean // Upside Down : flip 3D
+  reactor?: Reactor
 }
 
 const ROW_H = 54
@@ -22,12 +25,30 @@ function shortDate(iso: string): string {
   }
 }
 
-export default function HallOfFame({ entries, highlightRank, inverted }: HallOfFameProps) {
+export default function HallOfFame({
+  entries,
+  highlightRank,
+  inverted,
+  reactor,
+}: HallOfFameProps) {
   const slots = Array.from({ length: SLOTS }, (_, i) => i + 1)
   const byRank = new Map(entries.map((e) => [e.rank, e]))
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!reactor) return
+    return reactor.on((r) => {
+      if (r.kind === 'event' && r.label.startsWith('DROP') && rootRef.current) {
+        const el = rootRef.current
+        el.classList.remove('hof-shake')
+        void el.offsetWidth // reflow → relance la secousse
+        el.classList.add('hof-shake')
+      }
+    })
+  }, [reactor])
 
   return (
-    <div className={`hof ${inverted ? 'hof-inverted' : ''}`}>
+    <div ref={rootRef} className={`hof ${inverted ? 'hof-inverted' : ''}`}>
       <div className="hof-inner">
         <h2 className="hof-title">
           <span className="hof-title-text">HALL OF FAME</span>
