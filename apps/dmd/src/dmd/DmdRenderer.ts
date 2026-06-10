@@ -4,12 +4,12 @@ import {
   type PaletteName,
 } from './palette'
 
-export const GRID_W = 128
+export const GRID_W = 96
 export const GRID_H = 32
-export const PITCH = 15
+export const PITCH = 20
 
 const CANVAS_W = GRID_W * PITCH // 1920
-const CANVAS_H = GRID_H * PITCH // 480
+const CANVAS_H = GRID_H * PITCH // 640
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
@@ -84,8 +84,8 @@ export class DmdRenderer {
     const cy = PITCH / 2
     const grad = c.createRadialGradient(cx, cy, 0, cx, cy, PITCH / 2)
     grad.addColorStop(0, `rgba(${r},${g},${b},1)`)
-    grad.addColorStop(0.5, `rgba(${r},${g},${b},1)`)
-    grad.addColorStop(0.73, `rgba(${r},${g},${b},0.85)`)
+    grad.addColorStop(0.55, `rgba(${r},${g},${b},1)`)
+    grad.addColorStop(0.75, `rgba(${r},${g},${b},0.85)`)
     grad.addColorStop(1, `rgba(${r},${g},${b},0)`)
     c.fillStyle = grad
     c.fillRect(0, 0, PITCH, PITCH)

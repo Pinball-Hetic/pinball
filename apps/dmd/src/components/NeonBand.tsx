@@ -9,7 +9,7 @@ interface Props {
 export default function NeonBand({ text, position }: Props) {
   const isTop = position === 'top'
   const containerStyle: CSSProperties = {
-    height: 300,
+    height: 220,
     width: '100%',
     display: 'flex',
     alignItems: 'center',

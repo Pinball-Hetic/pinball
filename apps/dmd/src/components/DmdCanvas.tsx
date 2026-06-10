@@ -71,5 +71,5 @@ export default function DmdCanvas({ display, upsideDown }: Props) {
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  return <canvas ref={canvasRef} width={1920} height={480} style={canvasStyle} />
+  return <canvas ref={canvasRef} width={1920} height={640} style={canvasStyle} />
 }

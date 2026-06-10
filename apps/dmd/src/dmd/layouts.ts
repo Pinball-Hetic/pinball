@@ -1,5 +1,5 @@
 import type { DmdDisplay } from '@pinball/shared-types'
-import { FONT_5X7, FONT_8X12, drawText, measureText } from './fonts'
+import { FONT_5X7, FONT_10X16, drawText, measureText } from './fonts'
 import { GRID_W } from './DmdRenderer'
 import { DOT } from './palette'
 
@@ -46,7 +46,7 @@ function drawStatusRow(grid: Uint8Array, lives: number, hetic: number, y: number
 
 function layoutScore(grid: Uint8Array, display: DmdDisplay): void {
   const d = display as Variant<'SCORE'>
-  drawCentered(grid, String(d.score), 2, FONT_8X12, DOT.score)
+  drawCentered(grid, String(d.score), 3, FONT_10X16, DOT.score)
 
   const pieces: { text: string; color: number }[] = []
   if (d.combo > 1) pieces.push({ text: `COMBO x${d.combo}`, color: DOT.combo })
@@ -57,7 +57,7 @@ function layoutScore(grid: Uint8Array, display: DmdDisplay): void {
       pieces.reduce((sum, p) => sum + measureText(p.text, FONT_5X7), 0) + gap * (pieces.length - 1)
     let x = centerX(total)
     for (const p of pieces) {
-      drawText(grid, GRID_W, x, 16, p.text, FONT_5X7, p.color)
+      drawText(grid, GRID_W, x, 21, p.text, FONT_5X7, p.color)
       x += measureText(p.text, FONT_5X7) + gap
     }
   }
@@ -79,44 +79,44 @@ function layoutIntro(grid: Uint8Array, display: DmdDisplay, clockMs: number): vo
 function layoutEvent(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'EVENT'>
   if (flickerSkip(clockMs, 60, -0.7)) return
-  drawCentered(grid, d.label, 5, FONT_5X7, DOT.event)
-  drawAmount(grid, d.points, 17, DOT.event)
+  drawCentered(grid, d.label, 3, FONT_5X7, DOT.event)
+  drawAmount(grid, d.points, 12, DOT.event)
 }
 
-// "+N" : '+' en 5×7 (absent du 8×12) collé aux chiffres épais.
+// "+N" : '+' en 5×7 (absent du 10×16) collé aux chiffres épais.
 function drawAmount(grid: Uint8Array, points: number, y: number, color: number): void {
   const num = String(points)
   const plusW = FONT_5X7.width
-  const gap = 1
-  const total = plusW + gap + measureText(num, FONT_8X12)
+  const gap = 2
+  const total = plusW + gap + measureText(num, FONT_10X16)
   const x = centerX(total)
-  drawText(grid, GRID_W, x, y + 2, '+', FONT_5X7, color)
-  drawText(grid, GRID_W, x + plusW + gap, y, num, FONT_8X12, color)
+  drawText(grid, GRID_W, x, y + 5, '+', FONT_5X7, color)
+  drawText(grid, GRID_W, x + plusW + gap, y, num, FONT_10X16, color)
 }
 
-// "x{n}" : 'x' en 5×7 (absent du 8×12) collé au chiffre épais.
+// "x{n}" : 'x' en 5×7 (absent du 10×16) collé au chiffre épais.
 function drawTimes(grid: Uint8Array, n: number, y: number, color: number): void {
   const num = String(n)
   const xW = FONT_5X7.width
-  const gap = 1
-  const total = xW + gap + measureText(num, FONT_8X12)
+  const gap = 2
+  const total = xW + gap + measureText(num, FONT_10X16)
   const x = centerX(total)
-  drawText(grid, GRID_W, x, y + 3, 'x', FONT_5X7, color)
-  drawText(grid, GRID_W, x + xW + gap, y, num, FONT_8X12, color)
+  drawText(grid, GRID_W, x, y + 5, 'x', FONT_5X7, color)
+  drawText(grid, GRID_W, x + xW + gap, y, num, FONT_10X16, color)
 }
 
 function layoutComboFlash(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'COMBO_FLASH'>
   if (flickerSkip(clockMs, 90, -0.85)) return
-  drawCentered(grid, 'COMBO', 4, FONT_5X7, DOT.combo)
-  drawTimes(grid, d.combo, 14, DOT.combo)
+  drawCentered(grid, 'COMBO', 2, FONT_5X7, DOT.combo)
+  drawTimes(grid, d.combo, 12, DOT.combo)
 }
 
 function layoutMultiFlash(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'MULTI_FLASH'>
   if (flickerSkip(clockMs, 90, -0.85)) return
-  drawCentered(grid, 'MULTI', 4, FONT_5X7, DOT.multi)
-  drawTimes(grid, d.multiplier, 14, DOT.multi)
+  drawCentered(grid, 'MULTI', 2, FONT_5X7, DOT.multi)
+  drawTimes(grid, d.multiplier, 12, DOT.multi)
 }
 
 function layoutLifeLost(grid: Uint8Array, display: DmdDisplay): void {
@@ -134,8 +134,8 @@ function layoutLifeLost(grid: Uint8Array, display: DmdDisplay): void {
 
 function layoutGameOver(grid: Uint8Array, display: DmdDisplay): void {
   const d = display as Variant<'GAME_OVER'>
-  drawCentered(grid, 'GAME OVER', 4, FONT_5X7, DOT.gameOver)
-  drawCentered(grid, String(d.finalScore), 13, FONT_8X12, DOT.gameOver)
+  drawCentered(grid, 'GAME OVER', 2, FONT_5X7, DOT.gameOver)
+  drawCentered(grid, String(d.finalScore), 9, FONT_10X16, DOT.gameOver)
   drawCentered(grid, d.player, 25, FONT_5X7, DOT.gameOver)
 }
 
