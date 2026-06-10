@@ -4,6 +4,7 @@ import {
   DEMOGORGON_ANIM_HIT,
   DEMOGORGON_ANIM_IDLE,
   DEMOGORGON_ANIM_VICTORY,
+  DEMOGORGON_ANIM_VICTORY_FALLBACK,
   DEMOGORGON_MODEL_HEIGHT,
   DEMOGORGON_MODEL_URL,
   DEMOGORGON_MODEL_FOOT_LIFT,
@@ -33,6 +34,9 @@ export class DemogorgonTargetVisual {
   private animState: AnimState = 'idle';
   private pulseT = 0;
   private hitFlash = 0;
+  private rig: THREE.Group | null = null;
+  private offset: THREE.Group | null = null;
+  private pendingFit: THREE.Object3D | null = null;
   private victoryBurst: THREE.Mesh | null = null;
   private victoryBurstMat: THREE.MeshBasicMaterial | null = null;
   private glowLight: THREE.PointLight | null = null;
@@ -53,6 +57,10 @@ export class DemogorgonTargetVisual {
     anchor.visible = false;
     parent.add(anchor);
     this.anchor = anchor;
+
+    const rig = new THREE.Group();
+    anchor.add(rig);
+    this.rig = rig;
 
     this.glowLight = new THREE.PointLight(0xff5533, 0, 0.38, 2);
     this.glowLight.position.y = 0.03;
@@ -79,16 +87,14 @@ export class DemogorgonTargetVisual {
       DEMOGORGON_MODEL_URL,
       (gltf) => {
         if (!this.anchor) return;
-
         const model = gltf.scene;
         this.fitModel(model, gltf.animations);
-        this.anchor.add(model);
         this.modelRoot = model;
         this.syncFacing();
         if (this.anchor.visible) this.playIdle();
       },
       undefined,
-      () => {},
+      (err) => { console.error('[Demogorgon] load error:', err); },
     );
   }
 
@@ -133,6 +139,7 @@ export class DemogorgonTargetVisual {
   }
 
   update(dt: number): void {
+    if (this.pendingFit) this.tryApplyFit();
     if (!this.anchor?.visible) return;
 
     this.mixer?.update(dt);
@@ -193,41 +200,98 @@ export class DemogorgonTargetVisual {
     this.victoryBurst = null;
     this.victoryBurstMat = null;
     this.glowLight = null;
+    this.rig = null;
+    this.offset = null;
+    this.pendingFit = null;
     this.animState = 'idle';
     this.hitFlash = 0;
     this.pulseT = 0;
   }
 
   private syncFacing(): void {
-    if (!this.modelRoot || !this.anchor || !this.camera) return;
+    if (!this.rig || !this.anchor || !this.camera) return;
 
     const anchorPos = new THREE.Vector3();
     this.anchor.getWorldPosition(anchorPos);
     const dx = this.camera.position.x - anchorPos.x;
     const dz = this.camera.position.z - anchorPos.z;
-    this.modelRoot.rotation.y = Math.atan2(dx, dz) + DEMOGORGON_MODEL_YAW;
+    this.rig.rotation.y = Math.atan2(dx, dz) + DEMOGORGON_MODEL_YAW;
+  }
+
+  private tryApplyFit(): void {
+    const model = this.pendingFit;
+    if (!model || !this.rig || !this.offset || !this.anchor) return;
+
+    model.updateWorldMatrix(true, true);
+
+    const box = new THREE.Box3();
+    const v = new THREE.Vector3();
+    model.traverse((obj) => {
+      if (obj instanceof THREE.SkinnedMesh) {
+        const pos = obj.geometry.attributes.position;
+        const hasSkin = obj.geometry.attributes.skinIndex && obj.geometry.attributes.skinWeight;
+        if (!pos) return;
+        obj.skeleton.update();
+        const step = Math.max(1, Math.floor(pos.count / 2000));
+        for (let i = 0; i < pos.count; i += step) {
+          v.fromBufferAttribute(pos, i);
+          if (hasSkin) obj.applyBoneTransform(i, v);
+          obj.localToWorld(v);
+          this.anchor!.worldToLocal(v);
+          box.expandByPoint(v);
+        }
+      }
+    });
+    if (box.isEmpty()) return;
+
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    if (Math.max(Math.abs(center.x), Math.abs(center.y), Math.abs(center.z)) > 4) return;
+
+    const height = Math.max(size.y, 1e-4);
+    this.offset.position.set(-center.x, -box.min.y + 0.006, -center.z);
+    this.rig.scale.setScalar(DEMOGORGON_MODEL_HEIGHT / height);
+    this.pendingFit = null;
   }
 
   private fitModel(model: THREE.Object3D, clips: THREE.AnimationClip[]): void {
-    model.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const height = Math.max(size.y, 1e-4);
-    const scale = DEMOGORGON_MODEL_HEIGHT / height;
-    model.scale.setScalar(scale);
+    if (!this.anchor || !this.rig) return;
 
-    model.updateMatrixWorld(true);
-    box.setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    model.position.x -= center.x;
-    model.position.z -= center.z;
-    model.position.y -= box.min.y;
-    model.position.y += 0.006;
+    this.rig.position.set(0, 0, 0);
+    this.rig.scale.set(1, 1, 1);
+    this.rig.rotation.set(0, 0, 0);
+    this.anchor.scale.set(1, 1, 1);
+    const offset = new THREE.Group();
+    this.offset = offset;
+    this.rig.add(offset);
+    offset.add(model);
+    this.pendingFit = model;
+
+    model.traverse((obj) => {
+      obj.frustumCulled = false;
+      if (obj instanceof THREE.SkinnedMesh) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (mat instanceof THREE.MeshStandardMaterial) {
+            if (mat.map) {
+              mat.emissiveMap = mat.map;
+              mat.emissive.setHex(0xffffff);
+            } else {
+              mat.emissive.copy(mat.color);
+            }
+            mat.emissiveIntensity = 0.55;
+            mat.needsUpdate = true;
+          }
+        }
+      }
+    });
 
     this.mixer = new THREE.AnimationMixer(model);
     const idleClip = findAnimationClip(clips, DEMOGORGON_ANIM_IDLE);
     const hitClip = findAnimationClip(clips, DEMOGORGON_ANIM_HIT);
-    const victoryClip = findAnimationClip(clips, DEMOGORGON_ANIM_VICTORY);
+    const victoryClip =
+      findAnimationClip(clips, DEMOGORGON_ANIM_VICTORY) ??
+      findAnimationClip(clips, DEMOGORGON_ANIM_VICTORY_FALLBACK);
 
     if (idleClip) {
       this.idleAction = this.mixer.clipAction(idleClip);
