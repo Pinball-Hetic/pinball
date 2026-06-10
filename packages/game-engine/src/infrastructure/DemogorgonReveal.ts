@@ -175,9 +175,10 @@ export class DemogorgonReveal {
       }
       return;
     }
-    if (event.type === 'DRAIN' || event.type === 'BOTTOM_OUT') {
-      this.resetAtmosphere();
-    }
+  }
+
+  endFight(): void {
+    this.resetAtmosphere();
   }
 
   update(dt: number): void {

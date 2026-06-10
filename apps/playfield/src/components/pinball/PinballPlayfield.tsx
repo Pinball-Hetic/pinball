@@ -869,6 +869,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
+          if (
+            (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
+            && gameStateRef.current === "game_over"
+          ) {
+            collisionProcessor?.resetDemogorgonFight();
+            demogorgonReveal?.endFight();
+          }
           if (event.type === "DRAIN" && UPSIDE_DOWN_PERSISTENCE === "until_drain") {
             releaseUpsideDownWorld();
           }
@@ -1001,6 +1008,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 );
                 if (gameStateRef.current === "game_over") {
                   resetGame();
+                  collisionProcessor?.resetDemogorgonFight();
+                  demogorgonReveal?.endFight();
                   upsideDownPortal?.reset();
                   upsideDownAtmosphere?.reset();
                   if (ballMesh) ballMesh.visible = true;
@@ -1035,6 +1044,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             if (data.id === "START") {
               if (data.action === "DOWN" && gameStateRef.current === "game_over") {
                 resetGame();
+                collisionProcessor?.resetDemogorgonFight();
+                demogorgonReveal?.endFight();
                 upsideDownPortal?.reset();
                 upsideDownAtmosphere?.reset();
                 if (ballMesh) ballMesh.visible = true;

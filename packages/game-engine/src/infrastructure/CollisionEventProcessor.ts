@@ -50,6 +50,16 @@ export class CollisionEventProcessor {
     }
   }
 
+  resetDemogorgonFight(): void {
+    this.demogorgonTriggered = false;
+    this.demogorgonFightActive = false;
+    this.demogorgonTargetArmed = false;
+    this.demogorgonTargetLatchIgnore = false;
+    this.demogorgonTargetBallInside = false;
+    this.demogorgonTargetHits = 0;
+    this.demogorgonTargetLastHitMs = 0;
+  }
+
   constructor(
     private readonly colliderMap: Map<number, string>,
     private readonly bumperHitUC: BumperHit,
@@ -89,21 +99,11 @@ export class CollisionEventProcessor {
       }
 
       if (role === 'bottom_out' && gameState === 'playing') {
-        this.demogorgonTriggered = false;
-        this.demogorgonFightActive = false;
-        this.demogorgonTargetArmed = false;
-        this.demogorgonTargetLatchIgnore = false;
-        this.demogorgonTargetHits = 0;
         this.bottomOutBallUC.execute();
         this.resetDropTargets();
       }
 
       if (role === 'drain' && gameState === 'playing') {
-        this.demogorgonTriggered = false;
-        this.demogorgonFightActive = false;
-        this.demogorgonTargetArmed = false;
-        this.demogorgonTargetLatchIgnore = false;
-        this.demogorgonTargetHits = 0;
         this.drainBallUC.execute();
         this.resetDropTargets();
       }

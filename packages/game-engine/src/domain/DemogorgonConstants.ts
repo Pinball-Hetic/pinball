@@ -1,4 +1,4 @@
-export const DEMOGORGON_MODEL_URL = '/playfield/demogorgon1.glb';
+export const DEMOGORGON_MODEL_URL = '/playfield/demogorgon.glb';
 export const DEMOGORGON_MODEL_HEIGHT = 0.2;
 export const DEMOGORGON_MODEL_YAW = 0;
 export const DEMOGORGON_MODEL_FOOT_LIFT = 0.026;
