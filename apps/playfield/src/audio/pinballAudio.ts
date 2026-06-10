@@ -3,6 +3,8 @@ import { DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
 import { installAudioBootstrap } from "./AudioBootstrap";
 import { EarlySoundController } from "./EarlySoundController";
 import {
+  APPARITION_UPSIDE_DOWN_GAIN,
+  APPARITION_UPSIDE_DOWN_URL,
   EARLY_SOUND_URL,
   GAME_OVER_GAIN,
   GAME_OVER_URL,
@@ -27,6 +29,11 @@ function warmAssets(): void {
   void samples.prepareGaplessLoop(EARLY_SOUND_URL);
   void samples.preloadBuffer(GAME_OVER_URL);
   void samples.preloadBuffer(SPAWN_DG_URL);
+  void samples.preloadBuffer(APPARITION_UPSIDE_DOWN_URL);
+}
+
+export function playUpsideDownAppearSound(): void {
+  void samples.playOneShotBuffer(APPARITION_UPSIDE_DOWN_URL, APPARITION_UPSIDE_DOWN_GAIN);
 }
 
 function tryStartEarlySound(sync: boolean): void {

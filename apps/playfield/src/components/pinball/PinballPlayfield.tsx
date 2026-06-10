@@ -64,6 +64,7 @@ import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import {
   notifyBootPhase,
   onPlayfieldReady,
+  playUpsideDownAppearSound,
   resetPinballAudioForNewGame,
   unlockPinballAudio,
 } from "@/audio/pinballAudio";
@@ -930,6 +931,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             {
               ballMesh,
               ballBody: ballPhysicsInst.body,
+              onRevealStart: () => playUpsideDownAppearSound(),
               onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
             },
             () => {
