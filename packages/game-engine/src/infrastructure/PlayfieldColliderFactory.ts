@@ -107,11 +107,15 @@ export class PlayfieldColliderFactory {
       SHOOTER_LANE_BOTTOM_Z,
     );
     // Mur gauche : s'arrête avant le sommet → ouverture de sortie en haut-gauche.
+    // Aminci à 1cm, centre décalé à 0.211 → face extérieure 0.206 (au lieu de
+    // 0.196) : ne déborde plus dans l'outlane droite (guide Plane.008 à 0.170,
+    // canal 36mm pour bille 29.5mm). Face intérieure couloir inchangée (0.216).
     PlayfieldColliderFactory.createTiltedLaneWall(
       world,
-      SHOOTER_LANE_X_MIN,
+      SHOOTER_LANE_X_MIN + 0.005,
       SHOOTER_LANE_LEFT_WALL_TOP_Z,
       SHOOTER_LANE_BOTTOM_Z,
+      0.01,
     );
     PlayfieldColliderFactory.createShooterGuide(world);
     PlayfieldColliderFactory.createShooterBackWall(world);
@@ -170,6 +174,7 @@ export class PlayfieldColliderFactory {
     x: number,
     zTop: number,
     zBot: number,
+    thickness: number = SHOOTER_LANE_WALL_THICKNESS,
   ): void {
     const midZ = (zTop + zBot) / 2;
     const halfZ = (zBot - zTop) / 2;
@@ -185,7 +190,7 @@ export class PlayfieldColliderFactory {
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(
-        SHOOTER_LANE_WALL_THICKNESS / 2,
+        thickness / 2,
         SHOOTER_LANE_WALL_HEIGHT / 2,
         halfZ,
       )
