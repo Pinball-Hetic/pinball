@@ -119,6 +119,9 @@ function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
   if (isPinballmapGameplayMesh(node)) {
     if (collOnly && !selfNorm.startsWith('coll_')) return true;
     if (isFlipperGltfMesh(node)) return true;
+    // flipper_left_split / flipper_right_split ont des underscores (pas de points)
+    // → isFlipperGltfMesh ne les détecte pas. COLLISION_ANALYTIC couvre ces noms.
+    if (meshMatchesSet(node, COLLISION_ANALYTIC)) return true;
     return false;
   }
 
@@ -251,6 +254,7 @@ export class PlayfieldTrimeshBuilder {
       if (!(child instanceof THREE.Mesh)) return;
       if (!isPinballmapGameplayMesh(child)) return;
       if (isFlipperGltfMesh(child)) return;
+      if (meshMatchesSet(child, COLLISION_ANALYTIC)) return;
       // Mesh_0 (surface de jeu) : visible mais SANS collision. La physique est
       // assurée par le cuboïde analytique lisse (createPlayfieldFloor) → la
       // balle glisse sans accrocher les arêtes du trimesh. Mesh_1…4 (cadre bois,
