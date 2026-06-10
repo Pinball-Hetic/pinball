@@ -1,13 +1,327 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --background: #060406;
+  --foreground: #ede4d3;
+  /* teinte d'ambiance (vire violet en Upside Down — piloté en P6) */
+  --glow: #ff2d2d;
+  --vignette: #2a0606;
+  --st-font: 'Times New Roman', Georgia, serif;
 }
 
 body {
-  background: var(--background);
+  background: #000;
   color: var(--foreground);
   font-family: system-ui, sans-serif;
   margin: 0;
+  overflow: hidden;
+}
+
+/* ---------- Stage 1920×1080 ---------- */
+.stage-fit {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+.stage {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: center center;
+  background: radial-gradient(ellipse at 50% 38%, #160a10 0%, #060406 60%, #000 100%);
+  display: grid;
+  grid-template-rows: 240px 660px 180px;
+  grid-template-columns: 640px 1280px;
+  grid-template-areas:
+    'header header'
+    'side   hof'
+    'banner banner';
+  overflow: hidden;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    transparent 45%,
+    var(--vignette) 130%
+  );
+  transition: background 0.6s ease;
+}
+
+.zone-header { grid-area: header; position: relative; }
+.zone-side { grid-area: side; position: relative; overflow: hidden; }
+.zone-hof { grid-area: hof; position: relative; }
+.zone-banner { grid-area: banner; position: relative; }
+
+.disconnected {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 60;
+  color: #ff453a;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+}
+
+/* ---------- Joyce wall ---------- */
+.joyce-wall {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 18px 60px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #1c1209 0%, #120b06 100%);
+  border-bottom: 3px solid #000;
+  box-shadow: inset 0 -30px 60px #000;
+}
+.joyce-row {
+  display: flex;
+  justify-content: space-between;
+}
+.joyce-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 64px;
+}
+.joyce-bulb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  margin-bottom: 6px;
+  transition: opacity 0.12s ease, box-shadow 0.12s ease;
+}
+.joyce-letter {
+  font-family: var(--st-font);
+  font-size: 34px;
+  font-weight: 700;
+  transition: color 0.15s ease, text-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+/* ---------- Side art (demogorgon + vines) ---------- */
+.side-art {
+  width: 100%;
+  height: 100%;
+}
+.side-art-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--art-glow) 40%, transparent));
+}
+.demo-body {
+  transform-origin: 160px 400px;
+  animation: demo-breathe calc(var(--sway-dur) * 1.4) ease-in-out infinite;
+}
+.demo-petal {
+  fill: #0a0202;
+  transform-origin: 160px 215px;
+  animation: petal-flex var(--sway-dur) ease-in-out infinite;
+}
+.vine {
+  transform-origin: bottom center;
+  animation: vine-sway var(--sway-dur) ease-in-out infinite;
+}
+
+@keyframes vine-sway {
+  0%, 100% { transform: rotate(calc(-1 * var(--vine-amp))); }
+  50% { transform: rotate(var(--vine-amp)); }
+}
+@keyframes petal-flex {
+  0%, 100% { transform: rotate(-3deg) scale(1); }
+  50% { transform: rotate(3deg) scale(1.04); }
+}
+@keyframes demo-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.03); }
+}
+
+/* ---------- Hall of Fame ---------- */
+.hof {
+  width: 100%;
+  height: 100%;
+  padding: 18px 40px 18px 24px;
+  box-sizing: border-box;
+  perspective: 1400px;
+}
+.hof-inner {
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.9s ease;
+}
+.hof-inverted .hof-inner {
+  transform: rotateX(180deg);
+}
+.hof-inverted .hof-row,
+.hof-inverted .hof-title {
+  transform-origin: center;
+}
+/* contre-flip du texte + léger miroir partiel : lisible mais "à l'envers" */
+.hof-inverted .hof-row {
+  transform: scaleY(-1) skewX(-4deg);
+}
+.hof-inverted .hof-title-text {
+  display: inline-block;
+  transform: scaleY(-1);
+}
+
+.hof-title {
+  text-align: center;
+  margin: 0 0 14px;
+  font-family: var(--st-font);
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--glow);
+  text-shadow: 0 0 18px var(--glow), 0 0 42px color-mix(in srgb, var(--glow) 60%, transparent);
+}
+
+.hof-list {
+  position: relative;
+  width: 100%;
+}
+.hof-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 54px;
+  display: grid;
+  grid-template-columns: 70px 1fr 220px 90px;
+  align-items: center;
+  padding: 0 18px;
+  box-sizing: border-box;
+  font-size: 30px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  transition: top 0.6s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s, box-shadow 0.4s;
+}
+.hof-rank { font-family: var(--st-font); opacity: 0.6; }
+.hof-name { font-weight: 600; letter-spacing: 0.04em; }
+.hof-score { text-align: right; font-variant-numeric: tabular-nums; }
+.hof-date { text-align: right; font-size: 18px; opacity: 0.4; }
+
+.hof-ghost { color: rgba(237, 228, 211, 0.22); }
+
+.hof-gold {
+  color: #ffd95e;
+  background: linear-gradient(90deg, rgba(255, 200, 60, 0.12), transparent);
+  box-shadow: inset 0 0 26px rgba(255, 200, 60, 0.18);
+}
+.hof-silver {
+  color: #e6ecf5;
+  background: linear-gradient(90deg, rgba(220, 230, 245, 0.1), transparent);
+  box-shadow: inset 0 0 22px rgba(220, 230, 245, 0.14);
+}
+.hof-bronze {
+  color: #ffb072;
+  background: linear-gradient(90deg, rgba(255, 150, 80, 0.1), transparent);
+  box-shadow: inset 0 0 20px rgba(255, 150, 80, 0.12);
+}
+.hof-gold .hof-rank,
+.hof-silver .hof-rank,
+.hof-bronze .hof-rank { opacity: 1; }
+
+.hof-hot {
+  animation: hof-hot-pulse 1s ease-in-out infinite;
+  z-index: 5;
+}
+@keyframes hof-hot-pulse {
+  0%, 100% { background: rgba(255, 45, 45, 0.1); box-shadow: inset 0 0 30px rgba(255, 45, 45, 0.3); }
+  50% { background: rgba(255, 45, 45, 0.28); box-shadow: inset 0 0 50px rgba(255, 45, 45, 0.55); }
+}
+
+/* shimmer permanent qui balaye la table */
+.hof-shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.07) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: shimmer 6s linear infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 150% 0; }
+  100% { background-position: -150% 0; }
+}
+
+/* ---------- Stats banner ---------- */
+.stats-banner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding: 0 50px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #0c0608, #060406);
+  border-top: 2px solid rgba(255, 45, 45, 0.25);
+}
+.stats-carousel {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.stats-slide {
+  font-family: var(--st-font);
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--glow) 50%, transparent);
+  animation: slide-in 0.6s ease;
+}
+@keyframes slide-in {
+  0% { opacity: 0; transform: translateX(40px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* ---------- QR slot ---------- */
+.qr-slot {
+  width: 180px;
+  height: 140px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 45, 45, 0.4);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.qr-pattern {
+  width: 80px;
+  height: 80px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 2px;
+  flex-shrink: 0;
+}
+.qr-dot { background: rgba(237, 228, 211, 0.12); border-radius: 1px; }
+.qr-dot[data-on='true'] { background: var(--foreground); }
+.qr-caption {
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  color: rgba(237, 228, 211, 0.7);
 }
