@@ -6,6 +6,8 @@ import {
   EARLY_SOUND_URL,
   GAME_OVER_GAIN,
   GAME_OVER_URL,
+  SPAWN_DG_GAIN,
+  SPAWN_DG_URL,
 } from "./pinballAudioConfig";
 import { SamplePlayer } from "./SamplePlayer";
 import { SfxEngine } from "./SfxEngine";
@@ -24,6 +26,7 @@ function warmAssets(): void {
   assetsWarmed = true;
   void samples.prepareGaplessLoop(EARLY_SOUND_URL);
   void samples.preloadBuffer(GAME_OVER_URL);
+  void samples.preloadBuffer(SPAWN_DG_URL);
 }
 
 function tryStartEarlySound(sync: boolean): void {
@@ -106,7 +109,7 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       break;
     case "DEMOGORGON_REVEAL":
       earlySound.consumeForDemogorgon();
-      sfx.playDemogorgonReveal();
+      void samples.playOneShotBuffer(SPAWN_DG_URL, SPAWN_DG_GAIN);
       break;
     case "DEMOGORGON_TARGET_HIT":
       sfx.playTargetHit(event.hitCount);

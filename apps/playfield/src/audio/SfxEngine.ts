@@ -44,15 +44,6 @@ export class SfxEngine {
     });
   }
 
-  playDemogorgonReveal(): void {
-    this.playNow(() => {
-      this.playTone(55, 0.55, "sawtooth", 0.18, -200);
-      this.playTone(110, 0.45, "square", 0.1, 100);
-      this.playNoise(0.35, 0.2, 180);
-      window.setTimeout(() => this.playTone(880, 0.2, "sawtooth", 0.08, -300), 120);
-    });
-  }
-
   playTargetHit(hitCount: number): void {
     this.playNow(() => {
       const detune = hitCount * 120;
