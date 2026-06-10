@@ -637,6 +637,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           onFightEnd: () => collisionProcessor?.setDemogorgonFightActive(false),
           onTargetReady: () => collisionProcessor?.setDemogorgonTargetArmed(true),
         });
+        await demogorgonReveal.preload(renderer, scene, camera);
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);

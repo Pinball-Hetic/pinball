@@ -77,6 +77,18 @@ export class DemogorgonReveal {
     this.emit = listener;
   }
 
+  async preload(
+    renderer: THREE.WebGLRenderer,
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+  ): Promise<void> {
+    await Promise.all([
+      this.billboard.ensureReady(),
+      this.demogorgonVisual.ensureReady(),
+    ]);
+    await this.demogorgonVisual.warmup(renderer, scene, camera);
+  }
+
   setup(config: DemogorgonSetup): void {
     this.dispose();
     this.camera = config.camera;
@@ -162,7 +174,6 @@ export class DemogorgonReveal {
       this.elevenAssistActive = false;
       this.elevenAssistT = 0;
       this.billboard.show();
-      this.demogorgonVisual.show();
       if (this.targetGroup) this.targetGroup.visible = true;
       return;
     }
@@ -221,6 +232,7 @@ export class DemogorgonReveal {
         this.assistNextIn = ELEVEN_ASSIST_FIRST;
         this.billboard.setOpacity(0);
         this.billboard.hide();
+        this.demogorgonVisual.show();
         this.onTargetReady?.();
       }
       return;
