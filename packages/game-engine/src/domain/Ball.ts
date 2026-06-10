@@ -82,7 +82,7 @@ export const DEMOGORGON_TARGET = {
   z: -0.02,
 } as const;
 
-export const DEMOGORGON_TARGET_HITS = 2;
+export const DEMOGORGON_TARGET_HITS = 5;
 
 export const PORTAL_UPSIDE_DOWN = {
   x: -0.000751,
@@ -96,7 +96,12 @@ export const PORTAL_SENSOR_RADIUS = 0.017;
 export const PORTAL_MAGNET_RADIUS = 0.058;
 export const PORTAL_MAGNET_STRENGTH = 0.0055;
 export const PORTAL_ENTER_SCORE = 500;
-export const PORTAL_EJECT_IMPULSE = { x: 0, y: 0.11, z: -0.095 } as const;
+
+export const UPSIDE_DOWN_SPAWN = {
+  x: -0.0225,
+  z: -0.48,
+} as const;
+export const UPSIDE_DOWN_SPAWN_IMPULSE = { x: 0, y: 0, z: 0.055 } as const;
 
 export const ELEVEN_ASSIST_SCORE = 100;
 export const ELEVEN_ASSIST_INTERVAL = 3.2;

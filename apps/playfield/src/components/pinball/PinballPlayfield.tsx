@@ -652,6 +652,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           onFightEnd: () => collisionProcessor?.setDemogorgonFightActive(false),
           onTargetReady: () => collisionProcessor?.setDemogorgonTargetArmed(true),
         });
+        await demogorgonReveal.preload(renderer, scene, camera).catch((err) => {
+          console.warn("[Demogorgon] preload failed:", err);
+        });
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
@@ -880,6 +883,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         };
         const emit: typeof baseEmit = (event) => {
           baseEmit(event);
+          if (
+            "scoreIncrement" in event
+            && event.scoreIncrement
+            && gameStateRef.current === "playing"
+          ) {
+            collisionProcessor?.tryScoreReveal(scoreRef.current, gameStateRef.current);
+          }
           diag.noteEvent(event.type);
           if (event.type === "DRAIN") diag.noteReset("drain");
           if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
@@ -905,6 +915,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             }
           }
           if (event.type === "PORTAL_ENTER") onPortalEnter?.();
+          if (event.type === "PORTAL_TRANSITION_END") {
+            upsideDownPortal?.reset();
+            collisionProcessor?.resetPortalTrigger();
+          }
           if (event.type === "BALL_LAUNCHED") {
             collisionProcessor?.resetPortalTrigger();
             bottomOutBallUC?.resetLatch();
@@ -960,6 +974,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         onPortalEnter = () => {
           if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
           if (upsideDownTransition.isActive()) return;
+          ballPhysicsInst.holdAtUpsideDownSpawn();
+          ballPhysicsInst.syncToMesh(ballMesh);
           upsideDownTransition.start(
             {
               ballMesh,
@@ -968,11 +984,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
             },
             () => {
-              const portal = upsideDownPortal?.getAnchorPosition();
-              if (portal) ballPhysicsInst?.ejectFromPortal(portal);
+              ballPhysicsInst?.spawnFromUpsideDown();
               collisionProcessor?.resetPortalTrigger();
               stuckDetector.reset();
-              if (ballMesh) {
+              if (ballMesh && ballPhysicsInst) {
+                ballPhysicsInst.syncToMesh(ballMesh);
                 ballMesh.visible = true;
                 ballMesh.scale.setScalar(1);
               }
@@ -1009,10 +1025,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             if (!sessionStartedRef.current) {
               if (
                 data.action === "DOWN"
+                && physicsReadyRef.current
                 && (data.id === "PLUNGER" || data.id === "START")
-                && physicsReady
               ) {
                 beginSessionRef.current();
+                if (data.id === "PLUNGER" && gameStateRef.current === "idle") {
+                  plunger.startCharge(performance.now());
+                  isChargingPlunger = true;
+                  chargeStartTime = performance.now();
+                }
               }
               return;
             }
@@ -1038,7 +1059,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                   if (ballMesh) ballMesh.visible = true;
                   return;
                 }
-                if (gameStateRef.current === "idle" && physicsReady) {
+                if (gameStateRef.current === "idle" && physicsReadyRef.current) {
                   plunger.startCharge(performance.now());
                   isChargingPlunger = true;
                   chargeStartTime = performance.now();

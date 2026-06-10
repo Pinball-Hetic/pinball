@@ -37,6 +37,7 @@ export class DemogorgonTargetVisual {
   private offset: THREE.Group | null = null;
   private pendingFit: THREE.Object3D | null = null;
   private glowLight: THREE.PointLight | null = null;
+  private loadPromise: Promise<void> | null = null;
 
   mount(parent: THREE.Object3D, camera: THREE.Camera): void {
     this.dispose();
@@ -61,19 +62,16 @@ export class DemogorgonTargetVisual {
     this.glowLight.position.y = 0.03;
     anchor.add(this.glowLight);
 
-    const loader = createGltfLoader();
-    loader.load(
-      DEMOGORGON_MODEL_URL,
-      (gltf) => {
-        if (!this.anchor) return;
-        const model = gltf.scene;
-        this.fitModel(model, gltf.animations);
-        this.syncFacing();
-        if (this.anchor.visible) this.playIdle();
-      },
-      undefined,
-      (err) => { console.error('[Demogorgon] load error:', err); },
-    );
+    this.loadPromise = this.loadModel();
+  }
+
+  ensureReady(): Promise<void> {
+    return this.loadPromise ?? Promise.resolve();
+  }
+
+  async warmup(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
+    if (!this.anchor) return;
+    await renderer.compileAsync(this.anchor, camera, scene);
   }
 
   show(): void {
@@ -125,8 +123,8 @@ export class DemogorgonTargetVisual {
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
 
     this.pulseT += dt;
-    const hitBoost = this.hitFlash > 0 ? 1.8 : 1;
-    const pulse = (0.75 + Math.sin(this.pulseT * 8) * 0.25) * hitBoost;
+    const hitBoost = this.hitFlash > 0 ? 1.4 : 1;
+    const pulse = (0.82 + Math.sin(this.pulseT * 2.5) * 0.12) * hitBoost;
     if (this.glowLight) this.glowLight.intensity = 0.42 * pulse;
 
     const scale = 1 + (this.hitFlash / 0.18) * 0.2;
@@ -148,6 +146,29 @@ export class DemogorgonTargetVisual {
     this.animState = 'idle';
     this.hitFlash = 0;
     this.pulseT = 0;
+    this.loadPromise = null;
+  }
+
+  private async loadModel(): Promise<void> {
+    try {
+      const gltf = await createGltfLoader().loadAsync(DEMOGORGON_MODEL_URL);
+      if (!this.anchor) return;
+      this.fitModel(gltf.scene, gltf.animations);
+      this.syncFacing();
+      this.resolveFit();
+      if (this.pendingFit) {
+        await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
+        if (!this.anchor) return;
+        this.resolveFit();
+      }
+      if (this.anchor.visible) this.playIdle();
+    } catch (err) {
+      console.error('[Demogorgon] load error:', err);
+    }
+  }
+
+  private resolveFit(): void {
+    if (this.pendingFit) this.tryApplyFit();
   }
 
   private syncFacing(): void {
@@ -174,7 +195,7 @@ export class DemogorgonTargetVisual {
         const hasSkin = obj.geometry.attributes.skinIndex && obj.geometry.attributes.skinWeight;
         if (!pos) return;
         obj.skeleton.update();
-        const step = Math.max(1, Math.floor(pos.count / 2000));
+        const step = Math.max(1, Math.floor(pos.count / 800));
         for (let i = 0; i < pos.count; i += step) {
           v.fromBufferAttribute(pos, i);
           if (hasSkin) obj.applyBoneTransform(i, v);
