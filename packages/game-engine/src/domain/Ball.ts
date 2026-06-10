@@ -111,6 +111,10 @@ export const BUMPER_RESTITUTION  = 0.20;  // réduit de 0.30 (−33%) — rebond
 // Kick pop bumper : Δv = impulse/masse = 0.11/0.08 = 1.38 m/s (−35% vs 2.25 m/s original).
 export const BUMPER_EJECT_IMPULSE = 0.11;
 
+/** Au-dessus de ce décollage (m) au-dessus du tapis, la balle est recollée à la
+ *  surface inclinée (absorbe le jitter physique normal, ~6 mm). */
+export const SURFACE_SNAP_THRESHOLD = 0.006;
+
 // Walls — from GLB playfield mesh extents
 export const WALL_LEFT_X    = -0.265;
 export const WALL_RIGHT_X   =  0.265;

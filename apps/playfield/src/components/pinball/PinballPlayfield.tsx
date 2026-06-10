@@ -37,6 +37,8 @@ import {
   FLIPPER_RIGHT_X_MIN,
   FLIPPER_RIGHT_X_MAX,
   FLIPPER_MIN_LAUNCH_VZ,
+  FLIPPER_MIN_LAUNCH_ANGVEL,
+  SURFACE_SNAP_THRESHOLD,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   playfieldUsesCollOnlyCollision,
@@ -1248,9 +1250,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           const inZ = bp.z > FLIPPER_Z_MIN && bp.z < FLIPPER_Z_MAX;
           const angVelL = (leftSwing  - prevLeftSwing) / dt;
           const angVelR = (rightSwing - prevRightSwing) / dt;
-          if (inZ && angVelL > 0.24 && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+          if (inZ && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ)
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
-          if (inZ && angVelR > 0.24 && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+          if (inZ && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ)
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
         }
 
@@ -1269,10 +1271,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         }
       }
 
-      if (physicsWorld && !transitionActive) physicsWorld.update(dt);
-
-      if (physicsWorld && collisionProcessor && !transitionActive) {
-        collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
+      if (physicsWorld && !transitionActive) {
+        // Drain les events APRÈS chaque step (multi-step possible sous 60 FPS) —
+        // sinon les collisions des steps intermédiaires seraient perdues.
+        const world = physicsWorld;
+        world.update(dt, () => {
+          collisionProcessor?.process(world.eventQueue, gameStateRef.current);
+        });
       }
 
       // ── Diagnostic balle : pourquoi disparaît/sort + reset de secours ────
@@ -1350,8 +1355,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             sp.z > WALL_TOP_Z   && sp.z < WALL_BOTTOM_Z;
           if (!inLaneStraight2 && inPlayfield) {
             const surfaceY = ballCenterOnSurface(sp.z);
-            const SNAP_THRESHOLD = 0.006; // 6 mm — absorbe le jitter physique normal
-            if (sp.y > surfaceY + SNAP_THRESHOLD) {
+            if (sp.y > surfaceY + SURFACE_SNAP_THRESHOLD) {
               const sv = ballPhysicsInst.body.linvel();
               ballPhysicsInst.body.setTranslation(
                 { x: sp.x, y: surfaceY, z: sp.z },
