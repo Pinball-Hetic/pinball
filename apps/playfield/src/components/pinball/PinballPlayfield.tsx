@@ -1116,8 +1116,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               const fmt = (v: THREE.Vector3) => ({
                 x: +v.x.toFixed(4), y: +v.y.toFixed(4), z: +v.z.toFixed(4),
               });
-              console.log('[PIVOT LEFT] ', fmt(lp));
-              console.log('[PIVOT RIGHT]', fmt(rp));
               setFlipperPivotCoords({ left: fmt(lp), right: fmt(rp) });
             } else {
               setFlipperPivotCoords(null);
