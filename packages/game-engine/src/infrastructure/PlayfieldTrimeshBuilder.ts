@@ -26,7 +26,10 @@ const COLLISION_SOLIDS = new Set([
 ]);
 
 const COLLISION_ANALYTIC = new Set([
+  // Ancienne convention (nœud unique splitté géométriquement)
   'flipper', 'flipper_buttons', 'flipper_left_split', 'flipper_right_split',
+  // Nouvelle convention (sous-modèles nommés dans le GLB)
+  'flipper-left', 'flipper-right', 'flipper_left', 'flipper_right',
   'pop_bumper', 'pop_bumper_left', 'pop_bumper_right',
 ]);
 

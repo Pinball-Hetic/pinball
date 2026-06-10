@@ -292,6 +292,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   const [debugVisible, setDebugVisible] = useState(false);
   const debugVisibleRef = useRef(false);
 
+  const [flipperPivotCoords, setFlipperPivotCoords] = useState<{
+    left:  { x: number; y: number; z: number };
+    right: { x: number; y: number; z: number };
+  } | null>(null);
+
   const [physicsReady, setPhysicsReady] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [plungerCharge, setPlungerCharge] = useState<number | null>(null);
@@ -538,6 +543,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let leftFlipperDebug: THREE.Mesh | null = null;
     let rightFlipperDebug: THREE.Mesh | null = null;
 
+    // ── Flipper pivot debug markers (sphères visibles avec H) ────────────────
+    let leftPivotMarker: THREE.Mesh | null = null;
+    let rightPivotMarker: THREE.Mesh | null = null;
+
     // ── Rapier debug renderer — tous les colliders ───────────────────────────
     const rapierDebugGeo = new THREE.BufferGeometry();
     const rapierDebugMat = new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false });
@@ -672,23 +681,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const pinballmap =
           findObjectByNormalizedName(playfieldRoot, 'Pinballmap', 'pinballmap') ?? playfieldRoot;
 
-        let flipperSetup = resolvePlayfieldFlippers(playfieldRoot);
-        if (!flipperSetup) {
-          const meshA = playfieldRoot.getObjectByName('flipper.002');
-          const meshB = playfieldRoot.getObjectByName('flipper.003');
-          if ((meshA as THREE.Mesh | null)?.isMesh && (meshB as THREE.Mesh | null)?.isMesh) {
-            const leftMesh = meshA as THREE.Mesh;
-            const rightMesh = meshB as THREE.Mesh;
-            const center = new THREE.Vector3();
-            leftMesh.updateMatrixWorld(true);
-            rightMesh.updateMatrixWorld(true);
-            const lx = new THREE.Box3().setFromObject(leftMesh).getCenter(center).x;
-            const rx = new THREE.Box3().setFromObject(rightMesh).getCenter(center).x;
-            flipperSetup = lx <= rx
-              ? { left: leftMesh, right: rightMesh, hide: playfieldRoot }
-              : { left: rightMesh, right: leftMesh, hide: playfieldRoot };
-          }
-        }
+        // resolvePlayfieldFlippers gère en priorité le nouveau format (flipper-left / flipper-right)
+        // puis le format héritage (flipper.001 unique splitté géométriquement).
+        const flipperSetup = resolvePlayfieldFlippers(playfieldRoot);
 
         let leftFlipper: THREE.Object3D | null = null;
         let rightFlipper: THREE.Object3D | null = null;
@@ -815,6 +810,34 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         rightFlipperDebug = rightResult.debugMesh;
         leftFlipperBodyOffset.copy(leftResult.localOffset);
         rightFlipperBodyOffset.copy(rightResult.localOffset);
+
+        // ── Pivot debug markers — sphères visibles quand H est actif ─────────
+        {
+          const pivotGeo = new THREE.SphereGeometry(0.008, 12, 12);
+          const pivotMatL = new THREE.MeshBasicMaterial({ color: 0x00ffff, depthTest: false });
+          const pivotMatR = new THREE.MeshBasicMaterial({ color: 0xff00ff, depthTest: false });
+          disposableGeos.push(pivotGeo);
+          disposableMats.push(pivotMatL, pivotMatR);
+
+          if (leftFlipperPivot) {
+            const wp = new THREE.Vector3();
+            leftFlipperPivot.pivot.getWorldPosition(wp);
+            leftPivotMarker = new THREE.Mesh(pivotGeo, pivotMatL);
+            leftPivotMarker.position.copy(wp);
+            leftPivotMarker.renderOrder = 1000;
+            leftPivotMarker.visible = false;
+            scene.add(leftPivotMarker);
+          }
+          if (rightFlipperPivot) {
+            const wp = new THREE.Vector3();
+            rightFlipperPivot.pivot.getWorldPosition(wp);
+            rightPivotMarker = new THREE.Mesh(pivotGeo, pivotMatR);
+            rightPivotMarker.position.copy(wp);
+            rightPivotMarker.renderOrder = 1000;
+            rightPivotMarker.visible = false;
+            scene.add(rightPivotMarker);
+          }
+        }
 
         ballPhysicsInst.setSpawnPosition(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, BALL_SPAWN_POSITION.z);
         ballPhysicsInst.body.wakeUp();
@@ -1128,6 +1151,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             rapierDebugLines.visible = debugCollidersOn;
             if (leftFlipperDebug)  leftFlipperDebug.visible  = debugCollidersOn;
             if (rightFlipperDebug) rightFlipperDebug.visible = debugCollidersOn;
+            if (leftPivotMarker)   leftPivotMarker.visible   = debugCollidersOn;
+            if (rightPivotMarker)  rightPivotMarker.visible  = debugCollidersOn;
+            if (debugCollidersOn && leftFlipperPivot && rightFlipperPivot) {
+              const lp = new THREE.Vector3();
+              const rp = new THREE.Vector3();
+              leftFlipperPivot.pivot.getWorldPosition(lp);
+              rightFlipperPivot.pivot.getWorldPosition(rp);
+              const fmt = (v: THREE.Vector3) => ({
+                x: +v.x.toFixed(4), y: +v.y.toFixed(4), z: +v.z.toFixed(4),
+              });
+              setFlipperPivotCoords({ left: fmt(lp), right: fmt(rp) });
+            } else {
+              setFlipperPivotCoords(null);
+            }
             return;
           }
           if (e.key === "j" || e.key === "J") {
@@ -1526,6 +1563,19 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         />
 
         <BallDebugOverlay snapshot={debugSnapshot} visible={debugVisible} />
+
+        {flipperPivotCoords && (
+          <div className="pointer-events-none absolute right-2 top-2 z-[100] rounded-md bg-black/80 px-3.5 py-2 font-mono text-[11px] leading-[1.7] text-white">
+            <div className="font-bold text-[#00ffff]">⬤ PIVOT GAUCHE</div>
+            <div>x: {flipperPivotCoords.left.x}</div>
+            <div>y: {flipperPivotCoords.left.y}</div>
+            <div>z: {flipperPivotCoords.left.z}</div>
+            <div className="mt-1.5 font-bold text-[#ff00ff]">⬤ PIVOT DROIT</div>
+            <div>x: {flipperPivotCoords.right.x}</div>
+            <div>y: {flipperPivotCoords.right.y}</div>
+            <div>z: {flipperPivotCoords.right.z}</div>
+          </div>
+        )}
 
         <main
           ref={mountRef}

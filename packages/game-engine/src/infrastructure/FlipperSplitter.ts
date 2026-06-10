@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { HINGE_INSET_FROM_EDGE } from '../domain/FlipperConstants';
+import {
+  HINGE_INSET_FROM_EDGE,
+  FLIPPER_LEFT_PIVOT_X,
+  FLIPPER_RIGHT_PIVOT_X,
+  FLIPPER_PIVOT_Y,
+  FLIPPER_PIVOT_Z,
+} from '../domain/FlipperConstants';
 import { findObjectByNormalizedName, normalizeGltfName } from './GltfNodeNames';
 
 export type PlayfieldFlipperPair = {
@@ -34,16 +40,21 @@ function meshCenterX(mesh: THREE.Mesh): number {
   return new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()).x;
 }
 
-function resolveStrangerThingsFlippers(root: THREE.Object3D): PlayfieldFlipperPair | null {
-  // Three.js GLTFLoader sanitize les dots dans les node names. Tente les 2 formes.
-  const meshA = flipperMeshFrom(findObjectByNormalizedName(root, 'flipper.002', 'flipper002'));
-  const meshB = flipperMeshFrom(findObjectByNormalizedName(root, 'flipper.003', 'flipper003'));
-  if (!meshA || !meshB) return null;
+/**
+ * Résolution directe : le GLB expose déjà deux sous-modèles distincts
+ * nommés `flipper-left` et `flipper-right` (noms normalisés avec tiret).
+ * On les trouve directement — aucun split géométrique nécessaire.
+ */
+function resolveNamedFlippers(root: THREE.Object3D): PlayfieldFlipperPair | null {
+  const leftNode  = findObjectByNormalizedName(root, 'flipper-left',  'flipper_left')  ?? null;
+  const rightNode = findObjectByNormalizedName(root, 'flipper-right', 'flipper_right') ?? null;
+  if (!leftNode || !rightNode) return null;
 
-  const left = meshCenterX(meshA) <= meshCenterX(meshB) ? meshA : meshB;
-  const right = left === meshA ? meshB : meshA;
+  const leftMesh  = flipperMeshFrom(leftNode);
+  const rightMesh = flipperMeshFrom(rightNode);
+  if (!leftMesh || !rightMesh) return null;
 
-  return finalizeFlipperPair(root, { left, right, hide: root });
+  return finalizeFlipperPair(root, { left: leftMesh, right: rightMesh, hide: root });
 }
 
 const PLAYFIELD_CENTER_X = 0;
@@ -56,9 +67,12 @@ function meshSpansPlayfieldCenter(mesh: THREE.Mesh): boolean {
 }
 
 export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipperPair | null {
-  const stPair = resolveStrangerThingsFlippers(root);
-  if (stPair) return stPair;
+  // Cas 1 : GLB avec sous-modèles nommés flipper-left / flipper-right (nouveau format).
+  const namedPair = resolveNamedFlippers(root);
+  if (namedPair) return namedPair;
 
+  // Cas 2 : fallback héritage — flipper unique (flipper.001 / flipper001 / flipper)
+  // à découper géométriquement au plan X=0.
   // Three.js GLTFLoader sanitize les dots → flipper.001 devient flipper001 dans la scène.
   const group = findObjectByNormalizedName(root, 'flipper.001', 'flipper001', 'flipper') ?? null;
   const meshes: THREE.Mesh[] = [];
@@ -235,11 +249,13 @@ function hingeLocalPosition(
   const inset = (max.x - min.x) * HINGE_INSET_FROM_EDGE;
   // Convention pinball : hinge au far-X (côté bord playfield), tip au center.
   // LEFT → hinge à min.x (far left). RIGHT → hinge à max.x (far right).
-  const hingeX = side === 'left' ? min.x + inset : max.x - inset;
+  // Les constantes FLIPPER_*_PIVOT_* permettent un réglage fin sans recompute.
+  const baseX  = side === 'left' ? min.x + inset : max.x - inset;
+  const extraX = side === 'left' ? FLIPPER_LEFT_PIVOT_X : FLIPPER_RIGHT_PIVOT_X;
   const hingeWorld = new THREE.Vector3(
-    hingeX,
-    (min.y + max.y) / 2 + 0.012,
-    (min.z + max.z) / 2,
+    baseX  + extraX,
+    (min.y + max.y) / 2 + FLIPPER_PIVOT_Y,
+    (min.z + max.z) / 2 + FLIPPER_PIVOT_Z,
   );
   const hingeLocal = hingeWorld.clone();
   parent.worldToLocal(hingeLocal);
