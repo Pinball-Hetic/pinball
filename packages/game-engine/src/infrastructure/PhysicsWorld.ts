@@ -5,14 +5,22 @@ export class PhysicsWorld {
   public readonly eventQueue: RAPIER.EventQueue;
 
   /**
-   * Taux de simulation cible : 60 Hz.
-   * Le render loop tourne au refresh rate natif de l'écran (60/120/144 Hz),
-   * mais world.step() est appelé exactement 60 fois par seconde réelle
-   * grâce à l'accumulateur ci-dessous. Cela garantit un gameplay identique
-   * sur tous les appareils, calé sur le feel validé à 60 FPS.
+   * Deux constantes distinctes, intentionnellement différentes :
+   *
+   * STEP_INTERVAL : intervalle réel entre deux appels à world.step().
+   *   = 1/60 s → on appelle step() exactement 60 fois par seconde réelle,
+   *   peu importe le refresh rate de l'écran (60/120/144 Hz).
+   *
+   * world.timestep : durée de simulation avancée à chaque step().
+   *   = 1/100 s → 60 steps/s × 1/100 s = 0.6 s de physique par seconde réelle
+   *   (+20% vs le 0.5 s d'origine à 1/120). Ajusté au 2025-06-11 : vitesse
+   *   de balle jugée trop lente, +20% demandé explicitement.
+   *
+   * NE PAS égaliser ces deux valeurs : STEP_INTERVAL = world.timestep = 1/60
+   * ferait tourner la physique en temps réel → balle deux fois trop rapide.
    */
-  private static readonly PHYSICS_HZ = 60;
-  private static readonly PHYSICS_DT = 1 / PhysicsWorld.PHYSICS_HZ;
+  private static readonly STEP_INTERVAL = 1 / 60;   // fréquence d'appel réelle
+  private static readonly SIM_TIMESTEP  = 1 / 118;  // durée simulée par step (−15% vs 1/100)
   private accumulator = 0;
 
   private constructor(world: RAPIER.World) {
@@ -27,7 +35,7 @@ export class PhysicsWorld {
     // Ne pas booster — une bille qui "tombe" au lieu de rouler tue le feel.
     const gravity = { x: 0, y: -9.81, z: 0 };
     const world = new RAPIER.World(gravity);
-    world.timestep = PhysicsWorld.PHYSICS_DT;
+    world.timestep = PhysicsWorld.SIM_TIMESTEP;
     return new PhysicsWorld(world);
   }
 
@@ -39,12 +47,12 @@ export class PhysicsWorld {
     this.accumulator += dt;
     // Anti spiral-of-death : si l'onglet est en arrière-plan ou que dt explose,
     // on plafonne à un seul step en retard pour éviter une avalanche de steps.
-    if (this.accumulator > 2 * PhysicsWorld.PHYSICS_DT) {
-      this.accumulator = PhysicsWorld.PHYSICS_DT;
+    if (this.accumulator > 2 * PhysicsWorld.STEP_INTERVAL) {
+      this.accumulator = PhysicsWorld.STEP_INTERVAL;
     }
-    if (this.accumulator >= PhysicsWorld.PHYSICS_DT) {
+    if (this.accumulator >= PhysicsWorld.STEP_INTERVAL) {
       this.world.step(this.eventQueue);
-      this.accumulator -= PhysicsWorld.PHYSICS_DT;
+      this.accumulator -= PhysicsWorld.STEP_INTERVAL;
     }
   }
 }
