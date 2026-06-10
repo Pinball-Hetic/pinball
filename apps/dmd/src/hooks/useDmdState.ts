@@ -8,12 +8,11 @@ import type {
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-const INTRO: DmdDisplay = { mode: 'INTRO', player: '—' };
+const INTRO: DmdDisplay = { mode: 'INTRO', player: '—', upsideDown: false };
 
 export function useDmdState() {
   const socketRef = useRef<PinballSocket | null>(null);
   const [display, setDisplay] = useState<DmdDisplay>(INTRO);
-  const [upsideDown, setUpsideDown] = useState(false);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -25,12 +24,14 @@ export function useDmdState() {
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
     socket.on('dmd:display', (data) => setDisplay(data));
-    socket.on('dmd:atmosphere', (data) => setUpsideDown(data.upsideDownActive));
 
     return () => {
       socket.disconnect();
     };
   }, []);
+
+  // Dérivé du dernier display reçu — state-driven, pas d'event séparé.
+  const upsideDown = display.upsideDown;
 
   return { display, upsideDown, connected };
 }

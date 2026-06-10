@@ -32,8 +32,16 @@ const DURATIONS = {
   MULTI_FLASH: 1500,
 } as const;
 
+// upsideDown est injecté au moment de l'emit (atmosphereRef) — la stack
+// stocke les displays sans ce champ. Omit distributif sur l'union.
+type DisplayBase = DmdDisplay extends infer T
+  ? T extends DmdDisplay
+    ? Omit<T, 'upsideDown'>
+    : never
+  : never;
+
 interface PendingDisplay {
-  display: DmdDisplay;
+  display: DisplayBase;
   priority: number;
   expiresAt: number; // performance.now() + duration, Infinity si sticky
 }
@@ -102,13 +110,15 @@ export function useDmdOrchestrator(): DmdOrchestrator {
     const top = stackRef.current
       .slice()
       .sort((a, b) => b.priority - a.priority)[0]!;
-    const serialized = JSON.stringify(top.display);
+    // upsideDown injecté ici → l'atmosphere voyage dans chaque display.
+    const payload = { ...top.display, upsideDown: atmosphereRef.current } as DmdDisplay;
+    const serialized = JSON.stringify(payload);
     if (serialized === lastSentRef.current) return;
     lastSentRef.current = serialized;
-    socket.emit('dmd:display', top.display);
+    socket.emit('dmd:display', payload);
   };
 
-  const push = (display: DmdDisplay, opts: DisplayPushOpts) => {
+  const push = (display: DisplayBase, opts: DisplayPushOpts) => {
     const now = performance.now();
     const expiresAt = opts.duration ? now + opts.duration : Infinity;
     // Si même mode déjà présent, on remplace (refresh des données)
@@ -196,7 +206,9 @@ export function useDmdOrchestrator(): DmdOrchestrator {
     setAtmosphere: (upsideDownActive) => {
       if (atmosphereRef.current === upsideDownActive) return;
       atmosphereRef.current = upsideDownActive;
-      socketRef.current?.emit('dmd:atmosphere', { upsideDownActive });
+      // Re-pousse le display courant avec la nouvelle atmosphere.
+      lastSentRef.current = '';
+      sendCurrent();
     },
   };
 }
