@@ -3,14 +3,12 @@ import { DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
 import { installAudioBootstrap } from "./AudioBootstrap";
 import { EarlySoundController } from "./EarlySoundController";
 import {
-  APPARITION_UPSIDE_DOWN_GAIN,
   APPARITION_UPSIDE_DOWN_URL,
   EARLY_SOUND_URL,
-  GAME_OVER_GAIN,
   GAME_OVER_URL,
-  SPAWN_DG_GAIN,
   SPAWN_DG_URL,
 } from "./pinballAudioConfig";
+import { soundLevel } from "./pinballAudioVolumes";
 import { SamplePlayer } from "./SamplePlayer";
 import { SfxEngine } from "./SfxEngine";
 
@@ -33,7 +31,13 @@ function warmAssets(): void {
 }
 
 export function playUpsideDownAppearSound(): void {
-  void samples.playOneShotBuffer(APPARITION_UPSIDE_DOWN_URL, APPARITION_UPSIDE_DOWN_GAIN);
+  const gain = soundLevel("apparitionUpsideDown");
+  void samples.resumeContext();
+  sfx.markContextUnlocked();
+  samples.duckBackground(2.5);
+  sfx.playCinematicImpact();
+  if (samples.playOneShotCached(APPARITION_UPSIDE_DOWN_URL, gain)) return;
+  void samples.playOneShotBuffer(APPARITION_UPSIDE_DOWN_URL, gain);
 }
 
 function tryStartEarlySound(sync: boolean): void {
@@ -99,7 +103,7 @@ export function resetPinballAudioForNewGame(): void {
 
 export function playGameOverSound(): void {
   earlySound.release();
-  void samples.playOneShotBuffer(GAME_OVER_URL, GAME_OVER_GAIN);
+  void samples.playOneShotBuffer(GAME_OVER_URL, soundLevel("gameOver"));
 }
 
 export function handlePinballSoundEvent(event: GameEvent): void {
@@ -112,7 +116,7 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       break;
     case "DEMOGORGON_REVEAL":
       earlySound.consumeForDemogorgon();
-      void samples.playOneShotBuffer(SPAWN_DG_URL, SPAWN_DG_GAIN);
+      void samples.playOneShotBuffer(SPAWN_DG_URL, soundLevel("spawnDemogorgon"));
       break;
     case "DEMOGORGON_TARGET_HIT":
       sfx.playTargetHit(event.hitCount);
@@ -124,7 +128,7 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       sfx.playElevenAssist();
       break;
     case "PORTAL_ENTER":
-      sfx.playPortalEnter();
+      // Son MP3 géré par playUpsideDownAppearSound() à l'apparition de l'image.
       break;
     case "PORTAL_TREMOR":
       sfx.playPortalTremor();

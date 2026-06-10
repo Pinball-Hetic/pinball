@@ -1,4 +1,4 @@
-import { MASTER_GAIN } from "./pinballAudioConfig";
+import { AUDIO_VOLUME, percentToGain } from "./pinballAudioVolumes";
 
 type GaplessLoopHandle = {
   source: AudioBufferSourceNode;
@@ -24,21 +24,71 @@ export class SamplePlayer {
 
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private musicBus: GainNode | null = null;
+  private cinematicBus: GainNode | null = null;
+  private sfxBus: GainNode | null = null;
 
   ensureContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
-      this.master.gain.value = MASTER_GAIN;
+      this.musicBus = this.ctx.createGain();
+      this.cinematicBus = this.ctx.createGain();
+      this.sfxBus = this.ctx.createGain();
+
+      this.musicBus.connect(this.master);
+      this.cinematicBus.connect(this.master);
+      this.sfxBus.connect(this.master);
       this.master.connect(this.ctx.destination);
+
+      this.syncBusGains();
     }
     return this.ctx;
+  }
+
+  /** Recalcule les bus depuis AUDIO_VOLUME (appelé à l'init). */
+  syncBusGains(): void {
+    if (!this.master || !this.musicBus || !this.cinematicBus || !this.sfxBus) return;
+    this.master.gain.value = percentToGain(AUDIO_VOLUME.master);
+    this.musicBus.gain.value = percentToGain(AUDIO_VOLUME.music);
+    this.cinematicBus.gain.value = percentToGain(AUDIO_VOLUME.cinematic);
+    this.sfxBus.gain.value = percentToGain(AUDIO_VOLUME.sfx);
   }
 
   getMaster(): GainNode | null {
     this.ensureContext();
     return this.master;
+  }
+
+  getSfxBus(): GainNode | null {
+    this.ensureContext();
+    return this.sfxBus;
+  }
+
+  getCinematicBus(): GainNode | null {
+    this.ensureContext();
+    return this.cinematicBus;
+  }
+
+  /** Baisse musique + sfx pour laisser passer un hit cinématique. */
+  duckBackground(durationS = 2.5): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.musicBus || !this.sfxBus) return;
+
+    const now = ctx.currentTime;
+    const musicTarget = percentToGain(AUDIO_VOLUME.music);
+    const sfxTarget = percentToGain(AUDIO_VOLUME.sfx);
+
+    this.musicBus.gain.cancelScheduledValues(now);
+    this.musicBus.gain.setValueAtTime(this.musicBus.gain.value, now);
+    this.musicBus.gain.linearRampToValueAtTime(musicTarget * 0.05, now + 0.04);
+    this.musicBus.gain.linearRampToValueAtTime(musicTarget, now + durationS);
+
+    this.sfxBus.gain.cancelScheduledValues(now);
+    this.sfxBus.gain.setValueAtTime(this.sfxBus.gain.value, now);
+    this.sfxBus.gain.linearRampToValueAtTime(sfxTarget * 0.12, now + 0.04);
+    this.sfxBus.gain.linearRampToValueAtTime(sfxTarget, now + durationS);
   }
 
   isContextRunning(): boolean {
@@ -81,9 +131,9 @@ export class SamplePlayer {
 
   private startGaplessLoopSource(url: string, volume: number): boolean {
     const ctx = this.ensureContext();
-    const master = this.master;
+    const musicBus = this.musicBus;
     const buffer = this.bufferCache.get(url);
-    if (!ctx || !master || !buffer) return false;
+    if (!ctx || !musicBus || !buffer) return false;
     if (this.gaplessLoops.has(url)) return true;
 
     const bounds = this.loopBounds.get(url) ?? { start: 0, end: buffer.duration };
@@ -97,7 +147,7 @@ export class SamplePlayer {
     const gain = ctx.createGain();
     gain.gain.value = volume;
     source.connect(gain);
-    gain.connect(master);
+    gain.connect(musicBus);
 
     try {
       source.start(0, bounds.start);
@@ -157,24 +207,30 @@ export class SamplePlayer {
     }, fadeOutS * 1000 + 100);
   }
 
-  async playOneShotBuffer(url: string, gain: number): Promise<void> {
+  playOneShotCached(url: string, volume: number): boolean {
     const ctx = this.ensureContext();
-    const master = this.master;
-    if (!ctx || !master) return;
-
-    await this.resumeContext();
-    const buffer = await this.loadBuffer(url);
-    if (!buffer) return;
+    const cinematicBus = this.cinematicBus;
+    const buffer = this.bufferCache.get(url);
+    if (!ctx || !cinematicBus || !buffer) return false;
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
 
     const g = ctx.createGain();
-    g.gain.setValueAtTime(gain, ctx.currentTime);
+    g.gain.setValueAtTime(volume, ctx.currentTime);
 
     source.connect(g);
-    g.connect(master);
+    g.connect(cinematicBus);
     source.start();
+    return true;
+  }
+
+  async playOneShotBuffer(url: string, volume: number): Promise<void> {
+    await this.resumeContext();
+    if (this.playOneShotCached(url, volume)) return;
+    const buffer = await this.loadBuffer(url);
+    if (!buffer) return;
+    this.playOneShotCached(url, volume);
   }
 
   private fetchRaw(url: string): Promise<ArrayBuffer | null> {
