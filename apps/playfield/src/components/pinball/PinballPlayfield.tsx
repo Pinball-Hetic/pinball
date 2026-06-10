@@ -525,6 +525,52 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     const diag = new BallDiagnostics();
     let lastDebugPush = 0;
 
+    // ── Debug : déplacer la bille à la souris (toggle `M`) ───────────────────
+    // Drag la bille n'importe où sur le tapis pour tester les coincements.
+    // Pendant le drag : orbit désactivé, vitesse forcée à 0 (suit le curseur),
+    // locks du couloir bypassés. Au relâché : la physique reprend.
+    let ballMoveMode = false;
+    let ballDragging = false;
+    const dragRaycaster = new THREE.Raycaster();
+    const dragPointer = new THREE.Vector2();
+
+    const moveBallToPointer = (clientX: number, clientY: number) => {
+      if (!ballPhysicsInst || !playfieldRootRef) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      dragPointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      dragPointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      dragRaycaster.setFromCamera(dragPointer, camera);
+      const hits = dragRaycaster.intersectObject(playfieldRootRef, true);
+      if (!hits.length) return;
+      const p = hits[0].point;
+      ballPhysicsInst.body.setTranslation(
+        { x: p.x, y: ballCenterOnSurface(p.z), z: p.z },
+        true,
+      );
+      ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      if (ballMesh) ballMesh.visible = true;
+    };
+
+    const onBallDragDown = (e: PointerEvent) => {
+      if (!ballMoveMode) return;
+      ballDragging = true;
+      if (orbitControls) orbitControls.enabled = false;
+      moveBallToPointer(e.clientX, e.clientY);
+    };
+    const onBallDragMove = (e: PointerEvent) => {
+      if (!ballDragging) return;
+      moveBallToPointer(e.clientX, e.clientY);
+    };
+    const onBallDragUp = () => {
+      if (!ballDragging) return;
+      ballDragging = false;
+      if (orbitControls) orbitControls.enabled = true;
+    };
+    renderer.domElement.addEventListener("pointerdown", onBallDragDown);
+    window.addEventListener("pointermove", onBallDragMove);
+    window.addEventListener("pointerup", onBallDragUp);
+
     // Logs de diagnostic gérés par le toggle HUD `[J]` → silence total en prod.
     const debugLog = (...args: unknown[]) => {
       if (!debugVisibleRef.current) return;
@@ -1015,6 +1061,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             setDebugVisible(debugVisibleRef.current);
             return;
           }
+          if (e.key === "m" || e.key === "M") {
+            ballMoveMode = !ballMoveMode;
+            if (!ballMoveMode && ballDragging) {
+              ballDragging = false;
+              if (orbitControls) orbitControls.enabled = true;
+            }
+            return;
+          }
           if (e.key === "r" || e.key === "R") {
             resetBallRef.current?.();
             return;
@@ -1171,7 +1225,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // Balle figée au spawn tant qu'on est idle, Y COMPRIS pendant la charge
         // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
         // mur droit (frottement → ralentissement au lancement).
-        if (gameStateRef.current === "idle" && physicsReady) {
+        if (gameStateRef.current === "idle" && physicsReady && !ballMoveMode) {
           const z = BALL_SPAWN_POSITION.z;
           ballPhysicsInst.body.setTranslation(
             { x: BALL_SPAWN_POSITION.x, y: ballCenterOnSurface(z), z },
@@ -1187,7 +1241,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // dépendre de la géométrie GLB. La balle est libérée dès qu'elle atteint
         // la zone de sortie (Z <= SHOOTER_LANE_LEFT_WALL_TOP_Z) pour partir
         // naturellement dans le terrain.
-        if (gameStateRef.current === "playing") {
+        if (gameStateRef.current === "playing" && !ballMoveMode) {
           const lp = ballPhysicsInst.body.translation();
           const inLaneStraight =
             lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > SHOOTER_LANE_LOCK_X;
@@ -1338,6 +1392,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       cancelled = true;
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", handleResize);
+      renderer.domElement.removeEventListener("pointerdown", onBallDragDown);
+      window.removeEventListener("pointermove", onBallDragMove);
+      window.removeEventListener("pointerup", onBallDragUp);
       orbitControls?.dispose();
       const pw = physicsWorld as (PhysicsWorld & { _onKeyDown?: (e: KeyboardEvent) => void; _onKeyUp?: (e: KeyboardEvent) => void }) | null;
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
