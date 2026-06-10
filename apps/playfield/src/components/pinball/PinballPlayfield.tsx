@@ -874,11 +874,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
-          if (event.type === "DRAIN" && UPSIDE_DOWN_PERSISTENCE === "until_drain") {
-            releaseUpsideDownWorld();
-          }
-          if (event.type === "BOTTOM_OUT" && UPSIDE_DOWN_PERSISTENCE === "until_drain") {
-            releaseUpsideDownWorld();
+          // Retour au monde initial : à chaque drain en mode until_drain,
+          // ou au game over (baseEmit a déjà mis gameStateRef à jour) quel
+          // que soit le mode — sinon le violet persistait jusqu'au restart.
+          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
+            if (
+              UPSIDE_DOWN_PERSISTENCE === "until_drain" ||
+              gameStateRef.current === "game_over"
+            ) {
+              releaseUpsideDownWorld();
+            }
           }
           if (event.type === "PORTAL_ENTER") onPortalEnter?.();
           if (event.type === "BALL_LAUNCHED") {
