@@ -20,7 +20,7 @@ export class PhysicsWorld {
    * ferait tourner la physique en temps réel → balle deux fois trop rapide.
    */
   private static readonly STEP_INTERVAL = 1 / 60;   // fréquence d'appel réelle
-  private static readonly SIM_TIMESTEP  = 1 / 118;  // durée simulée par step (−15% vs 1/100)
+  private static readonly SIM_TIMESTEP  = 1 / 98;   // durée simulée par step (+20% vs 1/118)
   private accumulator = 0;
 
   private constructor(world: RAPIER.World) {
