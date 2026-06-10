@@ -868,6 +868,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         };
         const emit: typeof baseEmit = (event) => {
           baseEmit(event);
+          if (
+            "scoreIncrement" in event
+            && event.scoreIncrement
+            && gameStateRef.current === "playing"
+          ) {
+            collisionProcessor?.tryScoreReveal(scoreRef.current, gameStateRef.current);
+          }
           diag.noteEvent(event.type);
           if (event.type === "DRAIN") diag.noteReset("drain");
           if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
