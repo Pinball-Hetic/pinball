@@ -69,7 +69,9 @@ export class EarlySoundController {
 
   consumeForDemogorgon(): void {
     this.demogorgonConsumed = true;
-    this.release();
+    // Stop immédiat (pas de fade) pour que spawnDG ne soit pas masqué par la musique.
+    this.samples.stopGaplessLoop(EARLY_SOUND_URL);
+    this.phase = "released";
   }
 
   resetForNewGame(): void {
