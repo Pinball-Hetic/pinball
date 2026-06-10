@@ -945,6 +945,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         onPortalEnter = () => {
           if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
           if (upsideDownTransition.isActive()) return;
+          ballPhysicsInst.holdAtUpsideDownSpawn();
+          ballPhysicsInst.syncToMesh(ballMesh);
           upsideDownTransition.start(
             {
               ballMesh,
@@ -952,11 +954,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
             },
             () => {
-              const portal = upsideDownPortal?.getAnchorPosition();
-              if (portal) ballPhysicsInst?.ejectFromPortal(portal);
+              ballPhysicsInst?.spawnFromUpsideDown();
               collisionProcessor?.resetPortalTrigger();
               stuckDetector.reset();
-              if (ballMesh) {
+              if (ballMesh && ballPhysicsInst) {
+                ballPhysicsInst.syncToMesh(ballMesh);
                 ballMesh.visible = true;
                 ballMesh.scale.setScalar(1);
               }
