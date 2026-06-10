@@ -504,8 +504,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let rightFlipperBody: RAPIER.RigidBody | null = null;
     // Offset local (mesh-origin → geoCenter) — positionne le body cinématique
     // au vrai centre géométrique du mesh et pas à l'origine du groupe parent.
-    let leftFlipperBodyOffset  = new THREE.Vector3();
-    let rightFlipperBodyOffset = new THREE.Vector3();
+    const leftFlipperBodyOffset  = new THREE.Vector3();
+    const rightFlipperBodyOffset = new THREE.Vector3();
     let isChargingPlunger = false;
     let chargeStartTime = 0;
     let physicsReady = false;
