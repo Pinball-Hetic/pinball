@@ -2,6 +2,7 @@ import type { DmdDisplay } from '@pinball/shared-types'
 import { FONT_5X7, FONT_12X22, drawText, measureText } from './fonts'
 import { GRID_W } from './DmdRenderer'
 import { DOT } from './palette'
+import { attractFrame } from './attract'
 
 const TOTAL_LIVES = 3
 
@@ -29,14 +30,6 @@ function drawCentered(
 ): void {
   const x = centerX(measureText(text, font, spacing, scale))
   drawText(grid, GRID_W, x, y, text, font, color, spacing, scale)
-}
-
-// Plus grand scale ≤ max dont le texte tient dans la largeur.
-function fitScale(text: string, max: number): number {
-  for (let s = max; s > 1; s--) {
-    if (measureText(text, FONT_5X7, 1, s) <= GRID_W) return s
-  }
-  return 1
 }
 
 // Flash plein cadre scale 2 : une ligne si ça tient (≤ 8 chars), sinon
@@ -76,24 +69,7 @@ function layoutScore(grid: Uint8Array, display: DmdDisplay): void {
 
 function layoutIntro(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'INTRO'>
-  // Alterne toutes les 3s entre le marquee défilant et l'écran joueur.
-  if (Math.floor(clockMs / 3000) % 2 === 0) {
-    const text = 'PINBALL HETIC - PRESS START'
-    const textW = measureText(text, FONT_5X7, 1, 3)
-    const offset = Math.floor(clockMs / 30) % (textW + GRID_W)
-    drawText(grid, GRID_W, GRID_W - offset, 5, text, FONT_5X7, DOT.marquee, 1, 3)
-    return
-  }
-
-  const name = d.player && d.player !== '—' ? d.player : 'PLAYER'
-  const press = 'PRESS START'
-  const nameScale = fitScale(name, 2)
-  const pressScale = fitScale(press, 2)
-  const nameH = FONT_5X7.height * nameScale
-  const pressH = FONT_5X7.height * pressScale
-  const startY = Math.round((32 - (nameH + 4 + pressH)) / 2)
-  drawCentered(grid, name, startY, FONT_5X7, DOT.marquee, 1, nameScale)
-  drawCentered(grid, press, startY + nameH + 4, FONT_5X7, DOT.score, 1, pressScale)
+  attractFrame(grid, d, clockMs)
 }
 
 function layoutEvent(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
