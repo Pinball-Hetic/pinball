@@ -79,15 +79,18 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createPlayfieldFloor(world);
     PlayfieldColliderFactory.createBumpers(world, colliderMap);
     PlayfieldColliderFactory.createSensors(world, colliderMap);
-    // Pas de sol couloir ici : createPlayfieldFloor couvre déjà le couloir.
-    // Un 2e cuboïde + trimesh GLB Mesh_1…4 créaient des contacts multiples →
-    // la balle perdait ~95 % de vitesse dès les premiers centimètres.
-    PlayfieldColliderFactory.createShooterLane(world, { includeFloor: false });
+    // Sol analytique ACTIVÉ : le tapis Strangerthings est splitté en 2
+    // trimeshes avec une couture à Z≈-0.286 en plein couloir (+ lèvre ~3mm
+    // sur Circle.001). Le strip lisse shadow la couture → launch fiable.
+    PlayfieldColliderFactory.createShooterLane(world, { includeFloor: true });
   }
 
   /**
    * Couloir plongeur analytique : murs + guide (+ sol optionnel).
-   * Sur Pinballmap le sol est déjà fourni par createPlayfieldFloor.
+   * Sur Strangerthings le sol analytique est REQUIS : le tapis GLB est
+   * splitté en 2 trimeshes (Mesh_1 / Circle.001) avec une couture + lèvre
+   * ~3mm à Z≈-0.286 en plein couloir → la bille montante déviait. Le strip
+   * lisse (createShooterLaneFloor) shadow la couture. includeFloor: true.
    */
   static createShooterLane(
     world: RAPIER.World,
