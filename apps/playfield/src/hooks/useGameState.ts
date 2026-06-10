@@ -301,9 +301,11 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         multiplierRef.current = 1;
         setCombo(0);
         setMultiplier(1);
-        clearDemogorgonHud();
         clearScorePops();
         handleDrain(hideBall);
+        if (livesRef.current <= 0) {
+          clearDemogorgonHud();
+        }
       }
       if (event.type === "DROP_TARGET_COMPLETE") {
         if (heticRef.current < 5) {

@@ -23,6 +23,11 @@ task docker:dev:up
 
 Arrêt : `task docker:dev:down`.
 
+> **RAM limitée (≤8 Go) :** le compose dev démarre les écrans en
+> séquence (playfield compile seul, puis dmd, puis backglass) pour
+> éviter les pics Turbopack cumulés. Premier démarrage : ~2 min.
+> Recommandé : Docker Desktop → Resources → Swap ≥ 2 Go.
+
 ## Structure
 
 Monorepo Bun workspaces.
