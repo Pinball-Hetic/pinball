@@ -1221,10 +1221,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         upsideDownTransition?.update(dt);
       } else {
         // ── Flipper cinématique : Three.js → Rapier ───────────────────────────
+        // Lissage normalisé à 60 FPS : Math.pow(1 - SWING_SMOOTH, dt * 60)
+        // reproduit exactement le comportement 60 Hz sur tous les écrans
+        // (120 Hz → decay plus petit par frame, même vitesse angulaire réelle).
         prevLeftSwing  = leftSwing;
         prevRightSwing = rightSwing;
-        leftSwing  += (leftTarget  * SWING_RAD - leftSwing)  * SWING_SMOOTH;
-        rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
+        const swingDecay = 1 - Math.pow(1 - SWING_SMOOTH, dt * 60);
+        leftSwing  += (leftTarget  * SWING_RAD - leftSwing)  * swingDecay;
+        rightSwing += (rightTarget * SWING_RAD - rightSwing) * swingDecay;
         if (leftFlipperPivot)  applyFlipperSwing(leftFlipperPivot,  leftSwing);
         if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
 
@@ -1236,15 +1240,17 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // Quand le flipper est en train de monter ET que la balle est dans la
         // zone flipper, on garantit une vitesse -Z minimale sans override si la
         // physique fait déjà mieux.
+        // Seuil normalisé en vitesse angulaire (rad/s) : 0.004 * 60 = 0.24 rad/s,
+        // indépendant du fps (évite que le seuil ne se déclenche jamais à 120+ Hz).
         if (ballPhysicsInst && gameStateRef.current === 'playing') {
           const bp = ballPhysicsInst.body.translation();
           const bv = ballPhysicsInst.body.linvel();
           const inZ = bp.z > FLIPPER_Z_MIN && bp.z < FLIPPER_Z_MAX;
-          const dL = leftSwing  - prevLeftSwing;
-          const dR = rightSwing - prevRightSwing;
-          if (inZ && dL > 0.004 && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+          const angVelL = (leftSwing  - prevLeftSwing) / dt;
+          const angVelR = (rightSwing - prevRightSwing) / dt;
+          if (inZ && angVelL > 0.24 && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ)
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
-          if (inZ && dR > 0.004 && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+          if (inZ && angVelR > 0.24 && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ)
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
         }
 
@@ -1263,7 +1269,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         }
       }
 
-      if (physicsWorld && !transitionActive) physicsWorld.update(time);
+      if (physicsWorld && !transitionActive) physicsWorld.update(dt);
 
       if (physicsWorld && collisionProcessor && !transitionActive) {
         collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
