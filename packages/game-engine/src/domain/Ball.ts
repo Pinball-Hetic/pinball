@@ -82,7 +82,7 @@ export const DEMOGORGON_TARGET = {
   z: -0.02,
 } as const;
 
-export const DEMOGORGON_TARGET_HITS = 2;
+export const DEMOGORGON_TARGET_HITS = 5;
 
 export const PORTAL_UPSIDE_DOWN = {
   x: -0.000751,
