@@ -369,10 +369,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
     },
-    onGameOver: (finalScore) => {
+    onGameOver: (finalScore, stats) => {
       // Pas d'affichage GAME_OVER sur le DMD : on garde le dernier SCORE
       // jusqu'au reset (INTRO). emitGameOver sert au backglass/leaderboard.
-      dmd.emitGameOver(playerRef.current, finalScore);
+      dmd.emitGameOver(playerRef.current, finalScore, stats);
     },
     onGameStart: () => {
       dmd.emitGameStart(playerRef.current);

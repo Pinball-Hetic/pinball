@@ -8,6 +8,7 @@ import {
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
+import type { GameStats } from "@pinball/shared-types";
 import { handlePinballSoundEvent } from "../audio/PinballSounds";
 import { playfieldToScreenPercent, jitterScreenPoint } from "../utils/playfieldScreen";
 
@@ -38,7 +39,7 @@ export interface ScoringCallbacks {
     newMultiplier: number;
   }) => void;
   onLifeLost?: (livesRemaining: number) => void;
-  onGameOver?: (finalScore: number) => void;
+  onGameOver?: (finalScore: number, stats: GameStats) => void;
   onGameStart?: () => void;
   onIdleReset?: () => void;
   onAtmosphereChange?: (upsideDownActive: boolean) => void;
@@ -93,6 +94,13 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
   const upsideDownHintTimerRef = useRef<number | null>(null);
+
+  // Compteurs de stats de partie (reset dans resetGame, lus au game over)
+  const maxComboRef = useRef(0);
+  const maxMultiplierRef = useRef(1);
+  const demogorgonsRef = useRef(0);
+  const portalsRef = useRef(0);
+  const gameStartRef = useRef(0);
 
   // Sync ref to state when player change
   useEffect(() => {
@@ -185,7 +193,17 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     if (newLives <= 0) {
       hideBall();
       updateGameState("game_over");
-      callbacks?.onGameOver?.(scoreRef.current);
+      const stats: GameStats = {
+        maxCombo: maxComboRef.current,
+        maxMultiplier: maxMultiplierRef.current,
+        demogorgons: demogorgonsRef.current,
+        portals: portalsRef.current,
+        hetic: heticRef.current,
+        durationS: gameStartRef.current
+          ? Math.round((performance.now() - gameStartRef.current) / 1000)
+          : 0,
+      };
+      callbacks?.onGameOver?.(scoreRef.current, stats);
     } else {
       updateGameState("idle");
       callbacks?.onLifeLost?.(newLives);
@@ -204,6 +222,11 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     heticRef.current = 0;
     setHetic(0);
     lastEventTimeRef.current = 0;
+    maxComboRef.current = 0;
+    maxMultiplierRef.current = 1;
+    demogorgonsRef.current = 0;
+    portalsRef.current = 0;
+    gameStartRef.current = 0;
     const newName = generatePlayerName();
     setPlayer(newName);
     playerRef.current = newName;
@@ -222,6 +245,11 @@ export function useGameState(callbacks?: ScoringCallbacks) {
 
       if ("scoreIncrement" in event && event.scoreIncrement) {
         const comboChange = applyComboEvent(now);
+        maxComboRef.current = Math.max(maxComboRef.current, comboRef.current);
+        maxMultiplierRef.current = Math.max(
+          maxMultiplierRef.current,
+          multiplierRef.current,
+        );
         const finalPoints = event.scoreIncrement * multiplierRef.current;
         scoreRef.current += finalPoints;
         setScore(scoreRef.current);
@@ -261,6 +289,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           tone: "target",
         });
         const victory = event.hitCount >= DEMOGORGON_TARGET_HITS;
+        if (victory) demogorgonsRef.current += 1;
         setDemogorgonHud((prev) => ({
           ...prev,
           active: true,
@@ -312,10 +341,12 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         }
       }
       if (event.type === "BALL_LAUNCHED") {
+        if (gameStartRef.current === 0) gameStartRef.current = now;
         if (gameStateRef.current === "idle") callbacks?.onGameStart?.();
         updateGameState("playing");
       }
       if (event.type === "PORTAL_ENTER") {
+        portalsRef.current += 1;
         const point = jitterScreenPoint(
           playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
           3,
