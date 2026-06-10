@@ -811,7 +811,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         resetBallRef.current = () => {
           if (!drainBallUC || !sessionStartedRef.current) return;
-          if (gameStateRef.current === "game_over") return;
+          if (gameStateRef.current !== "playing") return;
           isChargingPlunger = false;
           plungerState = "idle";
           setPlungerCharge(null);

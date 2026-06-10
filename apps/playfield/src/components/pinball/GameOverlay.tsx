@@ -46,7 +46,7 @@ export default function GameOverlay({
   const showGameOver = bootPhase === "in_game" && gameState === "game_over";
 
   const showResetBall =
-    bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
+    bootPhase === "in_game" && gameState === "playing" && plungerCharge === null;
 
   const showDemogorgonHud =
     bootPhase === "in_game" && gameState === "playing" && demogorgonHud.active;
