@@ -34,14 +34,15 @@ export interface ScoreUpdate {
   combo: number
   multiplier: number
   lives: number
+  hetic: number
 }
 
 export type DmdDisplay =
   | { mode: 'INTRO'; player: string }
-  | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number }
-  | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string }
-  | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string }
-  | { mode: 'MULTI_FLASH'; multiplier: number; combo: number; score: number; lives: number; player: string }
+  | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number; hetic: number }
+  | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string; hetic: number }
+  | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string; hetic: number }
+  | { mode: 'MULTI_FLASH'; multiplier: number; combo: number; score: number; lives: number; player: string; hetic: number }
   | { mode: 'LIFE_LOST'; livesRemaining: number; score: number; player: string }
   | { mode: 'GAME_OVER'; player: string; finalScore: number }
 

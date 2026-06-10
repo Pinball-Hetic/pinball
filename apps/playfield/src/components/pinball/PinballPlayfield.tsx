@@ -332,6 +332,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: comboRef.current,
         multiplier: multiplierRef.current,
         lives: livesRef.current,
+        hetic: 0,
       };
 
       dmd.emitScoreSnapshot(snap);
@@ -356,6 +357,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: livesRemaining,
+        hetic: 0,
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
@@ -373,6 +375,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: livesRef.current,
+        hetic: 0,
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
@@ -385,6 +388,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: 3,
+        hetic: 0,
       });
     },
     onAtmosphereChange: (upsideDownActive) => {
