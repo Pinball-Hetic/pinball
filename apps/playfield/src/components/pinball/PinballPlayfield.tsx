@@ -67,7 +67,13 @@ import type { ButtonAction, ButtonId } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
-import { unlockPinballAudio } from "@/audio/PinballSounds";
+import {
+  notifyBootPhase,
+  onPlayfieldReady,
+  playUpsideDownAppearSound,
+  resetPinballAudioForNewGame,
+  unlockPinballAudio,
+} from "@/audio/pinballAudio";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 
@@ -294,14 +300,18 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   /** Appelé depuis le game loop quand la session démarre (affiche la balle). */
   const onSessionStartRef = useRef<(() => void) | null>(null);
 
+  const handleAttractInteract = useCallback(() => {
+    unlockPinballAudio();
+  }, []);
+
   const beginSession = useCallback(() => {
     if (!physicsReadyRef.current || sessionStartedRef.current) return;
     sessionStartedRef.current = true;
     setSessionStarted(true);
-    unlockPinballAudio();
+    handleAttractInteract();
     onSessionStartRef.current?.();
     mountRef.current?.focus();
-  }, []);
+  }, [handleAttractInteract]);
 
   const beginSessionRef = useRef(beginSession);
   beginSessionRef.current = beginSession;
@@ -311,6 +321,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     : !sessionStarted
       ? "attract"
       : "in_game";
+
+  useEffect(() => {
+    notifyBootPhase(bootPhase);
+  }, [bootPhase]);
 
   const dmd = useDmdOrchestrator();
 
@@ -388,6 +402,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       dmd.pushScore(snap);
     },
     onIdleReset: () => {
+      resetPinballAudioForNewGame();
       dmd.pushIntro(playerRef.current);
       dmd.emitScoreSnapshot({
         player: playerRef.current,
@@ -949,6 +964,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             {
               ballMesh,
               ballBody: ballPhysicsInst.body,
+              onRevealStart: () => playUpsideDownAppearSound(),
               onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
             },
             () => {
@@ -1138,6 +1154,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         physicsReady = true;
         physicsReadyRef.current = true;
         setPhysicsReady(true);
+        onPlayfieldReady();
         debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
@@ -1482,6 +1499,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           upsideDownActive={upsideDownActive}
           upsideDownHint={upsideDownHint}
           cabinetMode={cabinetMode}
+          onAttractInteract={() => {
+            if (physicsReady && !sessionStarted) beginSession();
+          }}
         />
 
         <BallDebugOverlay snapshot={debugSnapshot} visible={debugVisible} />

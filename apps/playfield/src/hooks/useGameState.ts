@@ -8,7 +8,7 @@ import {
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
-import { handlePinballSoundEvent } from "../audio/PinballSounds";
+import { handlePinballSoundEvent, playGameOverSound } from "../audio/pinballAudio";
 import { playfieldToScreenPercent, jitterScreenPoint } from "../utils/playfieldScreen";
 
 export type GameState = "idle" | "playing" | "game_over";
@@ -184,6 +184,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     setLives(newLives);
     if (newLives <= 0) {
       hideBall();
+      playGameOverSound();
       updateGameState("game_over");
       callbacks?.onGameOver?.(scoreRef.current);
     } else {
