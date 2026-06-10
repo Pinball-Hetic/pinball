@@ -4,7 +4,10 @@ import type { SamplePlayer } from "./SamplePlayer";
 export class SfxEngine {
   private contextUnlocked = false;
 
-  constructor(private readonly samples: SamplePlayer) {}
+  constructor(private readonly samples: SamplePlayer) {
+    const master = this.samples.getMaster();
+    if (master) master.gain.value = MASTER_GAIN;
+  }
 
   markContextUnlocked(): void {
     this.contextUnlocked = true;
@@ -13,9 +16,6 @@ export class SfxEngine {
   private playNow(play: () => void): void {
     const ctx = this.samples.ensureContext();
     if (!ctx) return;
-
-    const master = this.samples.getMaster();
-    if (master) master.gain.value = MASTER_GAIN;
 
     if (this.contextUnlocked && this.samples.isContextRunning()) {
       play();

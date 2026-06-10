@@ -78,6 +78,7 @@ export class EarlySoundController {
     this.phase = "off";
   }
 
+  /** Clears armed state only — intentionally does not stop an active loop. */
   disarm(): void {
     if (this.phase === "playing") return;
     this.phase = "off";

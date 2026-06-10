@@ -1475,10 +1475,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         <main
           ref={mountRef}
           onPointerDown={() => {
-            if (physicsReady && !sessionStarted) {
-              handleAttractInteract();
-              beginSession();
-            }
+            if (physicsReady && !sessionStarted) beginSession();
           }}
           className={
             cabinetMode

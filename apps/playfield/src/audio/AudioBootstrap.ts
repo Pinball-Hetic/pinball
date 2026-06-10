@@ -1,5 +1,7 @@
 import type { SamplePlayer } from "./SamplePlayer";
 
+const GESTURE_EVENTS = ["pointerdown", "touchstart", "keydown"] as const;
+
 type BootstrapDeps = {
   samples: SamplePlayer;
   onGestureUnlock: () => void;
@@ -27,5 +29,3 @@ export function installAudioBootstrap(deps: BootstrapDeps): void {
     document.addEventListener(event, onGesture, { capture: true, passive: true });
   }
 }
-
-const GESTURE_EVENTS = ["pointerdown", "touchstart", "keydown"] as const;

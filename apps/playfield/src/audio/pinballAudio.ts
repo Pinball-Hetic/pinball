@@ -61,11 +61,6 @@ installAudioBootstrap({
   },
 });
 
-/** @deprecated Prefer side-effect import in pinball.tsx — kept for PinballPlayfield mount. */
-export function preloadPinballAudio(): void {
-  warmAssets();
-}
-
 export function notifyBootPhase(phase: PinballBootPhase): void {
   if (phase === "loading") {
     wantsEarlySound = false;
@@ -79,6 +74,7 @@ export function notifyBootPhase(phase: PinballBootPhase): void {
     }
     return;
   }
+  // in_game: keep ambient loop playing (background music until Demogorgon / game over).
   wantsEarlySound = false;
   earlySound.disarm();
 }
