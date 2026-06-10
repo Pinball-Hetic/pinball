@@ -19,13 +19,12 @@ function findAnimationClip(clips: THREE.AnimationClip[], token: string): THREE.A
   const needle = token.toLowerCase();
   return clips.find((clip) => {
     const name = clip.name.toLowerCase();
-    return name === needle || name.endsWith(`|${needle}`) || name.endsWith(needle);
+    return name === needle || name.endsWith(`|${needle}`);
   });
 }
 
 export class DemogorgonTargetVisual {
   private anchor: THREE.Group | null = null;
-  private modelRoot: THREE.Object3D | null = null;
   private camera: THREE.Camera | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private idleAction: THREE.AnimationAction | null = null;
@@ -37,11 +36,7 @@ export class DemogorgonTargetVisual {
   private rig: THREE.Group | null = null;
   private offset: THREE.Group | null = null;
   private pendingFit: THREE.Object3D | null = null;
-  private victoryBurst: THREE.Mesh | null = null;
-  private victoryBurstMat: THREE.MeshBasicMaterial | null = null;
   private glowLight: THREE.PointLight | null = null;
-  private ownedGeos: THREE.BufferGeometry[] = [];
-  private ownedMats: THREE.Material[] = [];
 
   mount(parent: THREE.Object3D, camera: THREE.Camera): void {
     this.dispose();
@@ -66,22 +61,6 @@ export class DemogorgonTargetVisual {
     this.glowLight.position.y = 0.03;
     anchor.add(this.glowLight);
 
-    const burstGeo = new THREE.RingGeometry(0.02, 0.038, 24);
-    this.victoryBurstMat = new THREE.MeshBasicMaterial({
-      color: 0xffee55,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      toneMapped: false,
-    });
-    this.victoryBurst = new THREE.Mesh(burstGeo, this.victoryBurstMat);
-    this.victoryBurst.rotation.x = -Math.PI / 2;
-    this.victoryBurst.position.y = 0.002;
-    anchor.add(this.victoryBurst);
-    this.ownedGeos.push(burstGeo);
-    this.ownedMats.push(this.victoryBurstMat);
-
     const loader = createGltfLoader();
     loader.load(
       DEMOGORGON_MODEL_URL,
@@ -89,7 +68,6 @@ export class DemogorgonTargetVisual {
         if (!this.anchor) return;
         const model = gltf.scene;
         this.fitModel(model, gltf.animations);
-        this.modelRoot = model;
         this.syncFacing();
         if (this.anchor.visible) this.playIdle();
       },
@@ -111,7 +89,6 @@ export class DemogorgonTargetVisual {
     }
     this.animState = 'idle';
     this.hitFlash = 0;
-    this.resetVictoryBurst();
     if (this.glowLight) this.glowLight.intensity = 0;
   }
 
@@ -156,49 +133,14 @@ export class DemogorgonTargetVisual {
     this.anchor.scale.setScalar(scale);
   }
 
-  updateVictoryBurst(t: number): void {
-    if (!this.victoryBurst || !this.victoryBurstMat) return;
-    const burstT = Math.min(1, t * 1.35);
-    const burstFade = burstT * burstT;
-    this.victoryBurst.scale.setScalar(1 + burstFade * 4.5);
-    this.victoryBurstMat.opacity = (1 - burstFade) * 0.95;
-    if (this.glowLight) this.glowLight.intensity = 1.6 * (1 - burstFade);
-  }
-
-  applyAssistShake(t: number, assistT: number): void {
-    if (!this.anchor || t >= 0.45) return;
-    this.anchor.rotation.z = Math.sin(assistT * 32) * 0.1 * (1 - t / 0.45);
-  }
-
-  applyVictoryMotion(t: number): void {
-    if (!this.anchor) return;
-    const pop = 1 - Math.pow(1 - t, 3);
-    this.anchor.scale.setScalar(1 + pop * 0.35);
-    this.anchor.rotation.z = pop * Math.PI * 0.5;
-  }
-
-  resetMotion(): void {
-    if (!this.anchor) return;
-    this.anchor.scale.setScalar(1);
-    this.anchor.rotation.z = 0;
-    this.resetVictoryBurst();
-  }
-
   dispose(): void {
     if (this.anchor) this.anchor.parent?.remove(this.anchor);
-    for (const g of this.ownedGeos) g.dispose();
-    for (const m of this.ownedMats) m.dispose();
-    this.ownedGeos = [];
-    this.ownedMats = [];
     this.anchor = null;
-    this.modelRoot = null;
     this.camera = null;
     this.mixer = null;
     this.idleAction = null;
     this.hitAction = null;
     this.victoryAction = null;
-    this.victoryBurst = null;
-    this.victoryBurstMat = null;
     this.glowLight = null;
     this.rig = null;
     this.offset = null;
@@ -323,10 +265,5 @@ export class DemogorgonTargetVisual {
     this.idleAction.reset();
     this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
     this.idleAction.fadeIn(0.12).play();
-  }
-
-  private resetVictoryBurst(): void {
-    if (this.victoryBurst) this.victoryBurst.scale.setScalar(1);
-    if (this.victoryBurstMat) this.victoryBurstMat.opacity = 0;
   }
 }
