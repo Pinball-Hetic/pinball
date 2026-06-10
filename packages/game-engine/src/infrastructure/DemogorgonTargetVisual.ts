@@ -123,8 +123,8 @@ export class DemogorgonTargetVisual {
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
 
     this.pulseT += dt;
-    const hitBoost = this.hitFlash > 0 ? 1.8 : 1;
-    const pulse = (0.75 + Math.sin(this.pulseT * 8) * 0.25) * hitBoost;
+    const hitBoost = this.hitFlash > 0 ? 1.4 : 1;
+    const pulse = (0.82 + Math.sin(this.pulseT * 2.5) * 0.12) * hitBoost;
     if (this.glowLight) this.glowLight.intensity = 0.42 * pulse;
 
     const scale = 1 + (this.hitFlash / 0.18) * 0.2;
