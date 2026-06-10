@@ -1516,18 +1516,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         <BallDebugOverlay snapshot={debugSnapshot} visible={debugVisible} />
 
         {flipperPivotCoords && (
-          <div style={{
-            position: 'absolute', top: 8, right: 8, zIndex: 100,
-            background: 'rgba(0,0,0,0.78)', color: '#fff',
-            fontFamily: 'monospace', fontSize: 11,
-            padding: '8px 14px', borderRadius: 6, pointerEvents: 'none',
-            lineHeight: 1.7,
-          }}>
-            <div style={{ color: '#00ffff', fontWeight: 'bold' }}>⬤ PIVOT GAUCHE</div>
+          <div className="pointer-events-none absolute right-2 top-2 z-[100] rounded-md bg-black/80 px-3.5 py-2 font-mono text-[11px] leading-[1.7] text-white">
+            <div className="font-bold text-[#00ffff]">⬤ PIVOT GAUCHE</div>
             <div>x: {flipperPivotCoords.left.x}</div>
             <div>y: {flipperPivotCoords.left.y}</div>
             <div>z: {flipperPivotCoords.left.z}</div>
-            <div style={{ marginTop: 6, color: '#ff00ff', fontWeight: 'bold' }}>⬤ PIVOT DROIT</div>
+            <div className="mt-1.5 font-bold text-[#ff00ff]">⬤ PIVOT DROIT</div>
             <div>x: {flipperPivotCoords.right.x}</div>
             <div>y: {flipperPivotCoords.right.y}</div>
             <div>z: {flipperPivotCoords.right.z}</div>
