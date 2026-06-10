@@ -5,6 +5,8 @@ import {
   DEMOGORGON_ANIM_IDLE,
   DEMOGORGON_ANIM_VICTORY,
   DEMOGORGON_ANIM_VICTORY_FALLBACK,
+  DEMOGORGON_MODEL_FIT_FRAMES,
+  DEMOGORGON_MODEL_FLOOR_CLEARANCE,
   DEMOGORGON_MODEL_HEIGHT,
   DEMOGORGON_MODEL_URL,
   DEMOGORGON_MODEL_FOOT_LIFT,
@@ -114,7 +116,7 @@ export class DemogorgonTargetVisual {
   }
 
   update(dt: number): void {
-    if (this.pendingFit) this.tryApplyFit();
+    if (this.pendingFit) this.applyFit();
     if (!this.anchor?.visible) return;
 
     this.mixer?.update(dt);
@@ -155,11 +157,14 @@ export class DemogorgonTargetVisual {
       if (!this.anchor) return;
       this.fitModel(gltf.scene, gltf.animations);
       this.syncFacing();
-      this.resolveFit();
-      if (this.pendingFit) {
+      for (let i = 0; i < DEMOGORGON_MODEL_FIT_FRAMES && this.pendingFit; i++) {
+        if (this.applyFit()) break;
         await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
         if (!this.anchor) return;
-        this.resolveFit();
+      }
+      if (this.pendingFit) {
+        this.applyFit();
+        this.pendingFit = null;
       }
       if (this.anchor.visible) this.playIdle();
     } catch (err) {
@@ -167,8 +172,16 @@ export class DemogorgonTargetVisual {
     }
   }
 
-  private resolveFit(): void {
-    if (this.pendingFit) this.tryApplyFit();
+  private preparePoseForFit(): void {
+    if (this.idleAction) {
+      this.idleAction.play();
+      this.idleAction.time = 0;
+    }
+    this.mixer?.update(0);
+    this.pendingFit?.updateWorldMatrix(true, true);
+    this.pendingFit?.traverse((obj) => {
+      if (obj instanceof THREE.SkinnedMesh) obj.skeleton.update();
+    });
   }
 
   private syncFacing(): void {
@@ -181,40 +194,99 @@ export class DemogorgonTargetVisual {
     this.rig.rotation.y = Math.atan2(dx, dz) + DEMOGORGON_MODEL_YAW;
   }
 
-  private tryApplyFit(): void {
+  private applyFit(): boolean {
     const model = this.pendingFit;
-    if (!model || !this.rig || !this.offset || !this.anchor) return;
+    if (!model || !this.rig || !this.offset || !this.anchor) return false;
 
-    model.updateWorldMatrix(true, true);
+    this.preparePoseForFit();
+    this.anchor.updateMatrixWorld(true);
 
-    const box = new THREE.Box3();
-    const v = new THREE.Vector3();
-    model.traverse((obj) => {
-      if (obj instanceof THREE.SkinnedMesh) {
-        const pos = obj.geometry.attributes.position;
-        const hasSkin = obj.geometry.attributes.skinIndex && obj.geometry.attributes.skinWeight;
-        if (!pos) return;
-        obj.skeleton.update();
-        const step = Math.max(1, Math.floor(pos.count / 800));
-        for (let i = 0; i < pos.count; i += step) {
-          v.fromBufferAttribute(pos, i);
-          if (hasSkin) obj.applyBoneTransform(i, v);
-          obj.localToWorld(v);
-          this.anchor!.worldToLocal(v);
-          box.expandByPoint(v);
-        }
-      }
-    });
-    if (box.isEmpty()) return;
+    const bounds = this.measureBounds(model);
+    if (!bounds) return false;
 
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    if (Math.max(Math.abs(center.x), Math.abs(center.y), Math.abs(center.z)) > 4) return;
+    const centerX = (bounds.minX + bounds.maxX) * 0.5;
+    const centerZ = (bounds.minZ + bounds.maxZ) * 0.5;
+    const height = Math.max(bounds.maxY - bounds.minY, 1e-4);
 
-    const height = Math.max(size.y, 1e-4);
-    this.offset.position.set(-center.x, -box.min.y + 0.006, -center.z);
+    this.offset.position.set(
+      -centerX,
+      -bounds.minY + DEMOGORGON_MODEL_FLOOR_CLEARANCE,
+      -centerZ,
+    );
     this.rig.scale.setScalar(DEMOGORGON_MODEL_HEIGHT / height);
     this.pendingFit = null;
+    return true;
+  }
+
+  private measureBounds(model: THREE.Object3D): {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    minZ: number;
+    maxZ: number;
+  } | null {
+    if (!this.anchor) return null;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    let samples = 0;
+    const v = new THREE.Vector3();
+
+    model.traverse((obj) => {
+      if (!(obj instanceof THREE.SkinnedMesh)) return;
+      const pos = obj.geometry.attributes.position;
+      const hasSkin = obj.geometry.attributes.skinIndex && obj.geometry.attributes.skinWeight;
+      if (!pos) return;
+      obj.skeleton.update();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        if (hasSkin) obj.applyBoneTransform(i, v);
+        obj.localToWorld(v);
+        this.anchor!.worldToLocal(v);
+        minX = Math.min(minX, v.x);
+        maxX = Math.max(maxX, v.x);
+        minY = Math.min(minY, v.y);
+        maxY = Math.max(maxY, v.y);
+        minZ = Math.min(minZ, v.z);
+        maxZ = Math.max(maxZ, v.z);
+        samples += 1;
+      }
+    });
+
+    if (samples === 0) return null;
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return null;
+    if (maxY - minY > 8) return null;
+
+    const footY = this.measureFootFloorY(model);
+    if (footY !== null) minY = Math.min(minY, footY);
+
+    return { minX, maxX, minY, maxY, minZ, maxZ };
+  }
+
+  private measureFootFloorY(model: THREE.Object3D): number | null {
+    if (!this.anchor) return null;
+
+    let minY = Infinity;
+    const p = new THREE.Vector3();
+    model.traverse((obj) => {
+      const name = obj.name.toLowerCase();
+      const isFoot =
+        name.includes('foot')
+        || name.includes('toe')
+        || name.includes('backleg');
+      if (!isFoot) return;
+      if (!name.includes('end') && !name.includes('foot')) return;
+      obj.getWorldPosition(p);
+      this.anchor!.worldToLocal(p);
+      minY = Math.min(minY, p.y);
+    });
+
+    return minY === Infinity ? null : minY;
   }
 
   private fitModel(model: THREE.Object3D, clips: THREE.AnimationClip[]): void {
@@ -276,8 +348,6 @@ export class DemogorgonTargetVisual {
         this.playIdle();
       }
     });
-
-    this.playIdle();
   }
 
   private playIdle(): void {
