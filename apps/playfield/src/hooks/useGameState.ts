@@ -8,7 +8,7 @@ import {
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
-import { handlePinballSoundEvent, playGameOverSound } from "../audio/PinballSounds";
+import { handlePinballSoundEvent, playGameOverSound } from "../audio/pinballAudio";
 import { playfieldToScreenPercent, jitterScreenPoint } from "../utils/playfieldScreen";
 
 export type GameState = "idle" | "playing" | "game_over";

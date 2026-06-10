@@ -1,4 +1,6 @@
 import dynamic from 'next/dynamic';
+import Head from 'next/head';
+import '@/audio/pinballAudio';
 
 const PinballPlayfield = dynamic(
   () => import('@/components/pinball/PinballPlayfield'),
@@ -6,5 +8,12 @@ const PinballPlayfield = dynamic(
 );
 
 export default function PinballPage() {
-  return <PinballPlayfield />;
+  return (
+    <>
+      <Head>
+        <link rel="preload" href="/audio/early-sound.mp3" as="audio" type="audio/mpeg" />
+      </Head>
+      <PinballPlayfield />
+    </>
+  );
 }
