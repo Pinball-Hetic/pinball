@@ -222,29 +222,63 @@ export class BumperVineTextures {
   private paint(elapsed: number): void {
     const { albedoCtx, emissiveCtx, vines } = this;
     const s = TEXTURE_SIZE;
+    const t = elapsed;
 
-    albedoCtx.fillStyle = '#3a1828';
+    albedoCtx.fillStyle = '#3a1018';
     albedoCtx.fillRect(0, 0, s, s);
 
-    const albedoGrad = albedoCtx.createRadialGradient(s * 0.5, s * 0.5, s * 0.05, s * 0.5, s * 0.5, s * 0.55);
-    albedoGrad.addColorStop(0, '#5a2840');
-    albedoGrad.addColorStop(1, '#281018');
-    albedoCtx.fillStyle = albedoGrad;
+    const nebulaBlobs = [
+      { cx: 0.42, cy: 0.44, r: 0.42, inner: '#c04070', outer: '#00000000' },
+      { cx: 0.58, cy: 0.56, r: 0.38, inner: '#9030a8', outer: '#00000000' },
+      { cx: 0.5, cy: 0.5, r: 0.3, inner: '#e03050', outer: '#00000000' },
+      { cx: 0.35, cy: 0.62, r: 0.28, inner: '#6020a0', outer: '#00000000' },
+      { cx: 0.65, cy: 0.38, r: 0.25, inner: '#b02858', outer: '#00000000' },
+    ];
+
+    for (const blob of nebulaBlobs) {
+      const ox = s * (blob.cx + Math.sin(t * 0.15 + blob.cx * 10) * 0.03);
+      const oy = s * (blob.cy + Math.cos(t * 0.12 + blob.cy * 10) * 0.03);
+      const grad = albedoCtx.createRadialGradient(ox, oy, 0, ox, oy, s * blob.r);
+      grad.addColorStop(0, blob.inner);
+      grad.addColorStop(1, blob.outer);
+      albedoCtx.globalAlpha = 0.72;
+      albedoCtx.fillStyle = grad;
+      albedoCtx.fillRect(0, 0, s, s);
+    }
+    albedoCtx.globalAlpha = 1;
+
+    const rimGrad = albedoCtx.createRadialGradient(s * 0.5, s * 0.5, s * 0.15, s * 0.5, s * 0.5, s * 0.52);
+    rimGrad.addColorStop(0, '#00000000');
+    rimGrad.addColorStop(0.7, '#00000000');
+    rimGrad.addColorStop(1, '#6a1828');
+    albedoCtx.fillStyle = rimGrad;
     albedoCtx.fillRect(0, 0, s, s);
 
-    emissiveCtx.fillStyle = '#180810';
+    emissiveCtx.fillStyle = '#200810';
     emissiveCtx.fillRect(0, 0, s, s);
 
-    for (const vine of vines) {
-      drawVineStroke(albedoCtx, vine, elapsed, '#6a3048', 1);
-      drawVineStroke(albedoCtx, vine, elapsed + 0.4, '#4a2030', 0.55);
+    const glowBlobs = [
+      { cx: 0.5, cy: 0.5, r: 0.35, color: '#ff2244' },
+      { cx: 0.42, cy: 0.44, r: 0.28, color: '#e83868' },
+      { cx: 0.58, cy: 0.55, r: 0.25, color: '#cc40aa' },
+    ];
 
-      const glow = emissiveCtx.createLinearGradient(vine.sx, vine.sy, vine.ex, vine.ey);
-      glow.addColorStop(0, '#802040');
-      glow.addColorStop(0.5, '#e83858');
-      glow.addColorStop(1, '#b02848');
-      drawVineStroke(emissiveCtx, vine, elapsed, glow, 1.15);
-      drawVineStroke(emissiveCtx, vine, elapsed + 0.25, '#c03050', 0.45);
+    for (const blob of glowBlobs) {
+      const ox = s * (blob.cx + Math.sin(t * 0.2 + blob.cx * 8) * 0.04);
+      const oy = s * (blob.cy + Math.cos(t * 0.18 + blob.cy * 8) * 0.04);
+      const grad = emissiveCtx.createRadialGradient(ox, oy, 0, ox, oy, s * blob.r);
+      grad.addColorStop(0, blob.color);
+      grad.addColorStop(0.55, '#c02040');
+      grad.addColorStop(1, '#00000000');
+      emissiveCtx.globalAlpha = 0.85;
+      emissiveCtx.fillStyle = grad;
+      emissiveCtx.fillRect(0, 0, s, s);
+    }
+    emissiveCtx.globalAlpha = 1;
+
+    for (const vine of vines) {
+      drawVineStroke(albedoCtx, vine, elapsed, '#5a1828', 0.35);
+      drawVineStroke(emissiveCtx, vine, elapsed, '#802040', 0.3);
     }
 
     this.albedoMap.needsUpdate = true;

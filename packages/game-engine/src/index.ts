@@ -6,13 +6,14 @@ export * from './domain/FlipperConstants';
 export * from './domain/UpsideDownConstants';
 export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
+export * from './domain/ScoringConstants';
+export * from './domain/LiveGameSnapshot';
 
 // Use-cases
 export * from './use-cases/LaunchBall';
 export * from './use-cases/BumperHit';
 export * from './use-cases/DrainBall';
 export * from './use-cases/BottomOutBall';
-export * from './use-cases/DetectFlipperHit';
 export * from './use-cases/DetectStuckBall';
 export * from './use-cases/DetectBottomOut';
 

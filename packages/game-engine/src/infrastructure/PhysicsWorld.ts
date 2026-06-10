@@ -12,7 +12,9 @@ export class PhysicsWorld {
   static async create(): Promise<PhysicsWorld> {
     await RAPIER.init();
     // Straight down — playfield tilt is baked into the GLB trimesh geometry
-    const gravity = { x: 0, y: -11.5, z: 0 };
+    // 9.81 réel : descente downslope ≈ 1.1 m/s² (glisse) / 0.79 (roulis).
+    // Ne pas booster — une bille qui "tombe" au lieu de rouler tue le feel.
+    const gravity = { x: 0, y: -9.81, z: 0 };
     const world = new RAPIER.World(gravity);
     world.timestep = 1 / 120;
     return new PhysicsWorld(world);

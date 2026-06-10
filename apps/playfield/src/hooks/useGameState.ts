@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   INITIAL_LIVES,
   DEMOGORGON_TARGET_HITS,
@@ -7,7 +7,7 @@ import {
   PORTAL_UPSIDE_DOWN,
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
-import type { GameEventListener } from "@pinball/game-engine";
+import type { GameEvent, GameEventListener } from "@pinball/game-engine";
 import { handlePinballSoundEvent } from "../audio/PinballSounds";
 import { playfieldToScreenPercent, jitterScreenPoint } from "../utils/playfieldScreen";
 
@@ -28,6 +28,38 @@ export type DemogorgonHud = {
   elevenFlash: boolean;
 };
 
+export interface ScoringCallbacks {
+  onScoreEvent?: (info: {
+    event: GameEvent;
+    finalPoints: number;
+    previousCombo: number;
+    newCombo: number;
+    previousMultiplier: number;
+    newMultiplier: number;
+  }) => void;
+  onLifeLost?: (livesRemaining: number) => void;
+  onGameOver?: (finalScore: number) => void;
+  onGameStart?: () => void;
+  onIdleReset?: () => void;
+  onAtmosphereChange?: (upsideDownActive: boolean) => void;
+}
+
+const COMBO_DECAY_MS = 2000;
+const MULTIPLIER_THRESHOLDS = [5, 10, 20, 40] as const;
+
+function computeMultiplier(combo: number): number {
+  if (combo < MULTIPLIER_THRESHOLDS[0]) return 1;
+  if (combo < MULTIPLIER_THRESHOLDS[1]) return 2;
+  if (combo < MULTIPLIER_THRESHOLDS[2]) return 3;
+  if (combo < MULTIPLIER_THRESHOLDS[3]) return 4;
+  return 5;
+}
+
+function generatePlayerName(): string {
+  const n = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+  return `PLAYER${n}`;
+}
+
 const initialDemogorgonHud = (): DemogorgonHud => ({
   active: false,
   hits: 0,
@@ -35,10 +67,13 @@ const initialDemogorgonHud = (): DemogorgonHud => ({
   elevenFlash: false,
 });
 
-export function useGameState() {
+export function useGameState(callbacks?: ScoringCallbacks) {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(INITIAL_LIVES);
   const [gameState, setGameState] = useState<GameState>("idle");
+  const [combo, setCombo] = useState(0);
+  const [multiplier, setMultiplier] = useState(1);
+  const [player, setPlayer] = useState<string>(() => generatePlayerName());
   const [demogorgonHud, setDemogorgonHud] = useState<DemogorgonHud>(initialDemogorgonHud);
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
   const [upsideDownActive, setUpsideDownActive] = useState(false);
@@ -47,11 +82,35 @@ export function useGameState() {
   const scoreRef = useRef(0);
   const livesRef = useRef(INITIAL_LIVES);
   const gameStateRef = useRef<GameState>("idle");
+  const comboRef = useRef(0);
+  const multiplierRef = useRef(1);
+  const lastEventTimeRef = useRef(0);
+  const playerRef = useRef(player);
   const victoryTimerRef = useRef<number | null>(null);
   const elevenTimerRef = useRef<number | null>(null);
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
   const upsideDownHintTimerRef = useRef<number | null>(null);
+
+  // Sync ref to state when player change
+  useEffect(() => {
+    playerRef.current = player;
+  }, [player]);
+
+  useEffect(() => {
+    const tick = window.setInterval(() => {
+      if (
+        comboRef.current > 0 &&
+        performance.now() - lastEventTimeRef.current > COMBO_DECAY_MS
+      ) {
+        comboRef.current = 0;
+        multiplierRef.current = 1;
+        setCombo(0);
+        setMultiplier(1);
+      }
+    }, 250);
+    return () => window.clearInterval(tick);
+  }, []);
 
   const clearScorePops = useCallback(() => {
     for (const timer of scorePopTimersRef.current.values()) {
@@ -82,8 +141,9 @@ export function useGameState() {
 
   const clearUpsideDownSession = useCallback(() => {
     clearUpsideDownHint();
+    callbacks?.onAtmosphereChange?.(false);
     setUpsideDownActive(false);
-  }, [clearUpsideDownHint]);
+  }, [clearUpsideDownHint, callbacks]);
 
   const clearDemogorgonHud = useCallback(() => {
     if (victoryTimerRef.current !== null) {
@@ -102,6 +162,20 @@ export function useGameState() {
     setGameState(state);
   };
 
+  const applyComboEvent = (now: number): { prevCombo: number; prevMult: number } => {
+    const prevCombo = comboRef.current;
+    const prevMult = multiplierRef.current;
+    const isDecayed = prevCombo === 0 || now - lastEventTimeRef.current > COMBO_DECAY_MS;
+    const nextCombo = isDecayed ? 1 : prevCombo + 1;
+    const nextMult = computeMultiplier(nextCombo);
+    comboRef.current = nextCombo;
+    multiplierRef.current = nextMult;
+    lastEventTimeRef.current = now;
+    setCombo(nextCombo);
+    if (nextMult !== prevMult) setMultiplier(nextMult);
+    return { prevCombo, prevMult };
+  };
+
   const handleDrain = (hideBall: () => void) => {
     const newLives = livesRef.current - 1;
     livesRef.current = newLives;
@@ -109,8 +183,10 @@ export function useGameState() {
     if (newLives <= 0) {
       hideBall();
       updateGameState("game_over");
+      callbacks?.onGameOver?.(scoreRef.current);
     } else {
       updateGameState("idle");
+      callbacks?.onLifeLost?.(newLives);
     }
   };
 
@@ -119,19 +195,41 @@ export function useGameState() {
     setScore(0);
     livesRef.current = INITIAL_LIVES;
     setLives(INITIAL_LIVES);
+    comboRef.current = 0;
+    multiplierRef.current = 1;
+    setCombo(0);
+    setMultiplier(1);
+    lastEventTimeRef.current = 0;
+    const newName = generatePlayerName();
+    setPlayer(newName);
+    playerRef.current = newName;
     clearDemogorgonHud();
     clearScorePops();
     clearUpsideDownSession();
     updateGameState("idle");
+    callbacks?.onIdleReset?.();
   };
 
   const buildEmit = (hideBall: () => void): GameEventListener =>
     (event) => {
       handlePinballSoundEvent(event);
 
+      const now = performance.now();
+
       if ("scoreIncrement" in event && event.scoreIncrement) {
-        scoreRef.current += event.scoreIncrement;
+        const comboChange = applyComboEvent(now);
+        const finalPoints = event.scoreIncrement * multiplierRef.current;
+        scoreRef.current += finalPoints;
         setScore(scoreRef.current);
+
+        callbacks?.onScoreEvent?.({
+          event,
+          finalPoints,
+          previousCombo: comboChange.prevCombo,
+          newCombo: comboRef.current,
+          previousMultiplier: comboChange.prevMult,
+          newMultiplier: multiplierRef.current,
+        });
       }
       if (event.type === "BUMPER_HIT") {
         const bumper = BUMPER_POSITIONS[event.bumperIndex];
@@ -140,7 +238,7 @@ export function useGameState() {
             playfieldToScreenPercent(bumper.x, bumper.z),
           );
           pushScorePop({
-            amount: event.scoreIncrement,
+            amount: event.scoreIncrement * multiplierRef.current,
             x: point.x,
             y: point.y,
             tone: "bumper",
@@ -153,7 +251,7 @@ export function useGameState() {
           4,
         );
         pushScorePop({
-          amount: event.scoreIncrement,
+          amount: event.scoreIncrement * multiplierRef.current,
           x: point.x,
           y: point.y,
           tone: "target",
@@ -195,11 +293,16 @@ export function useGameState() {
         }, 900);
       }
       if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
+        comboRef.current = 0;
+        multiplierRef.current = 1;
+        setCombo(0);
+        setMultiplier(1);
         clearDemogorgonHud();
         clearScorePops();
         handleDrain(hideBall);
       }
       if (event.type === "BALL_LAUNCHED") {
+        if (gameStateRef.current === "idle") callbacks?.onGameStart?.();
         updateGameState("playing");
       }
       if (event.type === "PORTAL_ENTER") {
@@ -208,7 +311,7 @@ export function useGameState() {
           3,
         );
         pushScorePop({
-          amount: event.scoreIncrement,
+          amount: event.scoreIncrement * multiplierRef.current,
           x: point.x,
           y: point.y,
           tone: "target",
@@ -224,6 +327,7 @@ export function useGameState() {
           upsideDownHintTimerRef.current = null;
           setUpsideDownHint(false);
         }, UPSIDE_DOWN_HINT_MS);
+        callbacks?.onAtmosphereChange?.(true);
       }
     };
 
@@ -232,6 +336,14 @@ export function useGameState() {
     lives,
     gameState,
     gameStateRef,
+    combo,
+    multiplier,
+    player,
+    scoreRef,
+    livesRef,
+    comboRef,
+    multiplierRef,
+    playerRef,
     demogorgonHud,
     scorePops,
     upsideDownActive,
