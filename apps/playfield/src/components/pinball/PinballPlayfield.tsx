@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import {
   PhysicsWorld,
   BallPhysics,
@@ -30,6 +30,13 @@ import {
   SWING_SMOOTH,
   FLIPPER_RESTITUTION,
   FLIPPER_FRICTION,
+  FLIPPER_Z_MIN,
+  FLIPPER_Z_MAX,
+  FLIPPER_LEFT_X_MIN,
+  FLIPPER_LEFT_X_MAX,
+  FLIPPER_RIGHT_X_MIN,
+  FLIPPER_RIGHT_X_MAX,
+  FLIPPER_MIN_LAUNCH_VZ,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   playfieldUsesCollOnlyCollision,
@@ -38,7 +45,6 @@ import {
   applyFlipperSwing,
   type FlipperPivot,
   CollisionEventProcessor,
-  detectFlipperHit,
   StuckBallDetector,
   BallDiagnostics,
   type BallDiagnosticsSnapshot,
@@ -480,8 +486,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let leftFlipperObj: THREE.Object3D | null = null;
     let rightFlipperObj: THREE.Object3D | null = null;
     let leftSwing = 0, rightSwing = 0;
-    let leftTarget = 0, rightTarget = 0;
     let prevLeftSwing = 0, prevRightSwing = 0;
+    let leftTarget = 0, rightTarget = 0;
 
     // ── Physics / game objects ───────────────────────────────────────────────
     let ballMesh: THREE.Object3D | null = null;
@@ -501,6 +507,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
+    // Offset local (mesh-origin → geoCenter) — positionne le body cinématique
+    // au vrai centre géométrique du mesh et pas à l'origine du groupe parent.
+    const leftFlipperBodyOffset  = new THREE.Vector3();
+    const rightFlipperBodyOffset = new THREE.Vector3();
     let isChargingPlunger = false;
     let chargeStartTime = 0;
     let physicsReady = false;
@@ -508,8 +518,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
 
-    let leftFlipperHit = false;
-    let rightFlipperHit = false;
 
     // ── Flipper collider debug wireframes ────────────────────────────────────
     let leftFlipperDebug: THREE.Mesh | null = null;
@@ -715,52 +723,61 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         ballPhysicsInst = new BallPhysics(world);
 
-        // ── Flipper kinematic bodies (ConvexHull) ─────────────────────────────
+        // ── Flipper : corps cinématique + convex hull ─────────────────────────
         const makeFlipperBody = (
           flipper: THREE.Mesh | null,
           debugColor: number,
-        ): { body: RAPIER.RigidBody | null; debugMesh: THREE.Mesh | null } => {
-          if (!flipper) return { body: null, debugMesh: null };
+        ): { body: RAPIER.RigidBody | null; debugMesh: THREE.Mesh | null; localOffset: THREE.Vector3 } => {
+          if (!flipper) return { body: null, debugMesh: null, localOffset: new THREE.Vector3() };
           flipper.updateMatrixWorld(true);
-          const worldPos = new THREE.Vector3();
-          const worldQuat = new THREE.Quaternion();
-          flipper.getWorldPosition(worldPos);
+          const meshOrigin = new THREE.Vector3();
+          const worldQuat  = new THREE.Quaternion();
+          flipper.getWorldPosition(meshOrigin);
           flipper.getWorldQuaternion(worldQuat);
           const invWorldQuat = worldQuat.clone().invert();
           const posAttr = flipper.geometry.attributes.position as THREE.BufferAttribute;
-          const allBodyLocal: THREE.Vector3[] = [];
+          const n = posAttr.count;
           const v = new THREE.Vector3();
-          for (let i = 0; i < posAttr.count; i++) {
-            v.fromBufferAttribute(posAttr, i);
-            v.applyMatrix4(flipper.matrixWorld);
-            v.sub(worldPos);
-            v.applyQuaternion(invWorldQuat);
-            allBodyLocal.push(v.clone());
+
+          // Centre géométrique réel (pas l'origine du groupe parent)
+          let wSumX = 0, wSumY = 0, wSumZ = 0;
+          for (let i = 0; i < n; i++) {
+            v.fromBufferAttribute(posAttr, i).applyMatrix4(flipper.matrixWorld);
+            wSumX += v.x; wSumY += v.y; wSumZ += v.z;
           }
-          const sortedY = allBodyLocal.map(p => p.y).sort((a, b) => a - b);
-          const medianY = sortedY[Math.floor(sortedY.length * 0.50)];
-          const points = allBodyLocal.filter(p => p.y >= medianY);
+          const geoCenter = new THREE.Vector3(wSumX / n, wSumY / n, wSumZ / n);
+          const localOffset = geoCenter.clone().sub(meshOrigin).applyQuaternion(invWorldQuat);
+
+          // Vertices en espace body-local (centré sur geoCenter)
+          const localPts: THREE.Vector3[] = [];
           const raw: number[] = [];
-          for (const p of points) raw.push(p.x, p.y, p.z);
+          for (let i = 0; i < n; i++) {
+            v.fromBufferAttribute(posAttr, i).applyMatrix4(flipper.matrixWorld);
+            v.sub(geoCenter).applyQuaternion(invWorldQuat);
+            localPts.push(v.clone());
+            raw.push(v.x, v.y, v.z);
+          }
+
           const body = world.createRigidBody(
-            RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(worldPos.x, worldPos.y, worldPos.z),
+            RAPIER.RigidBodyDesc.kinematicPositionBased()
+              .setTranslation(geoCenter.x, geoCenter.y, geoCenter.z)
+              .setRotation({ x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w }),
           );
-          const desc = RAPIER.ColliderDesc.convexHull(new Float32Array(raw));
-          if (desc) {
+
+          const hullDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(raw));
+          if (hullDesc) {
             world.createCollider(
-              desc.setRestitution(FLIPPER_RESTITUTION).setFriction(FLIPPER_FRICTION)
+              hullDesc
+                .setRestitution(FLIPPER_RESTITUTION)
+                .setFriction(FLIPPER_FRICTION)
                 .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
               body,
             );
           }
 
-          const convexGeo = new ConvexGeometry(points);
+          const convexGeo = new ConvexGeometry(localPts);
           const convexMat = new THREE.MeshBasicMaterial({
-            color: debugColor,
-            wireframe: true,
-            transparent: true,
-            opacity: 0.85,
-            depthTest: false,
+            color: debugColor, wireframe: true, transparent: true, opacity: 0.85, depthTest: false,
           });
           const debugMesh = new THREE.Mesh(convexGeo, convexMat);
           debugMesh.renderOrder = 999;
@@ -769,15 +786,17 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           disposableGeos.push(convexGeo);
           disposableMats.push(convexMat);
 
-          return { body, debugMesh };
+          return { body, debugMesh, localOffset };
         };
 
-        const leftResult = makeFlipperBody(leftFlipper as THREE.Mesh | null, 0x00ffff);
+        const leftResult  = makeFlipperBody(leftFlipper  as THREE.Mesh | null, 0x00ffff);
         const rightResult = makeFlipperBody(rightFlipper as THREE.Mesh | null, 0xff00ff);
-        leftFlipperBody = leftResult.body;
+        leftFlipperBody  = leftResult.body;
         rightFlipperBody = rightResult.body;
-        leftFlipperDebug = leftResult.debugMesh;
+        leftFlipperDebug  = leftResult.debugMesh;
         rightFlipperDebug = rightResult.debugMesh;
+        leftFlipperBodyOffset.copy(leftResult.localOffset);
+        rightFlipperBodyOffset.copy(rightResult.localOffset);
 
         ballPhysicsInst.setSpawnPosition(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, BALL_SPAWN_POSITION.z);
         ballPhysicsInst.body.wakeUp();
@@ -1117,6 +1136,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     const syncFlipperBody = (
       body: RAPIER.RigidBody | null,
       flipper: THREE.Object3D | null,
+      localOffset: THREE.Vector3,
     ) => {
       if (!body || !flipper) return;
       flipper.updateMatrixWorld(true);
@@ -1124,6 +1144,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const wq = new THREE.Quaternion();
       flipper.getWorldPosition(wp);
       flipper.getWorldQuaternion(wq);
+      const worldOffset = localOffset.clone().applyQuaternion(wq);
+      wp.add(worldOffset);
       body.setNextKinematicTranslation({ x: wp.x, y: wp.y, z: wp.z });
       body.setNextKinematicRotation({ x: wq.x, y: wq.y, z: wq.z, w: wq.w });
     };
@@ -1147,28 +1169,47 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (transitionActive) {
         upsideDownTransition?.update(dt);
       } else {
-        prevLeftSwing = leftSwing;
+        // ── Flipper cinématique : Three.js → Rapier ───────────────────────────
+        prevLeftSwing  = leftSwing;
         prevRightSwing = rightSwing;
-        leftSwing += (leftTarget * SWING_RAD - leftSwing) * SWING_SMOOTH;
+        leftSwing  += (leftTarget  * SWING_RAD - leftSwing)  * SWING_SMOOTH;
         rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
-        if (leftFlipperPivot) applyFlipperSwing(leftFlipperPivot, leftSwing);
+        if (leftFlipperPivot)  applyFlipperSwing(leftFlipperPivot,  leftSwing);
         if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
 
-        syncFlipperBody(leftFlipperBody, leftFlipperObj);
-        syncFlipperBody(rightFlipperBody, rightFlipperObj);
-      }
+        syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftFlipperBodyOffset);
+        syncFlipperBody(rightFlipperBody, rightFlipperObj, rightFlipperBodyOffset);
 
-      if (leftFlipperDebug && leftFlipperObj && !transitionActive) {
-        const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
-        leftFlipperObj.getWorldPosition(wp); leftFlipperObj.getWorldQuaternion(wq);
-        leftFlipperDebug.position.copy(wp);
-        leftFlipperDebug.quaternion.copy(wq);
-      }
-      if (rightFlipperDebug && rightFlipperObj && !transitionActive) {
-        const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
-        rightFlipperObj.getWorldPosition(wp); rightFlipperObj.getWorldQuaternion(wq);
-        rightFlipperDebug.position.copy(wp);
-        rightFlipperDebug.quaternion.copy(wq);
+        // ── Garantie de vitesse minimale ─────────────────────────────────────
+        // Le contact cinématique est quasi nul près de la charnière.
+        // Quand le flipper est en train de monter ET que la balle est dans la
+        // zone flipper, on garantit une vitesse -Z minimale sans override si la
+        // physique fait déjà mieux.
+        if (ballPhysicsInst && gameStateRef.current === 'playing') {
+          const bp = ballPhysicsInst.body.translation();
+          const bv = ballPhysicsInst.body.linvel();
+          const inZ = bp.z > FLIPPER_Z_MIN && bp.z < FLIPPER_Z_MAX;
+          const dL = leftSwing  - prevLeftSwing;
+          const dR = rightSwing - prevRightSwing;
+          if (inZ && dL > 0.004 && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+            ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
+          if (inZ && dR > 0.004 && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+            ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
+        }
+
+        // ── Debug wireframes ─────────────────────────────────────────────────
+        if (leftFlipperDebug && leftFlipperObj) {
+          const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
+          leftFlipperObj.getWorldPosition(wp); leftFlipperObj.getWorldQuaternion(wq);
+          wp.add(leftFlipperBodyOffset.clone().applyQuaternion(wq));
+          leftFlipperDebug.position.copy(wp); leftFlipperDebug.quaternion.copy(wq);
+        }
+        if (rightFlipperDebug && rightFlipperObj) {
+          const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
+          rightFlipperObj.getWorldPosition(wp); rightFlipperObj.getWorldQuaternion(wq);
+          wp.add(rightFlipperBodyOffset.clone().applyQuaternion(wq));
+          rightFlipperDebug.position.copy(wp); rightFlipperDebug.quaternion.copy(wq);
+        }
       }
 
       if (physicsWorld && !transitionActive) physicsWorld.update(time);
@@ -1198,31 +1239,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         && upsideDownPortal?.isOpen()
       ) {
         upsideDownPortal.applyMagnet(ballPhysicsInst.body);
-      }
-
-      if (ballPhysicsInst && gameStateRef.current === "playing" && !transitionActive) {
-        const bp = ballPhysicsInst.body.translation();
-        const bv = ballPhysicsInst.body.linvel();
-        const { result, leftHit, rightHit } = detectFlipperHit(
-          bp,
-          bv,
-          leftSwing, prevLeftSwing,
-          rightSwing, prevRightSwing,
-          leftFlipperHit, rightFlipperHit,
-        );
-        leftFlipperHit = leftHit;
-        rightFlipperHit = rightHit;
-        if (result) {
-          const v = ballPhysicsInst.body.linvel();
-          const damp = 0.55;
-          ballPhysicsInst.body.setLinvel(
-            { x: v.x * damp, y: v.y * damp, z: v.z * damp },
-            true,
-          );
-          ballPhysicsInst.body.applyImpulse(result.impulse, true);
-        }
-        if (leftTarget === 0) leftFlipperHit = false;
-        if (rightTarget === 0) rightFlipperHit = false;
       }
 
       // Ball sync

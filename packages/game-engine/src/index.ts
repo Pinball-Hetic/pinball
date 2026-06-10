@@ -14,7 +14,6 @@ export * from './use-cases/LaunchBall';
 export * from './use-cases/BumperHit';
 export * from './use-cases/DrainBall';
 export * from './use-cases/BottomOutBall';
-export * from './use-cases/DetectFlipperHit';
 export * from './use-cases/DetectStuckBall';
 export * from './use-cases/DetectBottomOut';
 
