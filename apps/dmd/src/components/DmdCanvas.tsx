@@ -40,6 +40,9 @@ export default function DmdCanvas({ display, upsideDown }: Props) {
     const renderer = new DmdRenderer(canvas)
     const rain = new MatrixRain(GRID_W, GRID_H)
     let prevMode = displayRef.current.mode
+    let prevClip: string | undefined =
+      displayRef.current.mode === 'CINEMATIC' ? displayRef.current.clip : undefined
+    let modeStartedAt = performance.now()
     let glitchUntil = 0
     let burstUntil = 0
     let raf = 0
@@ -47,21 +50,31 @@ export default function DmdCanvas({ display, upsideDown }: Props) {
       const now = performance.now()
       const d = displayRef.current
 
-      // Triggers d'effets sur changement de mode.
-      if (d.mode !== prevMode) {
+      // Triggers d'effets sur changement de mode OU de clip (deux clips
+      // CINEMATIC consécutifs gardent mode='CINEMATIC' → il faut quand même
+      // remettre l'horloge à zéro pour le nouveau clip).
+      const clipNow = d.mode === 'CINEMATIC' ? d.clip : undefined
+      if (d.mode !== prevMode || clipNow !== prevClip) {
+        modeStartedAt = now
         if (d.mode === 'EVENT' || d.mode === 'COMBO_FLASH') glitchUntil = now + GLITCH_MS
         if (d.mode === 'GAME_OVER') burstUntil = now + BURST_MS
         prevMode = d.mode
+        prevClip = clipNow
       }
+
+      const cinematic = d.mode === 'CINEMATIC'
+      // CINEMATIC : horloge relative à l'arrivée du mode (frames du clip).
+      const clock = cinematic ? now - modeStartedAt : now
 
       renderer.setPalette(upsideDownRef.current ? 'upsideDown' : 'normal')
       renderer.clearGrid()
-      layouts[d.mode](renderer.grid, d, now)
+      layouts[d.mode](renderer.grid, d, clock)
       if (upsideDownRef.current) rain.drawBackground(renderer.grid)
-      if (now < glitchUntil) {
+      // Glitch/burst NE s'appliquent PAS pendant un clip (il se suffit).
+      if (!cinematic && now < glitchUntil) {
         applyGlitch(renderer.grid, GRID_W, GRID_H, (glitchUntil - now) / GLITCH_MS)
       }
-      if (now < burstUntil) {
+      if (!cinematic && now < burstUntil) {
         rain.drawBurst(renderer.grid, (burstUntil - now) / BURST_MS)
       }
       renderer.render()

@@ -3,6 +3,18 @@ import { FONT_5X7, FONT_12X22, drawText, measureText } from './fonts'
 import { GRID_W } from './DmdRenderer'
 import { DOT } from './palette'
 import { attractFrame } from './attract'
+import {
+  clipFor,
+  drawClipFrame,
+  revealRadial,
+  dissolve,
+  HERO_FRAME,
+} from './AsciiClipPlayer'
+
+// Palette du demogorgon (rouge + accent jaune) pour les transfos procédurales.
+const HERO_MAP = { ':': DOT.heticOff, '#': DOT.lives, '@': DOT.gameOver, '!': DOT.event }
+// Variante pulse : '!' ↔ '@' inversés (gueule qui clignote).
+const HERO_MAP_PULSE = { ':': DOT.heticOff, '#': DOT.lives, '@': DOT.event, '!': DOT.gameOver }
 
 const TOTAL_LIVES = 3
 
@@ -109,8 +121,65 @@ function layoutGameOver(grid: Uint8Array, display: DmdDisplay, clockMs: number):
   }
 }
 
+// clockMs = temps écoulé depuis l'arrivée du mode CINEMATIC (le DmdCanvas
+// passe l'elapsed pour ce mode, pas l'horloge absolue).
+function layoutCinematic(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
+  const d = display as Variant<'CINEMATIC'>
+
+  // ── demogorgon_rises (4000ms) : pousse radiale puis pulse ───────────────
+  if (d.clip === 'demogorgon_rises') {
+    if (clockMs < 2800) {
+      revealRadial(grid, HERO_FRAME, HERO_MAP, clockMs / 2800)
+    } else {
+      // frame complète, gueule qui clignote (inversion '!'/'@' toutes les 300ms)
+      const pulse = Math.floor((clockMs - 2800) / 300) % 2 === 0
+      revealRadial(grid, HERO_FRAME, pulse ? HERO_MAP : HERO_MAP_PULSE, 1)
+    }
+    return
+  }
+
+  // ── demogorgon_slain (3500ms) : flash → dissolve → VAINCU +500 ──────────
+  if (d.clip === 'demogorgon_slain') {
+    if (clockMs < 600) {
+      // flash : 2 ticks accent plein
+      const accent = Math.floor(clockMs / 150) % 2 === 0
+      revealRadial(grid, HERO_FRAME, accent ? HERO_MAP_PULSE : HERO_MAP, 1)
+    } else if (clockMs < 2600) {
+      dissolve(grid, HERO_FRAME, HERO_MAP, (clockMs - 600) / 2000)
+    } else {
+      drawCentered(grid, 'VAINCU', 4, FONT_5X7, DOT.event, 1, 2)
+      drawCentered(grid, '+500', 20, FONT_5X7, DOT.gameOver, 1, 1)
+    }
+    return
+  }
+
+  const clip = clipFor(d.clip)
+  if (!clip) return
+
+  if (d.clip === 'hall_of_fame') {
+    // 3.5s de cadre étoilé, puis le compteur roule de 0 au score en 1.5s.
+    if (clockMs < 3500) {
+      drawClipFrame(grid, clip, clockMs)
+      drawCentered(grid, 'HALL OF FAME', 13, FONT_5X7, DOT.marquee)
+    } else {
+      const t = Math.min(1, (clockMs - 3500) / 1500)
+      const eased = 1 - Math.pow(1 - t, 3)
+      const shown = Math.round(d.score * eased)
+      drawCentered(grid, 'HALL OF FAME', 2, FONT_5X7, DOT.marquee)
+      drawCentered(grid, String(shown), 11, FONT_12X22, DOT.score)
+    }
+    return
+  }
+
+  drawClipFrame(grid, clip, clockMs)
+  if (d.clip === 'last_chance') {
+    drawCentered(grid, 'DERNIERE VIE', 25, FONT_5X7, DOT.lives)
+  }
+}
+
 export const layouts: Record<DmdDisplay['mode'], LayoutFn> = {
   INTRO: layoutIntro,
+  CINEMATIC: layoutCinematic,
   SCORE: layoutScore,
   EVENT: layoutEvent,
   COMBO_FLASH: layoutComboFlash,

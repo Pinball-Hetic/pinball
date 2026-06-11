@@ -6,6 +6,7 @@ import type {
   DmdDisplay,
   ScoreUpdate,
   GameStats,
+  CinematicClip,
 } from '@pinball/shared-types';
 import type { GameEvent } from '@pinball/game-engine';
 
@@ -18,6 +19,7 @@ interface DisplayPushOpts {
 
 // Priorités (plus haut = plus prioritaire) :
 const PRIO = {
+  CINEMATIC: 110,
   GAME_OVER: 100,
   LIFE_LOST: 80,
   EVENT: 60,
@@ -32,6 +34,16 @@ const DURATIONS = {
   COMBO_FLASH: 1500,
   MULTI_FLASH: 1500,
 } as const;
+
+// Durées des clips cinématiques (alignées avec le CinematicDirector côté
+// playfield → les 3 écrans restent synchronisés).
+const CLIP_DURATIONS: Record<CinematicClip, number> = {
+  demogorgon_rises: 4000,
+  portal_swallow: 4000,
+  demogorgon_slain: 3500,
+  last_chance: 1200,
+  hall_of_fame: 7000,
+};
 
 // upsideDown est injecté au moment de l'emit (atmosphereRef) — la stack
 // stocke les displays sans ce champ. Omit distributif sur l'union.
@@ -52,6 +64,8 @@ export interface DmdOrchestrator {
   emitScoreSnapshot: (s: ScoreUpdate) => void;
   emitGameStart: (player: string) => void;
   emitGameOver: (player: string, finalScore: number, stats: GameStats) => void;
+  // Clip cinématique plein écran (prio max) — synchro avec playfield/backglass.
+  pushCinematic: (clip: CinematicClip) => void;
   // DMD high-level : push une display, l'orchestrator décide quoi montrer
   pushIntro: (player: string) => void;
   pushScore: (s: ScoreUpdate) => void;
@@ -83,6 +97,8 @@ export function useDmdOrchestrator(): DmdOrchestrator {
   const stackRef = useRef<PendingDisplay[]>([]);
   const lastSentRef = useRef<string>(''); // JSON.stringify de la dernière display envoyée
   const atmosphereRef = useRef<boolean>(false);
+  // Dernier snapshot joueur/score (pour alimenter pushCinematic).
+  const lastSnapRef = useRef<{ player: string; score: number }>({ player: '', score: 0 });
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
@@ -129,7 +145,10 @@ export function useDmdOrchestrator(): DmdOrchestrator {
   };
 
   return {
-    emitScoreSnapshot: (s) => socketRef.current?.emit('score:update', s),
+    emitScoreSnapshot: (s) => {
+      lastSnapRef.current = { player: s.player, score: s.score };
+      socketRef.current?.emit('score:update', s);
+    },
     emitGameStart: (player) => socketRef.current?.emit('game:start', { player }),
     emitGameOver: (player, finalScore, stats) =>
       socketRef.current?.emit('game:over', { player, finalScore, stats }),
@@ -201,6 +220,14 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       push(
         { mode: 'GAME_OVER', player, finalScore },
         { priority: PRIO.GAME_OVER },
+      );
+    },
+
+    pushCinematic: (clip) => {
+      const { player, score } = lastSnapRef.current;
+      push(
+        { mode: 'CINEMATIC', clip, player, score },
+        { priority: PRIO.CINEMATIC, duration: CLIP_DURATIONS[clip] },
       );
     },
 

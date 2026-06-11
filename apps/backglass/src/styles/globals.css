@@ -444,10 +444,6 @@ body {
 .attract-hof-row { display: grid; grid-template-columns: 80px 520px 260px; font-size: 48px; align-items: center; }
 .attract-hof-row span:last-child { text-align: right; }
 .attract-empty { font-size: 60px; opacity: 0.3; }
-.attract-stats { display: flex; gap: 90px; margin-top: 30px; }
-.attract-stats > div { display: flex; flex-direction: column; align-items: center; }
-.attract-stat-v { font-size: 110px; font-weight: 900; color: #fff; }
-.attract-stat-l { font-size: 26px; letter-spacing: 0.14em; opacity: 0.6; }
 
 /* ===================== VHS glitch ===================== */
 .vhs { position: absolute; inset: 0; overflow: hidden; }
@@ -595,4 +591,93 @@ body {
   20% { filter: brightness(0.4); }
   80% { filter: brightness(0.4); }
   100% { filter: brightness(1); }
+}
+
+/* ===================== Cinematic takeovers ===================== */
+.cine-blackout {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  animation: cine-blackout 2.5s ease-out;
+}
+@keyframes cine-blackout {
+  0% { opacity: 1; }
+  12% { opacity: 1; }
+  30% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.tk-cine-rises { background: radial-gradient(ellipse at 50% 45%, #2a0606 0%, #050202 70%, #000 100%); }
+.cine-giant-side {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 60px #ff2d2d);
+  animation: cine-loom 2.5s ease-out;
+}
+.cine-giant-side > * { width: 70%; height: 100%; }
+@keyframes cine-loom {
+  0% { transform: scale(1.5); opacity: 0; }
+  35% { opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+.cine-run {
+  font-family: var(--st-font);
+  font-size: 240px;
+  font-weight: 900;
+  color: #ff2d2d;
+  letter-spacing: 0.1em;
+  animation: cine-panic 0.18s steps(2) infinite;
+}
+@keyframes cine-panic {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(3px, -2px); }
+}
+
+.tk-cine-portal { background: #060010; }
+.cine-portal-wave {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(177, 77, 255, 0.9) 0%, rgba(120, 40, 220, 0.4) 30%, transparent 70%);
+  animation: cine-portal 4s ease-in;
+}
+@keyframes cine-portal {
+  0% { transform: scale(0); opacity: 0.2; }
+  60% { opacity: 1; }
+  100% { transform: scale(3.2); opacity: 0.85; }
+}
+
+.cine-demo-count {
+  position: absolute;
+  bottom: 80px;
+  left: 0;
+  right: 0;
+  z-index: 55;
+  text-align: center;
+  font-family: var(--st-font);
+  font-size: 64px;
+  font-weight: 900;
+  color: #ffd95e;
+  text-shadow: 0 0 30px #ffae00;
+  animation: slide-in 0.6s ease;
+}
+
+.tk-cine-last { background: #000; }
+.cine-last-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 25%, rgba(255, 20, 20, 0.75) 120%);
+  animation: cine-last 1.2s ease-in-out;
+}
+@keyframes cine-last {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 1; }
+}
+.cine-last-text {
+  color: #ff2d2d;
+  text-shadow: 0 0 30px #ff2d2d;
+  animation: pulse-soft 0.6s ease-in-out infinite;
 }

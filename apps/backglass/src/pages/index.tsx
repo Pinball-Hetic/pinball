@@ -11,13 +11,20 @@ import HighScoreTakeover from '@/components/takeovers/HighScoreTakeover'
 import RecapTakeover from '@/components/takeovers/RecapTakeover'
 import DemogorgonTakeover from '@/components/takeovers/DemogorgonTakeover'
 import AttractScene from '@/components/takeovers/AttractScene'
+import CinematicTakeover from '@/components/takeovers/CinematicTakeover'
 
 export default function BackglassPage() {
   const { entries, stats, connected } = useBackglassData()
-  const { takeover, upsideDown, highlightRank, agitation, joyce } =
+  const { takeover, upsideDown, highlightRank, agitation, joyce, holdHallFlip } =
     useBackglassTakeover(entries)
   const stageRef = useRef<HTMLDivElement>(null)
   const reactor = useIngameReactor(stageRef)
+
+  // Réacteur in-game suspendu pendant un clip cinématique (il ne doit pas
+  // poser de heat/hits par-dessus la scène).
+  useEffect(() => {
+    reactor.setSuspended(takeover?.scene === 'CINEMATIC')
+  }, [reactor, takeover?.scene])
 
   // Scale-to-fit : la borne est en 1920×1080 exact (scale 1), mais on
   // s'adapte aux fenêtres dev plus petites sans casser le layout fixe.
@@ -55,7 +62,7 @@ export default function BackglassPage() {
           <HallOfFame
             entries={entries}
             highlightRank={highlightRank}
-            inverted={upsideDown}
+            inverted={upsideDown && !holdHallFlip}
             reactor={reactor}
           />
         </section>
@@ -76,7 +83,14 @@ export default function BackglassPage() {
             )}
             {takeover.scene === 'DEMOGORGON' && <DemogorgonTakeover />}
             {takeover.scene === 'ATTRACT' && (
-              <AttractScene entries={entries} stats={stats} />
+              <AttractScene entries={entries} />
+            )}
+            {takeover.scene === 'CINEMATIC' && takeover.clip && (
+              <CinematicTakeover
+                clip={takeover.clip}
+                payload={takeover.payload}
+                entries={entries}
+              />
             )}
           </div>
         )}

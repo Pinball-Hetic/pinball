@@ -16,6 +16,7 @@ export class CameraBillboardSprite {
   private camera: THREE.Camera | null = null;
   private sprite: THREE.Sprite | null = null;
   private material: THREE.SpriteMaterial | null = null;
+  private texture: THREE.Texture | null = null;
   private imageReady = false;
   private depth = 0.38;
   private yOffset = 0.06;
@@ -47,6 +48,7 @@ export class CameraBillboardSprite {
         config.textureUrl,
         (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
+          this.texture = tex;
           if (this.material) {
             this.material.map = tex;
             this.material.needsUpdate = true;
@@ -65,6 +67,17 @@ export class CameraBillboardSprite {
 
   ensureReady(): Promise<void> {
     return this.loadPromise ?? Promise.resolve();
+  }
+
+  // Force l'upload GPU de la texture hors frame critique (évite le
+  // micro-freeze du premier rendu visible — texture ~16 Mo décodée).
+  warmup(renderer: THREE.WebGLRenderer): void {
+    if (this.texture) renderer.initTexture(this.texture);
+  }
+
+  // Exposé pour compileAsync (compilation des programs du sprite au preload).
+  get object3D(): THREE.Object3D | null {
+    return this.sprite;
   }
 
   isReady(): boolean {
@@ -107,6 +120,7 @@ export class CameraBillboardSprite {
     this.camera = null;
     this.sprite = null;
     this.material = null;
+    this.texture = null;
     this.imageReady = false;
     this.loadPromise = null;
   }

@@ -3,6 +3,7 @@ export type {
   ClientToServerEvents,
   ScoreUpdate,
   DmdDisplay,
+  CinematicClip,
   GameStart,
   GameOver,
   GameStats,

@@ -97,7 +97,14 @@ export class DemogorgonReveal {
       this.billboard.ensureReady(),
       this.demogorgonVisual.ensureReady(),
     ]);
+    // Upload GPU de la texture billboard + compilation des shaders du
+    // demogorgon, du targetGroup (ring/core/burst) et du sprite — hors
+    // frame critique. Sinon tout tombe sur la frame du spawn → freeze.
+    this.billboard.warmup(renderer);
     await this.demogorgonVisual.warmup(renderer, scene, camera);
+    if (this.targetGroup) await renderer.compileAsync(this.targetGroup, camera, scene);
+    const sprite = this.billboard.object3D;
+    if (sprite) await renderer.compileAsync(sprite, camera, scene);
   }
 
   setup(config: DemogorgonSetup): void {
