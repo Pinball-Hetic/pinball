@@ -82,7 +82,7 @@ export const DEMOGORGON_TARGET = {
   z: -0.02,
 } as const;
 
-export const DEMOGORGON_TARGET_HITS = 2;
+export const DEMOGORGON_TARGET_HITS = 5;
 
 export const PORTAL_UPSIDE_DOWN = {
   x: -0.000751,
@@ -96,15 +96,24 @@ export const PORTAL_SENSOR_RADIUS = 0.017;
 export const PORTAL_MAGNET_RADIUS = 0.058;
 export const PORTAL_MAGNET_STRENGTH = 0.0055;
 export const PORTAL_ENTER_SCORE = 500;
-export const PORTAL_EJECT_IMPULSE = { x: 0, y: 0.11, z: -0.095 } as const;
+
+export const UPSIDE_DOWN_SPAWN = {
+  x: -0.0225,
+  z: -0.48,
+} as const;
+export const UPSIDE_DOWN_SPAWN_IMPULSE = { x: 0, y: 0, z: 0.055 } as const;
 
 export const ELEVEN_ASSIST_SCORE = 100;
 export const ELEVEN_ASSIST_INTERVAL = 3.2;
 
 export const BUMPER_RADIUS       = 0.038;
-export const BUMPER_RESTITUTION  = 0.3;
-// Kick pop bumper : Δv = impulse/masse = 0.18/0.08 = 2.25 m/s (réel : 2–2.5).
-export const BUMPER_EJECT_IMPULSE = 0.18;
+export const BUMPER_RESTITUTION  = 0.20;  // réduit de 0.30 (−33%) — rebond collider moins violent
+// Kick pop bumper : Δv = impulse/masse = 0.11/0.08 = 1.38 m/s (−35% vs 2.25 m/s original).
+export const BUMPER_EJECT_IMPULSE = 0.11;
+
+/** Au-dessus de ce décollage (m) au-dessus du tapis, la balle est recollée à la
+ *  surface inclinée (absorbe le jitter physique normal, ~6 mm). */
+export const SURFACE_SNAP_THRESHOLD = 0.006;
 
 // Walls — from GLB playfield mesh extents
 export const WALL_LEFT_X    = -0.265;

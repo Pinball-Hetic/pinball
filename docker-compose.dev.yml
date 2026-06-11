@@ -11,6 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
+    mem_limit: 384m
 
   server:
     build:
@@ -28,6 +29,7 @@ services:
     depends_on:
       - db
     command: bun --watch src/interface/index.ts
+    mem_limit: 256m
 
   playfield:
     build:
@@ -41,6 +43,7 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
       NEXT_PUBLIC_KEYBOARD_MODE: "simulate-esp32"
+      NODE_OPTIONS: "--max-old-space-size=2560"
     ports:
       - "3333:3000"
     volumes:
@@ -50,6 +53,15 @@ services:
     depends_on:
       - server
     command: bun run dev
+    # Force la compilation Turbopack de la page lourde pendant le démarrage :
+    # le check ne passe qu'une fois /pinball compilé → débloque dmd ensuite.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/pinball"]
+      interval: 10s
+      timeout: 8s
+      retries: 30
+      start_period: 60s
+    mem_limit: 3g
 
   dmd:
     build:
@@ -62,13 +74,24 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
+      NODE_OPTIONS: "--max-old-space-size=1024"
     ports:
       - "3335:3000"
     volumes:
       - ./apps/dmd/src:/app/apps/dmd/src
     depends_on:
-      - server
+      server:
+        condition: service_started
+      playfield:
+        condition: service_healthy
     command: bun run dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 8s
+      retries: 20
+      start_period: 30s
+    mem_limit: 1536m
 
   backglass:
     build:
@@ -81,13 +104,18 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
+      NODE_OPTIONS: "--max-old-space-size=1024"
     ports:
       - "3336:3000"
     volumes:
       - ./apps/backglass/src:/app/apps/backglass/src
     depends_on:
-      - server
+      server:
+        condition: service_started
+      dmd:
+        condition: service_healthy
     command: bun run dev
+    mem_limit: 1536m
 
   input-bridge:
     build:
@@ -107,6 +135,7 @@ services:
     depends_on:
       - server
     command: bun --watch src/index.ts
+    mem_limit: 128m
 
 volumes:
   postgres_dev_data:

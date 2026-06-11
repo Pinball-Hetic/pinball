@@ -67,6 +67,15 @@ export class PlayfieldCinematicStrobe {
     this.clearFlashAndDecor();
   }
 
+  applyFightFlicker(shade: number, flashMix: number): void {
+    this.shade.setOpacity(shade);
+    if (this.flashLight) {
+      this.flashLight.intensity = this.flashIntensity * flashMix;
+    }
+    this.garlandLights?.setStrobe(false, false);
+    this.bumperVisuals?.setStrobe(false, false);
+  }
+
   stop(): void {
     this.shade.hide();
     this.clearFlashAndDecor();

@@ -30,6 +30,7 @@ type SetupConfig = {
 type StartConfig = {
   ballMesh: THREE.Object3D;
   ballBody: RAPIER.RigidBody;
+  onRevealStart?: () => void;
   onTremorStart?: () => void;
 };
 
@@ -49,6 +50,7 @@ export class UpsideDownTransition {
   private ballMesh: THREE.Object3D | null = null;
   private ballBody: RAPIER.RigidBody | null = null;
   private onComplete: CompleteHandler | null = null;
+  private onRevealStart: (() => void) | null = null;
   private onTremorStart: (() => void) | null = null;
   private tremorStarted = false;
   private baseCamPos = new THREE.Vector3();
@@ -87,6 +89,7 @@ export class UpsideDownTransition {
     this.ballMesh = config.ballMesh;
     this.ballBody = config.ballBody;
     this.onComplete = onComplete;
+    this.onRevealStart = config.onRevealStart ?? null;
     this.onTremorStart = config.onTremorStart ?? null;
     this.tremorStarted = false;
 
@@ -117,6 +120,7 @@ export class UpsideDownTransition {
         this.phase = 'reveal';
         this.elapsed = 0;
         this.strobeT = 0;
+        this.onRevealStart?.();
       }
       return;
     }
@@ -180,6 +184,7 @@ export class UpsideDownTransition {
     this.cinematicStrobe = new PlayfieldCinematicStrobe();
     this.billboard = new CameraBillboardSprite();
     this.onComplete = null;
+    this.onRevealStart = null;
     this.onTremorStart = null;
     this.tremorStarted = false;
     this.active = false;
