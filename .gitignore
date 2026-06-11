@@ -53,3 +53,6 @@ Thumbs.db
 
 # DB backups (dumps locaux du leaderboard)
 backups/
+
+.agents/
+skills-lock.json
