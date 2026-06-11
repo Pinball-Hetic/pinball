@@ -12,6 +12,7 @@ import {
   normalizeGltfName,
   playfieldUsesCollOnlyCollision,
   isPinballmapNonPhysicalFloorMesh,
+  SWITCH_SENSOR_NODES,
 } from './GltfNodeNames';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
@@ -72,23 +73,14 @@ const STANDALONE_WALL_MESHES = new Set([
   'fix-start', // guide de lancement : lisse la paroi du couloir au démarrage
 ]);
 
-const HIDDEN_NODES = new Set([
-  'switch_left_pop_bumper_zone', 'switch left pop bumper zone',
-  'switch_center_pop_bumper_zone', 'switch center pop bumper zone',
-  'switch_plunger', 'switch plunger',
-  'switch_right_pop_bumper_zone', 'switch right pop bumper zone',
-  'switch_rocket', 'switch rocket',
-  'switch_slingshot', 'switch slingshot',
-  'switch_out', 'switch out',
-]);
+// Switch sensors : source unique dans GltfNodeNames (partagée avec le rendu).
+const HIDDEN_NODES = new Set(SWITCH_SENSOR_NODES);
 
 const EXCLUDED_NODES = new Set([
   'ball', 'box', 'glass', 'feet', 'score_board', 'coin_slot',
   'exit_cover', 'plate', 'start_button',
   'drop_target_left_1', 'drop_target_left_2',
   'drop_target_right_1', 'drop_target_right_2', 'drop_target_right_3',
-  'switch_out', 'switch_center_pop_bumper_zone', 'switch_left_pop_bumper_zone',
-  'switch_right_pop_bumper_zone', 'switch_plunger', 'switch_rocket', 'switch_slingshot',
   'launcher',
   ...HIDDEN_NODES,
 ]);
