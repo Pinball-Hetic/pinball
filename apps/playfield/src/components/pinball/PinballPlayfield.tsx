@@ -64,6 +64,7 @@ import {
   CinematicDirector,
   ScreenShake,
   BallTrail,
+  QualityGovernor,
   DEMOGORGON_TARGET,
   DEMOGORGON_TARGET_HITS,
   PORTAL_ENTER_SCORE,
@@ -623,9 +624,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     configureGltfRenderer(renderer);
-    // Plafond à 2 : sur écran Retina/HiDPI, devicePixelRatio peut être 3×
-    // ce qui triple le nombre de pixels et multiplie le coût du shader par 9
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Démarrage à 1.5 (HiDPI plafonné) ; le QualityGovernor ajuste ensuite
+    // selon le frame time (1.5 → 1.25 → 1.0 → 1.0 + trail réduit/spores off).
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(clientWidth, clientHeight);
     // Shadows désactivées : avec 13+ PointLights (guirlandes + bumpers) dans
     // le shader, chaque pixel paie déjà lourd. La shadow map (cast + receive
@@ -729,6 +730,17 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let upsideDownPortal: UpsideDownPortal | null = null;
     let upsideDownTransition: UpsideDownTransition | null = null;
     let upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
+
+    // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
+    const quality = new QualityGovernor((tier) => {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, tier.dpr));
+      renderer.setSize(
+        mountRef.current?.clientWidth ?? clientWidth,
+        mountRef.current?.clientHeight ?? clientHeight,
+      );
+      ballTrail?.setMaxSprites(tier.trailMax);
+      upsideDownAtmosphere?.setSporesEnabled(tier.sporesOn);
+    });
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
     // Offset local (mesh-origin → geoCenter) — positionne le body cinématique
@@ -1762,6 +1774,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         rapierDebugGeo.setAttribute('color',    new THREE.BufferAttribute(rgb, 3));
         rapierDebugGeo.computeBoundingSphere();
       }
+
+      // ── Gouverneur de qualité (frame time → crans) ──────────────────────
+      quality.frame(dt * 1000);
 
       // ── Traînée de feu (intensité ∝ combo, max en fever) ────────────────
       if (ballTrail) {

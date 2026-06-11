@@ -40,7 +40,7 @@ export class BallTrail {
   private texture: THREE.CanvasTexture;
   private emitAccum = 0;
   private feverFlip = 0;
-  private readonly _color = new THREE.Color();
+  private maxActive = POOL; // plafonné par le QualityGovernor
 
   constructor() {
     this.texture = makeRadialTexture();
@@ -66,8 +66,19 @@ export class BallTrail {
     scene.add(this.group);
   }
 
+  // Plafond du pool actif (QualityGovernor : 24 → 12 au cran le plus bas).
+  setMaxSprites(n: number): void {
+    this.maxActive = Math.max(0, Math.min(POOL, n));
+  }
+
   private spawn(pos: { x: number; y: number; z: number }, color: number): void {
-    const s = this.sprites.find((sp) => sp.life <= 0);
+    let s: TrailSprite | undefined;
+    for (let i = 0; i < this.maxActive; i++) {
+      if (this.sprites[i].life <= 0) {
+        s = this.sprites[i];
+        break;
+      }
+    }
     if (!s) return;
     s.life = LIFE;
     s.mesh.visible = true;

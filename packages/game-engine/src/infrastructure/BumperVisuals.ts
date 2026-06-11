@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { GameEvent } from '../domain/GameEvents';
 import { BUMPER_POSITIONS } from '../domain/Ball';
 import { normalizeGltfName } from './GltfNodeNames';
+import { GlowSprite } from './GlowSprite';
 
 const LEGACY_BUMPER = /^bumper-st-\d+$/;
 const GLTF_BUMPER = /^bumper-\d+$/;
@@ -15,7 +16,6 @@ const BUMPER_EMISSIVE = 0xff1122;
 const BUMPER_EMISSIVE_INTENSITY = 3.4;
 const BUMPER_LIGHT_COLOR = 0xff5566;
 const BUMPER_LIGHT_INTENSITY = 0.95;
-const BUMPER_LIGHT_DISTANCE = 0.38;
 
 const RING_SURFACE = 0xc82838;
 const RING_EMISSIVE = 0x881018;
@@ -38,16 +38,18 @@ function easeOutBack(t: number): number {
 
 const _emissiveA = new THREE.Color();
 const _emissiveB = new THREE.Color();
-const _portalLightColor = new THREE.Color();
 
 type BumperKind = 'gltf' | 'base' | 'ring';
+
+const GLOW_SIZE = 0.11;
 
 type BumperPart = {
   mesh: THREE.Mesh;
   material: THREE.MeshStandardMaterial;
   bumperIndex: number;
   kind: BumperKind;
-  portalLight: THREE.PointLight | null;
+  glow: GlowSprite | null; // remplace l'ancienne PointLight (coût shader nul)
+  glowColor: number;
   baseIntensity: number;
   baseScale: THREE.Vector3;
 };
@@ -76,17 +78,13 @@ function nearestBumperIndex(pos: THREE.Vector3): number {
   return best;
 }
 
-function applyGltfBumperLook(material: THREE.MeshStandardMaterial, portalLight: THREE.PointLight): void {
+function applyGltfBumperLook(material: THREE.MeshStandardMaterial): void {
   material.color.setHex(BUMPER_SURFACE);
   material.emissive.setHex(BUMPER_EMISSIVE);
   material.emissiveIntensity = BUMPER_EMISSIVE_INTENSITY;
   material.metalness = BUMPER_METALNESS;
   material.roughness = BUMPER_ROUGHNESS;
   material.toneMapped = false;
-
-  portalLight.color.setHex(BUMPER_LIGHT_COLOR);
-  portalLight.intensity = BUMPER_LIGHT_INTENSITY;
-  portalLight.distance = BUMPER_LIGHT_DISTANCE;
 }
 
 export class BumperVisuals {
@@ -141,13 +139,15 @@ export class BumperVisuals {
       obj.getWorldPosition(wp);
       const bumperIndex = nearestBumperIndex(wp);
       const material = cloneStandardMaterial(obj);
-      let portalLight: THREE.PointLight | null = null;
+      let glow: GlowSprite | null = null;
+      let glowColor = BUMPER_LIGHT_COLOR;
 
       if (kind === 'gltf') {
-        portalLight = new THREE.PointLight(BUMPER_LIGHT_COLOR, BUMPER_LIGHT_INTENSITY, BUMPER_LIGHT_DISTANCE, 2);
-        portalLight.castShadow = false;
-        obj.add(portalLight);
-        applyGltfBumperLook(material, portalLight);
+        applyGltfBumperLook(material);
+        glowColor = BUMPER_LIGHT_COLOR;
+        glow = new GlowSprite(glowColor, GLOW_SIZE);
+        glow.sprite.position.y = 0.01;
+        obj.add(glow.sprite);
       } else if (kind === 'base') {
         material.color.setHex(0xffccd5);
         material.emissive.setHex(0xff2244);
@@ -156,9 +156,10 @@ export class BumperVisuals {
         material.roughness = 0.42;
         material.toneMapped = false;
 
-        portalLight = new THREE.PointLight(0xff4466, 0.75, 0.3, 2);
-        portalLight.castShadow = false;
-        obj.add(portalLight);
+        glowColor = 0xff5577;
+        glow = new GlowSprite(glowColor, GLOW_SIZE * 0.85);
+        glow.sprite.position.y = 0.008;
+        obj.add(glow.sprite);
       } else {
         material.color.setHex(RING_SURFACE);
         material.emissive.setHex(RING_EMISSIVE);
@@ -175,7 +176,8 @@ export class BumperVisuals {
         material,
         bumperIndex,
         kind,
-        portalLight,
+        glow,
+        glowColor,
         baseIntensity: material.emissiveIntensity,
         baseScale: obj.scale.clone(),
       });
@@ -218,7 +220,7 @@ export class BumperVisuals {
       if (!this.strobeOn) {
         for (const part of this.parts) {
           part.material.emissiveIntensity = 0;
-          if (part.portalLight) part.portalLight.intensity = 0;
+          part.glow?.set(0);
         }
         return;
       }
@@ -226,10 +228,7 @@ export class BumperVisuals {
         for (const part of this.parts) {
           part.material.emissive.setHex(0xff1133);
           part.material.emissiveIntensity = 2.6;
-          if (part.portalLight) {
-            part.portalLight.color.setHex(0xff1133);
-            part.portalLight.intensity = 1.1;
-          }
+          part.glow?.set(0.9, 1.1);
         }
         return;
       }
@@ -251,18 +250,20 @@ export class BumperVisuals {
         part.material.emissive.setHex(upsideDown && strobeFlash > 0.45 ? 0xff1133 : BUMPER_EMISSIVE);
         part.material.emissiveIntensity = (part.baseIntensity * slowBreath + hitFactor) * moodMul;
 
-        if (part.portalLight) {
-          _portalLightColor.setHex(upsideDown && strobeFlash > 0.45 ? 0xff2244 : BUMPER_LIGHT_COLOR);
-          part.portalLight.color.copy(_portalLightColor);
-          part.portalLight.intensity = (BUMPER_LIGHT_INTENSITY * slowBreath + hitFactor * 0.35) * moodMul;
+        if (part.glow) {
+          part.glow.setColor(upsideDown && strobeFlash > 0.45 ? 0xff2244 : BUMPER_LIGHT_COLOR);
+          // opacité ∝ ancienne intensité lumière (normalisée), pulse en scale.
+          const v = (BUMPER_LIGHT_INTENSITY * slowBreath + hitFactor * 0.35) * moodMul;
+          part.glow.set(Math.min(1, v * 0.55), 0.9 + hitFactor * 0.5);
         }
       } else if (part.kind === 'base') {
         part.material.emissive.setHex(upsideDown && strobeFlash > 0.45 ? 0xff1133 : 0xff2244);
         part.material.emissiveIntensity = (part.baseIntensity * slowBreath + hitFactor) * moodMul;
 
-        if (part.portalLight) {
-          part.portalLight.color.setHex(upsideDown && strobeFlash > 0.45 ? 0xff2244 : 0xff5577);
-          part.portalLight.intensity = (0.55 * slowBreath + hitFactor * 0.25) * moodMul;
+        if (part.glow) {
+          part.glow.setColor(upsideDown && strobeFlash > 0.45 ? 0xff2244 : 0xff5577);
+          const v = (0.55 * slowBreath + hitFactor * 0.25) * moodMul;
+          part.glow.set(Math.min(1, v * 0.7), 0.9 + hitFactor * 0.5);
         }
       } else {
         part.material.emissive.setHex(upsideDown && strobeFlash > 0.45 ? 0xff1133 : RING_EMISSIVE);
@@ -278,10 +279,7 @@ export class BumperVisuals {
 
   dispose(): void {
     for (const part of this.parts) {
-      if (part.portalLight) {
-        part.portalLight.removeFromParent();
-        part.portalLight.dispose();
-      }
+      part.glow?.dispose();
     }
     this.parts = [];
     this.hitTimers.clear();

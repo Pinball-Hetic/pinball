@@ -37,6 +37,8 @@ export * from './infrastructure/DemogorgonReveal';
 export * from './infrastructure/CinematicDirector';
 export * from './infrastructure/ScreenShake';
 export * from './infrastructure/BallTrail';
+export * from './infrastructure/GlowSprite';
+export * from './infrastructure/QualityGovernor';
 export * from './infrastructure/CinematicEasing';
 export * from './infrastructure/CameraBillboardSprite';
 export * from './infrastructure/PlayfieldCinematicStrobe';
