@@ -57,7 +57,7 @@ export interface DmdOrchestrator {
   emitGameStart: (player: string) => void;
   emitGameOver: (player: string, finalScore: number, stats: GameStats) => void;
   // Clip cinématique plein écran (prio max) — synchro avec playfield/backglass.
-  pushCinematic: (clip: CinematicClip) => void;
+  pushCinematic: (clip: CinematicClip, value?: number) => void;
   // DMD high-level : push une display, l'orchestrator décide quoi montrer
   pushIntro: (player: string) => void;
   pushScore: (s: ScoreUpdate) => void;
@@ -217,10 +217,10 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       );
     },
 
-    pushCinematic: (clip) => {
+    pushCinematic: (clip, value) => {
       const { player, score } = lastSnapRef.current;
       push(
-        { mode: 'CINEMATIC', clip, player, score },
+        { mode: 'CINEMATIC', clip, player, score, value },
         { priority: PRIO.CINEMATIC, duration: CLIP_SHOW_MS[clip] },
       );
     },

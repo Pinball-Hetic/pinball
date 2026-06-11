@@ -83,6 +83,7 @@ import type {
   CinematicClip,
   DevGameEventTrigger,
 } from "@pinball/shared-types";
+import { CLIP_FREEZE_MS } from "@pinball/shared-types";
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -107,6 +108,9 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
       return { type: "PORTAL_ENTER", scoreIncrement: PORTAL_ENTER_SCORE };
     case "ELEVEN_ASSIST":
       return { type: "ELEVEN_ASSIST", scoreIncrement: ELEVEN_ASSIST_SCORE };
+    case "DEBUG_ADD_SCORE":
+      // Score brut → le pipeline score/paliers réagit naturellement.
+      return { type: "ZONE_HIT", zone: "debug", scoreIncrement: d.amount ?? 1000 };
     case "DRAIN":
       return { type: "DRAIN" };
     case "BOTTOM_OUT":
@@ -395,16 +399,22 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   const playCinematic = useCallback(
     (
       clip: CinematicClip,
-      durationMs: number,
-      freeze: boolean,
-      opts?: { once?: boolean; onEnd?: () => void },
+      opts?: { once?: boolean; value?: number; onEnd?: () => void },
     ): boolean => {
-      const accepted = cinematics.play(
-        { id: clip, durationMs, freezePhysics: freeze, onEnd: opts?.onEnd },
-        { once: opts?.once },
-      );
-      if (accepted) dmd.pushCinematic(clip);
-      return accepted;
+      const freezeMs = CLIP_FREEZE_MS[clip];
+      // Clip avec gel → passe par le director (pause physique). Sans gel
+      // (freeze 0) → simple push DMD, le jeu continue.
+      if (freezeMs > 0) {
+        const accepted = cinematics.play(
+          { id: clip, durationMs: freezeMs, freezePhysics: true, onEnd: opts?.onEnd },
+          { once: opts?.once },
+        );
+        if (!accepted) return false;
+      } else {
+        opts?.onEnd?.();
+      }
+      dmd.pushCinematic(clip, opts?.value); // duration SHOW gérée par l'orchestrator
+      return true;
     },
     [cinematics, dmd],
   );
@@ -423,6 +433,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     multiplierRef,
     playerRef,
     heticRef,
+    isFeverActive,
+    startFever,
     clearUpsideDownSession,
     resetGame,
     buildEmit,
@@ -435,7 +447,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         multiplier: multiplierRef.current,
         lives: livesRef.current,
         hetic: heticRef.current,
-        fever: false, // P21 : branché à isFeverActive()
+        fever: isFeverActive(),
       };
 
       dmd.emitScoreSnapshot(snap);
@@ -461,12 +473,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         multiplier: 1,
         lives: livesRemaining,
         hetic: heticRef.current,
-        fever: false, // P21 : branché à isFeverActive()
+        fever: isFeverActive(),
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
       // Dernière vie engagée → respiration 1.2s (pas de gel : bille déjà drainée).
-      if (livesRemaining === 1) playCinematic('last_chance', 1200, false);
+      if (livesRemaining === 1) playCinematic('last_chance');
     },
     onGameOver: (finalScore, stats) => {
       // Pas d'affichage GAME_OVER sur le DMD : on garde le dernier SCORE
@@ -485,7 +497,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         multiplier: 1,
         lives: livesRef.current,
         hetic: heticRef.current,
-        fever: false, // P21 : branché à isFeverActive()
+        fever: isFeverActive(),
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
@@ -507,7 +519,40 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     onAtmosphereChange: (upsideDownActive) => {
       dmd.setAtmosphere(upsideDownActive);
     },
+    onMilestone: (threshold) => {
+      const clip: CinematicClip =
+        threshold === 5000
+          ? "milestone_5k"
+          : threshold === 15000
+            ? "milestone_15k"
+            : threshold === 30000
+              ? "milestone_30k"
+              : "milestone_big";
+      playCinematic(clip, { value: threshold });
+      garlandLightsRef.current?.celebrate();
+    },
+    onHeticLetter: (n) => playCinematic("hetic_letter", { value: n }),
+    onHeticComplete: () => {
+      // FEVER démarre quand le GEL du clip se termine (onEnd du director).
+      playCinematic("hetic_complete", { onEnd: () => startFever(30_000) });
+    },
+    onFeverEnd: () => {
+      // Re-émet un snapshot fever:false pour que DMD/backglass retombent.
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: comboRef.current,
+        multiplier: multiplierRef.current,
+        lives: livesRef.current,
+        hetic: heticRef.current,
+        fever: false,
+      };
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushScore(snap);
+    },
   });
+
+  const garlandLightsRef = useRef<GarlandLights | null>(null);
 
   useEffect(() => {
     dmd.pushIntro(playerRef.current);
@@ -737,6 +782,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         bumperVisuals.setup(playfieldRoot);
         garlandLights = new GarlandLights();
         garlandLights.setup(playfieldRoot);
+        garlandLightsRef.current = garlandLights;
         demogorgonReveal = new DemogorgonReveal();
         demogorgonReveal.setup({
           root: playfieldRoot,
@@ -1013,13 +1059,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (event.type === "DEMOGORGON_REVEAL") {
             // 1er reveau de la partie → pause 2.5s. Reveals suivants : refusé
             // (once) → le strobe court de DemogorgonReveal suffit.
-            playCinematic("demogorgon_rises", 4000, true, { once: true });
+            playCinematic("demogorgon_rises", { once: true });
           }
           if (
             event.type === "DEMOGORGON_TARGET_HIT"
             && event.hitCount >= DEMOGORGON_TARGET_HITS
           ) {
-            playCinematic("demogorgon_slain", 3500, true, {
+            playCinematic("demogorgon_slain", {
               // Reprise "avec un bang" : impulse radial depuis le target.
               onEnd: () =>
                 ballPhysicsInst?.applyEjectionForce({
@@ -1366,6 +1412,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       prevFrameTime = time;
 
       bumperVisuals?.update(dt);
+      garlandLights?.setFever(isFeverActive());
       garlandLights?.update(dt);
       demogorgonReveal?.update(dt);
       upsideDownAtmosphere?.update(dt);
