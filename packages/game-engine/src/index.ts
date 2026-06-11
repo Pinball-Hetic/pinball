@@ -16,6 +16,7 @@ export * from './use-cases/DrainBall';
 export * from './use-cases/BottomOutBall';
 export * from './use-cases/DetectStuckBall';
 export * from './use-cases/DetectBottomOut';
+export * from './use-cases/SnapBallToSurface';
 
 // Infrastructure
 export * from './infrastructure/PhysicsWorld';
