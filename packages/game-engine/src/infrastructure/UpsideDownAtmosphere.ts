@@ -57,7 +57,6 @@ type SetupConfig = {
 };
 
 type SporeParticle = {
-  mesh: THREE.Mesh;
   anchorX: number;
   anchorZ: number;
   baseY: number;
@@ -68,6 +67,19 @@ type SporeParticle = {
 };
 
 const _lerpColor = new THREE.Color();
+
+function sporeTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 16;
+  c.height = 16;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 16, 16);
+  return new THREE.CanvasTexture(c);
+}
 
 function skipAtmosphereTint(obj: THREE.Object3D): boolean {
   if (obj instanceof THREE.Mesh && isFlipperGltfMesh(obj)) return true;
@@ -159,12 +171,16 @@ export class UpsideDownAtmosphere {
   private garlandLights: GarlandLights | null = null;
   private bumperVisuals: BumperVisuals | null = null;
   private playfieldShade = new PlayfieldShadeOverlay();
-  private sporeGroup: THREE.Group | null = null;
+  private sporePoints: THREE.Points | null = null;
+  private sporeGeo: THREE.BufferGeometry | null = null;
+  private sporePositions: Float32Array | null = null;
   private spores: SporeParticle[] = [];
-  private sporeMat: THREE.MeshBasicMaterial | null = null;
-  private sporeGeos: THREE.BufferGeometry[] = [];
+  private sporeMat: THREE.PointsMaterial | null = null;
+  private sporeTex: THREE.CanvasTexture | null = null;
+  private sporesEnabled = true;
   private mix = 0;
   private targetMix = 0;
+  private lastAppliedMix = -1;
   private visited = false;
   private pulseT = 0;
 
@@ -287,19 +303,22 @@ export class UpsideDownAtmosphere {
 
     this.playfieldShade.dispose();
 
-    if (this.sporeGroup) this.sporeGroup.parent?.remove(this.sporeGroup);
-    for (const geo of this.sporeGeos) geo.dispose();
+    if (this.sporePoints) this.sporePoints.parent?.remove(this.sporePoints);
+    this.sporeGeo?.dispose();
     this.sporeMat?.dispose();
+    this.sporeTex?.dispose();
 
     this.materials = [];
     this.lighting = null;
     this.garlandLights = null;
     this.bumperVisuals = null;
     this.playfieldShade = new PlayfieldShadeOverlay();
-    this.sporeGroup = null;
+    this.sporePoints = null;
+    this.sporeGeo = null;
+    this.sporePositions = null;
     this.spores = [];
     this.sporeMat = null;
-    this.sporeGeos = [];
+    this.sporeTex = null;
     this.savedFog = null;
     this.upsideDownFog = null;
     this.mix = 0;
@@ -308,63 +327,69 @@ export class UpsideDownAtmosphere {
     this.pulseT = 0;
   }
 
+  setSporesEnabled(enabled: boolean): void {
+    this.sporesEnabled = enabled;
+  }
+
+  // Toutes les spores en UN THREE.Points (1 draw call) — l'animation met à
+  // jour l'attribut position.
   private buildSpores(root: THREE.Object3D): void {
-    this.sporeGroup = new THREE.Group();
-    this.sporeMat = new THREE.MeshBasicMaterial({
+    const n = UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT;
+    this.sporePositions = new Float32Array(n * 3);
+    this.sporeGeo = new THREE.BufferGeometry();
+    this.sporeGeo.setAttribute('position', new THREE.BufferAttribute(this.sporePositions, 3));
+    this.sporeTex = sporeTexture();
+    this.sporeMat = new THREE.PointsMaterial({
       color: 0xff6688,
+      map: this.sporeTex,
+      size: 0.018,
+      sizeAttenuation: true,
       transparent: true,
       opacity: 0,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      toneMapped: false,
     });
+    this.sporePoints = new THREE.Points(this.sporeGeo, this.sporeMat);
+    this.sporePoints.frustumCulled = false;
+    this.sporePoints.visible = false;
+    this.sporePoints.renderOrder = 520;
 
-    for (let i = 0; i < UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT; i++) {
-      const geo = new THREE.SphereGeometry(0.0016 + (i % 3) * 0.0005, 6, 6);
-      const mesh = new THREE.Mesh(geo, this.sporeMat);
-      mesh.visible = false;
-      mesh.renderOrder = 520;
-      this.sporeGroup.add(mesh);
-      this.sporeGeos.push(geo);
-
+    for (let i = 0; i < n; i++) {
       this.spores.push({
-        mesh,
         anchorX: THREE.MathUtils.lerp(-0.22, 0.22, ((i * 0.37) % 1)),
         anchorZ: THREE.MathUtils.lerp(-0.48, 0.32, ((i * 0.53 + 0.11) % 1)),
         baseY: 1.035 + (i % 6) * 0.009,
-        angle: (i / UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT) * Math.PI * 2,
+        angle: (i / n) * Math.PI * 2,
         radius: 0.014 + (i % 5) * 0.006,
         speed: 0.32 + (i % 7) * 0.1,
         drift: 0.55 + (i % 4) * 0.18,
       });
     }
 
-    root.add(this.sporeGroup);
+    root.add(this.sporePoints);
   }
 
   private updateSpores(dt: number, intensity: number): void {
-    if (!this.sporeMat) return;
+    if (!this.sporeMat || !this.sporePoints || !this.sporePositions || !this.sporeGeo) return;
 
-    const active = intensity > 0.01;
+    const active = intensity > 0.01 && this.sporesEnabled;
+    this.sporePoints.visible = active;
     this.sporeMat.opacity = 0.72 * intensity;
+    if (!active) return;
 
-    for (const spore of this.spores) {
-      spore.mesh.visible = active;
-      if (!active) continue;
-
+    const pos = this.sporePositions;
+    for (let i = 0; i < this.spores.length; i++) {
+      const spore = this.spores[i];
       spore.angle += spore.speed * dt;
       const r = spore.radius * (0.9 + Math.sin(this.pulseT * 2.4 + spore.angle) * 0.1);
       const lift = Math.sin(this.pulseT * spore.drift + spore.angle) * 0.014;
       const wander = Math.sin(this.pulseT * 1.6 + spore.angle * 2.1) * 0.006;
-
-      spore.mesh.position.set(
-        spore.anchorX + Math.cos(spore.angle) * r + wander,
-        spore.baseY + lift + Math.sin(this.pulseT * 0.35 + spore.angle) * 0.018,
-        spore.anchorZ + Math.sin(spore.angle) * r - wander * 0.6,
-      );
-
-      const scale = (0.48 + Math.sin(this.pulseT * 4.2 + spore.angle) * 0.32) * intensity;
-      spore.mesh.scale.setScalar(Math.max(0.15, scale));
+      pos[i * 3] = spore.anchorX + Math.cos(spore.angle) * r + wander;
+      pos[i * 3 + 1] = spore.baseY + lift + Math.sin(this.pulseT * 0.35 + spore.angle) * 0.018;
+      pos[i * 3 + 2] = spore.anchorZ + Math.sin(spore.angle) * r - wander * 0.6;
     }
+    this.sporeGeo.attributes.position.needsUpdate = true;
   }
 
   private applyLivePulse(): void {
@@ -378,6 +403,10 @@ export class UpsideDownAtmosphere {
   }
 
   private applyMix(t: number): void {
+    // Early return : ne retoucher les matériaux/lumières que si mix a bougé.
+    if (Math.abs(t - this.lastAppliedMix) < 0.001) return;
+    this.lastAppliedMix = t;
+
     const ease = t * t * (3 - 2 * t);
     const fullyActive = t >= 1 && this.targetMix >= 1;
 

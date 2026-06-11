@@ -15,6 +15,8 @@ import { createGltfLoader } from './GltfDisplay';
 
 type AnimState = 'idle' | 'hit' | 'victory';
 
+const _facingPos = new THREE.Vector3();
+
 function findAnimationClip(clips: THREE.AnimationClip[], token: string): THREE.AnimationClip | undefined {
   const needle = token.toLowerCase();
   return clips.find((clip) => {
@@ -58,9 +60,9 @@ export class DemogorgonTargetVisual {
     anchor.add(rig);
     this.rig = rig;
 
+    // PointLight ajoutée à la scène SEULEMENT pendant le fight (show/hide).
     this.glowLight = new THREE.PointLight(0xff5533, 0, 0.38, 2);
     this.glowLight.position.y = 0.03;
-    anchor.add(this.glowLight);
 
     this.loadPromise = this.loadModel();
   }
@@ -76,6 +78,9 @@ export class DemogorgonTargetVisual {
 
   show(): void {
     if (this.anchor) this.anchor.visible = true;
+    if (this.glowLight && this.anchor && !this.glowLight.parent) {
+      this.anchor.add(this.glowLight);
+    }
     this.playIdle();
   }
 
@@ -87,7 +92,10 @@ export class DemogorgonTargetVisual {
     }
     this.animState = 'idle';
     this.hitFlash = 0;
-    if (this.glowLight) this.glowLight.intensity = 0;
+    if (this.glowLight) {
+      this.glowLight.intensity = 0;
+      this.glowLight.removeFromParent(); // hors scène hors fight
+    }
   }
 
   playHit(): void {
@@ -174,10 +182,9 @@ export class DemogorgonTargetVisual {
   private syncFacing(): void {
     if (!this.rig || !this.anchor || !this.camera) return;
 
-    const anchorPos = new THREE.Vector3();
-    this.anchor.getWorldPosition(anchorPos);
-    const dx = this.camera.position.x - anchorPos.x;
-    const dz = this.camera.position.z - anchorPos.z;
+    this.anchor.getWorldPosition(_facingPos);
+    const dx = this.camera.position.x - _facingPos.x;
+    const dz = this.camera.position.z - _facingPos.z;
     this.rig.rotation.y = Math.atan2(dx, dz) + DEMOGORGON_MODEL_YAW;
   }
 

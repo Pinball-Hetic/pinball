@@ -31,6 +31,16 @@ export class PhysicsWorld {
   private static readonly SIM_TIMESTEP  = 1 / 98;
   private static readonly MAX_STEPS_PER_FRAME = 5;
   private accumulator = 0;
+  private timeScale = 1;
+
+  /**
+   * Échelle de temps (slow-mo). 1 = normal, 1/3 = ralenti. Implémenté en
+   * scalant l'accumulateur → moins de steps réels, la bille semble ralentir
+   * sans toucher au timestep fixe Rapier.
+   */
+  setTimeScale(scale: number): void {
+    this.timeScale = scale;
+  }
 
   private constructor(world: RAPIER.World) {
     this.world = world;
@@ -73,7 +83,7 @@ export class PhysicsWorld {
    *           fois par frame perdrait les collisions des steps intermédiaires.
    */
   update(dt: number, onStep?: () => void): void {
-    this.accumulator += dt;
+    this.accumulator += dt * this.timeScale;
     const { steps, remainder } = PhysicsWorld.planSteps(this.accumulator);
     this.accumulator = remainder;
     for (let i = 0; i < steps; i += 1) {

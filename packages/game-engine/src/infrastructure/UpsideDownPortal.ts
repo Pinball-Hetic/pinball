@@ -18,6 +18,7 @@ import {
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from '../domain/UpsideDownConstants';
 import { findObjectByNormalizedName } from './GltfNodeNames';
+import { GlowSprite } from './GlowSprite';
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -70,9 +71,9 @@ export class UpsideDownPortal {
   private innerRingMat: THREE.MeshStandardMaterial | null = null;
   private coreMat: THREE.MeshBasicMaterial | null = null;
   private vortexMat: THREE.MeshBasicMaterial | null = null;
-  private rimLight: THREE.PointLight | null = null;
-  private coreLight: THREE.PointLight | null = null;
-  private accentLight: THREE.PointLight | null = null;
+  private rimGlow: GlowSprite | null = null;
+  private coreLight: THREE.PointLight | null = null; // seule PointLight conservée
+  private accentGlow: GlowSprite | null = null;
   private vineMat: THREE.MeshStandardMaterial | null = null;
   private vines: PortalVine[] = [];
   private particles: PortalParticle[] = [];
@@ -201,15 +202,15 @@ export class UpsideDownPortal {
     if (this.vortexMat) {
       this.vortexMat.opacity = 0.25 + pulse * 0.2;
     }
-    if (this.rimLight) {
-      this.rimLight.intensity = 0.55 * pulse * (1 + this.suckBoost);
+    if (this.rimGlow) {
+      this.rimGlow.set(Math.min(1, 0.55 * pulse * (1 + this.suckBoost)), 0.9 + pulse * 0.4);
     }
     if (this.coreLight) {
       this.coreLight.intensity = 0.85 * pulse * (1 + this.suckBoost * 1.2);
     }
-    if (this.accentLight) {
+    if (this.accentGlow) {
       const accentPulse = 0.55 + Math.sin(this.pulseT * UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED) * 0.45;
-      this.accentLight.intensity = 0.48 * accentPulse * (1 + this.suckBoost * 0.55);
+      this.accentGlow.set(Math.min(1, 0.48 * accentPulse * (1 + this.suckBoost * 0.55)), 1);
     }
     if (this.vineMat) {
       this.vineMat.emissiveIntensity = 0.22 + pulse * 0.28 * (1 + this.suckBoost * 0.4);
@@ -293,17 +294,11 @@ export class UpsideDownPortal {
     }
     this.coverMat?.dispose();
     if (this.portalGroup) this.portalGroup.parent?.remove(this.portalGroup);
-    if (this.rimLight) {
-      this.rimLight.dispose();
-      this.rimLight.parent?.remove(this.rimLight);
-    }
+    this.rimGlow?.dispose();
+    this.accentGlow?.dispose();
     if (this.coreLight) {
       this.coreLight.dispose();
       this.coreLight.parent?.remove(this.coreLight);
-    }
-    if (this.accentLight) {
-      this.accentLight.dispose();
-      this.accentLight.parent?.remove(this.accentLight);
     }
     for (const g of this.ownedGeos) g.dispose();
     for (const m of this.ownedMats) m.dispose();
@@ -324,9 +319,9 @@ export class UpsideDownPortal {
     this.innerRingMat = null;
     this.coreMat = null;
     this.vortexMat = null;
-    this.rimLight = null;
+    this.rimGlow = null;
     this.coreLight = null;
-    this.accentLight = null;
+    this.accentGlow = null;
     this.vineMat = null;
     this.revealed = false;
     this.revealing = false;
@@ -429,18 +424,18 @@ export class UpsideDownPortal {
       });
     }
 
-    this.rimLight = new THREE.PointLight(0xff2244, 0.55, 0.14, 2);
-    this.rimLight.position.y = 0.012;
-    group.add(this.rimLight);
+    this.rimGlow = new GlowSprite(0xff2244, 0.05);
+    this.rimGlow.sprite.position.y = 0.012;
+    group.add(this.rimGlow.sprite);
 
+    // Seule PointLight du portail (le groupe invisible la sort du rendu).
     this.coreLight = new THREE.PointLight(0x7722cc, 0.85, 0.1, 2);
     this.coreLight.position.y = 0.004;
     group.add(this.coreLight);
 
-    this.accentLight = new THREE.PointLight(0x9955ee, 0, 0.22, 2);
-    this.accentLight.position.y = 0.016;
-    this.accentLight.castShadow = false;
-    group.add(this.accentLight);
+    this.accentGlow = new GlowSprite(0x9955ee, 0.06);
+    this.accentGlow.sprite.position.y = 0.016;
+    group.add(this.accentGlow.sprite);
 
     return group;
   }
