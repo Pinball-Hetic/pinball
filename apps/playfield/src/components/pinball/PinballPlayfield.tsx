@@ -18,6 +18,7 @@ import {
   BALL_SPAWN_POSITION,
   SHOOTER_LANE_LEFT_WALL_TOP_Z,
   SHOOTER_LANE_LOCK_X,
+  SHOOTER_LANE_EXIT_X,
   WALL_LEFT_X,
   WALL_RIGHT_X,
   WALL_BOTTOM_Z,
@@ -81,6 +82,7 @@ import {
   UpsideDownPortal,
   UpsideDownTransition,
   UpsideDownAtmosphere,
+  ShooterLaneGate,
 } from "@pinball/game-engine";
 import type {
   ButtonAction,
@@ -521,6 +523,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     onIdleReset: () => {
       cinematics.resetGame();
       resetPinballAudioForNewGame();
+      shooterLaneGateRef.current?.open();
       dmd.pushIntro(playerRef.current);
       dmd.emitScoreSnapshot({
         player: playerRef.current,
@@ -588,6 +591,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   });
 
   const garlandLightsRef = useRef<GarlandLights | null>(null);
+  const shooterLaneGateRef = useRef<ShooterLaneGate | null>(null);
   const screenShakeRef = useRef<ScreenShake | null>(null);
   if (!screenShakeRef.current) screenShakeRef.current = new ScreenShake();
   const atmosphereUpsideRef = useRef(false);
@@ -732,6 +736,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let upsideDownPortal: UpsideDownPortal | null = null;
     let upsideDownTransition: UpsideDownTransition | null = null;
     let upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
+    let shooterLaneGate: ShooterLaneGate | null = null;
 
     // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
     const quality = new QualityGovernor((tier) => {
@@ -932,6 +937,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // ── Physics ──────────────────────────────────────────────────────────
         physicsWorld = await PhysicsWorld.create();
         const world = physicsWorld.world;
+
+        shooterLaneGate = new ShooterLaneGate();
+        shooterLaneGate.bind(world);
+        shooterLaneGateRef.current = shooterLaneGate;
 
         modelRoot.updateMatrixWorld(true);
 
@@ -1210,6 +1219,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (event.type === "BALL_LAUNCHED") {
             collisionProcessor?.resetPortalTrigger();
             bottomOutBallUC?.resetLatch();
+          }
+          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
+            shooterLaneGate?.open();
           }
           if (event.type === 'DROP_TARGET_HIT') {
             const meshName = event.targetId.replace('drop_', 'drop_target_');
@@ -1648,7 +1660,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // dépendre de la géométrie GLB. La balle est libérée dès qu'elle atteint
         // la zone de sortie (Z <= SHOOTER_LANE_LEFT_WALL_TOP_Z) pour partir
         // naturellement dans le terrain.
-        if (gameStateRef.current === "playing" && !ballMoveMode) {
+        if (gameStateRef.current === "playing" && !ballMoveMode && !shooterLaneGate?.isClosed()) {
           const lp = ballPhysicsInst.body.translation();
           const inLaneStraight =
             lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > SHOOTER_LANE_LOCK_X;
@@ -1661,6 +1673,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             ballPhysicsInst.body.setLinvel({ x: 0, y: lv.y, z: lv.z }, true);
             const av = ballPhysicsInst.body.angvel();
             ballPhysicsInst.body.setAngvel({ x: av.x, y: 0, z: 0 }, true);
+          } else if (lp.x < SHOOTER_LANE_EXIT_X) {
+            shooterLaneGate?.close();
           }
         }
 
@@ -1852,6 +1866,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       garlandLights?.dispose();
       ballTrail?.dispose();
       demogorgonReveal?.dispose();
+      shooterLaneGate?.dispose();
+      shooterLaneGateRef.current = null;
       upsideDownPortal?.dispose();
       upsideDownTransition?.dispose();
       upsideDownAtmosphere?.dispose();
