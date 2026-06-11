@@ -15,6 +15,8 @@ export type Reaction =
 export interface Reactor {
   on: (cb: (r: Reaction) => void) => () => void
   getHeat: () => number
+  // Suspend les réactions/heat (pendant un clip cinématique plein écran).
+  setSuspended: (suspended: boolean) => void
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
@@ -26,6 +28,7 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
   const listenersRef = useRef<Set<(r: Reaction) => void>>(new Set())
   const heatRef = useRef(0)
   const lastScoreRef = useRef<number | null>(null)
+  const suspendedRef = useRef(false)
 
   const reactorRef = useRef<Reactor>({
     on: (cb) => {
@@ -35,10 +38,16 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
       }
     },
     getHeat: () => heatRef.current,
+    setSuspended: (suspended) => {
+      suspendedRef.current = suspended
+    },
   })
 
   useEffect(() => {
-    const emit = (r: Reaction) => listenersRef.current.forEach((cb) => cb(r))
+    const emit = (r: Reaction) => {
+      if (suspendedRef.current) return
+      listenersRef.current.forEach((cb) => cb(r))
+    }
 
     const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined
     const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling']
@@ -54,7 +63,7 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
         case 'SCORE': {
           const prev = lastScoreRef.current
           lastScoreRef.current = d.score
-          if (prev !== null && d.score > prev) {
+          if (prev !== null && d.score > prev && !suspendedRef.current) {
             const intensity = clamp((d.score - prev) / 500, 0.1, 1)
             heatRef.current = Math.min(1, heatRef.current + intensity * HIT_GAIN)
             emit({ kind: 'hit', intensity })

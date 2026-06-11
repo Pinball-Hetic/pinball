@@ -5,15 +5,22 @@ import type {
   ClientToServerEvents,
   LeaderboardEntry,
   GameOver,
+  CinematicClip,
 } from '@pinball/shared-types'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
-export type TakeoverScene = 'HIGH_SCORE' | 'RECAP' | 'DEMOGORGON' | 'ATTRACT'
+export type TakeoverScene =
+  | 'HIGH_SCORE'
+  | 'RECAP'
+  | 'DEMOGORGON'
+  | 'ATTRACT'
+  | 'CINEMATIC'
 
 export interface Takeover {
   scene: TakeoverScene
   payload?: GameOver & { rank: number }
+  clip?: CinematicClip
 }
 
 interface StackEntry {
@@ -21,6 +28,16 @@ interface StackEntry {
   priority: number
   expiresAt: number
   payload?: GameOver & { rank: number }
+  clip?: CinematicClip
+}
+
+// Durées alignées avec le playfield/DMD (synchro 3 écrans).
+const CLIP_DURATIONS: Record<CinematicClip, number> = {
+  demogorgon_rises: 2500,
+  portal_swallow: 4000,
+  demogorgon_slain: 2000,
+  last_chance: 1200,
+  hall_of_fame: 7000,
 }
 
 interface JoyceSignal {
@@ -34,6 +51,9 @@ interface TakeoverState {
   highlightRank: number | undefined
   agitation: number
   joyce: JoyceSignal
+  // true tant qu'un portal_swallow joue → on retarde le flip 3D du hall
+  // of fame jusqu'à la fin du clip (synchro avec le bascule playfield).
+  holdHallFlip: boolean
 }
 
 const TICK_MS = 250
@@ -73,6 +93,9 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
   const agitationStartRef = useRef(-AGITATION_MS)
   const joyceRef = useRef<JoyceSignal>({ text: null, id: 0 })
   const prevTopRef = useRef<TakeoverScene | null>(null)
+  // Dernier game:over complet (avec stats + rang) — alimente le clip
+  // hall_of_fame (HighScore/Recap), qui n'en reçoit pas via dmd:display.
+  const lastGameOverRef = useRef<(GameOver & { rank: number }) | null>(null)
 
   const [state, setState] = useState<TakeoverState>({
     takeover: null,
@@ -80,6 +103,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
     highlightRank: undefined,
     agitation: 0,
     joyce: { text: null, id: 0 },
+    holdHallFlip: false,
   })
 
   const pushJoyce = (text: string) => {
@@ -109,6 +133,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       const rank = computeRank(list, data.finalScore)
       const isHigh = qualifies(list, data.finalScore)
       const payload = { ...data, rank }
+      lastGameOverRef.current = payload
 
       if (isHigh) {
         stackRef.current.push({
@@ -138,6 +163,20 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
 
     socket.on('dmd:display', (d) => {
       upsideDownRef.current = d.upsideDown ?? false
+      if (d.mode === 'CINEMATIC') {
+        markActivity()
+        const now = performance.now()
+        stackRef.current.push({
+          scene: 'CINEMATIC',
+          priority: 110,
+          expiresAt: now + CLIP_DURATIONS[d.clip],
+          clip: d.clip,
+          payload: d.clip === 'hall_of_fame' ? lastGameOverRef.current ?? undefined : undefined,
+        })
+        if (d.clip === 'demogorgon_rises') pushJoyce('RUN')
+        if (d.clip === 'last_chance') pushJoyce('DERNIERE VIE')
+        return
+      }
       if (d.mode === 'EVENT') {
         markActivity()
         agitationStartRef.current = performance.now()
@@ -197,12 +236,19 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       )
       prevTopRef.current = top?.scene ?? null
 
+      const portalActive = stackRef.current.some(
+        (e) => e.scene === 'CINEMATIC' && e.clip === 'portal_swallow',
+      )
+
       setState({
-        takeover: top ? { scene: top.scene, payload: top.payload } : null,
+        takeover: top
+          ? { scene: top.scene, payload: top.payload, clip: top.clip }
+          : null,
         upsideDown: upsideDownRef.current,
         highlightRank: highlightRankRef.current,
         agitation: agitationAt(now - agitationStartRef.current),
         joyce: joyceRef.current,
+        holdHallFlip: portalActive,
       })
     }, TICK_MS)
 
