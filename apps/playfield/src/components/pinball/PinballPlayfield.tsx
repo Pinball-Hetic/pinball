@@ -534,7 +534,24 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     onHeticLetter: (n) => playCinematic("hetic_letter", { value: n }),
     onHeticComplete: () => {
       // FEVER démarre quand le GEL du clip se termine (onEnd du director).
-      playCinematic("hetic_complete", { onEnd: () => startFever(30_000) });
+      // On émet aussitôt un snapshot fever pour rendre la main au mode SCORE
+      // (bandeau + score live) sans attendre le premier hit du joueur.
+      playCinematic("hetic_complete", {
+        onEnd: () => {
+          startFever(30_000);
+          const snap = {
+            player: playerRef.current,
+            score: scoreRef.current,
+            combo: comboRef.current,
+            multiplier: multiplierRef.current,
+            lives: livesRef.current,
+            hetic: heticRef.current,
+            fever: true,
+          };
+          dmd.emitScoreSnapshot(snap);
+          dmd.pushScore(snap);
+        },
+      });
     },
     onFeverEnd: () => {
       // Re-émet un snapshot fever:false pour que DMD/backglass retombent.

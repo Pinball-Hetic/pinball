@@ -152,6 +152,13 @@ export const CLIP_SHOW_MS: Record<CinematicClip, number> = {
   skill_shot: 5_000,
 }
 
+// Durée d'occupation de la pile DMD (segment plein écran). Par défaut =
+// CLIP_SHOW_MS ; surchargé quand le visuel est plus court que le SHOW (ex.
+// hetic_complete : 10s de cinématique puis 30s d'état fever en mode SCORE).
+export const CLIP_TAKEOVER_MS: Partial<Record<CinematicClip, number>> = {
+  hetic_complete: 10_000,
+}
+
 // Durée du GEL physique playfield (0 = pas de pause du gameplay).
 export const CLIP_FREEZE_MS: Record<CinematicClip, number> = {
   demogorgon_rises: 6_000,

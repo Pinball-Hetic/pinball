@@ -231,13 +231,10 @@ function clipHeticLetter(grid: Uint8Array, n: number, ms: number): void {
   }
 }
 
-function clipHeticComplete(grid: Uint8Array, score: number, ms: number): void {
-  // Durée VISUELLE 10s (le SHOW dure 40s : 10-40s on rend le bandeau fever
-  // — le mode SCORE "reprend" visuellement, tronqué côté player).
-  if (ms >= 10000) {
-    drawFeverBanner(grid, score, ms)
-    return
-  }
+function clipHeticComplete(grid: Uint8Array, _score: number, ms: number): void {
+  // 10s de cinématique plein écran. Après, l'orchestrator rend la main au
+  // mode SCORE (bandeau fever + score LIVE) — voir CLIP_TAKEOVER_MS.
+  void _score
   const cx = GRID_W / 2
   const cy = 12
   if (ms < 3000) {

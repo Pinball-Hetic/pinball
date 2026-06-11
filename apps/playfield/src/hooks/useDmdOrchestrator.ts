@@ -8,7 +8,7 @@ import type {
   GameStats,
   CinematicClip,
 } from '@pinball/shared-types';
-import { CLIP_SHOW_MS } from '@pinball/shared-types';
+import { CLIP_SHOW_MS, CLIP_TAKEOVER_MS } from '@pinball/shared-types';
 import type { GameEvent } from '@pinball/game-engine';
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -221,7 +221,8 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       const { player, score } = lastSnapRef.current;
       push(
         { mode: 'CINEMATIC', clip, player, score, value },
-        { priority: PRIO.CINEMATIC, duration: CLIP_SHOW_MS[clip] },
+        // Segment plein écran : le mode SCORE reprend après (fever en SCORE).
+        { priority: PRIO.CINEMATIC, duration: CLIP_TAKEOVER_MS[clip] ?? CLIP_SHOW_MS[clip] },
       );
     },
 
