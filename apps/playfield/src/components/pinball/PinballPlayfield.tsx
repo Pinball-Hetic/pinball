@@ -53,6 +53,7 @@ import {
   type BallDiagnosticsSnapshot,
   findObjectByNormalizedName,
   removePinballmapUnusedMeshes,
+  hidePinballmapDecorNodes,
   prepareGltfMaterialsForDisplay,
   configureGltfRenderer,
   createGltfLoader,
@@ -319,7 +320,6 @@ function boundingBoxPlayfieldSurface(playfieldRoot: THREE.Object3D): THREE.Box3 
       n.includes("separator") ||
       n.includes("sling") ||
       n.includes("target") ||
-      n.includes("spinner") ||
       n.includes("guide") ||
       n.includes("rail") ||
       n.includes("rocket") ||
@@ -863,6 +863,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
         removePinballmapUnusedMeshes(playfieldRoot);
+        hidePinballmapDecorNodes(playfieldRoot);
         prepareGltfMaterialsForDisplay(playfieldRoot);
 
         bumperVisuals = new BumperVisuals();
