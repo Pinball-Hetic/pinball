@@ -64,7 +64,6 @@ import {
   UpsideDownPortal,
   UpsideDownTransition,
   UpsideDownAtmosphere,
-  VECNA_DEBUG_SPAWN_AT_START,
 } from "@pinball/game-engine";
 import type { ButtonAction, ButtonId } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
@@ -542,6 +541,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let prevFrameTime = 0;
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
+    let vecnaIntroHolding = false;
+    const vecnaIntroBallPos = { x: 0, y: 0, z: 0 };
 
 
     // ── Flipper collider debug wireframes ────────────────────────────────────
@@ -1056,13 +1057,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         demogorgonReveal?.setEmit(emit);
 
-        const spawnDebugVecna = () => {
-          emit({ type: "PORTAL_TRANSITION_END" });
-          upsideDownAtmosphere?.debugForceActive();
-          collisionProcessor?.prepareBossDebugFight('vecna', scoreRef.current);
-          emit({ type: "BOSS_REVEAL", bossId: "vecna", scoreIncrement: 0 });
-        };
-
         // ── Input handling ────────────────────────────────────────────────────
         console.log("[PinballPlayfield] KEYBOARD_MODE =", KEYBOARD_MODE);
 
@@ -1108,7 +1102,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                   bossReveals?.endAllFights();
                   upsideDownPortal?.reset();
                   upsideDownAtmosphere?.reset();
-                  if (VECNA_DEBUG_SPAWN_AT_START) spawnDebugVecna();
                   if (ballMesh) ballMesh.visible = true;
                   return;
                 }
@@ -1145,7 +1138,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 bossReveals?.endAllFights();
                 upsideDownPortal?.reset();
                 upsideDownAtmosphere?.reset();
-                if (VECNA_DEBUG_SPAWN_AT_START) spawnDebugVecna();
                 if (ballMesh) ballMesh.visible = true;
               }
             }
@@ -1244,10 +1236,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         physicsReadyRef.current = true;
         setPhysicsReady(true);
         onPlayfieldReady();
-        if (VECNA_DEBUG_SPAWN_AT_START) {
-          spawnDebugVecna();
-          beginSessionRef.current();
-        }
         debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
@@ -1288,10 +1276,28 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       upsideDownAtmosphere?.update(dt);
       upsideDownPortal?.update(dt);
 
-      const transitionActive = upsideDownTransition?.isActive() ?? false;
-      if (transitionActive) {
+      const portalTransitionActive = upsideDownTransition?.isActive() ?? false;
+      const vecnaIntroActive = bossReveals?.isGameplayFrozen() ?? false;
+      const physicsPaused = portalTransitionActive || vecnaIntroActive;
+
+      if (vecnaIntroActive && !vecnaIntroHolding && ballPhysicsInst) {
+        const p = ballPhysicsInst.body.translation();
+        vecnaIntroBallPos.x = p.x;
+        vecnaIntroBallPos.y = p.y;
+        vecnaIntroBallPos.z = p.z;
+        vecnaIntroHolding = true;
+        leftTarget = 0;
+        rightTarget = 0;
+        ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      if (!vecnaIntroActive) {
+        vecnaIntroHolding = false;
+      }
+
+      if (portalTransitionActive) {
         upsideDownTransition?.update(dt);
-      } else {
+      } else if (!vecnaIntroActive) {
         // ── Flipper cinématique : Three.js → Rapier ───────────────────────────
         prevLeftSwing  = leftSwing;
         prevRightSwing = rightSwing;
@@ -1335,14 +1341,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         }
       }
 
-      if (physicsWorld && !transitionActive) physicsWorld.update(time);
+      if (physicsWorld && !physicsPaused) physicsWorld.update(time);
 
-      if (physicsWorld && collisionProcessor && !transitionActive) {
+      if (physicsWorld && collisionProcessor && !physicsPaused) {
         collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
       }
 
-      // ── Diagnostic balle : pourquoi disparaît/sort + reset de secours ────
-      if (ballPhysicsInst && !transitionActive) {
+      if (ballPhysicsInst && !physicsPaused) {
         diag.verbose = debugVisibleRef.current;
         const lost = diag.update(ballPhysicsInst.body, gameStateRef.current);
         if (lost && gameStateRef.current === "playing") {
@@ -1358,14 +1363,23 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (
         ballPhysicsInst
         && gameStateRef.current === "playing"
-        && !transitionActive
+        && !physicsPaused
         && upsideDownPortal?.isOpen()
       ) {
         upsideDownPortal.applyMagnet(ballPhysicsInst.body);
       }
 
       // Ball sync
-      if (ballMesh?.visible && ballPhysicsInst && !transitionActive) {
+      if (ballMesh?.visible && ballPhysicsInst) {
+        if (vecnaIntroActive && gameStateRef.current === "playing") {
+          ballPhysicsInst.body.setTranslation(
+            { x: vecnaIntroBallPos.x, y: vecnaIntroBallPos.y, z: vecnaIntroBallPos.z },
+            true,
+          );
+          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          ballPhysicsInst.syncToMesh(ballMesh);
+        } else if (!physicsPaused) {
         // Balle figée au spawn tant qu'on est idle, Y COMPRIS pendant la charge
         // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
         // mur droit (frottement → ralentissement au lancement).
@@ -1447,6 +1461,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         }
 
         // Drain géré par le capteur Rapier bottom_out (CollisionEventProcessor)
+        }
       }
 
       // Plunger animation + jauge UI
@@ -1486,7 +1501,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       }
 
       // ── OrbitControls update ─────────────────────────────────────────────
-      if (orbitControls && !transitionActive) orbitControls.update();
+      if (orbitControls && !portalTransitionActive) orbitControls.update();
 
       // ── Rapier debug render (tous colliders) ─────────────────────────────
       if (debugCollidersOn && physicsWorld) {

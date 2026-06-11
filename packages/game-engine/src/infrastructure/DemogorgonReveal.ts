@@ -205,6 +205,10 @@ export class DemogorgonReveal implements BossRevealController {
     this.resetAtmosphere();
   }
 
+  isGameplayFrozen(): boolean {
+    return false;
+  }
+
   update(dt: number): void {
     this.demogorgonVisual.update(dt);
     this.billboard.sync();

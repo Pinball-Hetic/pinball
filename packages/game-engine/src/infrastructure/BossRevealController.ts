@@ -13,4 +13,5 @@ export interface BossRevealController {
   endFight(): void;
   update(dt: number): void;
   dispose(): void;
+  isGameplayFrozen(): boolean;
 }

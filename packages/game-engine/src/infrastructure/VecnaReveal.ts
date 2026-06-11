@@ -109,6 +109,10 @@ export class VecnaReveal implements BossRevealController {
     this.resetAtmosphere();
   }
 
+  isGameplayFrozen(): boolean {
+    return this.phase === 'walk' || this.phase === 'settle';
+  }
+
   update(dt: number): void {
     this.vecnaVisual.update(dt);
     this.targetPulse?.update(

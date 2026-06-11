@@ -55,4 +55,11 @@ export class BossRevealOrchestrator {
     }
     this.reveals.clear();
   }
+
+  isGameplayFrozen(): boolean {
+    for (const reveal of this.reveals.values()) {
+      if (reveal.isGameplayFrozen()) return true;
+    }
+    return false;
+  }
 }
