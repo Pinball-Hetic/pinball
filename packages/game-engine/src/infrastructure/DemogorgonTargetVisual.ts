@@ -12,6 +12,7 @@ import {
 } from '../domain/DemogorgonConstants';
 import { PLAYFIELD_TILT, surfaceYAtZ } from '../domain/PlayfieldGeometry';
 import { createGltfLoader } from './GltfDisplay';
+import { fitWithRetry, warmupObject3D } from './SkinnedModelWarmup';
 
 type AnimState = 'idle' | 'hit' | 'victory';
 
@@ -73,7 +74,16 @@ export class DemogorgonTargetVisual {
 
   async warmup(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
     if (!this.anchor) return;
-    await renderer.compileAsync(this.anchor, camera, scene);
+    await this.ensureReady();
+    await fitWithRetry(() => this.tryApplyFit());
+    this.syncFacing();
+    const primeActions = [this.idleAction, this.hitAction, this.victoryAction].filter(
+      (action): action is THREE.AnimationAction => action !== null,
+    );
+    await warmupObject3D(renderer, scene, camera, this.anchor, {
+      mixer: this.mixer,
+      primeActions,
+    });
   }
 
   show(): void {
@@ -163,36 +173,26 @@ export class DemogorgonTargetVisual {
       if (!this.anchor) return;
       this.fitModel(gltf.scene, gltf.animations);
       this.syncFacing();
-      this.resolveFit();
-      if (this.pendingFit) {
-        await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
-        if (!this.anchor) return;
-        this.resolveFit();
-      }
+      await fitWithRetry(() => this.tryApplyFit());
       if (this.anchor.visible) this.playIdle();
     } catch (err) {
       console.error('[Demogorgon] load error:', err);
     }
   }
 
-  private resolveFit(): void {
-    if (this.pendingFit) this.tryApplyFit();
-  }
-
-  private syncFacing(): void {
-    if (!this.rig || !this.anchor || !this.camera) return;
-
-    this.anchor.getWorldPosition(_facingPos);
-    const dx = this.camera.position.x - _facingPos.x;
-    const dz = this.camera.position.z - _facingPos.z;
-    this.rig.rotation.y = Math.atan2(dx, dz) + DEMOGORGON_MODEL_YAW;
-  }
-
-  private tryApplyFit(): void {
+  private tryApplyFit(): boolean {
     const model = this.pendingFit;
-    if (!model || !this.rig || !this.offset || !this.anchor) return;
+    if (!model || !this.rig || !this.offset || !this.anchor) return false;
 
     model.updateWorldMatrix(true, true);
+    if (this.idleAction) {
+      this.idleAction.play();
+      this.idleAction.time = 0;
+    }
+    this.mixer?.update(0);
+    model.traverse((obj) => {
+      if (obj instanceof THREE.SkinnedMesh) obj.skeleton.update();
+    });
 
     const box = new THREE.Box3();
     const v = new THREE.Vector3();
@@ -212,16 +212,26 @@ export class DemogorgonTargetVisual {
         }
       }
     });
-    if (box.isEmpty()) return;
+    if (box.isEmpty()) return false;
 
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    if (Math.max(Math.abs(center.x), Math.abs(center.y), Math.abs(center.z)) > 4) return;
+    if (Math.max(Math.abs(center.x), Math.abs(center.y), Math.abs(center.z)) > 4) return false;
 
     const height = Math.max(size.y, 1e-4);
     this.offset.position.set(-center.x, -box.min.y + 0.006, -center.z);
     this.rig.scale.setScalar(DEMOGORGON_MODEL_HEIGHT / height);
     this.pendingFit = null;
+    return true;
+  }
+
+  private syncFacing(): void {
+    if (!this.rig || !this.anchor || !this.camera) return;
+
+    this.anchor.getWorldPosition(_facingPos);
+    const dx = this.camera.position.x - _facingPos.x;
+    const dz = this.camera.position.z - _facingPos.z;
+    this.rig.rotation.y = Math.atan2(dx, dz) + DEMOGORGON_MODEL_YAW;
   }
 
   private fitModel(model: THREE.Object3D, clips: THREE.AnimationClip[]): void {
