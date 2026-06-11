@@ -61,11 +61,14 @@ import {
   BumperVisuals,
   GarlandLights,
   DemogorgonReveal,
+  CinematicDirector,
+  DEMOGORGON_TARGET,
+  DEMOGORGON_TARGET_HITS,
   UpsideDownPortal,
   UpsideDownTransition,
   UpsideDownAtmosphere,
 } from "@pinball/game-engine";
-import type { ButtonAction, ButtonId } from "@pinball/shared-types";
+import type { ButtonAction, ButtonId, CinematicClip } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
@@ -335,6 +338,29 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
   const dmd = useDmdOrchestrator();
 
+  // Directeur de cinématiques (stable). Ref → accessible depuis les
+  // callbacks render-scope (onLifeLost) et la boucle animate (useEffect).
+  const cinematicsRef = useRef<CinematicDirector | null>(null);
+  if (!cinematicsRef.current) cinematicsRef.current = new CinematicDirector();
+  const cinematics = cinematicsRef.current;
+
+  const playCinematic = useCallback(
+    (
+      clip: CinematicClip,
+      durationMs: number,
+      freeze: boolean,
+      opts?: { once?: boolean; onEnd?: () => void },
+    ): boolean => {
+      const accepted = cinematics.play(
+        { id: clip, durationMs, freezePhysics: freeze, onEnd: opts?.onEnd },
+        { once: opts?.once },
+      );
+      if (accepted) dmd.pushCinematic(clip);
+      return accepted;
+    },
+    [cinematics, dmd],
+  );
+
   const {
     lives,
     gameState,
@@ -389,11 +415,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
+      // Dernière vie engagée → respiration 1.2s (pas de gel : bille déjà drainée).
+      if (livesRemaining === 1) playCinematic('last_chance', 1200, false);
     },
     onGameOver: (finalScore, stats) => {
       // Pas d'affichage GAME_OVER sur le DMD : on garde le dernier SCORE
       // jusqu'au reset (INTRO). emitGameOver sert au backglass/leaderboard.
       dmd.emitGameOver(playerRef.current, finalScore, stats);
+      // Clip poussé à CHAQUE game over ; DMD/backglass décident de
+      // l'ampleur (le backglass connaît le rang → fanfare ou recap).
+      dmd.pushCinematic('hall_of_fame');
     },
     onGameStart: () => {
       dmd.emitGameStart(playerRef.current);
@@ -409,6 +440,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       dmd.pushScore(snap);
     },
     onIdleReset: () => {
+      cinematics.resetGame();
       resetPinballAudioForNewGame();
       dmd.pushIntro(playerRef.current);
       dmd.emitScoreSnapshot({
@@ -924,6 +956,26 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
+
+          // ── Cinématiques synchronisées 3 écrans ──────────────────────────────
+          if (event.type === "DEMOGORGON_REVEAL") {
+            // 1er reveau de la partie → pause 2.5s. Reveals suivants : refusé
+            // (once) → le strobe court de DemogorgonReveal suffit.
+            playCinematic("demogorgon_rises", 2500, true, { once: true });
+          }
+          if (
+            event.type === "DEMOGORGON_TARGET_HIT"
+            && event.hitCount >= DEMOGORGON_TARGET_HITS
+          ) {
+            playCinematic("demogorgon_slain", 2000, true, {
+              // Reprise "avec un bang" : impulse radial depuis le target.
+              onEnd: () =>
+                ballPhysicsInst?.applyEjectionForce({
+                  x: DEMOGORGON_TARGET.x,
+                  z: DEMOGORGON_TARGET.z,
+                }),
+            });
+          }
           if (
             (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
             && gameStateRef.current === "game_over"
@@ -939,7 +991,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               releaseUpsideDownWorld();
             }
           }
-          if (event.type === "PORTAL_ENTER") onPortalEnter?.();
+          if (event.type === "PORTAL_ENTER") {
+            onPortalEnter?.();
+            // Synchro DMD/backglass : la transition existante gère déjà la
+            // pause physique 4s, donc pas de director ici.
+            dmd.pushCinematic("portal_swallow");
+          }
           if (event.type === "PORTAL_TRANSITION_END") {
             upsideDownPortal?.reset();
             collisionProcessor?.resetPortalTrigger();
@@ -1255,10 +1312,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       upsideDownAtmosphere?.update(dt);
       upsideDownPortal?.update(dt);
 
+      cinematics.update(time);
       const transitionActive = upsideDownTransition?.isActive() ?? false;
+      // Physique gelée si transition Upside Down OU clip cinématique freeze.
+      const freezeFrame = transitionActive || cinematics.shouldFreeze();
       if (transitionActive) {
         upsideDownTransition?.update(dt);
-      } else {
+      }
+      if (!freezeFrame) {
         // ── Flipper cinématique : Three.js → Rapier ───────────────────────────
         // Lissage normalisé à 60 FPS : Math.pow(1 - SWING_SMOOTH, dt * 60)
         // reproduit exactement le comportement 60 Hz sur tous les écrans
@@ -1308,7 +1369,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         }
       }
 
-      if (physicsWorld && !transitionActive) {
+      if (physicsWorld && !freezeFrame) {
         // Drain les events APRÈS chaque step (multi-step possible sous 60 FPS) —
         // sinon les collisions des steps intermédiaires seraient perdues.
         const world = physicsWorld;
@@ -1318,7 +1379,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       }
 
       // ── Diagnostic balle : pourquoi disparaît/sort + reset de secours ────
-      if (ballPhysicsInst && !transitionActive) {
+      if (ballPhysicsInst && !freezeFrame) {
         diag.verbose = debugVisibleRef.current;
         const lost = diag.update(ballPhysicsInst.body, gameStateRef.current);
         if (lost && gameStateRef.current === "playing") {
@@ -1334,14 +1395,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (
         ballPhysicsInst
         && gameStateRef.current === "playing"
-        && !transitionActive
+        && !freezeFrame
         && upsideDownPortal?.isOpen()
       ) {
         upsideDownPortal.applyMagnet(ballPhysicsInst.body);
       }
 
       // Ball sync
-      if (ballMesh?.visible && ballPhysicsInst && !transitionActive) {
+      if (ballMesh?.visible && ballPhysicsInst && !freezeFrame) {
         // Balle figée au spawn tant qu'on est idle, Y COMPRIS pendant la charge
         // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
         // mur droit (frottement → ralentissement au lancement).
