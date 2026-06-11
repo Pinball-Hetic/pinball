@@ -8,6 +8,7 @@ export {
 } from './BossRegistry';
 
 export const SCORE_BUMPER = 100;
+export const SCORE_BUMP   = 30;
 export const SCORE_SLINGSHOT = 10;
 export const SCORE_POP_ZONE = 50;
 export const SCORE_RAMP = 200;

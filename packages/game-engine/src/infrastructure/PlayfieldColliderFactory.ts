@@ -248,6 +248,9 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createBossTargets(world, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, colliderMap);
     PlayfieldColliderFactory.createBottomOutSensor(world, colliderMap);
+    // Les bumps (Bump-left / Bump-right) sont détectés via leur trimesh GLB,
+    // taggé dans colliderMap par PlayfieldTrimeshBuilder. Aucun sensor cylindrique
+    // supplémentaire : la surface réelle du mèche est la zone de rebond.
   }
 
   private static createPlayfieldFloor(world: RAPIER.World): void {

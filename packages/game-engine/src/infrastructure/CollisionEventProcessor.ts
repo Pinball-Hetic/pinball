@@ -1,7 +1,13 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { BossId } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
-import { BUMPER_POSITIONS, DROP_TARGETS, PORTAL_ENTER_SCORE } from '../domain/Ball';
+import {
+  BUMPER_POSITIONS,
+  BUMP_EJECT_SCALE,
+  BUMP_HIT_COOLDOWN_MS,
+  DROP_TARGETS,
+  PORTAL_ENTER_SCORE,
+} from '../domain/Ball';
 import {
   SCORE_SLINGSHOT,
   SCORE_POP_ZONE,
@@ -10,6 +16,7 @@ import {
   SCORE_DROP_COMPLETE,
 } from '../domain/ScoringConstants';
 import type { BumperHit } from '../use-cases/BumperHit';
+import type { BumpHit } from '../use-cases/BumpHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
 import { BossFightManager } from './BossFightManager';
@@ -17,6 +24,7 @@ import { BossFightManager } from './BossFightManager';
 export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
   private readonly bossFights: BossFightManager;
+  private bumpLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
   private portalOpen = false;
   private portalTriggered = false;
   private upsideDownActive = false;
@@ -86,6 +94,7 @@ export class CollisionEventProcessor {
   constructor(
     private readonly colliderMap: Map<number, string>,
     private readonly bumperHitUC: BumperHit,
+    private readonly bumpHitUC: BumpHit,
     private readonly drainBallUC: DrainBall,
     private readonly bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
@@ -118,6 +127,15 @@ export class CollisionEventProcessor {
         const pos = BUMPER_POSITIONS[idx];
         if (pos) {
           this.bumperHitUC.execute(idx, pos);
+        }
+      }
+
+      if (started && (role === 'bump_right' || role === 'bump_left') && gameState === 'playing') {
+        const side = role === 'bump_right' ? 'right' as const : 'left' as const;
+        const now = performance.now();
+        if (now - this.bumpLastHitMs[side] >= BUMP_HIT_COOLDOWN_MS) {
+          this.bumpLastHitMs[side] = now;
+          this.bumpHitUC.execute(side, BUMP_EJECT_SCALE);
         }
       }
 

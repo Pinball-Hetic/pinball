@@ -16,6 +16,7 @@ export type GameEvent =
   | { type: 'PORTAL_TRANSITION_END' }
   | { type: 'DRAIN' }
   | { type: 'BOTTOM_OUT' }
+  | { type: 'BUMP_HIT'; side: 'left' | 'right'; scoreIncrement: number }
   | { type: 'BALL_LAUNCHED' };
 
 export type GameEventListener = (event: GameEvent) => void;
