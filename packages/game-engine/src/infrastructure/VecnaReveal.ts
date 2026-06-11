@@ -14,7 +14,7 @@ const VICTORY = 0.65;
 const TARGET_PULSE_SPEED = 2.2;
 const TARGET_PULSE_AMP = 0.16;
 
-type Phase = 'idle' | 'walk' | 'fight' | 'victory';
+type Phase = 'idle' | 'walk' | 'settle' | 'fight' | 'victory';
 
 export type VecnaSetup = {
   root: THREE.Object3D;
@@ -122,6 +122,14 @@ export class VecnaReveal {
       this.cinematicStrobe.apply(false, false, 0.48 + t * 0.16);
       if (t >= 1) {
         this.vecnaVisual.setPathProgress(1);
+        this.beginSettlePhase();
+      }
+      return;
+    }
+
+    if (this.phase === 'settle') {
+      this.cinematicStrobe.apply(false, false, 0.64);
+      if (this.vecnaVisual.updateSettle(dt)) {
         this.beginFightPhase();
       }
       return;
@@ -173,11 +181,16 @@ export class VecnaReveal {
     this.vecnaVisual.prepareWalk();
   }
 
+  private beginSettlePhase(): void {
+    this.phase = 'settle';
+    this.elapsed = 0;
+    this.vecnaVisual.startSettle();
+  }
+
   private beginFightPhase(): void {
     this.phase = 'fight';
     this.elapsed = 0;
     this.vecnaVisual.setPathProgress(1);
-    this.vecnaVisual.settleForFight();
     if (this.targetGroup) this.targetGroup.visible = true;
     this.onTargetReady?.();
     this.garlandLights?.setAtmosphere(0.94, 0.1, 2.5);

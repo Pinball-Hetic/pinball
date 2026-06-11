@@ -12,6 +12,7 @@ import {
   VECNA_SPAWN,
 } from '../domain/VecnaConstants';
 import { PLAYFIELD_TILT, surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { easeOut } from './CinematicEasing';
 import { findGltfAnimationClip } from './GltfAnimationClips';
 import { createGltfLoader } from './GltfDisplay';
 import {
@@ -32,8 +33,18 @@ export class VecnaTargetVisual {
   private loadPromise: Promise<void> | null = null;
   private pathT = 1;
   private walking = false;
+  private settling = false;
+  private settleElapsed = 0;
+  private settleDuration = 0;
+  private walkFacingY = 0;
   private pulseT = 0;
   private hitFlash = 0;
+
+  private readonly onWalkFinished = (event: { action: THREE.AnimationAction }): void => {
+    if (event.action === this.walkAction && this.settling) {
+      this.completeSettle();
+    }
+  };
 
   mount(parent: THREE.Object3D, camera: THREE.Camera): void {
     this.dispose();
@@ -68,6 +79,8 @@ export class VecnaTargetVisual {
 
   beginReveal(): void {
     this.walking = false;
+    this.settling = false;
+    this.settleElapsed = 0;
     this.walkAction?.stop();
     this.setPathProgress(0);
   }
@@ -97,6 +110,7 @@ export class VecnaTargetVisual {
       this.anchor.rotation.z = 0;
     }
     this.walking = false;
+    this.settling = false;
     this.walkAction?.stop();
     this.pathT = 0;
     this.hitFlash = 0;
@@ -107,22 +121,66 @@ export class VecnaTargetVisual {
   playWalk(): void {
     if (!this.walkAction) return;
     this.walking = true;
+    this.settling = false;
     this.walkAction.reset();
     this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
+    this.walkAction.clampWhenFinished = false;
     this.walkAction.play();
+  }
+
+  startSettle(): void {
+    if (!this.walking || this.settling) return;
+    this.settling = true;
+    this.settleElapsed = 0;
+    this.setPathProgress(1);
+    if (this.rig) this.walkFacingY = this.rig.rotation.y;
+
+    if (!this.walkAction) {
+      this.settleDuration = 0;
+      return;
+    }
+
+    const clipDuration = this.walkAction.getClip().duration;
+    const phase = this.walkAction.time % clipDuration;
+    this.settleDuration = clipDuration - phase;
+    this.walkAction.setLoop(THREE.LoopOnce, 1);
+    this.walkAction.clampWhenFinished = true;
+  }
+
+  updateSettle(dt: number): boolean {
+    if (!this.settling) return true;
+
+    if (this.settleDuration <= 0) {
+      this.completeSettle();
+      return true;
+    }
+
+    this.settleElapsed += dt;
+    const t = Math.min(1, this.settleElapsed / this.settleDuration);
+    this.lerpFacingToCamera(easeOut(t));
+
+    if (this.settleElapsed >= this.settleDuration + 0.05) {
+      this.completeSettle();
+    }
+
+    return !this.settling;
+  }
+
+  private completeSettle(): void {
+    if (!this.settling) return;
+    this.settling = false;
+    this.walking = false;
+    this.syncFacing();
   }
 
   stopWalk(): void {
     this.walking = false;
+    this.settling = false;
     if (this.walkAction) {
       this.walkAction.stop();
       this.walkAction.time = 0;
+      this.walkAction.clampWhenFinished = false;
     }
-  }
-
-  settleForFight(): void {
-    this.stopWalk();
-    this.applyFit();
   }
 
   playHit(): void {
@@ -138,8 +196,8 @@ export class VecnaTargetVisual {
 
     this.mixer?.update(dt);
 
-    if (this.walking) this.syncWalkFacing();
-    else this.syncFacing();
+    if (this.walking && !this.settling) this.syncWalkFacing();
+    else if (!this.settling) this.syncFacing();
 
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
 
@@ -153,6 +211,7 @@ export class VecnaTargetVisual {
   }
 
   dispose(): void {
+    this.mixer?.removeEventListener('finished', this.onWalkFinished);
     if (this.anchor) this.anchor.parent?.remove(this.anchor);
     this.anchor = null;
     this.camera = null;
@@ -163,6 +222,7 @@ export class VecnaTargetVisual {
     this.offset = null;
     this.model = null;
     this.walking = false;
+    this.settling = false;
     this.hitFlash = 0;
     this.pulseT = 0;
     this.pathT = 0;
@@ -215,6 +275,7 @@ export class VecnaTargetVisual {
     });
 
     this.mixer = new THREE.AnimationMixer(model);
+    this.mixer.addEventListener('finished', this.onWalkFinished);
     const walkClip = findGltfAnimationClip(clips, VECNA_ANIM_WALK);
     if (walkClip) {
       this.walkAction = this.mixer.clipAction(walkClip);
@@ -240,6 +301,13 @@ export class VecnaTargetVisual {
     });
   }
 
+  private lerpFacingToCamera(t: number): void {
+    if (!this.rig) return;
+    const targetY = this.cameraFacingY();
+    if (targetY === null) return;
+    this.rig.rotation.y = THREE.MathUtils.lerp(this.walkFacingY, targetY, t);
+  }
+
   private syncWalkFacing(): void {
     if (!this.rig) return;
     const dz = VECNA_TARGET.z - VECNA_SPAWN.z;
@@ -248,12 +316,19 @@ export class VecnaTargetVisual {
   }
 
   private syncFacing(): void {
-    if (!this.rig || !this.anchor || !this.camera) return;
+    if (!this.rig) return;
+    const targetY = this.cameraFacingY();
+    if (targetY === null) return;
+    this.rig.rotation.y = targetY;
+  }
+
+  private cameraFacingY(): number | null {
+    if (!this.anchor || !this.camera) return null;
 
     const anchorPos = new THREE.Vector3();
     this.anchor.getWorldPosition(anchorPos);
     const dx = this.camera.position.x - anchorPos.x;
     const dz = this.camera.position.z - anchorPos.z;
-    this.rig.rotation.y = Math.atan2(dx, dz) + VECNA_MODEL_YAW;
+    return Math.atan2(dx, dz) + VECNA_MODEL_YAW;
   }
 }
