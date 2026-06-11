@@ -106,6 +106,13 @@ export const UPSIDE_DOWN_SPAWN_IMPULSE = { x: 0, y: 0, z: 0.055 } as const;
 export const ELEVEN_ASSIST_SCORE = 100;
 export const ELEVEN_ASSIST_INTERVAL = 3.2;
 
+// Bump-right / Bump-left — positions extraites des node translations du GLB.
+export const BUMP_POSITIONS = [
+  { x:  0.0928, y: 0.9985, z: 0.1106, side: 'right' as const },
+  { x: -0.1358, y: 0.9985, z: 0.1106, side: 'left'  as const },
+] as const;
+export const BUMP_EJECT_SCALE     = 0.45;  // 45 % de la force d'un pop bumper
+
 export const BUMPER_RADIUS       = 0.038;
 export const BUMPER_RESTITUTION  = 0.20;  // réduit de 0.30 (−33%) — rebond collider moins violent
 // Kick pop bumper : Δv = impulse/masse = 0.11/0.08 = 1.38 m/s (−35% vs 2.25 m/s original).

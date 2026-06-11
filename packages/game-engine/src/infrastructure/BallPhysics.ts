@@ -103,6 +103,20 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
     );
   }
 
+  applyScaledEjectionForce(
+    pos: { x: number; z: number },
+    scale: number,
+    side: 'left' | 'right',
+  ): void {
+    // Direction X fixe : bump_left pousse toujours à droite (+X),
+    //                     bump_right pousse toujours à gauche (-X).
+    // Peu importe où la balle touche le mèche, la direction horizontale est
+    // déterministe → effet ping-pong entre les deux bumps.
+    const xDir = side === 'left' ? 1 : -1;
+    const impulse = BUMPER_EJECT_IMPULSE * scale;
+    this.body.applyImpulse({ x: xDir * impulse, y: 0, z: 0 }, true);
+  }
+
   syncToMesh(mesh: {
     position: { set(x: number, y: number, z: number): void };
     quaternion: { set(x: number, y: number, z: number, w: number): void };

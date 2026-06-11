@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEventListener } from '../domain/GameEvents';
-import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
+import { BUMPER_POSITIONS, BUMP_POSITIONS, BUMP_EJECT_SCALE, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
 import {
   SCORE_SLINGSHOT,
   SCORE_POP_ZONE,
@@ -12,6 +12,7 @@ import {
   SCORE_DROP_COMPLETE,
 } from '../domain/ScoringConstants';
 import type { BumperHit } from '../use-cases/BumperHit';
+import type { BumpHit } from '../use-cases/BumpHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
 
@@ -77,6 +78,7 @@ export class CollisionEventProcessor {
   constructor(
     private readonly colliderMap: Map<number, string>,
     private readonly bumperHitUC: BumperHit,
+    private readonly bumpHitUC: BumpHit,
     private readonly drainBallUC: DrainBall,
     private readonly bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
@@ -110,6 +112,12 @@ export class CollisionEventProcessor {
         if (pos) {
           this.bumperHitUC.execute(idx, pos);
         }
+      }
+
+      if ((role === 'bump_right' || role === 'bump_left') && gameState === 'playing') {
+        const side = role === 'bump_right' ? 'right' as const : 'left' as const;
+        const bp = BUMP_POSITIONS.find((b) => b.side === side);
+        if (bp) this.bumpHitUC.execute(side, bp, BUMP_EJECT_SCALE);
       }
 
       if (role === 'bottom_out' && gameState === 'playing') {

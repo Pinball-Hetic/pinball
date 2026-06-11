@@ -13,7 +13,6 @@ import {
   playfieldUsesCollOnlyCollision,
   isPinballmapNonPhysicalFloorMesh,
 } from './GltfNodeNames';
-import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
 const COLLISION_SOLIDS = new Set([
   'flipper',
@@ -96,6 +95,25 @@ const EXCLUDED_NODES = new Set([
 
 const PINBALLMAP_TRIMESH_RESTITUTION = 0.35;
 const PINBALLMAP_TRIMESH_FRICTION = 0.12;
+
+/**
+ * Seuil de taille pour les sous-meshes rail (Circle.xxx).
+ * Si les 2 plus petites dimensions sont toutes les deux < ce seuil,
+ * le mesh est un détail décoratif (vis, clip, anneau fin) → pas de physique.
+ * Exemple Circle.018 : Mesh_11 (18×29×19mm), Mesh_12 (6×0.6×6mm), Mesh_13 (24×7×24mm)
+ * → exclus. Mesh_8/9/10 (86×44×290mm) → inclus.
+ */
+const RAIL_SUBMESH_MIN_PHYS_DIM = 0.025; // 25 mm
+
+// Meshes Pinballmap qui doivent rebondir fort (surfaces "bump").
+// Noms normalisés : lowercase, espaces → underscores (les tirets restent).
+const PINBALLMAP_HIGH_BOUNCE = new Set([
+  'bump-right',
+  'bump-left',
+]);
+// Restitution modérée : le sensor BumpHit fournit l'impulsion active principale.
+const PINBALLMAP_HIGH_BOUNCE_RESTITUTION = 0.40;
+const PINBALLMAP_HIGH_BOUNCE_FRICTION    = 0.05;
 
 const PLASTIC_GROUPS = new Set([
   'plastic', 'plastic_left', 'plastic_pop_bumper_zone', 'plastic_rocket',
@@ -223,11 +241,15 @@ function laplacianSmooth(
 }
 
 export class PlayfieldTrimeshBuilder {
-  static build(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
+  static build(
+    playfieldRoot: THREE.Object3D,
+    world: RAPIER.World,
+    colliderMap?: Map<number, string>,
+  ): void {
     playfieldRoot.updateMatrixWorld(true);
 
     if (hasPinballmapRoot(playfieldRoot)) {
-      PlayfieldTrimeshBuilder.buildPinballmap(playfieldRoot, world);
+      PlayfieldTrimeshBuilder.buildPinballmap(playfieldRoot, world, colliderMap);
       // Les meshes hors-hiérarchie Pinballmap (ex : plaques-guide standalone)
       // ne sont pas couverts par buildPinballmap — on les traite séparément.
       PlayfieldTrimeshBuilder.buildStandaloneWalls(playfieldRoot, world);
@@ -252,7 +274,11 @@ export class PlayfieldTrimeshBuilder {
     PlayfieldTrimeshBuilder.buildPlasticTrimeshes(playfieldRoot, world);
   }
 
-  private static buildPinballmap(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
+  private static buildPinballmap(
+    playfieldRoot: THREE.Object3D,
+    world: RAPIER.World,
+    colliderMap?: Map<number, string>,
+  ): void {
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       if (!isPinballmapGameplayMesh(child)) return;
@@ -264,7 +290,46 @@ export class PlayfieldTrimeshBuilder {
       // structure haute) gardent leur collision.
       if (isPinballmapNonPhysicalFloorMesh(child)) return;
 
+      // Surfaces "bump" : le trimesh du mèche EST la surface de rebond ET la
+      // surface de détection. On l'ajoute à colliderMap (tag bump_left/bump_right)
+      // et on active COLLISION_EVENTS pour que CollisionEventProcessor le détecte.
+      // Aucun corps invisible supplémentaire : la balle ne rebondit que quand elle
+      // touche physiquement le mesh.
+      if (meshMatchesSet(child, PINBALLMAP_HIGH_BOUNCE)) {
+        const meshName = normalizeGltfName(child.name);   // 'bump-right' | 'bump-left'
+        const tag      = meshName.replace(/-/g, '_');     // 'bump_right' | 'bump_left'
+        const col = PlayfieldTrimeshBuilder.createTrimeshCollider(
+          world,
+          [extractWorldGeometry(child)],
+          PINBALLMAP_HIGH_BOUNCE_RESTITUTION,
+          PINBALLMAP_HIGH_BOUNCE_FRICTION,
+          false, // pas de lissage (mesh déjà propre)
+          false, // single-sided : les normales du mèche pointent vers la zone de jeu
+        );
+        if (col && colliderMap) {
+          col.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+          colliderMap.set(col.handle, tag);
+        }
+        return;
+      }
+
       if (isPinballmapRailMesh(child)) {
+        // Filtrer les détails décoratifs microscopiques (vis, clips, anneaux fins).
+        // On calcule la AABB du mesh et on vérifie que les 2 plus petites dimensions
+        // dépassent le seuil RAIL_SUBMESH_MIN_PHYS_DIM (25 mm).
+        // Ex : Circle.018/Mesh_11 (18×29×19mm), Mesh_12 (6×0.6mm×6mm) → exclus.
+        const testGeo = extractWorldGeometry(child);
+        testGeo.computeBoundingBox();
+        const bb = testGeo.boundingBox;
+        if (bb) {
+          const dims = [
+            bb.max.x - bb.min.x,
+            bb.max.y - bb.min.y,
+            bb.max.z - bb.min.z,
+          ].sort((a, b) => a - b);
+          // Les 2 plus petites dimensions doivent dépasser le seuil.
+          if (dims[0] < RAIL_SUBMESH_MIN_PHYS_DIM && dims[1] < RAIL_SUBMESH_MIN_PHYS_DIM) return;
+        }
         PlayfieldTrimeshBuilder.createRailColliders(
           world,
           child,
@@ -274,13 +339,19 @@ export class PlayfieldTrimeshBuilder {
         return;
       }
 
+      // Mesh_1 (murs moulés plein plateau) : doubleSided=false.
+      // doubleSided=true duplique chaque face avec la normale inversée →
+      // la balle près d'un bord de mur touche une face "intérieure" fantôme
+      // et est expulsée à travers le mur. Les normales de Mesh_1 pointent vers
+      // l'intérieur du terrain (vérifiées Blender) → single-sided suffit.
+      const isMesh1 = normalizeGltfName(child.name) === 'mesh_1';
       PlayfieldTrimeshBuilder.createTrimeshCollider(
         world,
         [extractWorldGeometry(child)],
         PINBALLMAP_TRIMESH_RESTITUTION,
         PINBALLMAP_TRIMESH_FRICTION,
         false,
-        true,
+        !isMesh1,  // doubleSided=false pour Mesh_1, true pour les autres
       );
     });
   }
@@ -315,10 +386,11 @@ export class PlayfieldTrimeshBuilder {
     friction: number,
   ): void {
     const geo = extractWorldGeometry(mesh);
-    geo.computeBoundingBox();
-    const bb = geo.boundingBox;
-    if (!bb) return;
-
+    // Trimesh uniquement — le cuboid bounding-box ajouté précédemment créait
+    // 2 corps physiques superposés par sous-mesh (trimesh + cuboid).
+    // Résultat : Rapier résolvait 2 collisions simultanées avec des normales
+    // contradictoires → téléportation de la balle à grande vitesse.
+    // CCD + trimesh suffit pour les rails de la taille de Circle.018 (≥ 86mm).
     PlayfieldTrimeshBuilder.createTrimeshCollider(
       world,
       [geo],
@@ -326,29 +398,6 @@ export class PlayfieldTrimeshBuilder {
       friction,
       false,
       true,
-    );
-
-    const cx = (bb.min.x + bb.max.x) * 0.5;
-    const cz = (bb.min.z + bb.max.z) * 0.5;
-    const floorY = surfaceYAtZ(cz);
-    const baseY = Math.min(bb.min.y, floorY);
-    const topY = bb.max.y;
-    const height = topY - baseY;
-    if (height < 0.004) return;
-
-    const hx = Math.max((bb.max.x - bb.min.x) * 0.5, 0.004);
-    const hz = Math.max((bb.max.z - bb.min.z) * 0.5, 0.004);
-    const hy = height * 0.5;
-    const cy = baseY + hy;
-
-    const body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(cx, cy, cz),
-    );
-    world.createCollider(
-      RAPIER.ColliderDesc.cuboid(hx, hy, hz)
-        .setRestitution(restitution)
-        .setFriction(friction),
-      body,
     );
   }
 
@@ -399,9 +448,9 @@ export class PlayfieldTrimeshBuilder {
     friction: number,
     smooth = true,
     doubleSided = false,
-  ): void {
+  ): RAPIER.Collider | null {
     const { verts, indices } = PlayfieldTrimeshBuilder.mergeGeos(geos);
-    if (verts.length === 0 || indices.length === 0) return;
+    if (verts.length === 0 || indices.length === 0) return null;
 
     const rawGeo = new THREE.BufferGeometry();
     rawGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
@@ -416,16 +465,16 @@ export class PlayfieldTrimeshBuilder {
       finalGeo = mergeVertices(finalGeo, 1e-4);
       idx = finalGeo.index;
     }
-    if (!idx) return;
+    if (!idx) return null;
 
     const vertsF = new Float32Array(pos.array as ArrayLike<number>);
     const indU = new Uint32Array(idx.array as ArrayLike<number>);
 
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     const desc = RAPIER.ColliderDesc.trimesh(vertsF, indU);
-    if (!desc) return;
+    if (!desc) return null;
 
-    world.createCollider(
+    return world.createCollider(
       desc.setRestitution(restitution).setFriction(friction),
       body,
     );

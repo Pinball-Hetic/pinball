@@ -9,6 +9,7 @@ import {
   Plunger,
   LaunchBall,
   BumperHit,
+  BumpHit,
   DrainBall,
   BottomOutBall,
   DetectBottomOut,
@@ -518,6 +519,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let ballPhysicsInst: BallPhysics | null = null;
     let launchBallUC: LaunchBall | null = null;
     let bumperHitUC: BumperHit | null = null;
+    let bumpHitUC: BumpHit | null = null;
     let drainBallUC: DrainBall | null = null;
     let bottomOutBallUC: BottomOutBall | null = null;
     let collisionProcessor: CollisionEventProcessor | null = null;
@@ -715,7 +717,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         const colliderMap = new Map<number, string>();
 
-        PlayfieldTrimeshBuilder.build(playfieldRoot, world);
+        // colliderMap est créé avant le build du trimesh pour que les bumps
+        // (Bump-left / Bump-right) puissent y être taggés directement.
+        PlayfieldTrimeshBuilder.build(playfieldRoot, world, colliderMap);
 
         const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
         PlayfieldColliderFactory.createAll(
@@ -962,12 +966,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         };
         launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
         bumperHitUC = new BumperHit(ballPhysicsInst, emit);
+        bumpHitUC = new BumpHit(ballPhysicsInst, emit);
         drainBallUC = new DrainBall(ballPhysicsInst, emit);
         bottomOutBallUC = new BottomOutBall(ballPhysicsInst, emit);
 
         collisionProcessor = new CollisionEventProcessor(
           colliderMap,
           bumperHitUC,
+          bumpHitUC,
           drainBallUC,
           bottomOutBallUC,
           emit,
