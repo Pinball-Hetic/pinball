@@ -1,21 +1,18 @@
-import { DEMOGORGON_TARGET_HITS, VECNA_TARGET_HITS } from "@pinball/game-engine";
-import type { DemogorgonHud, ScorePop, VecnaHud } from "../../hooks/useGameState";
+import { BOSS_IDS, getBossDefinition } from "@pinball/game-engine";
+import type { BossHudState, ScorePop } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
 import PlungerPowerBar from "./PlungerPowerBar";
 
-/** Phase d'amorçage avant / pendant la session de jeu. */
 export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
 
 interface GameOverlayProps {
   lives: number;
   gameState: "idle" | "playing" | "game_over";
   bootPhase: PlayfieldBootPhase;
-  /** Progression charge plongeur [0,1] ou null si inactive. */
   plungerCharge: number | null;
   onResetBall?: () => void;
   initialLives: number;
-  demogorgonHud: DemogorgonHud;
-  vecnaHud: VecnaHud;
+  bossHud: BossHudState;
   scorePops: ScorePop[];
   upsideDownActive: boolean;
   upsideDownHint: boolean;
@@ -30,8 +27,7 @@ export default function GameOverlay({
   plungerCharge,
   onResetBall,
   initialLives,
-  demogorgonHud,
-  vecnaHud,
+  bossHud,
   scorePops,
   upsideDownActive,
   upsideDownHint,
@@ -49,12 +45,6 @@ export default function GameOverlay({
 
   const showResetBall =
     bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
-
-  const showDemogorgonHud =
-    bootPhase === "in_game" && gameState === "playing" && demogorgonHud.active;
-
-  const showVecnaHud =
-    bootPhase === "in_game" && gameState === "playing" && upsideDownActive && vecnaHud.active;
 
   const showUpsideDownBanner =
     bootPhase === "in_game" && gameState === "playing" && upsideDownActive;
@@ -118,57 +108,55 @@ export default function GameOverlay({
         </div>
       )}
 
-      {showDemogorgonHud && demogorgonHud.elevenFlash && !demogorgonHud.victory && (
-        <div className="pointer-events-none absolute inset-x-0 top-24 z-10 flex justify-center">
-          <p className="font-mono text-sm font-bold uppercase tracking-[0.25em] text-violet-300 drop-shadow-[0_0_14px_rgba(180,100,255,0.85)] sm:text-base">
-            Eleven +100
-          </p>
-        </div>
-      )}
+      {BOSS_IDS.map((bossId) => {
+        const def = getBossDefinition(bossId);
+        const hud = bossHud[bossId];
+        const showBossHud =
+          bootPhase === "in_game" &&
+          gameState === "playing" &&
+          hud.active &&
+          (!def.hud.requiresUpsideDown || upsideDownActive);
 
-      {showDemogorgonHud && !demogorgonHud.victory && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-8 z-10 flex justify-center">
-          <div className="rounded border border-red-500/40 bg-black/70 px-4 py-2 text-center font-mono backdrop-blur-sm">
-            <p className="text-[10px] uppercase tracking-[0.35em] text-red-300/90">
-              Cible Demogorgon
-            </p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-red-400 drop-shadow-[0_0_10px_rgba(255,60,60,0.7)]">
-              {demogorgonHud.hits} / {DEMOGORGON_TARGET_HITS}
-            </p>
+        if (!showBossHud) return null;
+
+        return (
+          <div key={bossId}>
+            {hud.assistFlash && def.hud.assistLabel && !hud.victory && (
+              <div className="pointer-events-none absolute inset-x-0 top-24 z-10 flex justify-center">
+                <p className="font-mono text-sm font-bold uppercase tracking-[0.25em] text-violet-300 drop-shadow-[0_0_14px_rgba(180,100,255,0.85)] sm:text-base">
+                  {def.hud.assistLabel}
+                </p>
+              </div>
+            )}
+
+            {!hud.victory && (
+              <div
+                className={`pointer-events-none absolute inset-x-0 ${def.hud.bottomClass} z-10 flex justify-center`}
+              >
+                <div
+                  className={`rounded border ${def.hud.borderClass} bg-black/70 px-4 py-2 text-center font-mono backdrop-blur-sm`}
+                >
+                  <p className={`text-[10px] uppercase tracking-[0.35em] ${def.hud.subtitleClass}`}>
+                    {def.hud.label}
+                  </p>
+                  <p className={`mt-1 text-xl font-bold tabular-nums ${def.hud.hitsClass}`}>
+                    {hud.hits} / {def.targetHits}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {hud.victory && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                <p className={`font-mono text-2xl font-bold uppercase tracking-[0.2em] sm:text-3xl ${def.hud.victoryClass}`}>
+                  {def.hud.victoryLabel}
+                </p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })}
 
-      {showDemogorgonHud && demogorgonHud.victory && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <p className="font-mono text-2xl font-bold uppercase tracking-[0.2em] text-amber-300 drop-shadow-[0_0_20px_rgba(255,200,80,0.9)] sm:text-3xl">
-            Demogorgon vaincu !
-          </p>
-        </div>
-      )}
-
-      {showVecnaHud && !vecnaHud.victory && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center">
-          <div className="rounded border border-violet-500/45 bg-black/70 px-4 py-2 text-center font-mono backdrop-blur-sm">
-            <p className="text-[10px] uppercase tracking-[0.35em] text-violet-300/90">
-              Cible Vecna
-            </p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-violet-400 drop-shadow-[0_0_10px_rgba(160,80,255,0.7)]">
-              {vecnaHud.hits} / {VECNA_TARGET_HITS}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {showVecnaHud && vecnaHud.victory && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <p className="font-mono text-2xl font-bold uppercase tracking-[0.2em] text-violet-200 drop-shadow-[0_0_20px_rgba(160,80,255,0.9)] sm:text-3xl">
-            Vecna vaincu !
-          </p>
-        </div>
-      )}
-
-      {/* ── Écran de chargement ── */}
       {bootPhase === "loading" && (
         <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-[#0a0e18]/92 backdrop-blur-sm">
           <div
@@ -186,7 +174,6 @@ export default function GameOverlay({
         </div>
       )}
 
-      {/* ── Écran d'accueil (attract mode) ── */}
       {bootPhase === "attract" && (
         <div
           className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#0a0e18]/75 via-[#0a0e18]/55 to-[#0a0e18]/85 px-6 backdrop-blur-[2px]"
@@ -222,7 +209,6 @@ export default function GameOverlay({
         </div>
       )}
 
-      {/* ── Game over (plein écran) ── */}
       {showGameOver && (
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur-[1px]">
           <p className="font-mono text-4xl font-bold uppercase tracking-[0.25em] text-red-400 drop-shadow-[0_0_16px_rgba(239,68,68,0.8)]">
@@ -234,7 +220,6 @@ export default function GameOverlay({
         </div>
       )}
 
-      {/* ── Jauge de puissance plongeur ── */}
       {showPowerBar && <PlungerPowerBar charge={plungerCharge} />}
 
       {showPowerBar && (
@@ -245,7 +230,6 @@ export default function GameOverlay({
         </div>
       )}
 
-      {/* ── Hint lancement discret (bas) — masqué pendant la charge ── */}
       {showLaunchHint && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex flex-col items-center gap-2 px-4">
           {lives < initialLives && (

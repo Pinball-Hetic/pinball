@@ -1,5 +1,5 @@
 import type { GameEvent } from "@pinball/game-engine";
-import { DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
+import { getBossDefinition } from "@pinball/game-engine";
 import { installAudioBootstrap } from "./AudioBootstrap";
 import { EarlySoundController } from "./EarlySoundController";
 import {
@@ -114,16 +114,20 @@ export function handlePinballSoundEvent(event: GameEvent): void {
     case "BUMPER_HIT":
       sfx.playBumper(event.bumperIndex);
       break;
-    case "DEMOGORGON_REVEAL":
-      earlySound.consumeForDemogorgon();
-      void samples.playOneShotBuffer(SPAWN_DG_URL, soundLevel("spawnDemogorgon"));
+    case "BOSS_REVEAL":
+      if (event.bossId === "demogorgon") {
+        earlySound.consumeForDemogorgon();
+        void samples.playOneShotBuffer(SPAWN_DG_URL, soundLevel("spawnDemogorgon"));
+      }
       break;
-    case "DEMOGORGON_TARGET_HIT":
+    case "BOSS_TARGET_HIT": {
+      const def = getBossDefinition(event.bossId);
       sfx.playTargetHit(event.hitCount);
-      if (event.hitCount >= DEMOGORGON_TARGET_HITS) {
+      if (event.hitCount >= def.targetHits) {
         window.setTimeout(() => sfx.playVictory(), 80);
       }
       break;
+    }
     case "ELEVEN_ASSIST":
       sfx.playElevenAssist();
       break;

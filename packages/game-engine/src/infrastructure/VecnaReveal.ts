@@ -1,18 +1,18 @@
 import * as THREE from 'three';
 import type { GameEvent } from '../domain/GameEvents';
-import { VECNA_TARGET, VECNA_TARGET_HITS } from '../domain/Ball';
-import { VECNA_WALK_DURATION } from '../domain/VecnaConstants';
+import { getBossDefinition } from '../domain/BossRegistry';
+import { VECNA_TARGET } from '../domain/Ball';
 import { PLAYFIELD_TILT } from '../domain/PlayfieldGeometry';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
+import type { UpsideDownAtmosphere } from './UpsideDownAtmosphere';
 import { createBossTargetMesh } from './BossTargetMesh';
+import { BossTargetPulse } from './BossTargetPulse';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { VecnaTargetVisual } from './VecnaTargetVisual';
+import type { BossRevealController } from './BossRevealController';
 
-const TARGET_HIT_FLASH = 0.18;
 const VICTORY = 0.65;
-const TARGET_PULSE_SPEED = 2.2;
-const TARGET_PULSE_AMP = 0.16;
 
 type Phase = 'idle' | 'walk' | 'settle' | 'fight' | 'victory';
 
@@ -25,9 +25,11 @@ export type VecnaSetup = {
   onTargetReady?: () => void;
 };
 
-export class VecnaReveal {
+export class VecnaReveal implements BossRevealController {
+  readonly bossId = 'vecna' as const;
   private garlandLights: GarlandLights | null = null;
   private bumperVisuals: BumperVisuals | null = null;
+  private upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
   private onFightEnd: (() => void) | null = null;
   private onTargetReady: (() => void) | null = null;
 
@@ -37,13 +39,16 @@ export class VecnaReveal {
   private targetRingMat: THREE.MeshStandardMaterial | null = null;
   private targetCoreMat: THREE.MeshStandardMaterial | null = null;
   private targetLight: THREE.PointLight | null = null;
+  private targetPulse: BossTargetPulse | null = null;
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
 
   private phase: Phase = 'idle';
   private elapsed = 0;
-  private pulseT = 0;
-  private targetHitFlash = 0;
+
+  bindUpsideDownAtmosphere(atmosphere: UpsideDownAtmosphere | null): void {
+    this.upsideDownAtmosphere = atmosphere;
+  }
 
   async preload(
     renderer: THREE.WebGLRenderer,
@@ -82,18 +87,19 @@ export class VecnaReveal {
     this.targetGroup.rotation.x = PLAYFIELD_TILT;
     this.targetGroup.visible = false;
     config.root.add(this.targetGroup);
+    this.initTargetPulse();
   }
 
   onGameEvent(event: GameEvent): void {
-    if (event.type === 'VECNA_REVEAL') {
+    if (event.type === 'BOSS_REVEAL' && event.bossId === 'vecna') {
       this.startWalkPhase();
       return;
     }
-    if (event.type === 'VECNA_TARGET_HIT') {
+    if (event.type === 'BOSS_TARGET_HIT' && event.bossId === 'vecna') {
       if (this.phase !== 'fight') return;
-      this.targetHitFlash = TARGET_HIT_FLASH;
+      this.targetPulse?.flashHit();
       this.vecnaVisual.playHit();
-      if (event.hitCount >= VECNA_TARGET_HITS) {
+      if (event.hitCount >= getBossDefinition('vecna').targetHits) {
         this.beginVictory();
       }
     }
@@ -105,8 +111,11 @@ export class VecnaReveal {
 
   update(dt: number): void {
     this.vecnaVisual.update(dt);
-    if (this.targetHitFlash > 0) this.targetHitFlash = Math.max(0, this.targetHitFlash - dt);
-    this.updateTargetPulse(dt);
+    this.targetPulse?.update(
+      dt,
+      this.targetGroup?.visible ?? false,
+      this.phase === 'victory',
+    );
 
     if (this.phase === 'idle') {
       this.garlandLights?.setStrobe(false, false);
@@ -117,10 +126,8 @@ export class VecnaReveal {
     this.elapsed += dt;
 
     if (this.phase === 'walk') {
-      const t = Math.min(1, this.elapsed / VECNA_WALK_DURATION);
-      this.vecnaVisual.setPathProgress(t);
-      this.cinematicStrobe.apply(false, false, 0.48 + t * 0.16);
-      if (t >= 1) {
+      this.cinematicStrobe.stop();
+      if (this.vecnaVisual.isWalkPathComplete()) {
         this.vecnaVisual.setPathProgress(1);
         this.beginSettlePhase();
       }
@@ -128,7 +135,7 @@ export class VecnaReveal {
     }
 
     if (this.phase === 'settle') {
-      this.cinematicStrobe.apply(false, false, 0.64);
+      this.cinematicStrobe.stop();
       if (this.vecnaVisual.updateSettle(dt)) {
         this.beginFightPhase();
       }
@@ -167,6 +174,7 @@ export class VecnaReveal {
     this.targetRingMat = null;
     this.targetCoreMat = null;
     this.targetLight = null;
+    this.targetPulse = null;
     this.phase = 'idle';
     this.elapsed = 0;
   }
@@ -175,10 +183,12 @@ export class VecnaReveal {
     if (this.phase !== 'idle') return;
     this.phase = 'walk';
     this.elapsed = 0;
-    this.pulseT = 0;
+    this.targetPulse?.reset();
     this.vecnaVisual.beginReveal();
     this.vecnaVisual.show();
     this.vecnaVisual.prepareWalk();
+    this.cinematicStrobe.stop();
+    this.upsideDownAtmosphere?.setRevealLift(1);
   }
 
   private beginSettlePhase(): void {
@@ -190,6 +200,7 @@ export class VecnaReveal {
   private beginFightPhase(): void {
     this.phase = 'fight';
     this.elapsed = 0;
+    this.upsideDownAtmosphere?.setRevealLift(0);
     this.vecnaVisual.setPathProgress(1);
     if (this.targetGroup) this.targetGroup.visible = true;
     this.onTargetReady?.();
@@ -198,21 +209,7 @@ export class VecnaReveal {
   }
 
   private buildTargetMesh(): THREE.Group {
-    const parts = createBossTargetMesh({
-      ring: {
-        color: 0x6622aa,
-        emissive: 0x9933ff,
-        emissiveIntensity: 1.5,
-        radius: 0.034,
-      },
-      core: {
-        color: 0xeeddff,
-        emissive: 0xaa55ff,
-        emissiveIntensity: 1.1,
-        radius: 0.015,
-      },
-      light: { color: 0x9933ff, intensity: 0.42 },
-    });
+    const parts = createBossTargetMesh(getBossDefinition('vecna').targetMeshTheme);
     this.targetRingMat = parts.ringMat;
     this.targetCoreMat = parts.coreMat;
     this.targetLight = parts.light;
@@ -221,17 +218,14 @@ export class VecnaReveal {
     return parts.group;
   }
 
-  private updateTargetPulse(dt: number): void {
-    if (!this.targetGroup?.visible || this.phase === 'victory') return;
-    this.pulseT += dt;
-    const hitBoost = this.targetHitFlash > 0 ? 1.35 : 1;
-    const pulse = (0.82 + Math.sin(this.pulseT * TARGET_PULSE_SPEED) * TARGET_PULSE_AMP) * hitBoost;
-    if (this.targetRingMat) this.targetRingMat.emissiveIntensity = 1.5 * pulse;
-    if (this.targetCoreMat) this.targetCoreMat.emissiveIntensity = 1.1 * pulse;
-    if (this.targetLight) this.targetLight.intensity = 0.42 * pulse;
-    this.targetGroup.rotation.z = Math.sin(this.pulseT * 2.8) * 0.06;
-    const scale = 1 + (this.targetHitFlash / TARGET_HIT_FLASH) * 0.22;
-    this.targetGroup.scale.setScalar(scale);
+  private initTargetPulse(): void {
+    if (!this.targetGroup) return;
+    this.targetPulse = new BossTargetPulse(getBossDefinition('vecna').targetPulse, {
+      targetGroup: this.targetGroup,
+      ringMat: this.targetRingMat,
+      coreMat: this.targetCoreMat,
+      light: this.targetLight,
+    });
   }
 
   private beginVictory(): void {
@@ -251,13 +245,14 @@ export class VecnaReveal {
   private resetAtmosphere(): void {
     this.phase = 'idle';
     this.elapsed = 0;
-    this.targetHitFlash = 0;
+    this.upsideDownAtmosphere?.setRevealLift(0);
     this.vecnaVisual.hide();
     if (this.targetGroup) {
       this.targetGroup.visible = false;
       this.targetGroup.scale.setScalar(1);
       this.targetGroup.rotation.z = 0;
     }
+    this.targetPulse?.reset();
     this.garlandLights?.setStrobe(false, false);
     this.bumperVisuals?.setStrobe(false, false);
     this.cinematicStrobe.stop();

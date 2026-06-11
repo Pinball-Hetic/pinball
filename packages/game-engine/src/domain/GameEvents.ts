@@ -1,3 +1,5 @@
+import type { BossId } from './BossRegistry';
+
 export type GameEvent =
   | { type: 'BUMPER_HIT'; bumperIndex: number; scoreIncrement: number }
   | { type: 'SLINGSHOT_HIT'; side: 'left' | 'right'; scoreIncrement: number }
@@ -6,10 +8,8 @@ export type GameEvent =
   | { type: 'DROP_TARGET_COMPLETE'; side: 'left' | 'right'; scoreIncrement: number }
   | { type: 'DROP_TARGET_RESET' }
   | { type: 'ZONE_HIT'; zone: string; scoreIncrement: number }
-  | { type: 'DEMOGORGON_REVEAL'; scoreIncrement: number }
-  | { type: 'DEMOGORGON_TARGET_HIT'; hitCount: number; scoreIncrement: number }
-  | { type: 'VECNA_REVEAL'; scoreIncrement: number }
-  | { type: 'VECNA_TARGET_HIT'; hitCount: number; scoreIncrement: number }
+  | { type: 'BOSS_REVEAL'; bossId: BossId; scoreIncrement: number }
+  | { type: 'BOSS_TARGET_HIT'; bossId: BossId; hitCount: number; scoreIncrement: number }
   | { type: 'ELEVEN_ASSIST'; scoreIncrement: number }
   | { type: 'PORTAL_ENTER'; scoreIncrement: number }
   | { type: 'PORTAL_TREMOR' }

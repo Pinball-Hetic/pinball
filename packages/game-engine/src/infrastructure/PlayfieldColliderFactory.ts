@@ -9,8 +9,6 @@ import {
   SLINGSHOT_RIGHT_CENTER,
   POP_ZONE_SENSORS,
   ROCKET_SENSOR,
-  DEMOGORGON_TARGET,
-  VECNA_TARGET,
   DROP_TARGETS,
   SHOOTER_LANE_X_MIN,
   SHOOTER_LANE_X_MAX,
@@ -27,6 +25,7 @@ import {
   SHOOTER_GUIDE_ANGLE_START,
   SHOOTER_GUIDE_ANGLE_END,
 } from '../domain/Ball';
+import { BOSS_IDS, getBossDefinition } from '../domain/BossRegistry';
 import { surfaceYAtZ, BOTTOM_OUT_LANE_SEP_X, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
 import { hasPinballmapRoot } from './GltfNodeNames';
@@ -246,8 +245,7 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createSlingshotSensors(world, colliderMap);
     PlayfieldColliderFactory.createPopZoneSensors(world, colliderMap);
     PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
-    PlayfieldColliderFactory.createDemogorgonTarget(world, colliderMap);
-    PlayfieldColliderFactory.createVecnaTarget(world, colliderMap);
+    PlayfieldColliderFactory.createBossTargets(world, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, colliderMap);
     PlayfieldColliderFactory.createBottomOutSensor(world, colliderMap);
   }
@@ -389,32 +387,21 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createDemogorgonTarget(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    const p = DEMOGORGON_TARGET;
-    const b = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
-    );
-    const col = world.createCollider(
-      RAPIER.ColliderDesc.ball(0.034)
-        .setSensor(true)
-        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
-      b,
-    );
-    colliderMap.set(col.handle, 'demogorgon_target');
-  }
-
-  private static createVecnaTarget(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    const p = VECNA_TARGET;
-    const b = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
-    );
-    const col = world.createCollider(
-      RAPIER.ColliderDesc.ball(0.034)
-        .setSensor(true)
-        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
-      b,
-    );
-    colliderMap.set(col.handle, 'vecna_target');
+  private static createBossTargets(world: RAPIER.World, colliderMap: Map<number, string>): void {
+    for (const id of BOSS_IDS) {
+      const boss = getBossDefinition(id);
+      const p = boss.target;
+      const body = world.createRigidBody(
+        RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
+      );
+      const col = world.createCollider(
+        RAPIER.ColliderDesc.ball(0.034)
+          .setSensor(true)
+          .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+        body,
+      );
+      colliderMap.set(col.handle, boss.colliderRole);
+    }
   }
 
   private static createRocketSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {

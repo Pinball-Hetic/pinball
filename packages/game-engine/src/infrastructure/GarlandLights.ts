@@ -74,7 +74,7 @@ export class GarlandLights {
   }
 
   onGameEvent(event: GameEvent): void {
-    if (event.type === 'BUMPER_HIT' || event.type === 'DEMOGORGON_REVEAL') {
+    if (event.type === 'BUMPER_HIT' || event.type === 'BOSS_REVEAL') {
       this.hitSurge = HIT_SURGE_DURATION;
     }
   }

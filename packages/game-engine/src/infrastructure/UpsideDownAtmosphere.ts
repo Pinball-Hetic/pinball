@@ -167,6 +167,7 @@ export class UpsideDownAtmosphere {
   private targetMix = 0;
   private visited = false;
   private pulseT = 0;
+  private revealLift = 0;
 
   private origBg = new THREE.Color();
   private origExposure = 1.45;
@@ -278,9 +279,16 @@ export class UpsideDownAtmosphere {
 
   reset(): void {
     this.targetMix = 0;
+    this.revealLift = 0;
   }
 
-  /** Dev only — instant Upside Down visuals without portal transition. */
+  setRevealLift(lift: number): void {
+    this.revealLift = THREE.MathUtils.clamp(lift, 0, 1);
+    if (this.mix > 0) {
+      this.applyMix(this.mix);
+    }
+  }
+
   debugForceActive(): void {
     this.visited = true;
     this.targetMix = 1;
@@ -315,6 +323,7 @@ export class UpsideDownAtmosphere {
     this.targetMix = 0;
     this.visited = false;
     this.pulseT = 0;
+    this.revealLift = 0;
   }
 
   private buildSpores(root: THREE.Object3D): void {
@@ -379,11 +388,17 @@ export class UpsideDownAtmosphere {
   private applyLivePulse(): void {
     if (!this.lighting) return;
     const wave = 0.5 + Math.sin(this.pulseT * UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED) * 0.5;
-    this.lighting.renderer.toneMappingExposure = THREE.MathUtils.lerp(
+    const minExp = THREE.MathUtils.lerp(
       UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MIN,
-      UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MAX,
-      wave,
+      1.48,
+      this.revealLift,
     );
+    const maxExp = THREE.MathUtils.lerp(
+      UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MAX,
+      1.64,
+      this.revealLift,
+    );
+    this.lighting.renderer.toneMappingExposure = THREE.MathUtils.lerp(minExp, maxExp, wave);
   }
 
   private applyMix(t: number): void {
@@ -408,7 +423,9 @@ export class UpsideDownAtmosphere {
       );
     }
 
-    this.playfieldShade.setOpacity(UPSIDE_DOWN_ATMOSPHERE_SHADE_OPACITY * ease);
+    this.playfieldShade.setOpacity(
+      UPSIDE_DOWN_ATMOSPHERE_SHADE_OPACITY * ease * (1 - this.revealLift * 0.92),
+    );
 
     if (this.lighting) {
       const { scene, renderer, ambient, hemi, dir, fill } = this.lighting;
@@ -446,15 +463,24 @@ export class UpsideDownAtmosphere {
       fill.color.lerp(_lerpColor, ease * 0.4);
       fill.intensity = THREE.MathUtils.lerp(this.origFillIntensity, UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY, ease);
 
+      if (this.revealLift > 0 && fullyActive) {
+        ambient.intensity += 0.34 * this.revealLift;
+        dir.intensity += 0.3 * this.revealLift;
+        fill.intensity += 0.24 * this.revealLift;
+      }
+
       this.applyFog(ease);
     }
 
     const dim = THREE.MathUtils.lerp(1, 0.36, ease);
     const strobe = THREE.MathUtils.lerp(0, 0.48, ease);
     const strobeHz = fullyActive ? UPSIDE_DOWN_ATMOSPHERE_STROBE_HZ : UPSIDE_DOWN_ATMOSPHERE_BLEND_STROBE_HZ;
+    const lift = this.revealLift;
+    const effectiveDim = THREE.MathUtils.lerp(dim, Math.min(1, dim + 0.58), lift);
+    const effectiveStrobe = strobe * (1 - lift * 0.88);
 
-    this.garlandLights?.setAtmosphere(dim, strobe, strobeHz);
-    this.bumperVisuals?.setAtmosphere(dim, strobe, strobeHz);
+    this.garlandLights?.setAtmosphere(effectiveDim, effectiveStrobe, strobeHz);
+    this.bumperVisuals?.setAtmosphere(effectiveDim, effectiveStrobe, strobeHz);
   }
 
   private applyFog(ease: number): void {
@@ -466,7 +492,7 @@ export class UpsideDownAtmosphere {
       return;
     }
 
-    this.upsideDownFog.density = UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY * ease;
+    this.upsideDownFog.density = UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY * ease * (1 - this.revealLift * 0.8);
     if (scene.fog !== this.upsideDownFog) scene.fog = this.upsideDownFog;
   }
 

@@ -1,31 +1,5 @@
 import * as THREE from 'three';
-
-export type BossTargetMeshTheme = {
-  ring: {
-    color: number;
-    emissive: number;
-    emissiveIntensity: number;
-    radius?: number;
-    tube?: number;
-    metalness?: number;
-    roughness?: number;
-  };
-  core: {
-    color: number;
-    emissive: number;
-    emissiveIntensity: number;
-    radius?: number;
-    metalness?: number;
-    roughness?: number;
-  };
-  light: {
-    color: number;
-    intensity: number;
-    distance?: number;
-    decay?: number;
-  };
-  victoryBurst?: { color: number };
-};
+import type { BossTargetMeshTheme } from '../domain/BossRegistry';
 
 export type BossTargetMeshParts = {
   group: THREE.Group;

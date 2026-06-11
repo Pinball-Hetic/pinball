@@ -1,4 +1,3 @@
-// Dev only: skip portal/score gate and spawn Vecna walk fight at playfield load.
 export const VECNA_DEBUG_SPAWN_AT_START = true;
 
 export const VECNA_MODEL_URL = '/playfield/vecna.glb';
@@ -12,6 +11,8 @@ export const VECNA_ANIM_WALK = 'walking_man'; // GLB: Armature|walking_man|basel
 export const VECNA_WALK_CLIP_DURATION = 1.07;
 export const VECNA_WALK_CYCLES = 2.2;
 export const VECNA_WALK_DURATION = VECNA_WALK_CLIP_DURATION * VECNA_WALK_CYCLES;
+export const VECNA_WALK_SETTLE_FACING = 0.35;
+export const VECNA_WALK_FADE_OUT = 0.2;
 export const VECNA_SPAWN = {
   x: 0,
   z: -0.31,

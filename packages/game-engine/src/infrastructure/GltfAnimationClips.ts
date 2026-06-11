@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-/** Matches exact name, `*|token`, or `*|token|*` (Blender/GLTF pipe segments). */
 export function findGltfAnimationClip(
   clips: THREE.AnimationClip[],
   token: string,

@@ -10,6 +10,9 @@ import {
   VECNA_MODEL_URL,
   VECNA_MODEL_YAW,
   VECNA_SPAWN,
+  VECNA_WALK_DURATION,
+  VECNA_WALK_FADE_OUT,
+  VECNA_WALK_SETTLE_FACING,
 } from '../domain/VecnaConstants';
 import { PLAYFIELD_TILT, surfaceYAtZ } from '../domain/PlayfieldGeometry';
 import { easeOut } from './CinematicEasing';
@@ -33,18 +36,13 @@ export class VecnaTargetVisual {
   private loadPromise: Promise<void> | null = null;
   private pathT = 1;
   private walking = false;
+  private walkElapsed = 0;
   private settling = false;
   private settleElapsed = 0;
   private settleDuration = 0;
   private walkFacingY = 0;
   private pulseT = 0;
   private hitFlash = 0;
-
-  private readonly onWalkFinished = (event: { action: THREE.AnimationAction }): void => {
-    if (event.action === this.walkAction && this.settling) {
-      this.completeSettle();
-    }
-  };
 
   mount(parent: THREE.Object3D, camera: THREE.Camera): void {
     this.dispose();
@@ -61,7 +59,7 @@ export class VecnaTargetVisual {
     anchor.add(rig);
     this.rig = rig;
 
-    this.glowLight = new THREE.PointLight(0x9955ee, 0, 0.55, 2);
+    this.glowLight = new THREE.PointLight(0xbb88ff, 0, 0.62, 2);
     this.glowLight.position.y = 0.08;
     anchor.add(this.glowLight);
 
@@ -79,6 +77,7 @@ export class VecnaTargetVisual {
 
   beginReveal(): void {
     this.walking = false;
+    this.walkElapsed = 0;
     this.settling = false;
     this.settleElapsed = 0;
     this.walkAction?.stop();
@@ -110,6 +109,7 @@ export class VecnaTargetVisual {
       this.anchor.rotation.z = 0;
     }
     this.walking = false;
+    this.walkElapsed = 0;
     this.settling = false;
     this.walkAction?.stop();
     this.pathT = 0;
@@ -119,9 +119,10 @@ export class VecnaTargetVisual {
   }
 
   playWalk(): void {
-    if (!this.walkAction) return;
     this.walking = true;
+    this.walkElapsed = 0;
     this.settling = false;
+    if (!this.walkAction) return;
     this.walkAction.reset();
     this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
     this.walkAction.clampWhenFinished = false;
@@ -132,19 +133,22 @@ export class VecnaTargetVisual {
     if (!this.walking || this.settling) return;
     this.settling = true;
     this.settleElapsed = 0;
+    this.settleDuration = VECNA_WALK_SETTLE_FACING;
     this.setPathProgress(1);
     if (this.rig) this.walkFacingY = this.rig.rotation.y;
 
-    if (!this.walkAction) {
-      this.settleDuration = 0;
-      return;
+    if (this.walkAction) {
+      this.walkAction.fadeOut(VECNA_WALK_FADE_OUT);
     }
+  }
 
-    const clipDuration = this.walkAction.getClip().duration;
-    const phase = this.walkAction.time % clipDuration;
-    this.settleDuration = clipDuration - phase;
-    this.walkAction.setLoop(THREE.LoopOnce, 1);
-    this.walkAction.clampWhenFinished = true;
+  isWalkPathComplete(): boolean {
+    return this.walkElapsed >= VECNA_WALK_DURATION;
+  }
+
+  private syncWalkPath(): void {
+    const t = Math.min(1, this.walkElapsed / VECNA_WALK_DURATION);
+    this.setPathProgress(t);
   }
 
   updateSettle(dt: number): boolean {
@@ -170,11 +174,16 @@ export class VecnaTargetVisual {
     if (!this.settling) return;
     this.settling = false;
     this.walking = false;
+    if (this.walkAction) {
+      this.walkAction.stop();
+      this.walkAction.time = 0;
+    }
     this.syncFacing();
   }
 
   stopWalk(): void {
     this.walking = false;
+    this.walkElapsed = 0;
     this.settling = false;
     if (this.walkAction) {
       this.walkAction.stop();
@@ -196,22 +205,26 @@ export class VecnaTargetVisual {
 
     this.mixer?.update(dt);
 
-    if (this.walking && !this.settling) this.syncWalkFacing();
-    else if (!this.settling) this.syncFacing();
+    if (this.walking && !this.settling) {
+      this.walkElapsed = Math.min(VECNA_WALK_DURATION, this.walkElapsed + dt);
+      this.syncWalkPath();
+      this.syncWalkFacing();
+    } else if (!this.settling) {
+      this.syncFacing();
+    }
 
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
 
     this.pulseT += dt;
     const hitBoost = this.hitFlash > 0 ? 1.5 : 1;
     const pulse = (0.82 + Math.sin(this.pulseT * 2.2) * 0.14) * hitBoost;
-    if (this.glowLight) this.glowLight.intensity = 0.58 * pulse;
+    if (this.glowLight) this.glowLight.intensity = 0.72 * pulse;
 
     const scale = 1 + (this.hitFlash / 0.18) * 0.12;
     this.anchor.scale.setScalar(scale);
   }
 
   dispose(): void {
-    this.mixer?.removeEventListener('finished', this.onWalkFinished);
     if (this.anchor) this.anchor.parent?.remove(this.anchor);
     this.anchor = null;
     this.camera = null;
@@ -222,6 +235,7 @@ export class VecnaTargetVisual {
     this.offset = null;
     this.model = null;
     this.walking = false;
+    this.walkElapsed = 0;
     this.settling = false;
     this.hitFlash = 0;
     this.pulseT = 0;
@@ -266,8 +280,8 @@ export class VecnaTargetVisual {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         for (const mat of mats) {
           if (mat instanceof THREE.MeshStandardMaterial) {
-            mat.emissive.setHex(0x553366);
-            mat.emissiveIntensity = 0.55;
+            mat.emissive.setHex(0x775588);
+            mat.emissiveIntensity = 0.72;
             mat.needsUpdate = true;
           }
         }
@@ -275,7 +289,6 @@ export class VecnaTargetVisual {
     });
 
     this.mixer = new THREE.AnimationMixer(model);
-    this.mixer.addEventListener('finished', this.onWalkFinished);
     const walkClip = findGltfAnimationClip(clips, VECNA_ANIM_WALK);
     if (walkClip) {
       this.walkAction = this.mixer.clipAction(walkClip);

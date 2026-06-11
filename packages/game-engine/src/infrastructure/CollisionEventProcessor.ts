@@ -1,34 +1,26 @@
 import RAPIER from '@dimforge/rapier3d-compat';
+import type { BossId } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
-import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, VECNA_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
+import { BUMPER_POSITIONS, DROP_TARGETS, PORTAL_ENTER_SCORE } from '../domain/Ball';
 import {
   SCORE_SLINGSHOT,
   SCORE_POP_ZONE,
   SCORE_RAMP,
-  SCORE_DEMOGORGON_REVEAL,
-  DEMOGORGON_REVEAL_SCORE,
-  SCORE_DEMOGORGON_TARGET,
-  SCORE_VECNA_REVEAL,
-  VECNA_REVEAL_SCORE,
-  SCORE_VECNA_TARGET,
   SCORE_DROP_TARGET,
   SCORE_DROP_COMPLETE,
 } from '../domain/ScoringConstants';
 import type { BumperHit } from '../use-cases/BumperHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
-import { BossTargetSensor } from './BossTargetSensor';
+import { BossFightManager } from './BossFightManager';
 
 export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
-  private demogorgonTriggered = false;
-  private demogorgonTarget = new BossTargetSensor();
+  private readonly bossFights: BossFightManager;
   private portalOpen = false;
   private portalTriggered = false;
   private upsideDownActive = false;
   private upsideDownScoreBaseline = 0;
-  private vecnaTriggered = false;
-  private vecnaTarget = new BossTargetSensor();
 
   setPortalOpen(open: boolean): void {
     this.portalOpen = open;
@@ -39,17 +31,20 @@ export class CollisionEventProcessor {
     this.portalTriggered = false;
   }
 
-  setDemogorgonFightActive(active: boolean): void {
-    this.demogorgonTarget.setFightActive(active);
+  setBossFightActive(id: BossId, active: boolean): void {
+    this.bossFights.setFightActive(id, active);
   }
 
-  setDemogorgonTargetArmed(armed: boolean): void {
-    this.demogorgonTarget.setTargetArmed(armed);
+  setBossTargetArmed(id: BossId, armed: boolean): void {
+    this.bossFights.setTargetArmed(id, armed);
   }
 
-  resetDemogorgonFight(): void {
-    this.demogorgonTriggered = false;
-    this.demogorgonTarget.reset();
+  resetBossFight(id: BossId): void {
+    this.bossFights.resetBoss(id);
+  }
+
+  resetAllBossFights(): void {
+    this.bossFights.resetAll();
   }
 
   onUpsideDownEntered(score: number): void {
@@ -60,45 +55,32 @@ export class CollisionEventProcessor {
   resetUpsideDownSession(): void {
     this.upsideDownActive = false;
     this.upsideDownScoreBaseline = 0;
-    this.resetVecnaFight();
+    this.resetBossFight('vecna');
   }
 
-  setVecnaFightActive(active: boolean): void {
-    this.vecnaTarget.setFightActive(active);
+  tryBossReveal(id: BossId, totalScore: number, gameState: string): void {
+    this.bossFights.tryReveal(id, {
+      totalScore,
+      gameState,
+      upsideDownActive: this.upsideDownActive,
+      upsideDownScoreBaseline: this.upsideDownScoreBaseline,
+    });
   }
 
-  setVecnaTargetArmed(armed: boolean): void {
-    this.vecnaTarget.setTargetArmed(armed);
+  tryAllBossReveals(totalScore: number, gameState: string): void {
+    this.bossFights.tryAllReveals({
+      totalScore,
+      gameState,
+      upsideDownActive: this.upsideDownActive,
+      upsideDownScoreBaseline: this.upsideDownScoreBaseline,
+    });
   }
 
-  resetVecnaFight(): void {
-    this.vecnaTriggered = false;
-    this.vecnaTarget.reset();
-  }
-
-  tryVecnaReveal(totalScore: number, gameState: string): void {
-    if (gameState !== 'playing') return;
-    if (!this.upsideDownActive) return;
-    if (this.vecnaTriggered) return;
-    if (totalScore - this.upsideDownScoreBaseline < VECNA_REVEAL_SCORE) return;
-    this.beginVecnaFight(false);
-    this.emit({ type: 'VECNA_REVEAL', scoreIncrement: SCORE_VECNA_REVEAL });
-  }
-
-  /** Dev only — pairs with VECNA_DEBUG_SPAWN_AT_START in playfield. */
-  debugStartVecnaFight(score: number): void {
-    this.upsideDownActive = true;
-    this.upsideDownScoreBaseline = score;
-    this.beginVecnaFight(false);
-  }
-
-  tryScoreReveal(totalScore: number, gameState: string): void {
-    if (gameState !== 'playing') return;
-    if (this.demogorgonTriggered) return;
-    if (totalScore < DEMOGORGON_REVEAL_SCORE) return;
-    this.demogorgonTriggered = true;
-    this.demogorgonTarget.beginFight(false);
-    this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: SCORE_DEMOGORGON_REVEAL });
+  prepareBossDebugFight(id: BossId, score: number): void {
+    this.bossFights.prepareDebugFight(id, score, {
+      active: this.upsideDownActive,
+      baseline: this.upsideDownScoreBaseline,
+    });
   }
 
   constructor(
@@ -108,6 +90,7 @@ export class CollisionEventProcessor {
     private readonly bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
   ) {
+    this.bossFights = new BossFightManager(emit);
     for (const dt of DROP_TARGETS) this.dropTargetDown[dt.id] = false;
   }
 
@@ -116,31 +99,7 @@ export class CollisionEventProcessor {
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
 
-      if (role === 'demogorgon_target') {
-        this.demogorgonTarget.handleCollision(started, gameState, {
-          maxHits: DEMOGORGON_TARGET_HITS,
-          onHit: (hitCount) => {
-            this.emit({
-              type: 'DEMOGORGON_TARGET_HIT',
-              hitCount,
-              scoreIncrement: SCORE_DEMOGORGON_TARGET,
-            });
-          },
-        });
-        return;
-      }
-
-      if (role === 'vecna_target') {
-        this.vecnaTarget.handleCollision(started, gameState, {
-          maxHits: VECNA_TARGET_HITS,
-          onHit: (hitCount) => {
-            this.emit({
-              type: 'VECNA_TARGET_HIT',
-              hitCount,
-              scoreIncrement: SCORE_VECNA_TARGET,
-            });
-          },
-        });
+      if (this.bossFights.handleTargetCollision(role, started, gameState)) {
         return;
       }
 
@@ -196,11 +155,6 @@ export class CollisionEventProcessor {
       this.dropTargetDown[dt.id] = false;
     }
     this.emit({ type: 'DROP_TARGET_RESET' });
-  }
-
-  private beginVecnaFight(targetArmed: boolean): void {
-    this.vecnaTriggered = true;
-    this.vecnaTarget.beginFight(targetArmed);
   }
 
   private handleDropTarget(role: string): void {

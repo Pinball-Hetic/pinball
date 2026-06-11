@@ -7,6 +7,7 @@ import type {
   ScoreUpdate,
 } from '@pinball/shared-types';
 import type { GameEvent } from '@pinball/game-engine';
+import { getBossDefinition } from '@pinball/game-engine';
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -65,8 +66,14 @@ export interface DmdOrchestrator {
 // Labels lisibles pour les events highlight :
 function eventLabel(event: GameEvent): string | null {
   switch (event.type) {
-    case 'DEMOGORGON_REVEAL': return 'DEMOGORGON';
-    case 'DEMOGORGON_TARGET_HIT': return event.hitCount >= 2 ? 'DEMOGORGON VAINCU' : `DEMOGORGON HIT ${event.hitCount}/2`;
+    case 'BOSS_REVEAL':
+      return getBossDefinition(event.bossId).hud.dmdLabel;
+    case 'BOSS_TARGET_HIT': {
+      const def = getBossDefinition(event.bossId);
+      return event.hitCount >= def.targetHits
+        ? `${def.hud.dmdLabel} VAINCU`
+        : `${def.hud.dmdLabel} HIT ${event.hitCount}/${def.targetHits}`;
+    }
     case 'PORTAL_ENTER': return 'PORTAL';
     case 'RAMP_HIT': return 'RAMP';
     case 'DROP_TARGET_COMPLETE': return `DROP ${event.side.toUpperCase()}`;
