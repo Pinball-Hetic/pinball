@@ -121,6 +121,42 @@ export function isPinballmapNonPhysicalFloorMesh(mesh: THREE.Mesh): boolean {
   );
 }
 
+/**
+ * Switch sensors du GLB (zones de capteurs non-gameplay visuels).
+ * Source unique partagée par les 3 pipelines : trimesh (HIDDEN_NODES),
+ * colliders (EXCLUDED_NODES) et rendu (VISUALLY_HIDDEN_NODES). Variantes avec
+ * espace conservées par parité avec l'ancien code.
+ */
+export const SWITCH_SENSOR_NODES = new Set([
+  'switch_slingshot', 'switch slingshot',
+  'switch_left_pop_bumper_zone',  'switch left pop bumper zone',
+  'switch_center_pop_bumper_zone','switch center pop bumper zone',
+  'switch_right_pop_bumper_zone', 'switch right pop bumper zone',
+  'switch_plunger', 'switch plunger',
+  'switch_rocket',  'switch rocket',
+  'switch_out',     'switch out',
+]);
+
+/**
+ * Nœuds GLB présents dans le modèle mais qui doivent rester invisibles en jeu
+ * (plaque, switch sensors…).
+ * Pas de collision non plus — ces nœuds sont déjà dans EXCLUDED_NODES de
+ * PlayfieldTrimeshBuilder.
+ */
+const VISUALLY_HIDDEN_NODES = new Set(['plate', ...SWITCH_SENSOR_NODES]);
+
+/** Cache les maillages décoratifs / non-gameplay du GLB (plaque, switches). */
+export function hidePinballmapDecorNodes(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const n = normalizeGltfName(obj.name);
+    const c = canonicalGltfName(obj.name);
+    if (VISUALLY_HIDDEN_NODES.has(n) || VISUALLY_HIDDEN_NODES.has(c)) {
+      obj.visible = false;
+    }
+  });
+}
+
 export function removePinballmapUnusedMeshes(root: THREE.Object3D): void {
   const toRemove: THREE.Object3D[] = [];
   root.traverse((obj) => {
