@@ -4,6 +4,7 @@ export type {
   ScoreUpdate,
   DmdDisplay,
   CinematicClip,
+  DevGameEventTrigger,
   GameStart,
   GameOver,
   GameStats,

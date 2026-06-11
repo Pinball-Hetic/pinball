@@ -64,11 +64,59 @@ import {
   CinematicDirector,
   DEMOGORGON_TARGET,
   DEMOGORGON_TARGET_HITS,
+  PORTAL_ENTER_SCORE,
+  ELEVEN_ASSIST_SCORE,
+  SCORE_BUMPER,
+  SCORE_SLINGSHOT,
+  SCORE_RAMP,
+  SCORE_DROP_COMPLETE,
+  SCORE_DEMOGORGON_REVEAL,
+  SCORE_DEMOGORGON_TARGET,
+  type GameEvent,
   UpsideDownPortal,
   UpsideDownTransition,
   UpsideDownAtmosphere,
 } from "@pinball/game-engine";
-import type { ButtonAction, ButtonId, CinematicClip } from "@pinball/shared-types";
+import type {
+  ButtonAction,
+  ButtonId,
+  CinematicClip,
+  DevGameEventTrigger,
+} from "@pinball/shared-types";
+
+// Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
+function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
+  switch (d.type) {
+    case "BUMPER_HIT":
+      return { type: "BUMPER_HIT", bumperIndex: 0, scoreIncrement: SCORE_BUMPER };
+    case "SLINGSHOT_HIT":
+      return { type: "SLINGSHOT_HIT", side: "left", scoreIncrement: SCORE_SLINGSHOT };
+    case "RAMP_HIT":
+      return { type: "RAMP_HIT", scoreIncrement: SCORE_RAMP };
+    case "DROP_TARGET_COMPLETE":
+      return { type: "DROP_TARGET_COMPLETE", side: "left", scoreIncrement: SCORE_DROP_COMPLETE };
+    case "DEMOGORGON_REVEAL":
+      return { type: "DEMOGORGON_REVEAL", scoreIncrement: SCORE_DEMOGORGON_REVEAL };
+    case "DEMOGORGON_TARGET_HIT":
+      return {
+        type: "DEMOGORGON_TARGET_HIT",
+        hitCount: d.hitCount ?? 1,
+        scoreIncrement: SCORE_DEMOGORGON_TARGET,
+      };
+    case "PORTAL_ENTER":
+      return { type: "PORTAL_ENTER", scoreIncrement: PORTAL_ENTER_SCORE };
+    case "ELEVEN_ASSIST":
+      return { type: "ELEVEN_ASSIST", scoreIncrement: ELEVEN_ASSIST_SCORE };
+    case "DRAIN":
+      return { type: "DRAIN" };
+    case "BOTTOM_OUT":
+      return { type: "BOTTOM_OUT" };
+    case "BALL_LAUNCHED":
+      return { type: "BALL_LAUNCHED" };
+    default:
+      return null;
+  }
+}
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
@@ -1183,6 +1231,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           },
           onSensor: (data) => {
             console.log("[playfield] sensor reçu:", data, "— logique non implémentée");
+          },
+          onDevEvent: (d) => {
+            // Injecte dans le emit wrapper EXISTANT → chaîne complète
+            // (cinématiques, gel, DMD, backglass). DRAIN/BOTTOM_OUT
+            // appellent les vrais use-cases → la bille reset réellement.
+            const ev = toGameEvent(d);
+            if (ev) emit(ev);
           },
         };
 

@@ -10,6 +10,8 @@ export interface ServerToClientEvents {
   // `simulate-esp32`). Pas un event broadcasté aux frontends.
   'dev:simulate-button': (data: ButtonInput) => void
   'dmd:display': (data: DmdDisplay) => void
+  // Page /debug → injecte un GameEvent dans le playfield (chaîne complète).
+  'dev:trigger-game-event': (data: DevGameEventTrigger) => void
 }
 
 export interface ClientToServerEvents {
@@ -24,6 +26,24 @@ export interface ClientToServerEvents {
   // retransforme en `input:button` broadcast à TOUS (y compris émetteur).
   'dev:simulate-button': (data: ButtonInput) => void
   'dmd:display': (data: DmdDisplay) => void
+  'dev:trigger-game-event': (data: DevGameEventTrigger) => void
+}
+
+// Sous-ensemble injectable de GameEvent (sérialisé simple) — émis par /debug.
+export interface DevGameEventTrigger {
+  type:
+    | 'BUMPER_HIT'
+    | 'SLINGSHOT_HIT'
+    | 'RAMP_HIT'
+    | 'DROP_TARGET_COMPLETE'
+    | 'DEMOGORGON_REVEAL'
+    | 'DEMOGORGON_TARGET_HIT'
+    | 'PORTAL_ENTER'
+    | 'DRAIN'
+    | 'BOTTOM_OUT'
+    | 'BALL_LAUNCHED'
+    | 'ELEVEN_ASSIST'
+  hitCount?: number // pour DEMOGORGON_TARGET_HIT
 }
 
 export interface ScoreUpdate {
@@ -69,6 +89,8 @@ export interface GameOver {
   player: string
   finalScore: number
   stats: GameStats
+  // Émis depuis /debug → relay seul, PAS de persistence (ne pollue pas le leaderboard).
+  debug?: boolean
 }
 
 export interface LeaderboardEntry {
