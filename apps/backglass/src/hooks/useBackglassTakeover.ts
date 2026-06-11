@@ -7,6 +7,7 @@ import type {
   GameOver,
   CinematicClip,
 } from '@pinball/shared-types'
+import { CLIP_SHOW_MS } from '@pinball/shared-types'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
@@ -31,14 +32,6 @@ interface StackEntry {
   clip?: CinematicClip
 }
 
-// Durées alignées avec le playfield/DMD (synchro 3 écrans).
-const CLIP_DURATIONS: Record<CinematicClip, number> = {
-  demogorgon_rises: 4000,
-  portal_swallow: 4000,
-  demogorgon_slain: 3500,
-  last_chance: 1200,
-  hall_of_fame: 7000,
-}
 
 interface JoyceSignal {
   text: string | null
@@ -169,7 +162,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         stackRef.current.push({
           scene: 'CINEMATIC',
           priority: 110,
-          expiresAt: now + CLIP_DURATIONS[d.clip],
+          expiresAt: now + CLIP_SHOW_MS[d.clip],
           clip: d.clip,
           payload: d.clip === 'hall_of_fame' ? lastGameOverRef.current ?? undefined : undefined,
         })

@@ -60,6 +60,7 @@ export default function DebugPage() {
     multiplier: multi,
     lives,
     hetic,
+    fever: false,
     upsideDown: udRef.current,
   })
 
@@ -102,6 +103,7 @@ export default function DebugPage() {
         multiplier: 1 + Math.floor(i / 3),
         lives: 3,
         hetic: 0,
+        fever: false,
       })
       // eslint-disable-next-line no-await-in-loop
       await wait(150)

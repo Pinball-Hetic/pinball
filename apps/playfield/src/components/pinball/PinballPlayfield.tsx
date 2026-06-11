@@ -435,6 +435,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         multiplier: multiplierRef.current,
         lives: livesRef.current,
         hetic: heticRef.current,
+        fever: false, // P21 : branché à isFeverActive()
       };
 
       dmd.emitScoreSnapshot(snap);
@@ -460,6 +461,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         multiplier: 1,
         lives: livesRemaining,
         hetic: heticRef.current,
+        fever: false, // P21 : branché à isFeverActive()
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
@@ -483,6 +485,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         multiplier: 1,
         lives: livesRef.current,
         hetic: heticRef.current,
+        fever: false, // P21 : branché à isFeverActive()
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
@@ -498,6 +501,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         multiplier: 1,
         lives: 3,
         hetic: heticRef.current,
+        fever: false,
       });
     },
     onAtmosphereChange: (upsideDownActive) => {

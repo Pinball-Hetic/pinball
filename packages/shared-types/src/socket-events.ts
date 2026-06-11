@@ -43,7 +43,9 @@ export interface DevGameEventTrigger {
     | 'BOTTOM_OUT'
     | 'BALL_LAUNCHED'
     | 'ELEVEN_ASSIST'
+    | 'DEBUG_ADD_SCORE' // injecte du score brut (franchir les paliers)
   hitCount?: number // pour DEMOGORGON_TARGET_HIT
+  amount?: number // pour DEBUG_ADD_SCORE
 }
 
 export interface ScoreUpdate {
@@ -53,22 +55,30 @@ export interface ScoreUpdate {
   multiplier: number
   lives: number
   hetic: number
+  fever: boolean
 }
 
 export type CinematicClip =
-  | 'demogorgon_rises' // 1er reveal boss (pause 2.5s)
+  | 'demogorgon_rises' // 1er reveal boss
   | 'portal_swallow' // entrée Upside Down (transition existante 4s)
-  | 'demogorgon_slain' // victoire boss (pause 2s)
-  | 'last_chance' // dernière vie engagée (pause 1.2s)
-  | 'hall_of_fame' // game over qualifiant (6-8s, pas de pause)
+  | 'demogorgon_slain' // victoire boss
+  | 'last_chance' // dernière vie engagée
+  | 'hall_of_fame' // game over qualifiant
+  | 'milestone_5k'
+  | 'milestone_15k'
+  | 'milestone_30k'
+  | 'milestone_big'
+  | 'hetic_letter'
+  | 'hetic_complete'
+  | 'skill_shot' // réservé (implémentation plus tard)
 
 export type DmdDisplay =
   | { mode: 'INTRO'; player: string; upsideDown: boolean }
-  | { mode: 'CINEMATIC'; clip: CinematicClip; player: string; score: number; upsideDown: boolean }
-  | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number; hetic: number; upsideDown: boolean }
-  | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string; hetic: number; upsideDown: boolean }
-  | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string; hetic: number; upsideDown: boolean }
-  | { mode: 'MULTI_FLASH'; multiplier: number; combo: number; score: number; lives: number; player: string; hetic: number; upsideDown: boolean }
+  | { mode: 'CINEMATIC'; clip: CinematicClip; player: string; score: number; value?: number; upsideDown: boolean }
+  | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number; hetic: number; fever: boolean; upsideDown: boolean }
+  | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string; hetic: number; fever: boolean; upsideDown: boolean }
+  | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string; hetic: number; fever: boolean; upsideDown: boolean }
+  | { mode: 'MULTI_FLASH'; multiplier: number; combo: number; score: number; lives: number; player: string; hetic: number; fever: boolean; upsideDown: boolean }
   | { mode: 'LIFE_LOST'; livesRemaining: number; score: number; player: string; upsideDown: boolean }
   | { mode: 'GAME_OVER'; player: string; finalScore: number; upsideDown: boolean }
 
@@ -123,4 +133,37 @@ export interface TiltInput {
 export interface SensorInput {
   id: string
   value: number
+}
+
+// Durée du SHOW : combien de temps DMD/backglass jouent le clip (peut
+// dépasser le gel → phase célébration pendant que le jeu a repris).
+export const CLIP_SHOW_MS: Record<CinematicClip, number> = {
+  demogorgon_rises: 10_000, // 6s gel + 4s célébration
+  portal_swallow: 4_000,
+  demogorgon_slain: 15_000, // 8s gel + 7s célébration
+  last_chance: 2_000,
+  hall_of_fame: 25_000,
+  milestone_5k: 4_000,
+  milestone_15k: 8_000,
+  milestone_30k: 13_000,
+  milestone_big: 15_000,
+  hetic_letter: 5_000,
+  hetic_complete: 40_000, // 10s cinématique + 30s fever
+  skill_shot: 5_000,
+}
+
+// Durée du GEL physique playfield (0 = pas de pause du gameplay).
+export const CLIP_FREEZE_MS: Record<CinematicClip, number> = {
+  demogorgon_rises: 6_000,
+  portal_swallow: 4_000,
+  demogorgon_slain: 8_000,
+  last_chance: 0,
+  hall_of_fame: 0,
+  milestone_5k: 0,
+  milestone_15k: 3_000,
+  milestone_30k: 5_000,
+  milestone_big: 5_000,
+  hetic_letter: 2_000,
+  hetic_complete: 10_000,
+  skill_shot: 2_000,
 }
