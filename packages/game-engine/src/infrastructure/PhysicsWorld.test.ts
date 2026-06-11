@@ -1,0 +1,53 @@
+import { test, expect } from 'bun:test';
+import { PhysicsWorld } from './PhysicsWorld';
+
+const STEP = 1 / 60;
+
+/** Joue `seconds` de temps réel à `fps` et renvoie le nombre total de steps. */
+function simulateSteps(fps: number, seconds: number): number {
+  const dt = 1 / fps;
+  const frames = Math.round(fps * seconds);
+  let acc = 0;
+  let total = 0;
+  for (let i = 0; i < frames; i += 1) {
+    acc += dt;
+    const { steps, remainder } = PhysicsWorld.planSteps(acc);
+    acc = remainder;
+    total += steps;
+  }
+  return total;
+}
+
+test('runs ~60 physics steps per real second regardless of refresh rate', () => {
+  for (const fps of [60, 120, 144]) {
+    expect(simulateSteps(fps, 1)).toBeGreaterThanOrEqual(58);
+    expect(simulateSteps(fps, 1)).toBeLessThanOrEqual(61);
+  }
+});
+
+test('catches up below 60 FPS to stay real-time (down to 12 FPS)', () => {
+  // 30 FPS → 2 steps/frame ; 15 FPS → 4 steps/frame. Toujours ~60/s.
+  for (const fps of [30, 15, 12]) {
+    expect(simulateSteps(fps, 1)).toBeGreaterThanOrEqual(58);
+    expect(simulateSteps(fps, 1)).toBeLessThanOrEqual(61);
+  }
+});
+
+test('one full interval yields exactly one step', () => {
+  const { steps, remainder } = PhysicsWorld.planSteps(STEP);
+  expect(steps).toBe(1);
+  expect(remainder).toBeCloseTo(0, 6);
+});
+
+test('sub-interval accumulator yields no step', () => {
+  const { steps, remainder } = PhysicsWorld.planSteps(1 / 120);
+  expect(steps).toBe(0);
+  expect(remainder).toBeCloseTo(1 / 120, 6);
+});
+
+test('caps steps per frame (anti spiral-of-death) on a huge dt spike', () => {
+  // 10 s d'un coup (onglet refocus) → borné à 5 steps, pas une avalanche.
+  const { steps, remainder } = PhysicsWorld.planSteps(10);
+  expect(steps).toBe(5);
+  expect(remainder).toBeLessThan(STEP);
+});

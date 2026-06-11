@@ -37,6 +37,8 @@ import {
   FLIPPER_RIGHT_X_MIN,
   FLIPPER_RIGHT_X_MAX,
   FLIPPER_MIN_LAUNCH_VZ,
+  FLIPPER_MIN_LAUNCH_ANGVEL,
+  computeSurfaceSnap,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   playfieldUsesCollOnlyCollision,
@@ -67,7 +69,13 @@ import type { ButtonAction, ButtonId } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
-import { unlockPinballAudio } from "@/audio/PinballSounds";
+import {
+  notifyBootPhase,
+  onPlayfieldReady,
+  playUpsideDownAppearSound,
+  resetPinballAudioForNewGame,
+  unlockPinballAudio,
+} from "@/audio/pinballAudio";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 
@@ -286,6 +294,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   const [debugVisible, setDebugVisible] = useState(false);
   const debugVisibleRef = useRef(false);
 
+  const [flipperPivotCoords, setFlipperPivotCoords] = useState<{
+    left:  { x: number; y: number; z: number };
+    right: { x: number; y: number; z: number };
+  } | null>(null);
+
   const [physicsReady, setPhysicsReady] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [plungerCharge, setPlungerCharge] = useState<number | null>(null);
@@ -294,14 +307,18 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   /** Appelé depuis le game loop quand la session démarre (affiche la balle). */
   const onSessionStartRef = useRef<(() => void) | null>(null);
 
+  const handleAttractInteract = useCallback(() => {
+    unlockPinballAudio();
+  }, []);
+
   const beginSession = useCallback(() => {
     if (!physicsReadyRef.current || sessionStartedRef.current) return;
     sessionStartedRef.current = true;
     setSessionStarted(true);
-    unlockPinballAudio();
+    handleAttractInteract();
     onSessionStartRef.current?.();
     mountRef.current?.focus();
-  }, []);
+  }, [handleAttractInteract]);
 
   const beginSessionRef = useRef(beginSession);
   beginSessionRef.current = beginSession;
@@ -311,6 +328,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     : !sessionStarted
       ? "attract"
       : "in_game";
+
+  useEffect(() => {
+    notifyBootPhase(bootPhase);
+  }, [bootPhase]);
 
   const dmd = useDmdOrchestrator();
 
@@ -388,6 +409,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       dmd.pushScore(snap);
     },
     onIdleReset: () => {
+      resetPinballAudioForNewGame();
       dmd.pushIntro(playerRef.current);
       dmd.emitScoreSnapshot({
         player: playerRef.current,
@@ -523,6 +545,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let leftFlipperDebug: THREE.Mesh | null = null;
     let rightFlipperDebug: THREE.Mesh | null = null;
 
+    // ── Flipper pivot debug markers (sphères visibles avec H) ────────────────
+    let leftPivotMarker: THREE.Mesh | null = null;
+    let rightPivotMarker: THREE.Mesh | null = null;
+
     // ── Rapier debug renderer — tous les colliders ───────────────────────────
     const rapierDebugGeo = new THREE.BufferGeometry();
     const rapierDebugMat = new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false });
@@ -637,6 +663,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           onFightEnd: () => collisionProcessor?.setDemogorgonFightActive(false),
           onTargetReady: () => collisionProcessor?.setDemogorgonTargetArmed(true),
         });
+        await demogorgonReveal.preload(renderer, scene, camera).catch((err) => {
+          console.warn("[Demogorgon] preload failed:", err);
+        });
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
@@ -654,23 +683,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const pinballmap =
           findObjectByNormalizedName(playfieldRoot, 'Pinballmap', 'pinballmap') ?? playfieldRoot;
 
-        let flipperSetup = resolvePlayfieldFlippers(playfieldRoot);
-        if (!flipperSetup) {
-          const meshA = playfieldRoot.getObjectByName('flipper.002');
-          const meshB = playfieldRoot.getObjectByName('flipper.003');
-          if ((meshA as THREE.Mesh | null)?.isMesh && (meshB as THREE.Mesh | null)?.isMesh) {
-            const leftMesh = meshA as THREE.Mesh;
-            const rightMesh = meshB as THREE.Mesh;
-            const center = new THREE.Vector3();
-            leftMesh.updateMatrixWorld(true);
-            rightMesh.updateMatrixWorld(true);
-            const lx = new THREE.Box3().setFromObject(leftMesh).getCenter(center).x;
-            const rx = new THREE.Box3().setFromObject(rightMesh).getCenter(center).x;
-            flipperSetup = lx <= rx
-              ? { left: leftMesh, right: rightMesh, hide: playfieldRoot }
-              : { left: rightMesh, right: leftMesh, hide: playfieldRoot };
-          }
-        }
+        // resolvePlayfieldFlippers gère en priorité le nouveau format (flipper-left / flipper-right)
+        // puis le format héritage (flipper.001 unique splitté géométriquement).
+        const flipperSetup = resolvePlayfieldFlippers(playfieldRoot);
 
         let leftFlipper: THREE.Object3D | null = null;
         let rightFlipper: THREE.Object3D | null = null;
@@ -798,6 +813,34 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         leftFlipperBodyOffset.copy(leftResult.localOffset);
         rightFlipperBodyOffset.copy(rightResult.localOffset);
 
+        // ── Pivot debug markers — sphères visibles quand H est actif ─────────
+        {
+          const pivotGeo = new THREE.SphereGeometry(0.008, 12, 12);
+          const pivotMatL = new THREE.MeshBasicMaterial({ color: 0x00ffff, depthTest: false });
+          const pivotMatR = new THREE.MeshBasicMaterial({ color: 0xff00ff, depthTest: false });
+          disposableGeos.push(pivotGeo);
+          disposableMats.push(pivotMatL, pivotMatR);
+
+          if (leftFlipperPivot) {
+            const wp = new THREE.Vector3();
+            leftFlipperPivot.pivot.getWorldPosition(wp);
+            leftPivotMarker = new THREE.Mesh(pivotGeo, pivotMatL);
+            leftPivotMarker.position.copy(wp);
+            leftPivotMarker.renderOrder = 1000;
+            leftPivotMarker.visible = false;
+            scene.add(leftPivotMarker);
+          }
+          if (rightFlipperPivot) {
+            const wp = new THREE.Vector3();
+            rightFlipperPivot.pivot.getWorldPosition(wp);
+            rightPivotMarker = new THREE.Mesh(pivotGeo, pivotMatR);
+            rightPivotMarker.position.copy(wp);
+            rightPivotMarker.renderOrder = 1000;
+            rightPivotMarker.visible = false;
+            scene.add(rightPivotMarker);
+          }
+        }
+
         ballPhysicsInst.setSpawnPosition(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, BALL_SPAWN_POSITION.z);
         ballPhysicsInst.body.wakeUp();
 
@@ -865,6 +908,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         };
         const emit: typeof baseEmit = (event) => {
           baseEmit(event);
+          if (
+            "scoreIncrement" in event
+            && event.scoreIncrement
+            && gameStateRef.current === "playing"
+          ) {
+            collisionProcessor?.tryScoreReveal(scoreRef.current, gameStateRef.current);
+          }
           diag.noteEvent(event.type);
           if (event.type === "DRAIN") diag.noteReset("drain");
           if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
@@ -874,9 +924,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
-          // Retour au monde initial : à chaque drain en mode until_drain,
-          // ou au game over (baseEmit a déjà mis gameStateRef à jour) quel
-          // que soit le mode — sinon le violet persistait jusqu'au restart.
+          if (
+            (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
+            && gameStateRef.current === "game_over"
+          ) {
+            collisionProcessor?.resetDemogorgonFight();
+            demogorgonReveal?.endFight();
+          }
           if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
             if (
               UPSIDE_DOWN_PERSISTENCE === "until_drain" ||
@@ -886,6 +940,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             }
           }
           if (event.type === "PORTAL_ENTER") onPortalEnter?.();
+          if (event.type === "PORTAL_TRANSITION_END") {
+            upsideDownPortal?.reset();
+            collisionProcessor?.resetPortalTrigger();
+          }
           if (event.type === "BALL_LAUNCHED") {
             collisionProcessor?.resetPortalTrigger();
             bottomOutBallUC?.resetLatch();
@@ -941,18 +999,21 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         onPortalEnter = () => {
           if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
           if (upsideDownTransition.isActive()) return;
+          ballPhysicsInst.holdAtUpsideDownSpawn();
+          ballPhysicsInst.syncToMesh(ballMesh);
           upsideDownTransition.start(
             {
               ballMesh,
               ballBody: ballPhysicsInst.body,
+              onRevealStart: () => playUpsideDownAppearSound(),
               onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
             },
             () => {
-              const portal = upsideDownPortal?.getAnchorPosition();
-              if (portal) ballPhysicsInst?.ejectFromPortal(portal);
+              ballPhysicsInst?.spawnFromUpsideDown();
               collisionProcessor?.resetPortalTrigger();
               stuckDetector.reset();
-              if (ballMesh) {
+              if (ballMesh && ballPhysicsInst) {
+                ballPhysicsInst.syncToMesh(ballMesh);
                 ballMesh.visible = true;
                 ballMesh.scale.setScalar(1);
               }
@@ -989,10 +1050,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             if (!sessionStartedRef.current) {
               if (
                 data.action === "DOWN"
+                && physicsReadyRef.current
                 && (data.id === "PLUNGER" || data.id === "START")
-                && physicsReady
               ) {
                 beginSessionRef.current();
+                if (data.id === "PLUNGER" && gameStateRef.current === "idle") {
+                  plunger.startCharge(performance.now());
+                  isChargingPlunger = true;
+                  chargeStartTime = performance.now();
+                }
               }
               return;
             }
@@ -1011,12 +1077,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 );
                 if (gameStateRef.current === "game_over") {
                   resetGame();
+                  collisionProcessor?.resetDemogorgonFight();
+                  demogorgonReveal?.endFight();
                   upsideDownPortal?.reset();
                   upsideDownAtmosphere?.reset();
                   if (ballMesh) ballMesh.visible = true;
                   return;
                 }
-                if (gameStateRef.current === "idle" && physicsReady) {
+                if (gameStateRef.current === "idle" && physicsReadyRef.current) {
                   plunger.startCharge(performance.now());
                   isChargingPlunger = true;
                   chargeStartTime = performance.now();
@@ -1045,6 +1113,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             if (data.id === "START") {
               if (data.action === "DOWN" && gameStateRef.current === "game_over") {
                 resetGame();
+                collisionProcessor?.resetDemogorgonFight();
+                demogorgonReveal?.endFight();
                 upsideDownPortal?.reset();
                 upsideDownAtmosphere?.reset();
                 if (ballMesh) ballMesh.visible = true;
@@ -1083,6 +1153,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             rapierDebugLines.visible = debugCollidersOn;
             if (leftFlipperDebug)  leftFlipperDebug.visible  = debugCollidersOn;
             if (rightFlipperDebug) rightFlipperDebug.visible = debugCollidersOn;
+            if (leftPivotMarker)   leftPivotMarker.visible   = debugCollidersOn;
+            if (rightPivotMarker)  rightPivotMarker.visible  = debugCollidersOn;
+            if (debugCollidersOn && leftFlipperPivot && rightFlipperPivot) {
+              const lp = new THREE.Vector3();
+              const rp = new THREE.Vector3();
+              leftFlipperPivot.pivot.getWorldPosition(lp);
+              rightFlipperPivot.pivot.getWorldPosition(rp);
+              const fmt = (v: THREE.Vector3) => ({
+                x: +v.x.toFixed(4), y: +v.y.toFixed(4), z: +v.z.toFixed(4),
+              });
+              setFlipperPivotCoords({ left: fmt(lp), right: fmt(rp) });
+            } else {
+              setFlipperPivotCoords(null);
+            }
             return;
           }
           if (e.key === "j" || e.key === "J") {
@@ -1130,6 +1214,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         physicsReady = true;
         physicsReadyRef.current = true;
         setPhysicsReady(true);
+        onPlayfieldReady();
         debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
@@ -1175,10 +1260,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         upsideDownTransition?.update(dt);
       } else {
         // ── Flipper cinématique : Three.js → Rapier ───────────────────────────
+        // Lissage normalisé à 60 FPS : Math.pow(1 - SWING_SMOOTH, dt * 60)
+        // reproduit exactement le comportement 60 Hz sur tous les écrans
+        // (120 Hz → decay plus petit par frame, même vitesse angulaire réelle).
         prevLeftSwing  = leftSwing;
         prevRightSwing = rightSwing;
-        leftSwing  += (leftTarget  * SWING_RAD - leftSwing)  * SWING_SMOOTH;
-        rightSwing += (rightTarget * SWING_RAD - rightSwing) * SWING_SMOOTH;
+        const swingDecay = 1 - Math.pow(1 - SWING_SMOOTH, dt * 60);
+        leftSwing  += (leftTarget  * SWING_RAD - leftSwing)  * swingDecay;
+        rightSwing += (rightTarget * SWING_RAD - rightSwing) * swingDecay;
         if (leftFlipperPivot)  applyFlipperSwing(leftFlipperPivot,  leftSwing);
         if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
 
@@ -1190,15 +1279,17 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // Quand le flipper est en train de monter ET que la balle est dans la
         // zone flipper, on garantit une vitesse -Z minimale sans override si la
         // physique fait déjà mieux.
+        // Seuil normalisé en vitesse angulaire (rad/s) : 0.004 * 60 = 0.24 rad/s,
+        // indépendant du fps (évite que le seuil ne se déclenche jamais à 120+ Hz).
         if (ballPhysicsInst && gameStateRef.current === 'playing') {
           const bp = ballPhysicsInst.body.translation();
           const bv = ballPhysicsInst.body.linvel();
           const inZ = bp.z > FLIPPER_Z_MIN && bp.z < FLIPPER_Z_MAX;
-          const dL = leftSwing  - prevLeftSwing;
-          const dR = rightSwing - prevRightSwing;
-          if (inZ && dL > 0.004 && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+          const angVelL = (leftSwing  - prevLeftSwing) / dt;
+          const angVelR = (rightSwing - prevRightSwing) / dt;
+          if (inZ && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ)
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
-          if (inZ && dR > 0.004 && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+          if (inZ && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ)
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
         }
 
@@ -1217,10 +1308,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         }
       }
 
-      if (physicsWorld && !transitionActive) physicsWorld.update(time);
-
-      if (physicsWorld && collisionProcessor && !transitionActive) {
-        collisionProcessor.process(physicsWorld.eventQueue, gameStateRef.current);
+      if (physicsWorld && !transitionActive) {
+        // Drain les events APRÈS chaque step (multi-step possible sous 60 FPS) —
+        // sinon les collisions des steps intermédiaires seraient perdues.
+        const world = physicsWorld;
+        world.update(dt, () => {
+          collisionProcessor?.process(world.eventQueue, gameStateRef.current);
+        });
       }
 
       // ── Diagnostic balle : pourquoi disparaît/sort + reset de secours ────
@@ -1280,6 +1374,19 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             ballPhysicsInst.body.setLinvel({ x: 0, y: lv.y, z: lv.z }, true);
             const av = ballPhysicsInst.body.angvel();
             ballPhysicsInst.body.setAngvel({ x: av.x, y: 0, z: 0 }, true);
+          }
+        }
+
+        // ── Surface snap : recolle la balle au sol incliné (logique en
+        // game-engine, cf. computeSurfaceSnap). On lit pos/vel et on applique.
+        if (gameStateRef.current === "playing" && !ballMoveMode) {
+          const snap = computeSurfaceSnap(
+            ballPhysicsInst.body.translation(),
+            ballPhysicsInst.body.linvel(),
+          );
+          if (snap) {
+            ballPhysicsInst.body.setTranslation(snap.translation, true);
+            if (snap.linvel) ballPhysicsInst.body.setLinvel(snap.linvel, true);
           }
         }
 
@@ -1474,9 +1581,25 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           upsideDownActive={upsideDownActive}
           upsideDownHint={upsideDownHint}
           cabinetMode={cabinetMode}
+          onAttractInteract={() => {
+            if (physicsReady && !sessionStarted) beginSession();
+          }}
         />
 
         <BallDebugOverlay snapshot={debugSnapshot} visible={debugVisible} />
+
+        {flipperPivotCoords && (
+          <div className="pointer-events-none absolute right-2 top-2 z-[100] rounded-md bg-black/80 px-3.5 py-2 font-mono text-[11px] leading-[1.7] text-white">
+            <div className="font-bold text-[#00ffff]">⬤ PIVOT GAUCHE</div>
+            <div>x: {flipperPivotCoords.left.x}</div>
+            <div>y: {flipperPivotCoords.left.y}</div>
+            <div>z: {flipperPivotCoords.left.z}</div>
+            <div className="mt-1.5 font-bold text-[#ff00ff]">⬤ PIVOT DROIT</div>
+            <div>x: {flipperPivotCoords.right.x}</div>
+            <div>y: {flipperPivotCoords.right.y}</div>
+            <div>z: {flipperPivotCoords.right.z}</div>
+          </div>
+        )}
 
         <main
           ref={mountRef}

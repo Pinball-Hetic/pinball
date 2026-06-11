@@ -19,6 +19,7 @@ interface GameOverlayProps {
   upsideDownActive: boolean;
   upsideDownHint: boolean;
   cabinetMode?: boolean;
+  onAttractInteract?: () => void;
 }
 
 export default function GameOverlay({
@@ -33,6 +34,7 @@ export default function GameOverlay({
   upsideDownActive,
   upsideDownHint,
   cabinetMode = false,
+  onAttractInteract,
 }: GameOverlayProps) {
   void cabinetMode;
 
@@ -160,7 +162,10 @@ export default function GameOverlay({
 
       {/* ── Écran d'accueil (attract mode) ── */}
       {bootPhase === "attract" && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#0a0e18]/75 via-[#0a0e18]/55 to-[#0a0e18]/85 px-6 backdrop-blur-[2px]">
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#0a0e18]/75 via-[#0a0e18]/55 to-[#0a0e18]/85 px-6 backdrop-blur-[2px]"
+          onPointerDown={onAttractInteract}
+        >
           <div className="text-center">
             <p className="font-mono text-[10px] uppercase tracking-[0.55em] text-red-400/80">
               Hawkins National Laboratory

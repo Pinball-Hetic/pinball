@@ -9,7 +9,7 @@ import {
 } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
 import type { GameStats } from "@pinball/shared-types";
-import { handlePinballSoundEvent } from "../audio/PinballSounds";
+import { handlePinballSoundEvent, playGameOverSound } from "../audio/pinballAudio";
 import { playfieldToScreenPercent, jitterScreenPoint } from "../utils/playfieldScreen";
 
 export type GameState = "idle" | "playing" | "game_over";
@@ -192,6 +192,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     setLives(newLives);
     if (newLives <= 0) {
       hideBall();
+      playGameOverSound();
       updateGameState("game_over");
       const stats: GameStats = {
         maxCombo: maxComboRef.current,
@@ -330,9 +331,11 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         multiplierRef.current = 1;
         setCombo(0);
         setMultiplier(1);
-        clearDemogorgonHud();
         clearScorePops();
         handleDrain(hideBall);
+        if (livesRef.current <= 0) {
+          clearDemogorgonHud();
+        }
       }
       if (event.type === "DROP_TARGET_COMPLETE") {
         if (heticRef.current < 5) {

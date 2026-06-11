@@ -13,6 +13,7 @@ import { CameraBillboardSprite } from './CameraBillboardSprite';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
+import { DemogorgonTargetVisual } from './DemogorgonTargetVisual';
 
 const TEXTURE_URL = '/playfield/demogorgon.png';
 
@@ -24,7 +25,18 @@ const VICTORY = 0.65;
 const ELEVEN_ASSIST_ANIM = 0.85;
 const ELEVEN_ASSIST_FIRST = 0.55;
 
-const STROBE_HZ = 11;
+const STROBE_HZ_INTRO = 4;
+const FIGHT_SHADE = 0.36;
+const FIGHT_SHADE_BREATHE = 0.04;
+const FIGHT_SHADE_SPEED = 1.4;
+const FIGHT_FLICKER_HZ = 3;
+const FIGHT_FLINKER_DIP = 0.07;
+const FIGHT_FLICKER_LIFT = 0.04;
+const FIGHT_FLASH_MIX = 0.45;
+const FIGHT_DECOR_STROBE = 0.22;
+const FLASH_INTENSITY = 1.5;
+const TARGET_PULSE_SPEED = 2.5;
+const TARGET_PULSE_AMP = 0.18;
 
 type Phase = 'idle' | 'blackout' | 'reveal' | 'flicker' | 'victory' | 'restore';
 
@@ -48,6 +60,7 @@ export class DemogorgonReveal {
 
   private cinematicStrobe = new PlayfieldCinematicStrobe();
   private billboard = new CameraBillboardSprite();
+  private demogorgonVisual = new DemogorgonTargetVisual();
   private targetGroup: THREE.Group | null = null;
   private targetRingMat: THREE.MeshStandardMaterial | null = null;
   private targetCoreMat: THREE.MeshStandardMaterial | null = null;
@@ -75,6 +88,18 @@ export class DemogorgonReveal {
     this.emit = listener;
   }
 
+  async preload(
+    renderer: THREE.WebGLRenderer,
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+  ): Promise<void> {
+    await Promise.all([
+      this.billboard.ensureReady(),
+      this.demogorgonVisual.ensureReady(),
+    ]);
+    await this.demogorgonVisual.warmup(renderer, scene, camera);
+  }
+
   setup(config: DemogorgonSetup): void {
     this.dispose();
     this.camera = config.camera;
@@ -85,7 +110,7 @@ export class DemogorgonReveal {
 
     this.cinematicStrobe.mount(config.root, config.garlandLights, config.bumperVisuals, {
       flashColor: 0xff1122,
-      flashIntensity: 2.8,
+      flashIntensity: FLASH_INTENSITY,
       flashPosition: new THREE.Vector3(
         DEMOGORGON_SENSOR.x,
         DEMOGORGON_SENSOR.y + 0.12,
@@ -94,6 +119,7 @@ export class DemogorgonReveal {
     });
 
     this.billboard.mount(config.scene, config.camera, { textureUrl: TEXTURE_URL });
+    this.demogorgonVisual.mount(config.root, config.camera);
 
     this.targetGroup = this.buildTargetMesh();
     this.targetGroup.position.set(
@@ -165,17 +191,20 @@ export class DemogorgonReveal {
     if (event.type === 'DEMOGORGON_TARGET_HIT') {
       if (this.phase === 'idle' || this.phase === 'restore' || this.phase === 'victory') return;
       this.targetHitFlash = TARGET_HIT_FLASH;
+      this.demogorgonVisual.playHit();
       if (event.hitCount >= DEMOGORGON_TARGET_HITS) {
         this.beginVictory();
       }
       return;
     }
-    if (event.type === 'DRAIN' || event.type === 'BOTTOM_OUT') {
-      this.resetAtmosphere();
-    }
+  }
+
+  endFight(): void {
+    this.resetAtmosphere();
   }
 
   update(dt: number): void {
+    this.demogorgonVisual.update(dt);
     this.billboard.sync();
     if (this.targetHitFlash > 0) this.targetHitFlash = Math.max(0, this.targetHitFlash - dt);
     this.updateTargetPulse(dt);
@@ -189,7 +218,7 @@ export class DemogorgonReveal {
     this.elapsed += dt;
     this.strobeT += dt;
 
-    const on = strobeOn(this.strobeT, STROBE_HZ);
+    const on = strobeOn(this.strobeT, STROBE_HZ_INTRO);
     const darkMix = this.phase === 'restore'
       ? 1 - easeIn(Math.min(1, this.elapsed / RESTORE))
       : 1;
@@ -207,20 +236,30 @@ export class DemogorgonReveal {
     if (this.phase === 'reveal') {
       const t = Math.min(1, this.elapsed / REVEAL);
       this.cinematicStrobe.apply(on, false, 1);
-      this.billboard.setOpacity(this.billboard.isReady() && on ? easeOut(t) * 0.95 : 0);
+      this.billboard.setOpacity(this.billboard.isReady() ? easeOut(t) * 0.95 : 0);
       if (this.elapsed >= REVEAL) {
         this.phase = 'flicker';
         this.elapsed = 0;
         this.assistNextIn = ELEVEN_ASSIST_FIRST;
         this.billboard.setOpacity(0);
         this.billboard.hide();
+        this.demogorgonVisual.show();
+        this.garlandLights?.setAtmosphere(0.88, FIGHT_DECOR_STROBE, FIGHT_FLICKER_HZ);
+        this.bumperVisuals?.setAtmosphere(0.88, FIGHT_DECOR_STROBE, FIGHT_FLICKER_HZ);
         this.onTargetReady?.();
       }
       return;
     }
 
     if (this.phase === 'flicker') {
-      this.cinematicStrobe.apply(on, true, 1);
+      const breathe = Math.sin(this.pulseT * FIGHT_SHADE_SPEED) * FIGHT_SHADE_BREATHE;
+      const blink = strobeOn(this.strobeT, FIGHT_FLICKER_HZ);
+      const shade = THREE.MathUtils.clamp(
+        FIGHT_SHADE + breathe + (blink ? -FIGHT_FLICKER_LIFT : FIGHT_FLINKER_DIP),
+        0.18,
+        0.52,
+      );
+      this.cinematicStrobe.applyFightFlicker(shade, blink ? FIGHT_FLASH_MIX : 0);
       this.billboard.setOpacity(0);
       if (!this.elevenAssistActive) {
         this.assistNextIn -= dt;
@@ -245,7 +284,7 @@ export class DemogorgonReveal {
         this.resetAtmosphere();
         return;
       }
-      this.cinematicStrobe.apply(on, true, darkMix);
+      this.cinematicStrobe.applyHoldShade(FIGHT_SHADE * darkMix);
       this.billboard.setOpacity(0);
     }
   }
@@ -255,6 +294,7 @@ export class DemogorgonReveal {
 
     this.cinematicStrobe.dispose();
     this.billboard.dispose();
+    this.demogorgonVisual.dispose();
 
     if (this.elevenShockOuter) this.elevenShockOuter.parent?.remove(this.elevenShockOuter);
     if (this.elevenShockInner) this.elevenShockInner.parent?.remove(this.elevenShockInner);
@@ -277,6 +317,7 @@ export class DemogorgonReveal {
     this.emit = null;
     this.cinematicStrobe = new PlayfieldCinematicStrobe();
     this.billboard = new CameraBillboardSprite();
+    this.demogorgonVisual = new DemogorgonTargetVisual();
     this.targetGroup = null;
     this.targetRingMat = null;
     this.targetCoreMat = null;
@@ -349,8 +390,8 @@ export class DemogorgonReveal {
   private updateTargetPulse(dt: number): void {
     if (!this.targetGroup?.visible || this.phase === 'victory') return;
     this.pulseT += dt;
-    const hitBoost = this.targetHitFlash > 0 ? 1.8 : 1;
-    const pulse = (0.75 + Math.sin(this.pulseT * 8) * 0.25) * hitBoost;
+    const hitBoost = this.targetHitFlash > 0 ? 1.4 : 1;
+    const pulse = (0.82 + Math.sin(this.pulseT * TARGET_PULSE_SPEED) * TARGET_PULSE_AMP) * hitBoost;
     if (this.targetRingMat) this.targetRingMat.emissiveIntensity = 1.6 * pulse;
     if (this.targetCoreMat) this.targetCoreMat.emissiveIntensity = 1.2 * pulse;
     if (this.targetLight) this.targetLight.intensity = 0.45 * pulse;
@@ -416,6 +457,7 @@ export class DemogorgonReveal {
     this.phase = 'victory';
     this.elapsed = 0;
     this.billboard.hide();
+    this.demogorgonVisual.playVictory();
     if (this.targetGroup) this.targetGroup.visible = true;
   }
 
@@ -502,7 +544,10 @@ export class DemogorgonReveal {
     this.elevenAssistT = 0;
 
     this.cinematicStrobe.stop();
+    this.garlandLights?.setAtmosphere(1, 0);
+    this.bumperVisuals?.setAtmosphere(1, 0);
     this.billboard.hide();
+    this.demogorgonVisual.hide();
 
     if (this.targetGroup) {
       this.targetGroup.visible = false;

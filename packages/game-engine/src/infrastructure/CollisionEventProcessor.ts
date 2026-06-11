@@ -6,6 +6,7 @@ import {
   SCORE_POP_ZONE,
   SCORE_RAMP,
   SCORE_DEMOGORGON_REVEAL,
+  DEMOGORGON_REVEAL_SCORE,
   SCORE_DEMOGORGON_TARGET,
   SCORE_DROP_TARGET,
   SCORE_DROP_COMPLETE,
@@ -50,6 +51,29 @@ export class CollisionEventProcessor {
     }
   }
 
+  resetDemogorgonFight(): void {
+    this.demogorgonTriggered = false;
+    this.demogorgonFightActive = false;
+    this.demogorgonTargetArmed = false;
+    this.demogorgonTargetLatchIgnore = false;
+    this.demogorgonTargetBallInside = false;
+    this.demogorgonTargetHits = 0;
+    this.demogorgonTargetLastHitMs = 0;
+  }
+
+  tryScoreReveal(totalScore: number, gameState: string): void {
+    if (gameState !== 'playing') return;
+    if (this.demogorgonTriggered) return;
+    if (totalScore < DEMOGORGON_REVEAL_SCORE) return;
+    this.demogorgonTriggered = true;
+    this.demogorgonFightActive = true;
+    this.demogorgonTargetArmed = false;
+    this.demogorgonTargetLatchIgnore = false;
+    this.demogorgonTargetHits = 0;
+    this.demogorgonTargetLastHitMs = 0;
+    this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: SCORE_DEMOGORGON_REVEAL });
+  }
+
   constructor(
     private readonly colliderMap: Map<number, string>,
     private readonly bumperHitUC: BumperHit,
@@ -89,21 +113,11 @@ export class CollisionEventProcessor {
       }
 
       if (role === 'bottom_out' && gameState === 'playing') {
-        this.demogorgonTriggered = false;
-        this.demogorgonFightActive = false;
-        this.demogorgonTargetArmed = false;
-        this.demogorgonTargetLatchIgnore = false;
-        this.demogorgonTargetHits = 0;
         this.bottomOutBallUC.execute();
         this.resetDropTargets();
       }
 
       if (role === 'drain' && gameState === 'playing') {
-        this.demogorgonTriggered = false;
-        this.demogorgonFightActive = false;
-        this.demogorgonTargetArmed = false;
-        this.demogorgonTargetLatchIgnore = false;
-        this.demogorgonTargetHits = 0;
         this.drainBallUC.execute();
         this.resetDropTargets();
       }
@@ -119,18 +133,6 @@ export class CollisionEventProcessor {
 
       if (role === 'rocket_ramp' && gameState === 'playing') {
         this.emit({ type: 'RAMP_HIT', scoreIncrement: SCORE_RAMP });
-      }
-
-      if (role === 'demogorgon_center' && gameState === 'playing') {
-        if (!this.demogorgonTriggered) {
-          this.demogorgonTriggered = true;
-          this.demogorgonFightActive = true;
-          this.demogorgonTargetArmed = false;
-          this.demogorgonTargetLatchIgnore = false;
-          this.demogorgonTargetHits = 0;
-          this.demogorgonTargetLastHitMs = 0;
-          this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: SCORE_DEMOGORGON_REVEAL });
-        }
       }
 
       if (role.startsWith('drop_') && !role.startsWith('drop_target') && gameState === 'playing') {

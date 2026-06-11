@@ -19,6 +19,7 @@ export class CameraBillboardSprite {
   private imageReady = false;
   private depth = 0.38;
   private yOffset = 0.06;
+  private loadPromise: Promise<void> | null = null;
 
   mount(scene: THREE.Scene, camera: THREE.Camera, config: CameraBillboardConfig): void {
     this.dispose();
@@ -41,21 +42,29 @@ export class CameraBillboardSprite {
     scene.add(this.sprite);
 
     const loader = new THREE.TextureLoader();
-    loader.load(
-      config.textureUrl,
-      (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        if (this.material) {
-          this.material.map = tex;
-          this.material.needsUpdate = true;
-        }
-        this.imageReady = true;
-      },
-      undefined,
-      () => {
-        this.imageReady = true;
-      },
-    );
+    this.loadPromise = new Promise<void>((resolve) => {
+      loader.load(
+        config.textureUrl,
+        (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          if (this.material) {
+            this.material.map = tex;
+            this.material.needsUpdate = true;
+          }
+          this.imageReady = true;
+          resolve();
+        },
+        undefined,
+        () => {
+          this.imageReady = true;
+          resolve();
+        },
+      );
+    });
+  }
+
+  ensureReady(): Promise<void> {
+    return this.loadPromise ?? Promise.resolve();
   }
 
   isReady(): boolean {
@@ -99,5 +108,6 @@ export class CameraBillboardSprite {
     this.sprite = null;
     this.material = null;
     this.imageReady = false;
+    this.loadPromise = null;
   }
 }
