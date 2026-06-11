@@ -60,3 +60,34 @@ ESP32 (specs HETIC en attente).
 | `NEXT_PUBLIC_KEYBOARD_MODE` | `direct` | Voir tableau ci-dessus. |
 | `NEXT_PUBLIC_SOCKET_URL` | (vide) | URL Socket.io directe (dev avec port serveur exposé). Vide en prod Fliphetic → polling same-origin via rewrite Next.js. |
 | `SERVER_INTERNAL_URL` | `http://server:3001` | Cible des rewrites `/api/*` et `/socket.io/*` (DNS Docker). |
+
+## Overlays cinématiques
+
+Pendant les **gels** cinématiques, un overlay DOM (`CinematicOverlay`) joue
+une animation par-dessus le canvas 3D (sous le HUD). Sans asset → fallback
+CSS générique par famille (`demogorgon_*` pulsation rouge, `milestone_*`
+rayons dorés, `hetic_*` balayage). Déposer un fichier le remplace, sans code.
+
+### Convention
+
+- Fichiers dans `public/overlays/`, **commités** dans le repo (embarqués
+  dans l'image Docker → borne hors réseau). `public/overlays/` n'est PAS
+  gitignoré.
+- Nommage : `<clip>.webm` (préféré) ou `<clip>.webp` / `<clip>.gif`. Puis
+  référencer dans `src/overlays-manifest.ts` (`OVERLAY_FILES[clip] = 'fichier'`).
+- **Aucune URL externe** dans le code — uniquement des chemins `/overlays/*`.
+
+### Formats & budget (strict — le repo grossit à chaque asset)
+
+- WebM (VP9) ou WebP animé : **≤ 3 Mo** par clip. GIF accepté si **< 4 Mo**.
+- Boucle courte 2–4 s suffit (l'overlay tourne en `loop` pendant le gel).
+- Dimensions : 1280×720 suffisant (écran borne 1080p). Cible totale ≤ 20 Mo.
+
+### Conversion locale (ffmpeg)
+
+```bash
+# GIF/MP4 → WebM compact (VP9) :
+ffmpeg -i in.gif -c:v libvpx-vp9 -b:v 0 -crf 40 -an out.webm
+# → WebP animé :
+ffmpeg -i in.gif -c:v libwebp -lossless 0 -q:v 60 -loop 0 out.webp
+```

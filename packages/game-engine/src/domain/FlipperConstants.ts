@@ -31,6 +31,12 @@ export const FLIPPER_FRICTION    = 0.05;
 // ── Vitesse minimale garantie (garantie de lancement uniforme) ────────────────
 /** Vitesse Z minimale garantie quand le flipper frappe la balle (m/s, négatif = haut du tapis). */
 export const FLIPPER_MIN_LAUNCH_VZ = -2.8;
+/**
+ * Vitesse angulaire de montée du flipper (rad/s) au-dessus de laquelle on
+ * garantit FLIPPER_MIN_LAUNCH_VZ à la balle. Normalisé en rad/s (était
+ * 0.004 rad/frame × 60 = 0.24) → indépendant du fps.
+ */
+export const FLIPPER_MIN_LAUNCH_ANGVEL = 0.24;
 
 // ── Jeu ──────────────────────────────────────────────────────────────────────
 export const INITIAL_LIVES    = 3;

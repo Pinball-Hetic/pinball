@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Game {
+  id            String   @id @default(cuid())
+  player        String // pseudo affiché — aléatoire aujourd'hui
+  playerId      String? // réservé : future feature compte/pseudo (site web)
+  score         Int
+  maxCombo      Int      @default(0)
+  maxMultiplier Int      @default(1)
+  demogorgons   Int      @default(0)
+  portals       Int      @default(0)
+  hetic         Int      @default(0)
+  durationS     Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([score(sort: Desc)])
+  @@index([createdAt])
+}

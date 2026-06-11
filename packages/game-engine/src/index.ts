@@ -18,6 +18,7 @@ export * from './use-cases/DrainBall';
 export * from './use-cases/BottomOutBall';
 export * from './use-cases/DetectStuckBall';
 export * from './use-cases/DetectBottomOut';
+export * from './use-cases/SnapBallToSurface';
 
 // Infrastructure
 export * from './infrastructure/PhysicsWorld';
@@ -40,6 +41,11 @@ export * from './infrastructure/BumperVisuals';
 export * from './infrastructure/GarlandLights';
 export * from './infrastructure/DemogorgonReveal';
 export * from './infrastructure/VecnaReveal';
+export * from './infrastructure/CinematicDirector';
+export * from './infrastructure/ScreenShake';
+export * from './infrastructure/BallTrail';
+export * from './infrastructure/GlowSprite';
+export * from './infrastructure/QualityGovernor';
 export * from './infrastructure/CinematicEasing';
 export * from './infrastructure/CameraBillboardSprite';
 export * from './infrastructure/PlayfieldCinematicStrobe';

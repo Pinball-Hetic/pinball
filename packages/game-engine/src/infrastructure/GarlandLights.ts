@@ -37,6 +37,18 @@ export class GarlandLights {
   private strobeActive = false;
   private strobeOn = false;
   private strobeNormalWhenOn = false;
+  private feverActive = false;
+  private celebrateT = 0;
+
+  // Chenillard continu pendant le fever (vague permanente).
+  setFever(on: boolean): void {
+    this.feverActive = on;
+  }
+
+  // 1s de chenillard ponctuel (palier franchi).
+  celebrate(): void {
+    this.celebrateT = 1;
+  }
 
   setAtmosphere(dim: number, strobe: number, strobeHz = 4): void {
     this.atmosphereDim = dim;
@@ -119,6 +131,23 @@ export class GarlandLights {
         bulb.material.emissive.setHex(flashRed);
       } else {
         bulb.material.emissive.copy(bulb.origEmissive);
+      }
+    }
+
+    // Vague (chenillard) — fever continu OU célébration ponctuelle.
+    if (this.celebrateT > 0) this.celebrateT = Math.max(0, this.celebrateT - dt);
+    if (this.feverActive || this.celebrateT > 0) {
+      const speed = this.feverActive ? 6 : 9;
+      for (let i = 0; i < this.bulbs.length; i++) {
+        const bulb = this.bulbs[i];
+        const w = Math.sin(this.elapsed * speed - i * 0.5) * 0.5 + 0.5;
+        bulb.material.emissiveIntensity = Math.max(
+          bulb.material.emissiveIntensity,
+          bulb.origIntensity * (0.6 + w * 1.6),
+        );
+        if (this.feverActive) {
+          bulb.material.emissive.setHex(i % 2 === 0 ? 0xff8800 : 0x00c8ff);
+        }
       }
     }
   }

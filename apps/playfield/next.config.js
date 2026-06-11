@@ -8,12 +8,15 @@ const nextConfig = {
   skipTrailingSlashRedirect: true,
   reactStrictMode: true,
   turbopack: { root: '../..' },
-  transpilePackages: ['@pinball/game-engine'],
+  transpilePackages: ['@pinball/game-engine', '@pinball/shared-types'],
   async rewrites() {
     return [
       {
+        // Préserve le préfixe /api : les routes server sont exposées en
+        // /api/* — URL identique en accès direct (:3001/api/...) et via
+        // le proxy same-origin.
         source: '/api/:path*',
-        destination: `${SERVER_INTERNAL_URL}/:path*`,
+        destination: `${SERVER_INTERNAL_URL}/api/:path*`,
       },
       {
         // engine.io n'utilise jamais de sous-path : la destination est
