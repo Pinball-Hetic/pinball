@@ -35,8 +35,16 @@ export interface ScoreUpdate {
   hetic: number
 }
 
+export type CinematicClip =
+  | 'demogorgon_rises' // 1er reveal boss (pause 2.5s)
+  | 'portal_swallow' // entrée Upside Down (transition existante 4s)
+  | 'demogorgon_slain' // victoire boss (pause 2s)
+  | 'last_chance' // dernière vie engagée (pause 1.2s)
+  | 'hall_of_fame' // game over qualifiant (6-8s, pas de pause)
+
 export type DmdDisplay =
   | { mode: 'INTRO'; player: string; upsideDown: boolean }
+  | { mode: 'CINEMATIC'; clip: CinematicClip; player: string; score: number; upsideDown: boolean }
   | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number; hetic: number; upsideDown: boolean }
   | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string; hetic: number; upsideDown: boolean }
   | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string; hetic: number; upsideDown: boolean }

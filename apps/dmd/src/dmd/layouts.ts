@@ -109,8 +109,16 @@ function layoutGameOver(grid: Uint8Array, display: DmdDisplay, clockMs: number):
   }
 }
 
+// Placeholder no-op : le rendu réel des clips arrive en P15 (AsciiClipPlayer).
+function layoutCinematic(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
+  void grid
+  void display
+  void clockMs
+}
+
 export const layouts: Record<DmdDisplay['mode'], LayoutFn> = {
   INTRO: layoutIntro,
+  CINEMATIC: layoutCinematic,
   SCORE: layoutScore,
   EVENT: layoutEvent,
   COMBO_FLASH: layoutComboFlash,
