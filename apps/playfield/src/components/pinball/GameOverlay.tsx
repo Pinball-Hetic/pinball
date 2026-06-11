@@ -1,5 +1,5 @@
-import { DEMOGORGON_TARGET_HITS } from "@pinball/game-engine";
-import type { DemogorgonHud, ScorePop } from "../../hooks/useGameState";
+import { DEMOGORGON_TARGET_HITS, VECNA_TARGET_HITS } from "@pinball/game-engine";
+import type { DemogorgonHud, ScorePop, VecnaHud } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
 import PlungerPowerBar from "./PlungerPowerBar";
 
@@ -15,6 +15,7 @@ interface GameOverlayProps {
   onResetBall?: () => void;
   initialLives: number;
   demogorgonHud: DemogorgonHud;
+  vecnaHud: VecnaHud;
   scorePops: ScorePop[];
   upsideDownActive: boolean;
   upsideDownHint: boolean;
@@ -30,6 +31,7 @@ export default function GameOverlay({
   onResetBall,
   initialLives,
   demogorgonHud,
+  vecnaHud,
   scorePops,
   upsideDownActive,
   upsideDownHint,
@@ -50,6 +52,9 @@ export default function GameOverlay({
 
   const showDemogorgonHud =
     bootPhase === "in_game" && gameState === "playing" && demogorgonHud.active;
+
+  const showVecnaHud =
+    bootPhase === "in_game" && gameState === "playing" && upsideDownActive && vecnaHud.active;
 
   const showUpsideDownBanner =
     bootPhase === "in_game" && gameState === "playing" && upsideDownActive;
@@ -138,6 +143,27 @@ export default function GameOverlay({
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
           <p className="font-mono text-2xl font-bold uppercase tracking-[0.2em] text-amber-300 drop-shadow-[0_0_20px_rgba(255,200,80,0.9)] sm:text-3xl">
             Demogorgon vaincu !
+          </p>
+        </div>
+      )}
+
+      {showVecnaHud && !vecnaHud.victory && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center">
+          <div className="rounded border border-violet-500/45 bg-black/70 px-4 py-2 text-center font-mono backdrop-blur-sm">
+            <p className="text-[10px] uppercase tracking-[0.35em] text-violet-300/90">
+              Cible Vecna
+            </p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-violet-400 drop-shadow-[0_0_10px_rgba(160,80,255,0.7)]">
+              {vecnaHud.hits} / {VECNA_TARGET_HITS}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showVecnaHud && vecnaHud.victory && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <p className="font-mono text-2xl font-bold uppercase tracking-[0.2em] text-violet-200 drop-shadow-[0_0_20px_rgba(160,80,255,0.9)] sm:text-3xl">
+            Vecna vaincu !
           </p>
         </div>
       )}

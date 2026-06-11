@@ -7,6 +7,7 @@ export * from './domain/UpsideDownConstants';
 export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
 export * from './domain/ScoringConstants';
+export * from './domain/VecnaConstants';
 export * from './domain/LiveGameSnapshot';
 
 // Use-cases
@@ -33,6 +34,7 @@ export * from './infrastructure/GltfDisplay';
 export * from './infrastructure/BumperVisuals';
 export * from './infrastructure/GarlandLights';
 export * from './infrastructure/DemogorgonReveal';
+export * from './infrastructure/VecnaReveal';
 export * from './infrastructure/CinematicEasing';
 export * from './infrastructure/CameraBillboardSprite';
 export * from './infrastructure/PlayfieldCinematicStrobe';

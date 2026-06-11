@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEventListener } from '../domain/GameEvents';
-import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
+import { BUMPER_POSITIONS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, VECNA_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
 import {
   SCORE_SLINGSHOT,
   SCORE_POP_ZONE,
@@ -8,6 +8,9 @@ import {
   SCORE_DEMOGORGON_REVEAL,
   DEMOGORGON_REVEAL_SCORE,
   SCORE_DEMOGORGON_TARGET,
+  SCORE_VECNA_REVEAL,
+  VECNA_REVEAL_SCORE,
+  SCORE_VECNA_TARGET,
   SCORE_DROP_TARGET,
   SCORE_DROP_COMPLETE,
 } from '../domain/ScoringConstants';
@@ -26,6 +29,15 @@ export class CollisionEventProcessor {
   private demogorgonTargetLastHitMs = 0;
   private portalOpen = false;
   private portalTriggered = false;
+  private upsideDownActive = false;
+  private upsideDownScoreBaseline = 0;
+  private vecnaTriggered = false;
+  private vecnaFightActive = false;
+  private vecnaTargetArmed = false;
+  private vecnaTargetBallInside = false;
+  private vecnaTargetLatchIgnore = false;
+  private vecnaTargetHits = 0;
+  private vecnaTargetLastHitMs = 0;
 
   setPortalOpen(open: boolean): void {
     this.portalOpen = open;
@@ -61,6 +73,51 @@ export class CollisionEventProcessor {
     this.demogorgonTargetLastHitMs = 0;
   }
 
+  onUpsideDownEntered(score: number): void {
+    this.upsideDownActive = true;
+    this.upsideDownScoreBaseline = score;
+  }
+
+  resetUpsideDownSession(): void {
+    this.upsideDownActive = false;
+    this.upsideDownScoreBaseline = 0;
+    this.resetVecnaFight();
+  }
+
+  setVecnaFightActive(active: boolean): void {
+    this.vecnaFightActive = active;
+    if (!active) {
+      this.vecnaTargetArmed = false;
+      this.vecnaTargetLatchIgnore = false;
+    }
+  }
+
+  setVecnaTargetArmed(armed: boolean): void {
+    this.vecnaTargetArmed = armed;
+    if (armed && this.vecnaTargetBallInside) {
+      this.vecnaTargetLatchIgnore = true;
+    }
+  }
+
+  resetVecnaFight(): void {
+    this.vecnaTriggered = false;
+    this.vecnaFightActive = false;
+    this.vecnaTargetArmed = false;
+    this.vecnaTargetLatchIgnore = false;
+    this.vecnaTargetBallInside = false;
+    this.vecnaTargetHits = 0;
+    this.vecnaTargetLastHitMs = 0;
+  }
+
+  tryVecnaReveal(totalScore: number, gameState: string): void {
+    if (gameState !== 'playing') return;
+    if (!this.upsideDownActive) return;
+    if (this.vecnaTriggered) return;
+    if (totalScore - this.upsideDownScoreBaseline < VECNA_REVEAL_SCORE) return;
+    this.beginVecnaFight(false);
+    this.emit({ type: 'VECNA_REVEAL', scoreIncrement: SCORE_VECNA_REVEAL });
+  }
+
   tryScoreReveal(totalScore: number, gameState: string): void {
     if (gameState !== 'playing') return;
     if (this.demogorgonTriggered) return;
@@ -91,6 +148,11 @@ export class CollisionEventProcessor {
 
       if (role === 'demogorgon_target') {
         this.handleDemogorgonTargetSensor(started, gameState);
+        return;
+      }
+
+      if (role === 'vecna_target') {
+        this.handleVecnaTargetSensor(started, gameState);
         return;
       }
 
@@ -148,6 +210,15 @@ export class CollisionEventProcessor {
     this.emit({ type: 'DROP_TARGET_RESET' });
   }
 
+  private beginVecnaFight(targetArmed: boolean): void {
+    this.vecnaTriggered = true;
+    this.vecnaFightActive = true;
+    this.vecnaTargetArmed = targetArmed;
+    this.vecnaTargetLatchIgnore = false;
+    this.vecnaTargetHits = 0;
+    this.vecnaTargetLastHitMs = 0;
+  }
+
   private handleDemogorgonTargetSensor(started: boolean, gameState: string): void {
     if (started) {
       this.demogorgonTargetBallInside = true;
@@ -172,6 +243,32 @@ export class CollisionEventProcessor {
 
     this.demogorgonTargetBallInside = false;
     this.demogorgonTargetLatchIgnore = false;
+  }
+
+  private handleVecnaTargetSensor(started: boolean, gameState: string): void {
+    if (started) {
+      this.vecnaTargetBallInside = true;
+      if (gameState !== 'playing' || !this.vecnaFightActive || !this.vecnaTargetArmed) return;
+      if (this.vecnaTargetLatchIgnore) return;
+
+      const now = performance.now();
+      if (now - this.vecnaTargetLastHitMs < 450) return;
+      this.vecnaTargetLastHitMs = now;
+      this.vecnaTargetHits += 1;
+      this.emit({
+        type: 'VECNA_TARGET_HIT',
+        hitCount: this.vecnaTargetHits,
+        scoreIncrement: SCORE_VECNA_TARGET,
+      });
+      if (this.vecnaTargetHits >= VECNA_TARGET_HITS) {
+        this.vecnaFightActive = false;
+        this.vecnaTargetArmed = false;
+      }
+      return;
+    }
+
+    this.vecnaTargetBallInside = false;
+    this.vecnaTargetLatchIgnore = false;
   }
 
   private handleDropTarget(role: string): void {

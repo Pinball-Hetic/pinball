@@ -10,6 +10,7 @@ import {
   POP_ZONE_SENSORS,
   ROCKET_SENSOR,
   DEMOGORGON_TARGET,
+  VECNA_TARGET,
   DROP_TARGETS,
   SHOOTER_LANE_X_MIN,
   SHOOTER_LANE_X_MAX,
@@ -246,6 +247,7 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createPopZoneSensors(world, colliderMap);
     PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
     PlayfieldColliderFactory.createDemogorgonTarget(world, colliderMap);
+    PlayfieldColliderFactory.createVecnaTarget(world, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, colliderMap);
     PlayfieldColliderFactory.createBottomOutSensor(world, colliderMap);
   }
@@ -399,6 +401,20 @@ export class PlayfieldColliderFactory {
       b,
     );
     colliderMap.set(col.handle, 'demogorgon_target');
+  }
+
+  private static createVecnaTarget(world: RAPIER.World, colliderMap: Map<number, string>): void {
+    const p = VECNA_TARGET;
+    const b = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
+    );
+    const col = world.createCollider(
+      RAPIER.ColliderDesc.ball(0.034)
+        .setSensor(true)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+      b,
+    );
+    colliderMap.set(col.handle, 'vecna_target');
   }
 
   private static createRocketSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {

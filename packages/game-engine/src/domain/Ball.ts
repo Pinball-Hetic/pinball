@@ -84,6 +84,14 @@ export const DEMOGORGON_TARGET = {
 
 export const DEMOGORGON_TARGET_HITS = 5;
 
+export const VECNA_TARGET = {
+  x: 0,
+  y: 1.012,
+  z: -0.067,
+} as const;
+
+export const VECNA_TARGET_HITS = 10;
+
 export const PORTAL_UPSIDE_DOWN = {
   x: -0.000751,
   y: 1.015191,

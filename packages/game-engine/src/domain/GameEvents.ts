@@ -8,6 +8,8 @@ export type GameEvent =
   | { type: 'ZONE_HIT'; zone: string; scoreIncrement: number }
   | { type: 'DEMOGORGON_REVEAL'; scoreIncrement: number }
   | { type: 'DEMOGORGON_TARGET_HIT'; hitCount: number; scoreIncrement: number }
+  | { type: 'VECNA_REVEAL'; scoreIncrement: number }
+  | { type: 'VECNA_TARGET_HIT'; hitCount: number; scoreIncrement: number }
   | { type: 'ELEVEN_ASSIST'; scoreIncrement: number }
   | { type: 'PORTAL_ENTER'; scoreIncrement: number }
   | { type: 'PORTAL_TREMOR' }

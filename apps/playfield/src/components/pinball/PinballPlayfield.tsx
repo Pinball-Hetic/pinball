@@ -59,6 +59,7 @@ import {
   BumperVisuals,
   GarlandLights,
   DemogorgonReveal,
+  VecnaReveal,
   UpsideDownPortal,
   UpsideDownTransition,
   UpsideDownAtmosphere,
@@ -338,6 +339,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     gameState,
     gameStateRef,
     demogorgonHud,
+    vecnaHud,
     scorePops,
     upsideDownActive,
     upsideDownHint,
@@ -522,6 +524,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
     let demogorgonReveal: DemogorgonReveal | null = null;
+    let vecnaReveal: VecnaReveal | null = null;
     let upsideDownPortal: UpsideDownPortal | null = null;
     let upsideDownTransition: UpsideDownTransition | null = null;
     let upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
@@ -663,6 +666,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         });
         await demogorgonReveal.preload(renderer, scene, camera).catch((err) => {
           console.warn("[Demogorgon] preload failed:", err);
+        });
+
+        vecnaReveal = new VecnaReveal();
+        vecnaReveal.setup({
+          root: playfieldRoot,
+          scene,
+          camera,
+          garlandLights,
+          bumperVisuals,
+          onFightEnd: () => collisionProcessor?.setVecnaFightActive(false),
+          onTargetReady: () => collisionProcessor?.setVecnaTargetArmed(true),
+        });
+        await vecnaReveal.preload(renderer, scene, camera).catch((err) => {
+          console.warn("[Vecna] preload failed:", err);
         });
 
         // ── Ball mesh ────────────────────────────────────────────────────────
@@ -902,6 +919,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         });
         const releaseUpsideDownWorld = () => {
           upsideDownAtmosphere?.reset();
+          collisionProcessor?.resetUpsideDownSession();
+          vecnaReveal?.endFight();
           clearUpsideDownSession();
         };
         const emit: typeof baseEmit = (event) => {
@@ -912,6 +931,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             && gameStateRef.current === "playing"
           ) {
             collisionProcessor?.tryScoreReveal(scoreRef.current, gameStateRef.current);
+            collisionProcessor?.tryVecnaReveal(scoreRef.current, gameStateRef.current);
           }
           diag.noteEvent(event.type);
           if (event.type === "DRAIN") diag.noteReset("drain");
@@ -920,6 +940,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           bumperVisuals?.onGameEvent(event);
           garlandLights?.onGameEvent(event);
           demogorgonReveal?.onGameEvent(event);
+          vecnaReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
           if (
@@ -928,6 +949,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           ) {
             collisionProcessor?.resetDemogorgonFight();
             demogorgonReveal?.endFight();
+            collisionProcessor?.resetVecnaFight();
+            vecnaReveal?.endFight();
           }
           if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
             if (
@@ -941,6 +964,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (event.type === "PORTAL_TRANSITION_END") {
             upsideDownPortal?.reset();
             collisionProcessor?.resetPortalTrigger();
+            collisionProcessor?.onUpsideDownEntered(scoreRef.current);
           }
           if (event.type === "BALL_LAUNCHED") {
             collisionProcessor?.resetPortalTrigger();
@@ -1077,6 +1101,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                   resetGame();
                   collisionProcessor?.resetDemogorgonFight();
                   demogorgonReveal?.endFight();
+                  collisionProcessor?.resetVecnaFight();
+                  vecnaReveal?.endFight();
                   upsideDownPortal?.reset();
                   upsideDownAtmosphere?.reset();
                   if (ballMesh) ballMesh.visible = true;
@@ -1113,6 +1139,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 resetGame();
                 collisionProcessor?.resetDemogorgonFight();
                 demogorgonReveal?.endFight();
+                collisionProcessor?.resetVecnaFight();
+                vecnaReveal?.endFight();
                 upsideDownPortal?.reset();
                 upsideDownAtmosphere?.reset();
                 if (ballMesh) ballMesh.visible = true;
@@ -1250,6 +1278,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       bumperVisuals?.update(dt);
       garlandLights?.update(dt);
       demogorgonReveal?.update(dt);
+      vecnaReveal?.update(dt);
       upsideDownAtmosphere?.update(dt);
       upsideDownPortal?.update(dt);
 
@@ -1512,6 +1541,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       bumperVisuals?.dispose();
       garlandLights?.dispose();
       demogorgonReveal?.dispose();
+      vecnaReveal?.dispose();
       upsideDownPortal?.dispose();
       upsideDownTransition?.dispose();
       upsideDownAtmosphere?.dispose();
@@ -1553,6 +1583,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           onResetBall={handleResetBall}
           initialLives={INITIAL_LIVES}
           demogorgonHud={demogorgonHud}
+          vecnaHud={vecnaHud}
           scorePops={scorePops}
           upsideDownActive={upsideDownActive}
           upsideDownHint={upsideDownHint}

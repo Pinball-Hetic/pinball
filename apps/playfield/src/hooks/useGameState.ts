@@ -2,8 +2,10 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   INITIAL_LIVES,
   DEMOGORGON_TARGET_HITS,
+  VECNA_TARGET_HITS,
   BUMPER_POSITIONS,
   DEMOGORGON_TARGET,
+  VECNA_TARGET,
   PORTAL_UPSIDE_DOWN,
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
@@ -26,6 +28,12 @@ export type DemogorgonHud = {
   hits: number;
   victory: boolean;
   elevenFlash: boolean;
+};
+
+export type VecnaHud = {
+  active: boolean;
+  hits: number;
+  victory: boolean;
 };
 
 export interface ScoringCallbacks {
@@ -67,6 +75,12 @@ const initialDemogorgonHud = (): DemogorgonHud => ({
   elevenFlash: false,
 });
 
+const initialVecnaHud = (): VecnaHud => ({
+  active: false,
+  hits: 0,
+  victory: false,
+});
+
 export function useGameState(callbacks?: ScoringCallbacks) {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(INITIAL_LIVES);
@@ -75,6 +89,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const [multiplier, setMultiplier] = useState(1);
   const [player, setPlayer] = useState<string>(() => generatePlayerName());
   const [demogorgonHud, setDemogorgonHud] = useState<DemogorgonHud>(initialDemogorgonHud);
+  const [vecnaHud, setVecnaHud] = useState<VecnaHud>(initialVecnaHud);
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
   const [upsideDownActive, setUpsideDownActive] = useState(false);
   const [upsideDownHint, setUpsideDownHint] = useState(false);
@@ -89,6 +104,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const lastEventTimeRef = useRef(0);
   const playerRef = useRef(player);
   const victoryTimerRef = useRef<number | null>(null);
+  const vecnaVictoryTimerRef = useRef<number | null>(null);
   const elevenTimerRef = useRef<number | null>(null);
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
@@ -141,11 +157,20 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     setUpsideDownHint(false);
   }, []);
 
+  const clearVecnaHud = useCallback(() => {
+    if (vecnaVictoryTimerRef.current !== null) {
+      window.clearTimeout(vecnaVictoryTimerRef.current);
+      vecnaVictoryTimerRef.current = null;
+    }
+    setVecnaHud(initialVecnaHud());
+  }, []);
+
   const clearUpsideDownSession = useCallback(() => {
     clearUpsideDownHint();
+    clearVecnaHud();
     callbacks?.onAtmosphereChange?.(false);
     setUpsideDownActive(false);
-  }, [clearUpsideDownHint, callbacks]);
+  }, [clearUpsideDownHint, clearVecnaHud, callbacks]);
 
   const clearDemogorgonHud = useCallback(() => {
     if (victoryTimerRef.current !== null) {
@@ -209,6 +234,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     setPlayer(newName);
     playerRef.current = newName;
     clearDemogorgonHud();
+    clearVecnaHud();
     clearScorePops();
     clearUpsideDownSession();
     updateGameState("idle");
@@ -283,6 +309,38 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         }
         setDemogorgonHud({ active: true, hits: 0, victory: false, elevenFlash: false });
       }
+      if (event.type === "VECNA_TARGET_HIT") {
+        const point = jitterScreenPoint(
+          playfieldToScreenPercent(VECNA_TARGET.x, VECNA_TARGET.z),
+          4,
+        );
+        pushScorePop({
+          amount: event.scoreIncrement * multiplierRef.current,
+          x: point.x,
+          y: point.y,
+          tone: "target",
+        });
+        const victory = event.hitCount >= VECNA_TARGET_HITS;
+        setVecnaHud((prev) => ({
+          ...prev,
+          active: true,
+          hits: event.hitCount,
+          victory,
+        }));
+        if (victory) {
+          vecnaVictoryTimerRef.current = window.setTimeout(() => {
+            vecnaVictoryTimerRef.current = null;
+            setVecnaHud(initialVecnaHud());
+          }, 1600);
+        }
+      }
+      if (event.type === "VECNA_REVEAL") {
+        if (vecnaVictoryTimerRef.current !== null) {
+          window.clearTimeout(vecnaVictoryTimerRef.current);
+          vecnaVictoryTimerRef.current = null;
+        }
+        setVecnaHud({ active: true, hits: 0, victory: false });
+      }
       if (event.type === "ELEVEN_ASSIST") {
         setDemogorgonHud((prev) => ({
           ...prev,
@@ -306,6 +364,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         handleDrain(hideBall);
         if (livesRef.current <= 0) {
           clearDemogorgonHud();
+          clearVecnaHud();
         }
       }
       if (event.type === "DROP_TARGET_COMPLETE") {
@@ -358,6 +417,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     multiplierRef,
     playerRef,
     demogorgonHud,
+    vecnaHud,
     scorePops,
     upsideDownActive,
     upsideDownHint,
