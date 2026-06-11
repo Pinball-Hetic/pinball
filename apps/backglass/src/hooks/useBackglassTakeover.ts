@@ -24,12 +24,23 @@ export interface Takeover {
   clip?: CinematicClip
 }
 
+// Chaînage : la scène suivante n'est poussée qu'à l'expiration de la
+// courante (sa durée démarre alors). Le modèle pile-à-priorités préempte
+// mais ne séquence pas — followUp ajoute le séquençage.
+interface FollowUp {
+  scene: TakeoverScene
+  durationMs: number
+  priority?: number
+  payload?: GameOver & { rank: number }
+}
+
 interface StackEntry {
   scene: TakeoverScene
   priority: number
   expiresAt: number
   payload?: GameOver & { rank: number }
   clip?: CinematicClip
+  followUp?: FollowUp
 }
 
 
@@ -135,18 +146,15 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       lastGameOverRef.current = payload
 
       if (isHigh) {
+        // HIGH_SCORE puis RECAP CHAÎNÉ : le recap ne démarre qu'à
+        // l'expiration du high score (followUp), pas en parallèle masqué.
+        // Le payload (stats) voyage dans l'entry → pas écrasé par un event.
         stackRef.current.push({
           scene: 'HIGH_SCORE',
           priority: 100,
           expiresAt: now + HIGH_SCORE_MS,
           payload,
-        })
-        // RECAP enchaîné APRÈS le HIGH_SCORE
-        stackRef.current.push({
-          scene: 'RECAP',
-          priority: 80,
-          expiresAt: now + HIGH_SCORE_MS + RECAP_MS,
-          payload,
+          followUp: { scene: 'RECAP', durationMs: 10_000, priority: 80, payload },
         })
         pushJoyce(data.player)
       } else {
@@ -230,11 +238,27 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       const expiring = stackRef.current.filter((e) => e.expiresAt <= now)
       stackRef.current = stackRef.current.filter((e) => e.expiresAt > now)
 
-      // un HIGH_SCORE qui vient d'expirer → surbrillance de la ligne
+      // Chaînage : une scène qui expire avec un followUp pousse la suivante
+      // MAINTENANT (sa durée démarre ici, plus de masquage).
+      for (const e of expiring) {
+        if (e.followUp) {
+          stackRef.current.push({
+            scene: e.followUp.scene,
+            priority: e.followUp.priority ?? 80,
+            expiresAt: now + e.followUp.durationMs,
+            payload: e.followUp.payload,
+          })
+        }
+      }
+
+      // un HIGH_SCORE qui vient d'expirer → surbrillance de la ligne. Si un
+      // followUp (RECAP) suit, on prolonge la surbrillance pour qu'elle
+      // survive au recap et reste visible sur la scène de base.
       const highExpired = expiring.find((e) => e.scene === 'HIGH_SCORE')
       if (highExpired?.payload) {
         highlightRankRef.current = highExpired.payload.rank
-        highlightUntilRef.current = now + HIGHLIGHT_MS
+        const extra = highExpired.followUp ? highExpired.followUp.durationMs : 0
+        highlightUntilRef.current = now + extra + HIGHLIGHT_MS
       }
       if (highlightUntilRef.current && now > highlightUntilRef.current) {
         highlightUntilRef.current = 0
