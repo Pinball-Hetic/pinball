@@ -79,13 +79,12 @@ const HIDDEN_NODES = new Set([
   'switch_right_pop_bumper_zone', 'switch right pop bumper zone',
   'switch_rocket', 'switch rocket',
   'switch_slingshot', 'switch slingshot',
-  'spinner',
   'switch_out', 'switch out',
 ]);
 
 const EXCLUDED_NODES = new Set([
   'ball', 'box', 'glass', 'feet', 'score_board', 'coin_slot',
-  'exit_cover', 'plate', 'start_button', 'spinner',
+  'exit_cover', 'plate', 'start_button',
   'drop_target_left_1', 'drop_target_left_2',
   'drop_target_right_1', 'drop_target_right_2', 'drop_target_right_3',
   'switch_out', 'switch_center_pop_bumper_zone', 'switch_left_pop_bumper_zone',
