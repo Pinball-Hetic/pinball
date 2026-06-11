@@ -40,6 +40,7 @@ export default function DmdCanvas({ display, upsideDown }: Props) {
     const renderer = new DmdRenderer(canvas)
     const rain = new MatrixRain(GRID_W, GRID_H)
     let prevMode = displayRef.current.mode
+    let modeStartedAt = performance.now()
     let glitchUntil = 0
     let burstUntil = 0
     let raf = 0
@@ -49,19 +50,25 @@ export default function DmdCanvas({ display, upsideDown }: Props) {
 
       // Triggers d'effets sur changement de mode.
       if (d.mode !== prevMode) {
+        modeStartedAt = now
         if (d.mode === 'EVENT' || d.mode === 'COMBO_FLASH') glitchUntil = now + GLITCH_MS
         if (d.mode === 'GAME_OVER') burstUntil = now + BURST_MS
         prevMode = d.mode
       }
 
+      const cinematic = d.mode === 'CINEMATIC'
+      // CINEMATIC : horloge relative à l'arrivée du mode (frames du clip).
+      const clock = cinematic ? now - modeStartedAt : now
+
       renderer.setPalette(upsideDownRef.current ? 'upsideDown' : 'normal')
       renderer.clearGrid()
-      layouts[d.mode](renderer.grid, d, now)
+      layouts[d.mode](renderer.grid, d, clock)
       if (upsideDownRef.current) rain.drawBackground(renderer.grid)
-      if (now < glitchUntil) {
+      // Glitch/burst NE s'appliquent PAS pendant un clip (il se suffit).
+      if (!cinematic && now < glitchUntil) {
         applyGlitch(renderer.grid, GRID_W, GRID_H, (glitchUntil - now) / GLITCH_MS)
       }
-      if (now < burstUntil) {
+      if (!cinematic && now < burstUntil) {
         rain.drawBurst(renderer.grid, (burstUntil - now) / BURST_MS)
       }
       renderer.render()

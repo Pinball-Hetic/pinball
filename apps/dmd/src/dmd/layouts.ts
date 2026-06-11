@@ -3,6 +3,7 @@ import { FONT_5X7, FONT_12X22, drawText, measureText } from './fonts'
 import { GRID_W } from './DmdRenderer'
 import { DOT } from './palette'
 import { attractFrame } from './attract'
+import { CLIPS, drawClipFrame } from './AsciiClipPlayer'
 
 const TOTAL_LIVES = 3
 
@@ -109,11 +110,35 @@ function layoutGameOver(grid: Uint8Array, display: DmdDisplay, clockMs: number):
   }
 }
 
-// Placeholder no-op : le rendu réel des clips arrive en P15 (AsciiClipPlayer).
+// clockMs = temps écoulé depuis l'arrivée du mode CINEMATIC (le DmdCanvas
+// passe l'elapsed pour ce mode, pas l'horloge absolue).
 function layoutCinematic(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
-  void grid
-  void display
-  void clockMs
+  const d = display as Variant<'CINEMATIC'>
+  const clip = CLIPS[d.clip]
+
+  if (d.clip === 'hall_of_fame') {
+    // 3.5s de cadre étoilé, puis le compteur roule de 0 au score en 1.5s.
+    if (clockMs < 3500) {
+      drawClipFrame(grid, clip, clockMs)
+      drawCentered(grid, 'HALL OF FAME', 13, FONT_5X7, DOT.marquee)
+    } else {
+      const t = Math.min(1, (clockMs - 3500) / 1500)
+      const eased = 1 - Math.pow(1 - t, 3)
+      const shown = Math.round(d.score * eased)
+      drawCentered(grid, 'HALL OF FAME', 2, FONT_5X7, DOT.marquee)
+      drawCentered(grid, String(shown), 11, FONT_12X22, DOT.score)
+    }
+    return
+  }
+
+  drawClipFrame(grid, clip, clockMs)
+  // Textes lisibles par-dessus (police réelle).
+  if (d.clip === 'demogorgon_slain' && clockMs > 1400) {
+    drawCentered(grid, 'VAINCU', 12, FONT_5X7, DOT.event, 1, 2)
+  }
+  if (d.clip === 'last_chance') {
+    drawCentered(grid, 'DERNIERE VIE', 25, FONT_5X7, DOT.lives)
+  }
 }
 
 export const layouts: Record<DmdDisplay['mode'], LayoutFn> = {
