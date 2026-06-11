@@ -33,9 +33,9 @@ interface StackEntry {
 
 // Durées alignées avec le playfield/DMD (synchro 3 écrans).
 const CLIP_DURATIONS: Record<CinematicClip, number> = {
-  demogorgon_rises: 2500,
+  demogorgon_rises: 4000,
   portal_swallow: 4000,
-  demogorgon_slain: 2000,
+  demogorgon_slain: 3500,
   last_chance: 1200,
   hall_of_fame: 7000,
 }

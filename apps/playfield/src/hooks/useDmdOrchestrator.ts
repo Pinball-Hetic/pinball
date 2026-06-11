@@ -38,9 +38,9 @@ const DURATIONS = {
 // Durées des clips cinématiques (alignées avec le CinematicDirector côté
 // playfield → les 3 écrans restent synchronisés).
 const CLIP_DURATIONS: Record<CinematicClip, number> = {
-  demogorgon_rises: 2500,
+  demogorgon_rises: 4000,
   portal_swallow: 4000,
-  demogorgon_slain: 2000,
+  demogorgon_slain: 3500,
   last_chance: 1200,
   hall_of_fame: 7000,
 };

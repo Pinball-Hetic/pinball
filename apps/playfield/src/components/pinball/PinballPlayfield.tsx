@@ -961,13 +961,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (event.type === "DEMOGORGON_REVEAL") {
             // 1er reveau de la partie → pause 2.5s. Reveals suivants : refusé
             // (once) → le strobe court de DemogorgonReveal suffit.
-            playCinematic("demogorgon_rises", 2500, true, { once: true });
+            playCinematic("demogorgon_rises", 4000, true, { once: true });
           }
           if (
             event.type === "DEMOGORGON_TARGET_HIT"
             && event.hitCount >= DEMOGORGON_TARGET_HITS
           ) {
-            playCinematic("demogorgon_slain", 2000, true, {
+            playCinematic("demogorgon_slain", 3500, true, {
               // Reprise "avec un bang" : impulse radial depuis le target.
               onEnd: () =>
                 ballPhysicsInst?.applyEjectionForce({
