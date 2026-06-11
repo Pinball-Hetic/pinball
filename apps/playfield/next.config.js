@@ -8,7 +8,7 @@ const nextConfig = {
   skipTrailingSlashRedirect: true,
   reactStrictMode: true,
   turbopack: { root: '../..' },
-  transpilePackages: ['@pinball/game-engine'],
+  transpilePackages: ['@pinball/game-engine', '@pinball/shared-types'],
   async rewrites() {
     return [
       {

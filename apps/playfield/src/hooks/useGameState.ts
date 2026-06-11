@@ -43,10 +43,34 @@ export interface ScoringCallbacks {
   onGameStart?: () => void;
   onIdleReset?: () => void;
   onAtmosphereChange?: (upsideDownActive: boolean) => void;
+  onMilestone?: (threshold: number) => void;
+  onHeticLetter?: (letterIndex: number) => void; // 1-4
+  onHeticComplete?: () => void;
+  onFeverEnd?: () => void;
 }
 
 const COMBO_DECAY_MS = 2000;
 const MULTIPLIER_THRESHOLDS = [5, 10, 20, 40] as const;
+
+const MILESTONES = [5_000, 15_000, 30_000];
+const MILESTONE_REPEAT_EVERY = 25_000; // au-delà de 50k
+
+// Plus haut seuil de {5k,15k,30k,50k,75k,100k,…} franchi entre prev et next.
+// Marque TOUS les seuils franchis dans `passed` (sinon les seuils intermédiaires
+// non retournés re-déclencheraient au prochain event) et renvoie le plus haut.
+function nextMilestone(prev: number, next: number, passed: Set<number>): number | null {
+  let crossed: number | null = null;
+  const mark = (m: number) => {
+    if (m > prev && m <= next && !passed.has(m)) {
+      passed.add(m);
+      if (crossed === null || m > crossed) crossed = m;
+    }
+  };
+  for (const m of MILESTONES) mark(m);
+  // Répétition tous les 25k au-delà de 50k.
+  for (let m = 50_000; m <= next; m += MILESTONE_REPEAT_EVERY) mark(m);
+  return crossed;
+}
 
 function computeMultiplier(combo: number): number {
   if (combo < MULTIPLIER_THRESHOLDS[0]) return 1;
@@ -69,6 +93,12 @@ const initialDemogorgonHud = (): DemogorgonHud => ({
 });
 
 export function useGameState(callbacks?: ScoringCallbacks) {
+  // `callbacks` est un objet littéral recréé à chaque render → on le lit via
+  // un ref pour ne PAS remettre l'interval 250ms (decay combo + expiration
+  // fever) à zéro à chaque render (sinon il pourrait ne jamais se déclencher).
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks;
+
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(INITIAL_LIVES);
   const [gameState, setGameState] = useState<GameState>("idle");
@@ -80,8 +110,11 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const [upsideDownActive, setUpsideDownActive] = useState(false);
   const [upsideDownHint, setUpsideDownHint] = useState(false);
   const [hetic, setHetic] = useState(0);
+  const [fever, setFever] = useState(false);
 
   const heticRef = useRef(0);
+  const milestonesPassedRef = useRef<Set<number>>(new Set());
+  const feverUntilRef = useRef(0);
   const scoreRef = useRef(0);
   const livesRef = useRef(INITIAL_LIVES);
   const gameStateRef = useRef<GameState>("idle");
@@ -118,9 +151,22 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         setCombo(0);
         setMultiplier(1);
       }
+      // Expiration du fever
+      if (feverUntilRef.current && performance.now() > feverUntilRef.current) {
+        feverUntilRef.current = 0;
+        setFever(false);
+        callbacksRef.current?.onFeverEnd?.();
+      }
     }, 250);
     return () => window.clearInterval(tick);
   }, []);
+
+  const isFeverActive = () => performance.now() < feverUntilRef.current;
+
+  const startFever = (durationMs: number) => {
+    feverUntilRef.current = performance.now() + durationMs;
+    setFever(true);
+  };
 
   const clearScorePops = useCallback(() => {
     for (const timer of scorePopTimersRef.current.values()) {
@@ -222,6 +268,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     setMultiplier(1);
     heticRef.current = 0;
     setHetic(0);
+    milestonesPassedRef.current.clear();
+    feverUntilRef.current = 0;
+    setFever(false);
     lastEventTimeRef.current = 0;
     maxComboRef.current = 0;
     maxMultiplierRef.current = 1;
@@ -251,7 +300,11 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           maxMultiplierRef.current,
           multiplierRef.current,
         );
-        const finalPoints = event.scoreIncrement * multiplierRef.current;
+        // En fever le multiplier effectif est forcé à 5 (combo continue
+        // de compter en arrière-plan).
+        const mult = isFeverActive() ? 5 : multiplierRef.current;
+        const finalPoints = event.scoreIncrement * mult;
+        const prevScore = scoreRef.current;
         scoreRef.current += finalPoints;
         setScore(scoreRef.current);
 
@@ -263,6 +316,10 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           previousMultiplier: comboChange.prevMult,
           newMultiplier: multiplierRef.current,
         });
+
+        // Paliers de score (nextMilestone marque déjà tous les seuils franchis)
+        const crossed = nextMilestone(prevScore, scoreRef.current, milestonesPassedRef.current);
+        if (crossed) callbacks?.onMilestone?.(crossed);
       }
       if (event.type === "BUMPER_HIT") {
         const bumper = BUMPER_POSITIONS[event.bumperIndex];
@@ -338,9 +395,16 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         }
       }
       if (event.type === "DROP_TARGET_COMPLETE") {
+        heticRef.current += 1;
+        setHetic(heticRef.current);
         if (heticRef.current < 5) {
-          heticRef.current += 1;
-          setHetic(heticRef.current);
+          callbacks?.onHeticLetter?.(heticRef.current); // 1..4
+        } else {
+          // complete émis AVANT le reset (snapshot montre encore 5/5), puis
+          // la boucle redevient collectable (re-jouable).
+          callbacks?.onHeticComplete?.();
+          heticRef.current = 0;
+          setHetic(0);
         }
       }
       if (event.type === "BALL_LAUNCHED") {
@@ -394,6 +458,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     upsideDownHint,
     hetic,
     heticRef,
+    fever,
+    isFeverActive,
+    startFever,
     clearUpsideDownSession,
     resetGame,
     buildEmit,

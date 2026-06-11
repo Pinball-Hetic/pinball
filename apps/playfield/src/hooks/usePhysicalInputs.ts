@@ -3,6 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   ButtonInput,
   ClientToServerEvents,
+  DevGameEventTrigger,
   SensorInput,
   ServerToClientEvents,
   TiltInput,
@@ -12,6 +13,8 @@ export interface PhysicalInputCallbacks {
   onButton?: (data: ButtonInput) => void;
   onTilt?: (data: TiltInput) => void;
   onSensor?: (data: SensorInput) => void;
+  // Injection d'un GameEvent depuis la page /debug (chaîne complète).
+  onDevEvent?: (data: DevGameEventTrigger) => void;
 }
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -58,6 +61,7 @@ export function usePhysicalInputs(): UsePhysicalInputs {
     socket.on('input:button', (data) => callbacksRef.current.onButton?.(data));
     socket.on('input:tilt', (data) => callbacksRef.current.onTilt?.(data));
     socket.on('input:sensor', (data) => callbacksRef.current.onSensor?.(data));
+    socket.on('dev:trigger-game-event', (data) => callbacksRef.current.onDevEvent?.(data));
 
     return () => {
       socket.disconnect();

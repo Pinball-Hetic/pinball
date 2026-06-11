@@ -83,6 +83,11 @@ io.on('connection', (socket) => {
   socket.on('game:over', async (data) => {
     console.log('[server] game:over', data.player, 'final=', data.finalScore);
     io.emit('game:over', data); // relay inchangé (DMD, backglass)
+    // Game over déclenché depuis /debug : relay seul, pas de persistence.
+    if (data.debug === true) {
+      console.log('[server] game:over [debug skip] — pas de persistence');
+      return;
+    }
     try {
       await recordGame(data);
       io.emit('leaderboard:refresh', await topTen());
@@ -95,6 +100,11 @@ io.on('connection', (socket) => {
   socket.on('dmd:display', (data) => {
     console.log('[server] dmd:display', data.mode);
     io.emit('dmd:display', data);
+  });
+
+  socket.on('dev:trigger-game-event', (data) => {
+    console.log('[server] dev:trigger-game-event', data.type);
+    io.emit('dev:trigger-game-event', data);
   });
 
   socket.on('disconnect', () => {

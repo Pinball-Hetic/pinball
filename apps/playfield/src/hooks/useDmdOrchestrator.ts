@@ -8,6 +8,7 @@ import type {
   GameStats,
   CinematicClip,
 } from '@pinball/shared-types';
+import { CLIP_SHOW_MS, CLIP_TAKEOVER_MS } from '@pinball/shared-types';
 import type { GameEvent } from '@pinball/game-engine';
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -35,15 +36,6 @@ const DURATIONS = {
   MULTI_FLASH: 1500,
 } as const;
 
-// Durées des clips cinématiques (alignées avec le CinematicDirector côté
-// playfield → les 3 écrans restent synchronisés).
-const CLIP_DURATIONS: Record<CinematicClip, number> = {
-  demogorgon_rises: 4000,
-  portal_swallow: 4000,
-  demogorgon_slain: 3500,
-  last_chance: 1200,
-  hall_of_fame: 7000,
-};
 
 // upsideDown est injecté au moment de l'emit (atmosphereRef) — la stack
 // stocke les displays sans ce champ. Omit distributif sur l'union.
@@ -65,7 +57,7 @@ export interface DmdOrchestrator {
   emitGameStart: (player: string) => void;
   emitGameOver: (player: string, finalScore: number, stats: GameStats) => void;
   // Clip cinématique plein écran (prio max) — synchro avec playfield/backglass.
-  pushCinematic: (clip: CinematicClip) => void;
+  pushCinematic: (clip: CinematicClip, value?: number) => void;
   // DMD high-level : push une display, l'orchestrator décide quoi montrer
   pushIntro: (player: string) => void;
   pushScore: (s: ScoreUpdate) => void;
@@ -185,6 +177,7 @@ export function useDmdOrchestrator(): DmdOrchestrator {
           lives: snap.lives,
           player: snap.player,
           hetic: snap.hetic,
+          fever: snap.fever,
         },
         { priority: PRIO.COMBO_FLASH, duration: DURATIONS.COMBO_FLASH },
       ),
@@ -199,6 +192,7 @@ export function useDmdOrchestrator(): DmdOrchestrator {
           lives: snap.lives,
           player: snap.player,
           hetic: snap.hetic,
+          fever: snap.fever,
         },
         { priority: PRIO.MULTI_FLASH, duration: DURATIONS.MULTI_FLASH },
       ),
@@ -223,11 +217,12 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       );
     },
 
-    pushCinematic: (clip) => {
+    pushCinematic: (clip, value) => {
       const { player, score } = lastSnapRef.current;
       push(
-        { mode: 'CINEMATIC', clip, player, score },
-        { priority: PRIO.CINEMATIC, duration: CLIP_DURATIONS[clip] },
+        { mode: 'CINEMATIC', clip, player, score, value },
+        // Segment plein écran : le mode SCORE reprend après (fever en SCORE).
+        { priority: PRIO.CINEMATIC, duration: CLIP_TAKEOVER_MS[clip] ?? CLIP_SHOW_MS[clip] },
       );
     },
 
