@@ -156,7 +156,7 @@ function clipMilestone15k(grid: Uint8Array, value: number, ms: number): void {
   } else {
     drawCentered(grid, fmtNum(value), 0, FONT_5X7, DOT.score, 1, 1)
     for (let i = 0; i < 14; i++) {
-      plot(grid, seeded(i + ms / 200) * GRID_W, seeded(i * 3) * GRID_H, DOT.event)
+      plot(grid, seeded(i + Math.floor(ms / 200)) * GRID_W, seeded(i * 3) * GRID_H, DOT.event)
     }
   }
 }

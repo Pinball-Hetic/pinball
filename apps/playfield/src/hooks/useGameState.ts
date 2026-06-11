@@ -56,17 +56,19 @@ const MILESTONES = [5_000, 15_000, 30_000];
 const MILESTONE_REPEAT_EVERY = 25_000; // au-delà de 50k
 
 // Plus haut seuil de {5k,15k,30k,50k,75k,100k,…} franchi entre prev et next.
+// Marque TOUS les seuils franchis dans `passed` (sinon les seuils intermédiaires
+// non retournés re-déclencheraient au prochain event) et renvoie le plus haut.
 function nextMilestone(prev: number, next: number, passed: Set<number>): number | null {
   let crossed: number | null = null;
-  for (const m of MILESTONES) {
-    if (m > prev && m <= next && !passed.has(m)) crossed = m;
-  }
+  const mark = (m: number) => {
+    if (m > prev && m <= next && !passed.has(m)) {
+      passed.add(m);
+      if (crossed === null || m > crossed) crossed = m;
+    }
+  };
+  for (const m of MILESTONES) mark(m);
   // Répétition tous les 25k au-delà de 50k.
-  let m = 50_000;
-  while (m <= next) {
-    if (m > prev && !passed.has(m)) crossed = m;
-    m += MILESTONE_REPEAT_EVERY;
-  }
+  for (let m = 50_000; m <= next; m += MILESTONE_REPEAT_EVERY) mark(m);
   return crossed;
 }
 
@@ -91,6 +93,12 @@ const initialDemogorgonHud = (): DemogorgonHud => ({
 });
 
 export function useGameState(callbacks?: ScoringCallbacks) {
+  // `callbacks` est un objet littéral recréé à chaque render → on le lit via
+  // un ref pour ne PAS remettre l'interval 250ms (decay combo + expiration
+  // fever) à zéro à chaque render (sinon il pourrait ne jamais se déclencher).
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks;
+
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(INITIAL_LIVES);
   const [gameState, setGameState] = useState<GameState>("idle");
@@ -147,11 +155,11 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       if (feverUntilRef.current && performance.now() > feverUntilRef.current) {
         feverUntilRef.current = 0;
         setFever(false);
-        callbacks?.onFeverEnd?.();
+        callbacksRef.current?.onFeverEnd?.();
       }
     }, 250);
     return () => window.clearInterval(tick);
-  }, [callbacks]);
+  }, []);
 
   const isFeverActive = () => performance.now() < feverUntilRef.current;
 
@@ -309,12 +317,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           newMultiplier: multiplierRef.current,
         });
 
-        // Paliers de score
+        // Paliers de score (nextMilestone marque déjà tous les seuils franchis)
         const crossed = nextMilestone(prevScore, scoreRef.current, milestonesPassedRef.current);
-        if (crossed) {
-          milestonesPassedRef.current.add(crossed);
-          callbacks?.onMilestone?.(crossed);
-        }
+        if (crossed) callbacks?.onMilestone?.(crossed);
       }
       if (event.type === "BUMPER_HIT") {
         const bumper = BUMPER_POSITIONS[event.bumperIndex];

@@ -194,6 +194,10 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
             break
           case 'hetic_complete':
             pushTk(8_000) // +30s de fever pilotées par display.fever
+            // Le fever démarre dès le clip : pendant les 8s de CINEMATIC
+            // aucun display SCORE (porteur de fever) n'arrive, donc on
+            // l'active ici pour que la bordure/heat-lock ne soit pas en retard.
+            feverRef.current = true
             break
           default:
             // demogorgon_rises/slain, portal_swallow, last_chance, hall_of_fame
