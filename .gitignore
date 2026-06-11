@@ -50,3 +50,6 @@ Thumbs.db
 
 # Project specific
 .gemini/
+
+# DB backups (dumps locaux du leaderboard)
+backups/

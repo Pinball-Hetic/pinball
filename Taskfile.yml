@@ -26,6 +26,28 @@ tasks:
     cmds:
       - docker restart pinball-playfield-dev pinball-server-dev pinball-db-dev pinball-dmd-dev pinball-backglass-dev
 
+  "db:dump":
+    desc: Dump DB prod (format custom) dans ./backups/
+    cmds:
+      - mkdir -p backups
+      - docker compose exec -T db pg_dump -U user -Fc pinball > backups/pinball-$(date +%Y-%m-%d_%H-%M).dump
+
+  "db:restore":
+    desc: "Restaure : task db:restore -- backups/pinball-XXX.dump"
+    cmds:
+      - docker compose exec -T db pg_restore -U user -d pinball --clean --if-exists < {{.CLI_ARGS}}
+
+  "db:dump:dev":
+    desc: Dump DB dev
+    cmds:
+      - mkdir -p backups
+      - docker compose -f docker-compose.dev.yml exec -T db pg_dump -U dev_user -Fc pinball_dev > backups/pinball-dev-$(date +%Y-%m-%d_%H-%M).dump
+
+  "db:restore:dev":
+    desc: "Restaure dev : task db:restore:dev -- backups/XXX.dump"
+    cmds:
+      - docker compose -f docker-compose.dev.yml exec -T db pg_restore -U dev_user -d pinball_dev --clean --if-exists < {{.CLI_ARGS}}
+
   clean:
     desc: Supprimer artefacts de build et node_modules
     cmds:
