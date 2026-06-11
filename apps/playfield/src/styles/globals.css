@@ -36,3 +36,49 @@ body {
 .score-pop-rise {
   animation: score-pop-rise 0.88s ease-out forwards;
 }
+
+/* ===================== Overlays cinématiques (fallback CSS) ===================== */
+.cine-fallback {
+  position: absolute;
+  inset: 0;
+}
+/* demogorgon_* : pulsation rouge radiale. */
+.cine-fallback-demogorgon {
+  background: radial-gradient(ellipse at 50% 45%, rgba(255, 30, 30, 0.55), transparent 60%);
+  animation: cine-fb-pulse 1.1s ease-in-out infinite;
+}
+@keyframes cine-fb-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.05); }
+}
+/* milestone_* : rayons dorés rotatifs. */
+.cine-fallback-milestone {
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 200, 70, 0.0) 0deg,
+    rgba(255, 200, 70, 0.45) 20deg,
+    rgba(255, 200, 70, 0.0) 40deg,
+    rgba(255, 200, 70, 0.0) 180deg,
+    rgba(255, 200, 70, 0.45) 200deg,
+    rgba(255, 200, 70, 0.0) 220deg
+  );
+  animation: cine-fb-spin 3s linear infinite;
+}
+@keyframes cine-fb-spin {
+  to { transform: rotate(360deg); }
+}
+/* hetic_* : balayage de lettres en filigrane. */
+.cine-fallback-hetic {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 200, 70, 0.12) 0 2px, transparent 2px 60px);
+  background-size: 200% 100%;
+  animation: cine-fb-sweep 2.5s linear infinite;
+}
+@keyframes cine-fb-sweep {
+  0% { background-position: 0 0; }
+  100% { background-position: 200% 0; }
+}
+.cine-fallback-other {
+  background: radial-gradient(ellipse at 50% 50%, rgba(180, 80, 255, 0.4), transparent 60%);
+  animation: cine-fb-pulse 1.4s ease-in-out infinite;
+}

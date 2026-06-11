@@ -134,6 +134,7 @@ import {
   unlockPinballAudio,
 } from "@/audio/pinballAudio";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
+import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 
 const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
@@ -349,6 +350,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
   const [debugSnapshot, setDebugSnapshot] = useState<BallDiagnosticsSnapshot | null>(null);
   const [debugVisible, setDebugVisible] = useState(false);
+  // Overlay cinématique DOM (un re-render par cinématique, pas par frame).
+  const [cinematicClip, setCinematicClip] = useState<CinematicClip | null>(null);
   const debugVisibleRef = useRef(false);
 
   const [flipperPivotCoords, setFlipperPivotCoords] = useState<{
@@ -408,10 +411,19 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       // (freeze 0) → simple push DMD, le jeu continue.
       if (freezeMs > 0) {
         const accepted = cinematics.play(
-          { id: clip, durationMs: freezeMs, freezePhysics: true, onEnd: opts?.onEnd },
+          {
+            id: clip,
+            durationMs: freezeMs,
+            freezePhysics: true,
+            onEnd: () => {
+              setCinematicClip(null); // overlay DOM masqué à la reprise
+              opts?.onEnd?.();
+            },
+          },
           { once: opts?.once },
         );
         if (!accepted) return false;
+        setCinematicClip(clip); // overlay DOM visible pendant le gel
       } else {
         opts?.onEnd?.();
       }
@@ -1882,6 +1894,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             <div>z: {flipperPivotCoords.right.z}</div>
           </div>
         )}
+
+        <CinematicOverlay clip={cinematicClip} />
 
         <main
           ref={mountRef}
