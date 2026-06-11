@@ -64,6 +64,17 @@ export default function DebugPage() {
     upsideDown: udRef.current,
   })
 
+  const addScore = (amount: number) =>
+    socketRef.current?.emit('dev:trigger-game-event', { type: 'DEBUG_ADD_SCORE', amount })
+
+  const heticComplete = async () => {
+    for (let i = 0; i < 5; i++) {
+      triggerEvent('DROP_TARGET_COMPLETE')
+      // eslint-disable-next-line no-await-in-loop
+      await wait(400)
+    }
+  }
+
   // ── Partie simulée ─────────────────────────────────────────────────────
   const gameOverNormal = () =>
     socketRef.current?.emit('game:over', {
@@ -191,16 +202,49 @@ export default function DebugPage() {
           >
             GAME_OVER
           </Btn>
-          {(['demogorgon_rises', 'portal_swallow', 'demogorgon_slain', 'last_chance', 'hall_of_fame'] as const).map(
-            (clip) => (
-              <Btn
-                key={clip}
-                onClick={() => pushDisplay({ mode: 'CINEMATIC', clip, player: PLAYER, score, upsideDown: ud })}
-              >
-                CINEMATIC: {clip}
-              </Btn>
-            ),
-          )}
+          {(
+            [
+              ['demogorgon_rises'],
+              ['portal_swallow'],
+              ['demogorgon_slain'],
+              ['last_chance'],
+              ['hall_of_fame'],
+              ['milestone_5k', 5000],
+              ['milestone_15k', 15000],
+              ['milestone_30k', 30000],
+              ['milestone_big', 75000],
+              ['hetic_letter', 3],
+              ['hetic_complete'],
+              ['skill_shot'],
+            ] as const
+          ).map(([clip, value]) => (
+            <Btn
+              key={clip}
+              onClick={() =>
+                pushDisplay({ mode: 'CINEMATIC', clip, player: PLAYER, score, value, upsideDown: ud })
+              }
+            >
+              CINEMATIC: {clip}
+              {value != null ? ` (${value})` : ''}
+            </Btn>
+          ))}
+        </Group>
+
+        <Group title="Score & paliers">
+          <p className="text-xs text-amber-400 mb-2">
+            via la vraie chaîne (playfield ouvert) — franchit les paliers
+          </p>
+          <Btn onClick={() => addScore(1000)}>+1 000</Btn>
+          <Btn onClick={() => addScore(5000)}>+5 000</Btn>
+          <Btn onClick={() => addScore(15000)}>+15 000</Btn>
+          <Btn onClick={() => addScore(30000)}>+30 000</Btn>
+        </Group>
+
+        <Group title="HETIC">
+          <Btn onClick={() => triggerEvent('DROP_TARGET_COMPLETE')}>
+            LETTRE +1 (drop complete)
+          </Btn>
+          <Btn onClick={heticComplete}>HETIC COMPLET (×5)</Btn>
         </Group>
 
         <Group title="Partie simulée">
