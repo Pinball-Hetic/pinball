@@ -34,6 +34,7 @@ export * from './infrastructure/GltfDisplay';
 export * from './infrastructure/BumperVisuals';
 export * from './infrastructure/GarlandLights';
 export * from './infrastructure/DemogorgonReveal';
+export * from './infrastructure/CinematicDirector';
 export * from './infrastructure/CinematicEasing';
 export * from './infrastructure/CameraBillboardSprite';
 export * from './infrastructure/PlayfieldCinematicStrobe';
