@@ -15,9 +15,10 @@ import CinematicTakeover from '@/components/takeovers/CinematicTakeover'
 
 export default function BackglassPage() {
   const { entries, stats, connected } = useBackglassData()
-  const { takeover, upsideDown, highlightRank, agitation, joyce, holdHallFlip } =
+  const { takeover, upsideDown, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
     useBackglassTakeover(entries)
   const stageRef = useRef<HTMLDivElement>(null)
+  const goldWaveRef = useRef<HTMLDivElement>(null)
   const reactor = useIngameReactor(stageRef)
 
   // Réacteur in-game suspendu pendant un clip cinématique (il ne doit pas
@@ -25,6 +26,21 @@ export default function BackglassPage() {
   useEffect(() => {
     reactor.setSuspended(takeover?.scene === 'CINEMATIC')
   }, [reactor, takeover?.scene])
+
+  // FEVER : heat verrouillé à 1 (embrasement permanent) pendant l'état.
+  useEffect(() => {
+    reactor.setHeatLock(fever)
+  }, [reactor, fever])
+
+  // Onde dorée (milestones 5k/15k) — rejoue l'animation à chaque incrément.
+  useEffect(() => {
+    if (goldWaveId === 0) return
+    const el = goldWaveRef.current
+    if (!el) return
+    el.classList.remove('gold-wave-on')
+    void el.offsetWidth
+    el.classList.add('gold-wave-on')
+  }, [goldWaveId])
 
   // Scale-to-fit : la borne est en 1920×1080 exact (scale 1), mais on
   // s'adapte aux fenêtres dev plus petites sans casser le layout fixe.
@@ -41,10 +57,11 @@ export default function BackglassPage() {
   const sideAgitation = upsideDown ? 1 : Math.max(0.15, agitation)
 
   return (
-    <div className={`stage-fit ${upsideDown ? 'upside-down' : ''}`}>
+    <div className={`stage-fit ${upsideDown ? 'upside-down' : ''} ${fever ? 'fever' : ''}`}>
       <main className="stage" ref={stageRef}>
         <div className="vignette" style={{ opacity: 1 + agitation * 0.8 }} />
         <div className="vignette-heat" />
+        <div ref={goldWaveRef} className="gold-wave" />
 
         <header className="zone-header">
           <JoyceWall message={joyce.text} messageId={joyce.id} reactor={reactor} />

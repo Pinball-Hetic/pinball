@@ -17,6 +17,8 @@ export interface Reactor {
   getHeat: () => number
   // Suspend les réactions/heat (pendant un clip cinématique plein écran).
   setSuspended: (suspended: boolean) => void
+  // Verrouille le heat à 1 (état FEVER : embrasement permanent).
+  setHeatLock: (locked: boolean) => void
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
@@ -29,6 +31,7 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
   const heatRef = useRef(0)
   const lastScoreRef = useRef<number | null>(null)
   const suspendedRef = useRef(false)
+  const heatLockRef = useRef(false)
 
   const reactorRef = useRef<Reactor>({
     on: (cb) => {
@@ -40,6 +43,9 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
     getHeat: () => heatRef.current,
     setSuspended: (suspended) => {
       suspendedRef.current = suspended
+    },
+    setHeatLock: (locked) => {
+      heatLockRef.current = locked
     },
   })
 
@@ -96,7 +102,9 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
     let last: number | null = null
     let written = -1
     const loop = (t: number) => {
-      if (last !== null) {
+      if (heatLockRef.current) {
+        heatRef.current = 1 // FEVER : embrasement verrouillé
+      } else if (last !== null) {
         const dt = (t - last) / 1000
         heatRef.current = Math.max(0, heatRef.current - HEAT_DECAY * dt)
       }

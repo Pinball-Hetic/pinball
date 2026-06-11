@@ -47,6 +47,8 @@ interface TakeoverState {
   // true tant qu'un portal_swallow joue → on retarde le flip 3D du hall
   // of fame jusqu'à la fin du clip (synchro avec le bascule playfield).
   holdHallFlip: boolean
+  fever: boolean
+  goldWaveId: number // incrémenté → rejoue l'onde dorée (milestones 5k/15k)
 }
 
 const TICK_MS = 250
@@ -89,6 +91,8 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
   // Dernier game:over complet (avec stats + rang) — alimente le clip
   // hall_of_fame (HighScore/Recap), qui n'en reçoit pas via dmd:display.
   const lastGameOverRef = useRef<(GameOver & { rank: number }) | null>(null)
+  const feverRef = useRef(false)
+  const goldWaveRef = useRef(0)
 
   const [state, setState] = useState<TakeoverState>({
     takeover: null,
@@ -97,6 +101,8 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
     agitation: 0,
     joyce: { text: null, id: 0 },
     holdHallFlip: false,
+    fever: false,
+    goldWaveId: 0,
   })
 
   const pushJoyce = (text: string) => {
@@ -156,18 +162,45 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
 
     socket.on('dmd:display', (d) => {
       upsideDownRef.current = d.upsideDown ?? false
+      if ('fever' in d) feverRef.current = d.fever
       if (d.mode === 'CINEMATIC') {
         markActivity()
         const now = performance.now()
-        stackRef.current.push({
-          scene: 'CINEMATIC',
-          priority: 110,
-          expiresAt: now + CLIP_SHOW_MS[d.clip],
-          clip: d.clip,
-          payload: d.clip === 'hall_of_fame' ? lastGameOverRef.current ?? undefined : undefined,
-        })
-        if (d.clip === 'demogorgon_rises') pushJoyce('RUN')
-        if (d.clip === 'last_chance') pushJoyce('DERNIERE VIE')
+        const pushTk = (durationMs: number) =>
+          stackRef.current.push({
+            scene: 'CINEMATIC',
+            priority: 110,
+            expiresAt: now + durationMs,
+            clip: d.clip,
+            payload:
+              d.clip === 'hall_of_fame' ? lastGameOverRef.current ?? undefined : undefined,
+          })
+        switch (d.clip) {
+          case 'milestone_5k':
+            goldWaveRef.current += 1 // onde dorée, pas de takeover
+            break
+          case 'milestone_15k':
+            goldWaveRef.current += 1
+            pushJoyce('BIEN')
+            break
+          case 'hetic_letter':
+            pushJoyce('HETIC'[(d.value ?? 1) - 1] ?? 'H')
+            break
+          case 'milestone_30k':
+            pushTk(4_000)
+            break
+          case 'milestone_big':
+            pushTk(6_000)
+            break
+          case 'hetic_complete':
+            pushTk(8_000) // +30s de fever pilotées par display.fever
+            break
+          default:
+            // demogorgon_rises/slain, portal_swallow, last_chance, hall_of_fame
+            pushTk(CLIP_SHOW_MS[d.clip])
+            if (d.clip === 'demogorgon_rises') pushJoyce('RUN')
+            if (d.clip === 'last_chance') pushJoyce('DERNIERE VIE')
+        }
         return
       }
       if (d.mode === 'EVENT') {
@@ -242,6 +275,8 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         agitation: agitationAt(now - agitationStartRef.current),
         joyce: joyceRef.current,
         holdHallFlip: portalActive,
+        fever: feverRef.current,
+        goldWaveId: goldWaveRef.current,
       })
     }, TICK_MS)
 
