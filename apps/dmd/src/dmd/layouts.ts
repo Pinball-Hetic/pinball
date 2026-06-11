@@ -1,6 +1,6 @@
 import type { DmdDisplay } from '@pinball/shared-types'
 import { FONT_5X7, FONT_12X22, drawText, measureText } from './fonts'
-import { GRID_W } from './DmdRenderer'
+import { GRID_W, GRID_H } from './DmdRenderer'
 import { DOT } from './palette'
 import { attractFrame } from './attract'
 import {
@@ -71,12 +71,205 @@ function drawStatusRow(grid: Uint8Array, lives: number, hetic: number, y: number
   }
 }
 
-function layoutScore(grid: Uint8Array, display: DmdDisplay): void {
+// ── Helpers procéduraux (paliers / HETIC) ────────────────────────────────
+function plot(grid: Uint8Array, x: number, y: number, color: number): void {
+  const px = Math.round(x)
+  const py = Math.round(y)
+  if (px < 0 || px >= GRID_W || py < 0 || py >= GRID_H) return
+  grid[py * GRID_W + px] = color
+}
+
+// RNG déterministe seedée (stable entre frames → pas de scintillement).
+function seeded(n: number): number {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
+  return x - Math.floor(x)
+}
+
+function fmtNum(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+// Chenillard orange/cyan défilant sur une rangée.
+function drawChenillard(grid: Uint8Array, clockMs: number, y: number): void {
+  const off = Math.floor(clockMs / 60)
+  for (let x = 0; x < GRID_W; x++) {
+    if ((x + off) % 3 === 0) {
+      plot(grid, x, y, ((x + off) >> 1) % 2 === 0 ? DOT.combo : DOT.multi)
+    }
+  }
+}
+
+// Bandeau FEVER (mode SCORE) : chenillard haut/bas + score accent + "FEVER X5".
+function drawFeverBanner(grid: Uint8Array, score: number, clockMs: number): void {
+  drawChenillard(grid, clockMs, 0)
+  drawChenillard(grid, -clockMs, GRID_H - 1)
+  drawCentered(grid, String(score), 2, FONT_12X22, DOT.event)
+  if (Math.floor(clockMs / 350) % 2 === 0) {
+    drawCentered(grid, 'FEVER X5', 25, FONT_5X7, DOT.event)
+  }
+}
+
+function layoutScore(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'SCORE'>
+  if (d.fever) {
+    drawFeverBanner(grid, d.score, clockMs)
+    return
+  }
   // Le score remplit la bande (rows 1-22). Combo/multiplier ne s'affichent
   // que via les overlays COMBO_FLASH / MULTI_FLASH (pas de ligne permanente).
   drawCentered(grid, String(d.score), 1, FONT_12X22, DOT.score)
   drawStatusRow(grid, d.lives, d.hetic, 24)
+}
+
+// ── Clips paliers (procéduraux) ───────────────────────────────────────────
+function clipMilestone5k(grid: Uint8Array, value: number, ms: number): void {
+  const t = Math.min(1, ms / 4000)
+  const cx = GRID_W / 2
+  const cy = 12
+  const r = (1 - Math.pow(1 - Math.min(1, ms / 1500), 3)) * 26
+  const fade = ms > 3200 ? 1 - (ms - 3200) / 800 : 1
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2
+    if (seeded(i) < fade) {
+      plot(grid, cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.7, DOT.event)
+    }
+  }
+  if (t < 0.95) drawCentered(grid, `${fmtNum(value)} !`, 22, FONT_5X7, DOT.score, 1, 2)
+}
+
+function clipMilestone15k(grid: Uint8Array, value: number, ms: number): void {
+  const celebrate = ms > 3000
+  // 3 éclairs verticaux seedés, flashent alternativement.
+  const active = Math.floor(ms / 120) % 3
+  for (let b = 0; b < 3; b++) {
+    if (celebrate && b !== active) continue
+    if (b !== active && !celebrate) continue
+    const x0 = 12 + Math.floor(seeded(b * 7 + 1) * (GRID_W - 24))
+    let x = x0
+    for (let y = 0; y < GRID_H; y++) {
+      plot(grid, x, y, DOT.multi)
+      x += seeded(b * 31 + y) < 0.5 ? -1 : 1
+    }
+  }
+  if (!celebrate) {
+    drawCentered(grid, fmtNum(value), 4, FONT_5X7, DOT.score, 1, 3)
+  } else {
+    drawCentered(grid, fmtNum(value), 0, FONT_5X7, DOT.score, 1, 1)
+    for (let i = 0; i < 14; i++) {
+      plot(grid, seeded(i + ms / 200) * GRID_W, seeded(i * 3) * GRID_H, DOT.event)
+    }
+  }
+}
+
+function clipMilestone30k(grid: Uint8Array, value: number, ms: number): void {
+  const cx = GRID_W / 2
+  if (ms < 2500) {
+    // fusée qui monte
+    const y = GRID_H - (ms / 2500) * (GRID_H - 4)
+    plot(grid, cx, y, DOT.event)
+    plot(grid, cx - 1, y + 1, DOT.score)
+    plot(grid, cx + 1, y + 1, DOT.score)
+    plot(grid, cx, y + 2, DOT.lives) // flamme
+    plot(grid, cx, y + 3, DOT.combo)
+  } else {
+    // explosion en pluie d'étoiles depuis le sommet
+    const et = (ms - 2500) / (13000 - 2500)
+    for (let i = 0; i < 26; i++) {
+      const a = seeded(i) * Math.PI * 2
+      const speed = 6 + seeded(i * 2) * 18
+      const x = cx + Math.cos(a) * speed * et * 2
+      const y = 4 + Math.sin(a) * speed * et + et * et * 30 // retombée
+      plot(grid, x, y, seeded(i) > 0.5 ? DOT.event : DOT.score)
+    }
+    drawCentered(grid, fmtNum(value), 22, FONT_5X7, DOT.score, 1, 1)
+  }
+}
+
+function clipMilestoneBig(grid: Uint8Array, value: number, ms: number): void {
+  // 5 explosions successives (cercles concentriques seedés par value).
+  for (let e = 0; e < 5; e++) {
+    const start = e * 1800
+    const local = ms - start
+    if (local < 0 || local > 2200) continue
+    const cx = 14 + seeded(value + e) * (GRID_W - 28)
+    const cy = 6 + seeded(value + e * 5) * 16
+    const r = (local / 2200) * 14
+    const fade = 1 - local / 2200
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2
+      if (seeded(i + e) < fade + 0.3) {
+        plot(grid, cx + Math.cos(a) * r, cy + Math.sin(a) * r, i % 2 ? DOT.event : DOT.combo)
+      }
+    }
+  }
+  drawCentered(grid, fmtNum(value), 4, FONT_5X7, DOT.score, 1, 3)
+}
+
+const HETIC_LETTERS = 'HETIC'.split('')
+
+function clipHeticLetter(grid: Uint8Array, n: number, ms: number): void {
+  const idx = Math.max(0, Math.min(4, n - 1))
+  const letter = HETIC_LETTERS[idx]
+  const landMs = 900
+  let y: number
+  let shake = 0
+  if (ms < landMs) {
+    const p = ms / landMs
+    y = -16 + p * (12 + 16) // tombe vers y=12
+  } else {
+    y = 12
+    if (ms < landMs + 80) shake = 1 // clunk
+  }
+  const sx = shake ? (Math.floor(ms) % 2 ? 1 : -1) : 0
+  drawCentered(grid, letter, y + 0, FONT_5X7, DOT.heticOn, 1, 3)
+  // rangée H E T I C en bas, acquises allumées
+  const step = 8
+  const startX = Math.round((GRID_W - 5 * step) / 2)
+  for (let i = 0; i < 5; i++) {
+    const lit = i <= idx
+    drawText(grid, GRID_W, startX + i * step + sx, 25, HETIC_LETTERS[i], FONT_5X7, lit ? DOT.heticOn : DOT.heticOff)
+  }
+}
+
+function clipHeticComplete(grid: Uint8Array, score: number, ms: number): void {
+  // Durée VISUELLE 10s (le SHOW dure 40s : 10-40s on rend le bandeau fever
+  // — le mode SCORE "reprend" visuellement, tronqué côté player).
+  if (ms >= 10000) {
+    drawFeverBanner(grid, score, ms)
+    return
+  }
+  const cx = GRID_W / 2
+  const cy = 12
+  if (ms < 3000) {
+    // les 5 lettres convergent du bord vers le centre
+    const p = ms / 3000
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2
+      const x = cx + Math.cos(a) * (1 - p) * 50
+      const y = cy + Math.sin(a) * (1 - p) * 14
+      drawText(grid, GRID_W, x, y, HETIC_LETTERS[i], FONT_5X7, DOT.heticOn, 1, 2)
+    }
+  } else if (ms < 5000) {
+    // assemblage "HETIC" qui pulse de plus en plus vite
+    const speed = 200 - ((ms - 3000) / 2000) * 150
+    if (Math.floor(ms / speed) % 2 === 0) {
+      drawCentered(grid, 'HETIC', 4, FONT_5X7, DOT.heticOn, 1, 3)
+    }
+  } else if (ms < 7000) {
+    // explosion : particules qui remplissent l'écran
+    const p = (ms - 5000) / 2000
+    for (let i = 0; i < 60; i++) {
+      const a = seeded(i) * Math.PI * 2
+      const d = seeded(i * 2) * p * 60
+      plot(grid, cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.5, i % 2 ? DOT.event : DOT.combo)
+    }
+  } else {
+    // "HETIC FEVER" + "MULTIPLIER X5" clignotant
+    if (Math.floor(ms / 250) % 2 === 0) {
+      drawCentered(grid, 'HETIC FEVER', 3, FONT_5X7, DOT.event, 1, 2)
+      drawCentered(grid, 'X5', 18, FONT_5X7, DOT.combo, 1, 2)
+    }
+  }
 }
 
 function layoutIntro(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
@@ -151,6 +344,31 @@ function layoutCinematic(grid: Uint8Array, display: DmdDisplay, clockMs: number)
       drawCentered(grid, '+500', 20, FONT_5X7, DOT.gameOver, 1, 1)
     }
     return
+  }
+
+  // ── Clips paliers / HETIC (procéduraux, durée = CLIP_SHOW_MS) ───────────
+  const value = d.value ?? 0
+  switch (d.clip) {
+    case 'milestone_5k':
+      clipMilestone5k(grid, value || 5000, clockMs)
+      return
+    case 'milestone_15k':
+      clipMilestone15k(grid, value || 15000, clockMs)
+      return
+    case 'milestone_30k':
+      clipMilestone30k(grid, value || 30000, clockMs)
+      return
+    case 'milestone_big':
+      clipMilestoneBig(grid, value || 50000, clockMs)
+      return
+    case 'hetic_letter':
+      clipHeticLetter(grid, value || 1, clockMs)
+      return
+    case 'hetic_complete':
+      clipHeticComplete(grid, d.score, clockMs)
+      return
+    default:
+      break
   }
 
   const clip = clipFor(d.clip)
