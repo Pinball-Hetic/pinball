@@ -62,6 +62,7 @@ import {
   GarlandLights,
   DemogorgonReveal,
   CinematicDirector,
+  ScreenShake,
   DEMOGORGON_TARGET,
   DEMOGORGON_TARGET_HITS,
   PORTAL_ENTER_SCORE,
@@ -530,6 +531,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               : "milestone_big";
       playCinematic(clip, { value: threshold });
       garlandLightsRef.current?.celebrate();
+      screenShakeRef.current?.add(0.4); // shake du gel palier
     },
     onHeticLetter: (n) => playCinematic("hetic_letter", { value: n }),
     onHeticComplete: () => {
@@ -570,6 +572,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   });
 
   const garlandLightsRef = useRef<GarlandLights | null>(null);
+  const screenShakeRef = useRef<ScreenShake | null>(null);
+  if (!screenShakeRef.current) screenShakeRef.current = new ScreenShake();
 
   useEffect(() => {
     dmd.pushIntro(playerRef.current);
@@ -656,6 +660,42 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let leftSwing = 0, rightSwing = 0;
     let prevLeftSwing = 0, prevRightSwing = 0;
     let leftTarget = 0, rightTarget = 0;
+
+    // ── Juice : screen shake + hit-flash flippers ───────────────────────────
+    const screenShake = screenShakeRef.current!;
+    type FlashMat = { mat: THREE.MeshStandardMaterial; emissive: THREE.Color; intensity: number };
+    let leftFlashMats: FlashMat[] = [];
+    let rightFlashMats: FlashMat[] = [];
+    let leftFlash = 0;
+    let rightFlash = 0;
+    const FLASH_DURATION = 0.08; // retour en 80ms
+    const FLASH_INTENSITY = 1.2;
+    const _flashColor = new THREE.Color(0xfff0e0); // blanc chaud
+    const collectFlashMats = (obj: THREE.Object3D): FlashMat[] => {
+      const out: FlashMat[] = [];
+      obj.traverse((c) => {
+        if (!(c instanceof THREE.Mesh)) return;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        for (const m of mats) {
+          if (m instanceof THREE.MeshStandardMaterial) {
+            out.push({ mat: m, emissive: m.emissive.clone(), intensity: m.emissiveIntensity });
+          }
+        }
+      });
+      return out;
+    };
+    const applyFlash = (mats: FlashMat[], t: number) => {
+      const f = t > 0 ? t / FLASH_DURATION : 0;
+      for (const fm of mats) {
+        if (f > 0) {
+          fm.mat.emissive.copy(fm.emissive).lerp(_flashColor, f);
+          fm.mat.emissiveIntensity = fm.intensity + FLASH_INTENSITY * f;
+        } else {
+          fm.mat.emissive.copy(fm.emissive);
+          fm.mat.emissiveIntensity = fm.intensity;
+        }
+      }
+    };
 
     // ── Physics / game objects ───────────────────────────────────────────────
     let ballMesh: THREE.Object3D | null = null;
@@ -848,10 +888,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         if (leftFlipper && (leftFlipper as THREE.Mesh).isMesh) {
           leftFlipperPivot = attachFlipperAtHinge(leftFlipper, "left", pinballmap);
           leftFlipperObj = leftFlipper;
+          leftFlashMats = collectFlashMats(leftFlipper);
         }
         if (rightFlipper && (rightFlipper as THREE.Mesh).isMesh) {
           rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", pinballmap);
           rightFlipperObj = rightFlipper;
+          rightFlashMats = collectFlashMats(rightFlipper);
         }
 
         // ── Physics ──────────────────────────────────────────────────────────
@@ -1071,6 +1113,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           demogorgonReveal?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
+
+          // ── Screen shake par event (juice) ───────────────────────────────────
+          if (event.type === "BUMPER_HIT") screenShake.add(0.25);
+          else if (event.type === "SLINGSHOT_HIT") screenShake.add(0.2);
+          else if (event.type === "DROP_TARGET_HIT") screenShake.add(0.35);
+          else if (event.type === "DROP_TARGET_COMPLETE") screenShake.add(0.6);
+          else if (event.type === "DEMOGORGON_TARGET_HIT") screenShake.add(0.5);
 
           // ── Cinématiques synchronisées 3 écrans ──────────────────────────────
           if (event.type === "DEMOGORGON_REVEAL") {
@@ -1471,11 +1520,21 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           const inZ = bp.z > FLIPPER_Z_MIN && bp.z < FLIPPER_Z_MAX;
           const angVelL = (leftSwing  - prevLeftSwing) / dt;
           const angVelR = (rightSwing - prevRightSwing) / dt;
-          if (inZ && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+          if (inZ && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
-          if (inZ && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ)
+            leftFlash = FLASH_DURATION; // hit-flash à la frappe
+          }
+          if (inZ && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
+            rightFlash = FLASH_DURATION;
+          }
         }
+
+        // Décroissance + application du hit-flash flippers.
+        if (leftFlash > 0) leftFlash = Math.max(0, leftFlash - dt);
+        if (rightFlash > 0) rightFlash = Math.max(0, rightFlash - dt);
+        applyFlash(leftFlashMats, leftFlash);
+        applyFlash(rightFlashMats, rightFlash);
 
         // ── Debug wireframes ─────────────────────────────────────────────────
         if (leftFlipperDebug && leftFlipperObj) {
@@ -1679,7 +1738,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         rapierDebugGeo.computeBoundingSphere();
       }
 
+      // ── Screen shake : offset transitoire appliqué APRÈS le placement
+      // caméra, restauré après le rendu (pas d'accumulation côté OrbitControls).
+      const shake = screenShake.update(dt);
+      camera.position.x += shake.x;
+      camera.position.y += shake.y;
       renderer.render(scene, camera);
+      camera.position.x -= shake.x;
+      camera.position.y -= shake.y;
     };
 
     frameId = requestAnimationFrame(animate);

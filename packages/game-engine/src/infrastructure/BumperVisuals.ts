@@ -26,6 +26,15 @@ const IDLE_PULSE_SPEED = 1.35;
 const IDLE_PULSE_AMP = 0.18;
 const HIT_FLASH_DURATION = 0.2;
 const HIT_FLASH_BOOST = 1.1;
+const PUNCH_DURATION = 0.15; // scale punch 1 → 1.22 → 1
+const PUNCH_PEAK = 0.22;
+
+// easeOutBack : léger dépassement puis retour.
+function easeOutBack(t: number): number {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
 
 const _emissiveA = new THREE.Color();
 const _emissiveB = new THREE.Color();
@@ -40,6 +49,7 @@ type BumperPart = {
   kind: BumperKind;
   portalLight: THREE.PointLight | null;
   baseIntensity: number;
+  baseScale: THREE.Vector3;
 };
 
 function cloneStandardMaterial(mesh: THREE.Mesh): THREE.MeshStandardMaterial {
@@ -82,6 +92,7 @@ function applyGltfBumperLook(material: THREE.MeshStandardMaterial, portalLight: 
 export class BumperVisuals {
   private parts: BumperPart[] = [];
   private hitTimers = new Map<number, number>();
+  private punchTimers = new Map<number, number>();
   private elapsed = 0;
   private strobeActive = false;
   private strobeOn = false;
@@ -166,6 +177,7 @@ export class BumperVisuals {
         kind,
         portalLight,
         baseIntensity: material.emissiveIntensity,
+        baseScale: obj.scale.clone(),
       });
     });
   }
@@ -173,6 +185,7 @@ export class BumperVisuals {
   onGameEvent(event: GameEvent): void {
     if (event.type !== 'BUMPER_HIT') return;
     this.hitTimers.set(event.bumperIndex, HIT_FLASH_DURATION);
+    this.punchTimers.set(event.bumperIndex, PUNCH_DURATION);
   }
 
   update(dt: number): void {
@@ -182,6 +195,23 @@ export class BumperVisuals {
       const next = t - dt;
       if (next <= 0) this.hitTimers.delete(idx);
       else this.hitTimers.set(idx, next);
+    }
+
+    // Scale punch (mesh visuel uniquement, colliders inchangés).
+    for (const [idx, t] of this.punchTimers) {
+      const next = t - dt;
+      if (next <= 0) this.punchTimers.delete(idx);
+      else this.punchTimers.set(idx, next);
+    }
+    for (const part of this.parts) {
+      const pt = this.punchTimers.get(part.bumperIndex) ?? 0;
+      let factor = 1;
+      if (pt > 0) {
+        const prog = 1 - pt / PUNCH_DURATION; // 0 → 1
+        const env = prog < 0.5 ? easeOutBack(prog * 2) : 1 - (prog - 0.5) * 2;
+        factor = 1 + PUNCH_PEAK * Math.max(0, env);
+      }
+      part.mesh.scale.copy(part.baseScale).multiplyScalar(factor);
     }
 
     if (this.strobeActive) {
@@ -255,6 +285,7 @@ export class BumperVisuals {
     }
     this.parts = [];
     this.hitTimers.clear();
+    this.punchTimers.clear();
     this.atmosphereDim = 1;
     this.atmosphereStrobe = 0;
     this.atmosphereStrobeHz = 4;
