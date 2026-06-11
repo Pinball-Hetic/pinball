@@ -46,7 +46,10 @@ export class QualityGovernor {
     const avg = this.samples.reduce((s, v) => s + v, 0) / this.samples.length;
 
     if (this.clock - this.lastChange < COOLDOWN_MS) {
-      if (avg >= UP_MS) this.goodSince = this.clock;
+      // Pendant le cooldown, le minuteur de remontée ne court PAS (sinon il
+      // serait déjà écoulé à la sortie du cooldown → remontée immédiate puis
+      // re-dégradation = oscillation).
+      this.goodSince = this.clock;
       return;
     }
 
