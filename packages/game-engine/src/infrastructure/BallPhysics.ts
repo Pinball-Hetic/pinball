@@ -103,11 +103,7 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
     );
   }
 
-  applyScaledEjectionForce(
-    pos: { x: number; z: number },
-    scale: number,
-    side: 'left' | 'right',
-  ): void {
+  applyScaledEjectionForce(scale: number, side: 'left' | 'right'): void {
     // Direction X fixe : bump_left pousse toujours à droite (+X),
     //                     bump_right pousse toujours à gauche (-X).
     // Peu importe où la balle touche le mèche, la direction horizontale est

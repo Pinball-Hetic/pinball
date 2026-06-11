@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEventListener } from '../domain/GameEvents';
-import { BUMPER_POSITIONS, BUMP_POSITIONS, BUMP_EJECT_SCALE, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
+import { BUMPER_POSITIONS, BUMP_EJECT_SCALE, BUMP_HIT_COOLDOWN_MS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
 import {
   SCORE_SLINGSHOT,
   SCORE_POP_ZONE,
@@ -18,6 +18,7 @@ import type { BottomOutBall } from '../use-cases/BottomOutBall';
 
 export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
+  private bumpLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
   private demogorgonTriggered = false;
   private demogorgonFightActive = false;
   private demogorgonTargetArmed = false;
@@ -114,10 +115,15 @@ export class CollisionEventProcessor {
         }
       }
 
-      if ((role === 'bump_right' || role === 'bump_left') && gameState === 'playing') {
+      if (started && (role === 'bump_right' || role === 'bump_left') && gameState === 'playing') {
+        // started uniquement (pas la fin de contact) + cooldown par côté :
+        // évite le double-trigger (start+stop) et le farm quand la balle vibre.
         const side = role === 'bump_right' ? 'right' as const : 'left' as const;
-        const bp = BUMP_POSITIONS.find((b) => b.side === side);
-        if (bp) this.bumpHitUC.execute(side, bp, BUMP_EJECT_SCALE);
+        const now = performance.now();
+        if (now - this.bumpLastHitMs[side] >= BUMP_HIT_COOLDOWN_MS) {
+          this.bumpLastHitMs[side] = now;
+          this.bumpHitUC.execute(side, BUMP_EJECT_SCALE);
+        }
       }
 
       if (role === 'bottom_out' && gameState === 'playing') {

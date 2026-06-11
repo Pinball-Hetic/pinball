@@ -115,6 +115,11 @@ const PINBALLMAP_HIGH_BOUNCE = new Set([
 const PINBALLMAP_HIGH_BOUNCE_RESTITUTION = 0.40;
 const PINBALLMAP_HIGH_BOUNCE_FRICTION    = 0.05;
 
+// Murs moulés plein plateau : trimesh single-sided (doubleSided=true créerait
+// des faces fantômes qui expulsent la balle à travers le mur). Normales
+// orientées vers l'intérieur du terrain (vérifiées Blender).
+const PINBALLMAP_SINGLE_SIDED_WALL = 'mesh_1';
+
 const PLASTIC_GROUPS = new Set([
   'plastic', 'plastic_left', 'plastic_pop_bumper_zone', 'plastic_rocket',
 ]);
@@ -330,21 +335,19 @@ export class PlayfieldTrimeshBuilder {
           // Les 2 plus petites dimensions doivent dépasser le seuil.
           if (dims[0] < RAIL_SUBMESH_MIN_PHYS_DIM && dims[1] < RAIL_SUBMESH_MIN_PHYS_DIM) return;
         }
+        // Réutilise la géométrie déjà extraite pour le test de taille.
         PlayfieldTrimeshBuilder.createRailColliders(
           world,
           child,
           PINBALLMAP_TRIMESH_RESTITUTION,
           PINBALLMAP_TRIMESH_FRICTION,
+          testGeo,
         );
         return;
       }
 
-      // Mesh_1 (murs moulés plein plateau) : doubleSided=false.
-      // doubleSided=true duplique chaque face avec la normale inversée →
-      // la balle près d'un bord de mur touche une face "intérieure" fantôme
-      // et est expulsée à travers le mur. Les normales de Mesh_1 pointent vers
-      // l'intérieur du terrain (vérifiées Blender) → single-sided suffit.
-      const isMesh1 = normalizeGltfName(child.name) === 'mesh_1';
+      // Mesh_1 (murs moulés) : single-sided (cf. PINBALLMAP_SINGLE_SIDED_WALL).
+      const isMesh1 = normalizeGltfName(child.name) === PINBALLMAP_SINGLE_SIDED_WALL;
       PlayfieldTrimeshBuilder.createTrimeshCollider(
         world,
         [extractWorldGeometry(child)],
@@ -384,8 +387,9 @@ export class PlayfieldTrimeshBuilder {
     mesh: THREE.Mesh,
     restitution: number,
     friction: number,
+    preExtracted?: THREE.BufferGeometry,
   ): void {
-    const geo = extractWorldGeometry(mesh);
+    const geo = preExtracted ?? extractWorldGeometry(mesh);
     // Trimesh uniquement — le cuboid bounding-box ajouté précédemment créait
     // 2 corps physiques superposés par sous-mesh (trimesh + cuboid).
     // Résultat : Rapier résolvait 2 collisions simultanées avec des normales
