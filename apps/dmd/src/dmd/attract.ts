@@ -17,6 +17,7 @@ const PHASES: { id: string; duration: number }[] = [
   { id: 'title', duration: 5000 },
   { id: 'marquee', duration: marqueeDuration },
   { id: 'coin', duration: 5000 },
+  { id: 'rules', duration: 8000 },
   { id: 'ready', duration: 4000 },
 ]
 const TOTAL = PHASES.reduce((s, p) => s + p.duration, 0)
@@ -72,6 +73,9 @@ export function attractFrame(grid: Uint8Array, display: { player: string }, cloc
       break
     case 'coin':
       phaseCoin(grid, tLocal)
+      break
+    case 'rules':
+      phaseRules(grid, tLocal)
       break
     case 'ready':
       phaseReady(grid, tLocal, display.player)
@@ -162,6 +166,29 @@ function drawCoin(grid: Uint8Array, cx: number, cy: number, squashed: boolean): 
     }
   }
   for (let dy = 2; dy <= 6; dy++) plot(grid, cx + 4, cy + dy, DOT.event)
+}
+
+// Phase 'rules' — pédagogie : cibles → rangée HETIC lettre par lettre →
+// FEVER X5. 3 sous-phases sur 8s.
+function phaseRules(grid: Uint8Array, tLocal: number): void {
+  if (tLocal < 2500) {
+    drawCentered(grid, 'COMPLETE', 4, DOT.score, 2)
+    drawCentered(grid, 'LES CIBLES', 18, DOT.score, 2)
+    return
+  }
+  if (tLocal < 5500) {
+    const letters = 'HETIC'.split('')
+    const lit = Math.min(5, Math.floor((tLocal - 2500) / 600) + 1)
+    const step = 14
+    const startX = centerX(letters.length * step)
+    for (let i = 0; i < letters.length; i++) {
+      drawText(grid, GRID_W, startX + i * step, 9, letters[i], FONT_5X7, i < lit ? DOT.heticOn : DOT.heticOff, 1, 2)
+    }
+    return
+  }
+  if (blinkOn(tLocal - 5500, 350, 350)) {
+    drawCentered(grid, 'FEVER X5 !', 9, DOT.event, 2)
+  }
 }
 
 // Phase 'ready' — nom joueur + 'START !' blink.

@@ -50,6 +50,7 @@ services:
       - ./apps/playfield/src:/app/apps/playfield/src
       - ./apps/playfield/public:/app/apps/playfield/public
       - ./packages/game-engine/src:/app/packages/game-engine/src
+      - ./packages/shared-types/src:/app/packages/shared-types/src
     depends_on:
       - server
     command: bun run dev
@@ -73,12 +74,13 @@ services:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
-      NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
+#      NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
       NODE_OPTIONS: "--max-old-space-size=1024"
     ports:
       - "3335:3000"
     volumes:
       - ./apps/dmd/src:/app/apps/dmd/src
+      - ./packages/shared-types/src:/app/packages/shared-types/src
     depends_on:
       server:
         condition: service_started
@@ -103,12 +105,12 @@ services:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
-      NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
-      NODE_OPTIONS: "--max-old-space-size=1024"
+#      NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
     ports:
       - "3336:3000"
     volumes:
       - ./apps/backglass/src:/app/apps/backglass/src
+      - ./packages/shared-types/src:/app/packages/shared-types/src
     depends_on:
       server:
         condition: service_started

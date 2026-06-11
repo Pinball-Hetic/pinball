@@ -16,9 +16,21 @@ export type PlayfieldCinematicStrobeConfig = {
 export class PlayfieldCinematicStrobe {
   private shade = new PlayfieldShadeOverlay();
   private flashLight: THREE.PointLight | null = null;
+  private flashRoot: THREE.Object3D | null = null;
   private garlandLights: GarlandLights | null = null;
   private bumperVisuals: BumperVisuals | null = null;
   private flashIntensity = 2.4;
+
+  // La PointLight n'est DANS la scène que quand elle flashe (perf).
+  private setFlash(intensity: number): void {
+    if (!this.flashLight) return;
+    this.flashLight.intensity = intensity;
+    if (intensity > 0) {
+      if (this.flashRoot && !this.flashLight.parent) this.flashRoot.add(this.flashLight);
+    } else if (this.flashLight.parent) {
+      this.flashLight.removeFromParent();
+    }
+  }
 
   mount(
     root: THREE.Object3D,
@@ -43,16 +55,14 @@ export class PlayfieldCinematicStrobe {
       config.flashDecay ?? 2,
     );
     this.flashLight.position.copy(config.flashPosition);
-    root.add(this.flashLight);
+    this.flashRoot = root; // ajout/retrait à la demande
   }
 
   apply(on: boolean, fullMap: boolean, mix: number): void {
     this.shade.setOpacity(playfieldShadeStrobeOpacity(on, fullMap, mix));
 
     const active = mix > 0.02;
-    if (this.flashLight) {
-      this.flashLight.intensity = on && !fullMap ? this.flashIntensity * mix : 0;
-    }
+    this.setFlash(on && !fullMap ? this.flashIntensity * mix : 0);
 
     this.garlandLights?.setStrobe(active, on, fullMap);
     this.bumperVisuals?.setStrobe(active, on, fullMap);
@@ -69,9 +79,7 @@ export class PlayfieldCinematicStrobe {
 
   applyFightFlicker(shade: number, flashMix: number): void {
     this.shade.setOpacity(shade);
-    if (this.flashLight) {
-      this.flashLight.intensity = this.flashIntensity * flashMix;
-    }
+    this.setFlash(this.flashIntensity * flashMix);
     this.garlandLights?.setStrobe(false, false);
     this.bumperVisuals?.setStrobe(false, false);
   }
@@ -88,13 +96,14 @@ export class PlayfieldCinematicStrobe {
       this.flashLight.parent?.remove(this.flashLight);
     }
     this.flashLight = null;
+    this.flashRoot = null;
     this.garlandLights = null;
     this.bumperVisuals = null;
     this.shade = new PlayfieldShadeOverlay();
   }
 
   private clearFlashAndDecor(): void {
-    if (this.flashLight) this.flashLight.intensity = 0;
+    this.setFlash(0);
     this.garlandLights?.setStrobe(false, false);
     this.bumperVisuals?.setStrobe(false, false);
   }

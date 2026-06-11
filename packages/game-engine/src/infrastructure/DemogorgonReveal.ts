@@ -72,6 +72,7 @@ export class DemogorgonReveal {
   private elevenShockInner: THREE.Mesh | null = null;
   private elevenShockInnerMat: THREE.MeshBasicMaterial | null = null;
   private elevenAssistLight: THREE.PointLight | null = null;
+  private root: THREE.Object3D | null = null;
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
 
@@ -97,7 +98,14 @@ export class DemogorgonReveal {
       this.billboard.ensureReady(),
       this.demogorgonVisual.ensureReady(),
     ]);
+    // Upload GPU de la texture billboard + compilation des shaders du
+    // demogorgon, du targetGroup (ring/core/burst) et du sprite — hors
+    // frame critique. Sinon tout tombe sur la frame du spawn → freeze.
+    this.billboard.warmup(renderer);
     await this.demogorgonVisual.warmup(renderer, scene, camera);
+    if (this.targetGroup) await renderer.compileAsync(this.targetGroup, camera, scene);
+    const sprite = this.billboard.object3D;
+    if (sprite) await renderer.compileAsync(sprite, camera, scene);
   }
 
   setup(config: DemogorgonSetup): void {
@@ -107,6 +115,7 @@ export class DemogorgonReveal {
     this.bumperVisuals = config.bumperVisuals;
     this.onFightEnd = config.onFightEnd ?? null;
     this.onTargetReady = config.onTargetReady ?? null;
+    this.root = config.root;
 
     this.cinematicStrobe.mount(config.root, config.garlandLights, config.bumperVisuals, {
       flashColor: 0xff1122,
@@ -133,9 +142,9 @@ export class DemogorgonReveal {
 
     const assistY = DEMOGORGON_TARGET.y + 0.021;
 
+    // Ajoutée à la scène SEULEMENT pendant ses flashs (cf. trigger/hide).
     this.elevenAssistLight = new THREE.PointLight(0xbb55ff, 0, 0.32, 0.3);
     this.elevenAssistLight.position.set(DEMOGORGON_TARGET.x, DEMOGORGON_TARGET.y + 0.045, DEMOGORGON_TARGET.z);
-    config.root.add(this.elevenAssistLight);
 
     this.elevenShockOuterMat = new THREE.MeshBasicMaterial({
       color: 0x9933dd,
@@ -329,6 +338,7 @@ export class DemogorgonReveal {
     this.elevenShockInner = null;
     this.elevenShockInnerMat = null;
     this.elevenAssistLight = null;
+    this.root = null;
     this.phase = 'idle';
     this.elapsed = 0;
   }
@@ -407,6 +417,9 @@ export class DemogorgonReveal {
     this.targetHitFlash = TARGET_HIT_FLASH;
     if (this.elevenShockOuter) this.elevenShockOuter.visible = true;
     if (this.elevenShockInner) this.elevenShockInner.visible = true;
+    if (this.elevenAssistLight && this.root && !this.elevenAssistLight.parent) {
+      this.root.add(this.elevenAssistLight);
+    }
     this.emit?.({ type: 'ELEVEN_ASSIST', scoreIncrement: ELEVEN_ASSIST_SCORE });
   }
 
@@ -422,7 +435,10 @@ export class DemogorgonReveal {
     }
     if (this.elevenShockOuterMat) this.elevenShockOuterMat.opacity = 0;
     if (this.elevenShockInnerMat) this.elevenShockInnerMat.opacity = 0;
-    if (this.elevenAssistLight) this.elevenAssistLight.intensity = 0;
+    if (this.elevenAssistLight) {
+      this.elevenAssistLight.intensity = 0;
+      this.elevenAssistLight.removeFromParent(); // hors scène entre les flashs
+    }
   }
 
   private updateElevenAssist(dt: number): void {

@@ -50,3 +50,9 @@ Thumbs.db
 
 # Project specific
 .gemini/
+
+# DB backups (dumps locaux du leaderboard)
+backups/
+
+.agents/
+skills-lock.json

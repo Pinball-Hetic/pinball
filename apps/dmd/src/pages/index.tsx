@@ -88,6 +88,16 @@ function renderDisplay(d: DmdDisplay): ReactElement {
           </div>
         </div>
       )
+
+    case 'CINEMATIC':
+      // Placeholder no-op : rendu réel des clips en P15 (AsciiClipPlayer).
+      return (
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-6xl font-mono font-bold tabular-nums">
+            {d.score.toLocaleString()}
+          </div>
+        </div>
+      )
   }
 }
 
