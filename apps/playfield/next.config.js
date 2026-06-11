@@ -9,6 +9,11 @@ const nextConfig = {
   reactStrictMode: true,
   turbopack: { root: '../..' },
   transpilePackages: ['@pinball/game-engine', '@pinball/shared-types'],
+  // RAPIER et three/examples utilisent des modules async (WASM / ESM).
+  // Turbopack SSR ne sait pas bundler ces modules en CJS → "CJS module can't be
+  // async". On les déclare externes pour SSR : Node.js les résout depuis
+  // node_modules à l'exécution (jamais appelés côté serveur de toute façon).
+  serverExternalPackages: ['@dimforge/rapier3d-compat'],
   async rewrites() {
     return [
       {
