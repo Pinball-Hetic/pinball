@@ -63,6 +63,7 @@ import {
   DemogorgonReveal,
   CinematicDirector,
   ScreenShake,
+  BallTrail,
   DEMOGORGON_TARGET,
   DEMOGORGON_TARGET_HITS,
   PORTAL_ENTER_SCORE,
@@ -519,6 +520,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     },
     onAtmosphereChange: (upsideDownActive) => {
       dmd.setAtmosphere(upsideDownActive);
+      atmosphereUpsideRef.current = upsideDownActive;
     },
     onMilestone: (threshold) => {
       const clip: CinematicClip =
@@ -574,6 +576,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   const garlandLightsRef = useRef<GarlandLights | null>(null);
   const screenShakeRef = useRef<ScreenShake | null>(null);
   if (!screenShakeRef.current) screenShakeRef.current = new ScreenShake();
+  const atmosphereUpsideRef = useRef(false);
 
   useEffect(() => {
     dmd.pushIntro(playerRef.current);
@@ -709,6 +712,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let collisionProcessor: CollisionEventProcessor | null = null;
     let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
+    let ballTrail: BallTrail | null = null;
     let demogorgonReveal: DemogorgonReveal | null = null;
     let upsideDownPortal: UpsideDownPortal | null = null;
     let upsideDownTransition: UpsideDownTransition | null = null;
@@ -840,6 +844,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         garlandLights = new GarlandLights();
         garlandLights.setup(playfieldRoot);
         garlandLightsRef.current = garlandLights;
+        ballTrail = new BallTrail();
+        ballTrail.mount(scene);
         demogorgonReveal = new DemogorgonReveal();
         demogorgonReveal.setup({
           root: playfieldRoot,
@@ -1131,14 +1137,21 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             event.type === "DEMOGORGON_TARGET_HIT"
             && event.hitCount >= DEMOGORGON_TARGET_HITS
           ) {
-            playCinematic("demogorgon_slain", {
-              // Reprise "avec un bang" : impulse radial depuis le target.
-              onEnd: () =>
-                ballPhysicsInst?.applyEjectionForce({
-                  x: DEMOGORGON_TARGET.x,
-                  z: DEMOGORGON_TARGET.z,
-                }),
-            });
+            // Slow-mo 400ms (physique ÷3) AVANT la cinématique de victoire.
+            // Timer local (plus simple que d'ajouter une phase au director ;
+            // le director enchaîne ensuite avec le gel).
+            physicsWorld?.setTimeScale(1 / 3);
+            window.setTimeout(() => {
+              physicsWorld?.setTimeScale(1);
+              playCinematic("demogorgon_slain", {
+                // Reprise "avec un bang" : impulse radial depuis le target.
+                onEnd: () =>
+                  ballPhysicsInst?.applyEjectionForce({
+                    x: DEMOGORGON_TARGET.x,
+                    z: DEMOGORGON_TARGET.z,
+                  }),
+              });
+            }, 400);
           }
           if (
             (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
@@ -1738,6 +1751,24 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         rapierDebugGeo.computeBoundingSphere();
       }
 
+      // ── Traînée de feu (intensité ∝ combo, max en fever) ────────────────
+      if (ballTrail) {
+        const feverNow = isFeverActive();
+        const playing = ballMesh?.visible && gameStateRef.current === "playing";
+        const intensity = !playing
+          ? 0
+          : feverNow
+            ? 1
+            : Math.max(0, Math.min(1, (comboRef.current - 3) / 7));
+        ballTrail.update(
+          dt,
+          ballMesh ? ballMesh.position : { x: 0, y: 0, z: 0 },
+          intensity,
+          { upsideDown: atmosphereUpsideRef.current, fever: feverNow },
+          camera.quaternion,
+        );
+      }
+
       // ── Screen shake : offset transitoire appliqué APRÈS le placement
       // caméra, restauré après le rendu (pas d'accumulation côté OrbitControls).
       const shake = screenShake.update(dt);
@@ -1785,6 +1816,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
       bumperVisuals?.dispose();
       garlandLights?.dispose();
+      ballTrail?.dispose();
       demogorgonReveal?.dispose();
       upsideDownPortal?.dispose();
       upsideDownTransition?.dispose();
