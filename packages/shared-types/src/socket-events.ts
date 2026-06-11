@@ -48,9 +48,19 @@ export interface GameStart {
   player: string
 }
 
+export interface GameStats {
+  maxCombo: number
+  maxMultiplier: number
+  demogorgons: number // boss vaincus dans la partie
+  portals: number // entrées Upside Down
+  hetic: number // lettres allumées 0..5
+  durationS: number // durée de la partie en secondes
+}
+
 export interface GameOver {
   player: string
   finalScore: number
+  stats: GameStats
 }
 
 export interface LeaderboardEntry {
@@ -58,6 +68,14 @@ export interface LeaderboardEntry {
   name: string
   score: number
   date: string
+}
+
+export interface GlobalStats {
+  totalGames: number
+  totalDemogorgons: number
+  totalPortals: number
+  bestCombo: { value: number; player: string } | null
+  bestToday: { score: number; player: string } | null
 }
 
 export type ButtonId = 'LEFT' | 'RIGHT' | 'PLUNGER' | 'START'

@@ -12,6 +12,9 @@ COPY . .
 # Installation avec bun
 RUN bun install
 
+# Génération du client Prisma (le serveur importe @prisma/client)
+RUN bun run --filter @pinball/server prisma:generate
+
 # Build du serveur
 RUN bun run --filter @pinball/server build
 

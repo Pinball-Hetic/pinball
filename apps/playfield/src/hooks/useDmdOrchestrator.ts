@@ -5,6 +5,7 @@ import type {
   ClientToServerEvents,
   DmdDisplay,
   ScoreUpdate,
+  GameStats,
 } from '@pinball/shared-types';
 import type { GameEvent } from '@pinball/game-engine';
 
@@ -50,7 +51,7 @@ export interface DmdOrchestrator {
   // Score broadcast bas niveau (DMD data sync, indépendant du mode display)
   emitScoreSnapshot: (s: ScoreUpdate) => void;
   emitGameStart: (player: string) => void;
-  emitGameOver: (player: string, finalScore: number) => void;
+  emitGameOver: (player: string, finalScore: number, stats: GameStats) => void;
   // DMD high-level : push une display, l'orchestrator décide quoi montrer
   pushIntro: (player: string) => void;
   pushScore: (s: ScoreUpdate) => void;
@@ -130,8 +131,8 @@ export function useDmdOrchestrator(): DmdOrchestrator {
   return {
     emitScoreSnapshot: (s) => socketRef.current?.emit('score:update', s),
     emitGameStart: (player) => socketRef.current?.emit('game:start', { player }),
-    emitGameOver: (player, finalScore) =>
-      socketRef.current?.emit('game:over', { player, finalScore }),
+    emitGameOver: (player, finalScore, stats) =>
+      socketRef.current?.emit('game:over', { player, finalScore, stats }),
 
     pushIntro: (player) => {
       // Reset complet : l'INTRO ne s'affiche qu'au repos (ball non lancée),
