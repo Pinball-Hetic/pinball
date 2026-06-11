@@ -12,6 +12,7 @@ import { easeIn, easeOut, strobeOn } from './CinematicEasing';
 import { CameraBillboardSprite } from './CameraBillboardSprite';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
+import { createBossTargetMesh } from './BossTargetMesh';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { DemogorgonTargetVisual } from './DemogorgonTargetVisual';
 
@@ -334,57 +335,34 @@ export class DemogorgonReveal {
   }
 
   private buildTargetMesh(): THREE.Group {
-    const group = new THREE.Group();
-
-    const ringGeo = new THREE.TorusGeometry(0.032, 0.004, 8, 24);
-    this.targetRingMat = new THREE.MeshStandardMaterial({
-      color: 0xff2244,
-      emissive: 0xff1133,
-      emissiveIntensity: 1.6,
-      metalness: 0.4,
-      roughness: 0.35,
+    const parts = createBossTargetMesh({
+      ring: {
+        color: 0xff2244,
+        emissive: 0xff1133,
+        emissiveIntensity: 1.6,
+        radius: 0.032,
+        metalness: 0.4,
+        roughness: 0.35,
+      },
+      core: {
+        color: 0xffeedd,
+        emissive: 0xff4422,
+        emissiveIntensity: 1.2,
+        radius: 0.014,
+        metalness: 0.2,
+        roughness: 0.4,
+      },
+      light: { color: 0xff2244, intensity: 0.45 },
+      victoryBurst: { color: 0xffee55 },
     });
-    const ring = new THREE.Mesh(ringGeo, this.targetRingMat);
-    ring.rotation.x = Math.PI / 2;
-    group.add(ring);
-    this.ownedGeos.push(ringGeo);
-    this.ownedMats.push(this.targetRingMat);
-
-    const coreGeo = new THREE.CircleGeometry(0.014, 16);
-    this.targetCoreMat = new THREE.MeshStandardMaterial({
-      color: 0xffeedd,
-      emissive: 0xff4422,
-      emissiveIntensity: 1.2,
-      metalness: 0.2,
-      roughness: 0.4,
-      side: THREE.DoubleSide,
-    });
-    const core = new THREE.Mesh(coreGeo, this.targetCoreMat);
-    core.rotation.x = -Math.PI / 2;
-    group.add(core);
-    this.ownedGeos.push(coreGeo);
-    this.ownedMats.push(this.targetCoreMat);
-
-    this.targetLight = new THREE.PointLight(0xff2244, 0.45, 0.18, 2);
-    this.targetLight.position.y = 0.02;
-    group.add(this.targetLight);
-
-    const burstGeo = new THREE.RingGeometry(0.02, 0.038, 24);
-    this.victoryBurstMat = new THREE.MeshBasicMaterial({
-      color: 0xffee55,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      toneMapped: false,
-    });
-    this.victoryBurst = new THREE.Mesh(burstGeo, this.victoryBurstMat);
-    this.victoryBurst.rotation.x = -Math.PI / 2;
-    group.add(this.victoryBurst);
-    this.ownedGeos.push(burstGeo);
-    this.ownedMats.push(this.victoryBurstMat);
-
-    return group;
+    this.targetRingMat = parts.ringMat;
+    this.targetCoreMat = parts.coreMat;
+    this.targetLight = parts.light;
+    this.victoryBurst = parts.victoryBurst;
+    this.victoryBurstMat = parts.victoryBurstMat;
+    this.ownedGeos.push(...parts.ownedGeos);
+    this.ownedMats.push(...parts.ownedMats);
+    return parts.group;
   }
 
   private updateTargetPulse(dt: number): void {

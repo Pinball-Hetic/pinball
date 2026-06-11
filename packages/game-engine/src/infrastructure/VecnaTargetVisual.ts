@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { VECNA_TARGET } from '../domain/Ball';
 import {
+  VECNA_ANIM_WALK,
   VECNA_MODEL_BIND_HEIGHT,
   VECNA_MODEL_FIT_FRAMES,
   VECNA_MODEL_FLOOR_CLEARANCE,
@@ -8,8 +9,10 @@ import {
   VECNA_MODEL_HEIGHT,
   VECNA_MODEL_URL,
   VECNA_MODEL_YAW,
+  VECNA_SPAWN,
 } from '../domain/VecnaConstants';
 import { PLAYFIELD_TILT, surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { findGltfAnimationClip } from './GltfAnimationClips';
 import { createGltfLoader } from './GltfDisplay';
 import {
   applySkinnedModelFit,
@@ -23,10 +26,12 @@ export class VecnaTargetVisual {
   private rig: THREE.Group | null = null;
   private offset: THREE.Group | null = null;
   private model: THREE.Object3D | null = null;
+  private mixer: THREE.AnimationMixer | null = null;
+  private walkAction: THREE.AnimationAction | null = null;
   private glowLight: THREE.PointLight | null = null;
   private loadPromise: Promise<void> | null = null;
-  private groundY = 0;
-  private liftY = 0;
+  private pathT = 1;
+  private walking = false;
   private pulseT = 0;
   private hitFlash = 0;
 
@@ -34,13 +39,12 @@ export class VecnaTargetVisual {
     this.dispose();
     this.camera = camera;
 
-    this.groundY = surfaceYAtZ(VECNA_TARGET.z) + VECNA_MODEL_FOOT_LIFT;
     const anchor = new THREE.Group();
-    anchor.position.set(VECNA_TARGET.x, this.groundY, VECNA_TARGET.z);
     anchor.rotation.x = PLAYFIELD_TILT;
     anchor.visible = false;
     parent.add(anchor);
     this.anchor = anchor;
+    this.setPathProgress(0);
 
     const rig = new THREE.Group();
     anchor.add(rig);
@@ -62,9 +66,24 @@ export class VecnaTargetVisual {
     await renderer.compileAsync(this.anchor, camera, scene);
   }
 
-  setLift(lift: number): void {
-    this.liftY = lift;
-    if (this.anchor) this.anchor.position.y = this.groundY + lift;
+  beginReveal(): void {
+    this.walking = false;
+    this.walkAction?.stop();
+    this.setPathProgress(0);
+  }
+
+  prepareWalk(): void {
+    this.applyFit();
+    this.playWalk();
+  }
+
+  setPathProgress(t: number): void {
+    this.pathT = THREE.MathUtils.clamp(t, 0, 1);
+    if (!this.anchor) return;
+
+    const x = THREE.MathUtils.lerp(VECNA_SPAWN.x, VECNA_TARGET.x, this.pathT);
+    const z = THREE.MathUtils.lerp(VECNA_SPAWN.z, VECNA_TARGET.z, this.pathT);
+    this.anchor.position.set(x, surfaceYAtZ(z) + VECNA_MODEL_FOOT_LIFT, z);
   }
 
   show(): void {
@@ -76,14 +95,33 @@ export class VecnaTargetVisual {
       this.anchor.visible = false;
       this.anchor.scale.setScalar(1);
       this.anchor.rotation.z = 0;
-      this.anchor.position.y = this.groundY;
     }
-    this.liftY = 0;
+    this.walking = false;
+    this.walkAction?.stop();
+    this.pathT = 0;
     this.hitFlash = 0;
+    this.setPathProgress(0);
     if (this.glowLight) this.glowLight.intensity = 0;
   }
 
-  land(): void {
+  playWalk(): void {
+    if (!this.walkAction) return;
+    this.walking = true;
+    this.walkAction.reset();
+    this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
+    this.walkAction.play();
+  }
+
+  stopWalk(): void {
+    this.walking = false;
+    if (this.walkAction) {
+      this.walkAction.stop();
+      this.walkAction.time = 0;
+    }
+  }
+
+  settleForFight(): void {
+    this.stopWalk();
     this.applyFit();
   }
 
@@ -98,7 +136,10 @@ export class VecnaTargetVisual {
   update(dt: number): void {
     if (!this.anchor?.visible) return;
 
-    this.syncFacing();
+    this.mixer?.update(dt);
+
+    if (this.walking) this.syncWalkFacing();
+    else this.syncFacing();
 
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
 
@@ -115,13 +156,16 @@ export class VecnaTargetVisual {
     if (this.anchor) this.anchor.parent?.remove(this.anchor);
     this.anchor = null;
     this.camera = null;
+    this.mixer = null;
+    this.walkAction = null;
     this.glowLight = null;
     this.rig = null;
     this.offset = null;
     this.model = null;
+    this.walking = false;
     this.hitFlash = 0;
     this.pulseT = 0;
-    this.liftY = 0;
+    this.pathT = 0;
     this.loadPromise = null;
   }
 
@@ -129,20 +173,20 @@ export class VecnaTargetVisual {
     try {
       const gltf = await createGltfLoader().loadAsync(VECNA_MODEL_URL);
       if (!this.anchor) return;
-      this.attachModel(gltf.scene);
+      this.attachModel(gltf.scene, gltf.animations);
       await fitSkinnedModelWithRetry(
         () => this.applyFit(),
         VECNA_MODEL_FIT_FRAMES,
         () => this.anchor !== null,
       );
-      this.syncFacing();
-      this.setLift(this.liftY);
+      this.setPathProgress(this.pathT);
+      this.syncWalkFacing();
     } catch (err) {
       console.error('[Vecna] load error:', err);
     }
   }
 
-  private attachModel(model: THREE.Object3D): void {
+  private attachModel(model: THREE.Object3D, clips: THREE.AnimationClip[]): void {
     if (!this.anchor || !this.rig) return;
 
     this.rig.position.set(0, 0, 0);
@@ -169,6 +213,16 @@ export class VecnaTargetVisual {
         }
       }
     });
+
+    this.mixer = new THREE.AnimationMixer(model);
+    const walkClip = findGltfAnimationClip(clips, VECNA_ANIM_WALK);
+    if (walkClip) {
+      this.walkAction = this.mixer.clipAction(walkClip);
+      this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
+      this.walkAction.clampWhenFinished = false;
+    } else {
+      console.warn(`[Vecna] walk clip not found (token="${VECNA_ANIM_WALK}")`, clips.map((c) => c.name));
+    }
   }
 
   private applyFit(): boolean {
@@ -184,6 +238,13 @@ export class VecnaTargetVisual {
       fixedBindHeight: VECNA_MODEL_BIND_HEIGHT,
       beforeMeasure: () => updateSkinnedBindPose(this.model!),
     });
+  }
+
+  private syncWalkFacing(): void {
+    if (!this.rig) return;
+    const dz = VECNA_TARGET.z - VECNA_SPAWN.z;
+    const dx = VECNA_TARGET.x - VECNA_SPAWN.x;
+    this.rig.rotation.y = Math.atan2(dx, dz) + VECNA_MODEL_YAW;
   }
 
   private syncFacing(): void {

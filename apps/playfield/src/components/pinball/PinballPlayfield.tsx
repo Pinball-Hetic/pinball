@@ -63,6 +63,7 @@ import {
   UpsideDownPortal,
   UpsideDownTransition,
   UpsideDownAtmosphere,
+  VECNA_DEBUG_SPAWN_AT_START,
 } from "@pinball/game-engine";
 import type { ButtonAction, ButtonId } from "@pinball/shared-types";
 import { useGameState } from "@/hooks/useGameState";
@@ -671,7 +672,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         vecnaReveal = new VecnaReveal();
         vecnaReveal.setup({
           root: playfieldRoot,
-          scene,
           camera,
           garlandLights,
           bumperVisuals,
@@ -1058,6 +1058,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         demogorgonReveal?.setEmit(emit);
 
+        // Dev: force Upside Down + Vecna reveal (VECNA_DEBUG_SPAWN_AT_START).
+        const spawnDebugVecna = () => {
+          emit({ type: "PORTAL_TRANSITION_END" });
+          upsideDownAtmosphere?.debugForceActive();
+          collisionProcessor?.debugStartVecnaFight(scoreRef.current);
+          emit({ type: "VECNA_REVEAL", scoreIncrement: 0 });
+        };
+
         // ── Input handling ────────────────────────────────────────────────────
         console.log("[PinballPlayfield] KEYBOARD_MODE =", KEYBOARD_MODE);
 
@@ -1105,6 +1113,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                   vecnaReveal?.endFight();
                   upsideDownPortal?.reset();
                   upsideDownAtmosphere?.reset();
+                  if (VECNA_DEBUG_SPAWN_AT_START) spawnDebugVecna();
                   if (ballMesh) ballMesh.visible = true;
                   return;
                 }
@@ -1143,6 +1152,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 vecnaReveal?.endFight();
                 upsideDownPortal?.reset();
                 upsideDownAtmosphere?.reset();
+                if (VECNA_DEBUG_SPAWN_AT_START) spawnDebugVecna();
                 if (ballMesh) ballMesh.visible = true;
               }
             }
@@ -1241,6 +1251,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         physicsReadyRef.current = true;
         setPhysicsReady(true);
         onPlayfieldReady();
+        if (VECNA_DEBUG_SPAWN_AT_START) {
+          spawnDebugVecna();
+          beginSessionRef.current();
+        }
         debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);

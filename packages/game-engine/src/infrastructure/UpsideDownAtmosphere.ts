@@ -280,6 +280,15 @@ export class UpsideDownAtmosphere {
     this.targetMix = 0;
   }
 
+  /** Dev only — instant Upside Down visuals without portal transition. */
+  debugForceActive(): void {
+    this.visited = true;
+    this.targetMix = 1;
+    this.mix = 1;
+    this.applyMix(1);
+    this.updateSpores(0, 1);
+  }
+
   dispose(): void {
     this.applyMix(0);
     this.restoreFog();

@@ -13,6 +13,7 @@ import {
   DEMOGORGON_MODEL_YAW,
 } from '../domain/DemogorgonConstants';
 import { PLAYFIELD_TILT, surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { findGltfAnimationClip } from './GltfAnimationClips';
 import { createGltfLoader } from './GltfDisplay';
 import {
   applySkinnedModelFit,
@@ -20,14 +21,6 @@ import {
 } from './SkinnedModelFit';
 
 type AnimState = 'idle' | 'hit' | 'victory';
-
-function findAnimationClip(clips: THREE.AnimationClip[], token: string): THREE.AnimationClip | undefined {
-  const needle = token.toLowerCase();
-  return clips.find((clip) => {
-    const name = clip.name.toLowerCase();
-    return name === needle || name.endsWith(`|${needle}`);
-  });
-}
 
 export class DemogorgonTargetVisual {
   private anchor: THREE.Group | null = null;
@@ -244,11 +237,11 @@ export class DemogorgonTargetVisual {
     });
 
     this.mixer = new THREE.AnimationMixer(model);
-    const idleClip = findAnimationClip(clips, DEMOGORGON_ANIM_IDLE);
-    const hitClip = findAnimationClip(clips, DEMOGORGON_ANIM_HIT);
+    const idleClip = findGltfAnimationClip(clips, DEMOGORGON_ANIM_IDLE);
+    const hitClip = findGltfAnimationClip(clips, DEMOGORGON_ANIM_HIT);
     const victoryClip =
-      findAnimationClip(clips, DEMOGORGON_ANIM_VICTORY) ??
-      findAnimationClip(clips, DEMOGORGON_ANIM_VICTORY_FALLBACK);
+      findGltfAnimationClip(clips, DEMOGORGON_ANIM_VICTORY) ??
+      findGltfAnimationClip(clips, DEMOGORGON_ANIM_VICTORY_FALLBACK);
 
     if (idleClip) {
       this.idleAction = this.mixer.clipAction(idleClip);

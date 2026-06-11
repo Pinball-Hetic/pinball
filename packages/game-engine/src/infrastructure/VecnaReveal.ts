@@ -1,14 +1,11 @@
 import * as THREE from 'three';
 import type { GameEvent } from '../domain/GameEvents';
 import { VECNA_TARGET, VECNA_TARGET_HITS } from '../domain/Ball';
-import {
-  VECNA_DESCENT_DURATION,
-  VECNA_DESCENT_HEIGHT,
-} from '../domain/VecnaConstants';
+import { VECNA_WALK_DURATION } from '../domain/VecnaConstants';
 import { PLAYFIELD_TILT } from '../domain/PlayfieldGeometry';
-import { easeOut } from './CinematicEasing';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
+import { createBossTargetMesh } from './BossTargetMesh';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { VecnaTargetVisual } from './VecnaTargetVisual';
 
@@ -17,11 +14,10 @@ const VICTORY = 0.65;
 const TARGET_PULSE_SPEED = 2.2;
 const TARGET_PULSE_AMP = 0.16;
 
-type Phase = 'idle' | 'descend' | 'fight' | 'victory';
+type Phase = 'idle' | 'walk' | 'fight' | 'victory';
 
 export type VecnaSetup = {
   root: THREE.Object3D;
-  scene: THREE.Scene;
   camera: THREE.Camera;
   garlandLights: GarlandLights | null;
   bumperVisuals: BumperVisuals | null;
@@ -30,7 +26,6 @@ export type VecnaSetup = {
 };
 
 export class VecnaReveal {
-  private camera: THREE.Camera | null = null;
   private garlandLights: GarlandLights | null = null;
   private bumperVisuals: BumperVisuals | null = null;
   private onFightEnd: (() => void) | null = null;
@@ -61,7 +56,6 @@ export class VecnaReveal {
 
   setup(config: VecnaSetup): void {
     this.dispose();
-    this.camera = config.camera;
     this.garlandLights = config.garlandLights;
     this.bumperVisuals = config.bumperVisuals;
     this.onFightEnd = config.onFightEnd ?? null;
@@ -92,12 +86,7 @@ export class VecnaReveal {
 
   onGameEvent(event: GameEvent): void {
     if (event.type === 'VECNA_REVEAL') {
-      if (this.phase !== 'idle') return;
-      this.phase = 'descend';
-      this.elapsed = 0;
-      this.pulseT = 0;
-      this.vecnaVisual.setLift(VECNA_DESCENT_HEIGHT);
-      this.vecnaVisual.show();
+      this.startWalkPhase();
       return;
     }
     if (event.type === 'VECNA_TARGET_HIT') {
@@ -127,13 +116,12 @@ export class VecnaReveal {
 
     this.elapsed += dt;
 
-    if (this.phase === 'descend') {
-      const t = Math.min(1, this.elapsed / VECNA_DESCENT_DURATION);
-      const ease = easeOut(t);
-      const lift = VECNA_DESCENT_HEIGHT * (1 - ease);
-      this.vecnaVisual.setLift(lift);
-      this.cinematicStrobe.apply(false, false, 0.38 + ease * 0.18);
+    if (this.phase === 'walk') {
+      const t = Math.min(1, this.elapsed / VECNA_WALK_DURATION);
+      this.vecnaVisual.setPathProgress(t);
+      this.cinematicStrobe.apply(false, false, 0.48 + t * 0.16);
       if (t >= 1) {
+        this.vecnaVisual.setPathProgress(1);
         this.beginFightPhase();
       }
       return;
@@ -161,7 +149,6 @@ export class VecnaReveal {
     for (const m of this.ownedMats) m.dispose();
     this.ownedGeos = [];
     this.ownedMats = [];
-    this.camera = null;
     this.garlandLights = null;
     this.bumperVisuals = null;
     this.onFightEnd = null;
@@ -176,11 +163,21 @@ export class VecnaReveal {
     this.elapsed = 0;
   }
 
+  private startWalkPhase(): void {
+    if (this.phase !== 'idle') return;
+    this.phase = 'walk';
+    this.elapsed = 0;
+    this.pulseT = 0;
+    this.vecnaVisual.beginReveal();
+    this.vecnaVisual.show();
+    this.vecnaVisual.prepareWalk();
+  }
+
   private beginFightPhase(): void {
     this.phase = 'fight';
     this.elapsed = 0;
-    this.vecnaVisual.setLift(0);
-    this.vecnaVisual.land();
+    this.vecnaVisual.setPathProgress(1);
+    this.vecnaVisual.settleForFight();
     if (this.targetGroup) this.targetGroup.visible = true;
     this.onTargetReady?.();
     this.garlandLights?.setAtmosphere(0.94, 0.1, 2.5);
@@ -188,42 +185,27 @@ export class VecnaReveal {
   }
 
   private buildTargetMesh(): THREE.Group {
-    const group = new THREE.Group();
-
-    const ringGeo = new THREE.TorusGeometry(0.034, 0.004, 8, 24);
-    this.targetRingMat = new THREE.MeshStandardMaterial({
-      color: 0x6622aa,
-      emissive: 0x9933ff,
-      emissiveIntensity: 1.5,
-      metalness: 0.45,
-      roughness: 0.32,
+    const parts = createBossTargetMesh({
+      ring: {
+        color: 0x6622aa,
+        emissive: 0x9933ff,
+        emissiveIntensity: 1.5,
+        radius: 0.034,
+      },
+      core: {
+        color: 0xeeddff,
+        emissive: 0xaa55ff,
+        emissiveIntensity: 1.1,
+        radius: 0.015,
+      },
+      light: { color: 0x9933ff, intensity: 0.42 },
     });
-    const ring = new THREE.Mesh(ringGeo, this.targetRingMat);
-    ring.rotation.x = Math.PI / 2;
-    group.add(ring);
-    this.ownedGeos.push(ringGeo);
-    this.ownedMats.push(this.targetRingMat);
-
-    const coreGeo = new THREE.CircleGeometry(0.015, 16);
-    this.targetCoreMat = new THREE.MeshStandardMaterial({
-      color: 0xeeddff,
-      emissive: 0xaa55ff,
-      emissiveIntensity: 1.1,
-      metalness: 0.25,
-      roughness: 0.38,
-      side: THREE.DoubleSide,
-    });
-    const core = new THREE.Mesh(coreGeo, this.targetCoreMat);
-    core.rotation.x = -Math.PI / 2;
-    group.add(core);
-    this.ownedGeos.push(coreGeo);
-    this.ownedMats.push(this.targetCoreMat);
-
-    this.targetLight = new THREE.PointLight(0x9933ff, 0.42, 0.18, 2);
-    this.targetLight.position.y = 0.02;
-    group.add(this.targetLight);
-
-    return group;
+    this.targetRingMat = parts.ringMat;
+    this.targetCoreMat = parts.coreMat;
+    this.targetLight = parts.light;
+    this.ownedGeos.push(...parts.ownedGeos);
+    this.ownedMats.push(...parts.ownedMats);
+    return parts.group;
   }
 
   private updateTargetPulse(dt: number): void {
