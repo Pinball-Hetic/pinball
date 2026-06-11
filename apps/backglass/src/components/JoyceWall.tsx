@@ -25,11 +25,16 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
   const letterRefs = useRef<(HTMLSpanElement | null)[]>([])
   const queueRef = useRef<string[]>([])
   const busyRef = useRef(false)
-  const timersRef = useRef<number[]>([])
+  const timersRef = useRef<Set<number>>(new Set())
   const hitCursorRef = useRef(0)
 
+  // Set + auto-prune : sur une borne 24/7 l'array grossissait sans fin.
   const later = (fn: () => void, ms: number) => {
-    timersRef.current.push(window.setTimeout(fn, ms))
+    const id = window.setTimeout(() => {
+      timersRef.current.delete(id)
+      fn()
+    }, ms)
+    timersRef.current.add(id)
   }
 
   // Mutation DOM directe d'une ampoule (0 re-render React)

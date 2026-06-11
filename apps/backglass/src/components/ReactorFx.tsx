@@ -11,15 +11,20 @@ export default function ReactorFx({ reactor, stageRef }: ReactorFxProps) {
   const portalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    const handles = new Set<number>()
     const replay = (el: HTMLElement | null, cls: string, ms: number) => {
       if (!el) return
       el.classList.remove(cls)
       void el.offsetWidth // reflow
       el.classList.add(cls)
-      window.setTimeout(() => el.classList.remove(cls), ms)
+      const id = window.setTimeout(() => {
+        handles.delete(id)
+        el.classList.remove(cls)
+      }, ms)
+      handles.add(id)
     }
 
-    return reactor.on((r) => {
+    const off = reactor.on((r) => {
       if (r.kind === 'event' && r.label === 'PORTAL') {
         replay(portalRef.current, 'portal-wave-on', 1100)
       } else if (r.kind === 'gameStart') {
@@ -29,6 +34,10 @@ export default function ReactorFx({ reactor, stageRef }: ReactorFxProps) {
         replay(stageRef.current, 'stage-dimmed', 1600)
       }
     })
+    return () => {
+      off()
+      handles.forEach(window.clearTimeout)
+    }
   }, [reactor, stageRef])
 
   return <div ref={portalRef} className="portal-wave" />
