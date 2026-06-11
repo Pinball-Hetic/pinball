@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { GlobalStats, LeaderboardEntry } from '@pinball/shared-types'
+import type { LeaderboardEntry } from '@pinball/shared-types'
 import VhsGlitch from '../VhsGlitch'
 
 interface Props {
   entries: LeaderboardEntry[]
-  stats: GlobalStats
 }
 
 const PANEL_MS = 8_000
@@ -13,11 +12,11 @@ function fmt(n: number): string {
   return n.toLocaleString('fr-FR')
 }
 
-export default function AttractScene({ entries, stats }: Props) {
+export default function AttractScene({ entries }: Props) {
   const [panel, setPanel] = useState(0)
 
   useEffect(() => {
-    const t = window.setInterval(() => setPanel((p) => (p + 1) % 3), PANEL_MS)
+    const t = window.setInterval(() => setPanel((p) => (p + 1) % 2), PANEL_MS)
     return () => window.clearInterval(t)
   }, [])
 
@@ -53,25 +52,6 @@ export default function AttractScene({ entries, stats }: Props) {
               <div className="attract-giant">TENTEZ LE HALL OF FAME !</div>
             )}
             <div className="tk-invite">UNE PIÈCE, UNE LÉGENDE</div>
-          </div>
-        )}
-        {panel === 2 && (
-          <div className="tk-center">
-            <div className="tk-kicker">STATISTIQUES</div>
-            <div className="attract-stats">
-              <div>
-                <span className="attract-stat-v tabular-nums">{fmt(stats.totalGames)}</span>
-                <span className="attract-stat-l">PARTIES</span>
-              </div>
-              <div>
-                <span className="attract-stat-v tabular-nums">{fmt(stats.totalDemogorgons)}</span>
-                <span className="attract-stat-l">DEMOGORGONS</span>
-              </div>
-              <div>
-                <span className="attract-stat-v tabular-nums">{fmt(stats.totalPortals)}</span>
-                <span className="attract-stat-l">PORTAILS</span>
-              </div>
-            </div>
           </div>
         )}
       </div>

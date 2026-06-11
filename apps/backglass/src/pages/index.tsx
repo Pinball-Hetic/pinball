@@ -76,7 +76,7 @@ export default function BackglassPage() {
             )}
             {takeover.scene === 'DEMOGORGON' && <DemogorgonTakeover />}
             {takeover.scene === 'ATTRACT' && (
-              <AttractScene entries={entries} stats={stats} />
+              <AttractScene entries={entries} />
             )}
           </div>
         )}

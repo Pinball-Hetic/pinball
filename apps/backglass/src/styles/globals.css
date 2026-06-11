@@ -444,10 +444,6 @@ body {
 .attract-hof-row { display: grid; grid-template-columns: 80px 520px 260px; font-size: 48px; align-items: center; }
 .attract-hof-row span:last-child { text-align: right; }
 .attract-empty { font-size: 60px; opacity: 0.3; }
-.attract-stats { display: flex; gap: 90px; margin-top: 30px; }
-.attract-stats > div { display: flex; flex-direction: column; align-items: center; }
-.attract-stat-v { font-size: 110px; font-weight: 900; color: #fff; }
-.attract-stat-l { font-size: 26px; letter-spacing: 0.14em; opacity: 0.6; }
 
 /* ===================== VHS glitch ===================== */
 .vhs { position: absolute; inset: 0; overflow: hidden; }
