@@ -64,7 +64,6 @@ import {
   BossNestMarker,
   BOSS_IDS,
   getBossDefinition,
-  bossThresholdMet,
   type BossId,
   CinematicDirector,
   ScreenShake,
@@ -1020,6 +1019,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               collisionProcessor?.setBossFightActive(bossId as BossId, active),
             setBossTargetArmed: (bossId, armed) =>
               collisionProcessor?.setBossTargetArmed(bossId as BossId, armed),
+            bossGateContext: () => ({
+              totalScore: scoreRef.current,
+              upsideDownActive: collisionProcessor?.isUpsideDownActive() ?? false,
+              normalWorldScoreBaseline: collisionProcessor?.getNormalWorldScoreBaseline() ?? 0,
+              upsideDownScoreBaseline: collisionProcessor?.getUpsideDownScoreBaseline() ?? 0,
+            }),
+            isBossTriggered: (bossId) =>
+              collisionProcessor?.isBossTriggered(bossId as BossId) ?? false,
             addScore: (points, label) =>
               emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
             setMapState: (patch) => {
@@ -1268,29 +1275,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           vecnaReveal?.endFight();
           clearUpsideDownSession();
         };
-        // Réconcilie l'état visuel des marqueurs de nid avec la vérité du jeu :
-        // déclenché (reveal consommé) → revealed ; sinon palier atteint → armed,
-        // sinon locked. Idempotent (setState ignore l'état identique).
-        const syncNestMarkers = () => {
-          if (!nestMarker || !collisionProcessor) return;
-          const ctx = {
-            totalScore: scoreRef.current,
-            upsideDownActive: collisionProcessor.isUpsideDownActive(),
-            normalWorldScoreBaseline: collisionProcessor.getNormalWorldScoreBaseline(),
-            upsideDownScoreBaseline: collisionProcessor.getUpsideDownScoreBaseline(),
-          };
-          nestMarker.setUpsideDown(ctx.upsideDownActive);
-          for (const id of BOSS_IDS) {
-            if (collisionProcessor.isBossTriggered(id)) {
-              nestMarker.setState(id, "revealed");
-            } else {
-              nestMarker.setState(
-                id,
-                bossThresholdMet(getBossDefinition(id), ctx) ? "armed" : "locked",
-              );
-            }
-          }
-        };
+        // Réconciliation des marqueurs de nid : gérée par le module de map
+        // (fin de mapModule.onGameEvent, après chaque event).
         emit = (event) => {
           baseEmit(event);
           if (
@@ -1381,9 +1367,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             }
           }
 
-          // État des marqueurs de nid recalculé après chaque event (reveal,
-          // reset de combat, franchissement de palier, entrée/sortie Upside Down).
-          syncNestMarkers();
+          // État des marqueurs de nid : recalculé par le module de map.
         };
         launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
         bumperHitUC = new BumperHit(ballPhysicsInst, emit);

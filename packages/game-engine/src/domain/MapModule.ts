@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import type { MapManifest, MapState } from '@pinball/shared-types';
 import type { GameEvent } from './GameEvents';
+import type { BossGateContext } from './BossRegistry';
 import type { MapLayout } from './MapLayout';
 import type { PhysicsWorld } from '../infrastructure/PhysicsWorld';
 import type { BallPhysics } from '../infrastructure/BallPhysics';
@@ -60,6 +61,10 @@ export interface MapContext {
   setBossFightActive(bossId: string, active: boolean): void;
   /** Arme/désarme la cible d'un boss côté traitement collision. */
   setBossTargetArmed(bossId: string, armed: boolean): void;
+  /** Contexte de gate boss (score + monde + baselines) pour évaluer les seuils. */
+  bossGateContext(): BossGateContext;
+  /** True si le combat d'un boss est déclenché (reveal consommé). */
+  isBossTriggered(bossId: string): boolean;
 
   /** Ajoute du score (+ label DMD optionnel) via le scoring du jeu. */
   addScore(points: number, label?: string): void;

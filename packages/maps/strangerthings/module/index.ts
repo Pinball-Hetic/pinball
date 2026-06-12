@@ -8,6 +8,7 @@ import {
   DemogorgonReveal,
   VecnaReveal,
   BossRevealOrchestrator,
+  bossThresholdMet,
 } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 
@@ -212,6 +213,20 @@ export function createModule(): StModule {
             ctx.emitGameEvent({ type: 'RETURN_PORTAL_TRANSITION_END' })
           },
         )
+      }
+
+      // Reconciliation des marqueurs de nid après chaque event : déclenché →
+      // revealed ; sinon palier atteint → armed ; sinon locked. Idempotent.
+      if (nestMarker) {
+        const gate = ctx.bossGateContext()
+        nestMarker.setUpsideDown(gate.upsideDownActive)
+        for (const boss of ctx.layout.bosses) {
+          if (ctx.isBossTriggered(boss.id)) {
+            nestMarker.setState(boss.id, 'revealed')
+          } else {
+            nestMarker.setState(boss.id, bossThresholdMet(boss, gate) ? 'armed' : 'locked')
+          }
+        }
       }
     },
     update(dt: number): void {
