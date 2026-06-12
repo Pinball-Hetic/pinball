@@ -84,7 +84,7 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
   }
   if (meshes.length === 0) return null;
 
-  // Cas Strangerthings.glb : 2+ meshes qui couvrent CHACUN toute la largeur
+  // Cas GLB multi-mesh sol : 2+ meshes qui couvrent CHACUN toute la largeur
   // du playfield (base + plastique du même couple de flippers). On découpe
   // géométriquement le plus dense au X=0 pour obtenir 2 demi-meshes
   // gauche/droit, et on masque les autres.

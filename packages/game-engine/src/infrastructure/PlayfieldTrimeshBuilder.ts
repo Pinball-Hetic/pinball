@@ -81,7 +81,7 @@ const TRIMESH_DEDICATED = new Set([
 ]);
 
 /**
- * Meshes racines de scène (pas sous Pinballmap ni Strangerthings) qui doivent
+ * Meshes racines de scène (hors hiérarchie GLB connue) qui doivent
  * recevoir un collider trimesh. Typiquement : petites plaques/guides ajoutés
  * pour lisser une paroi où la balle se bloquait.
  * Noms normalisés (lowercase, espaces → underscores).

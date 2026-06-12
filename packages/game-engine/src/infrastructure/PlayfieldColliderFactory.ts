@@ -76,7 +76,7 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createPlayfieldFloor(world);
     PlayfieldColliderFactory.createBumpers(world, layout, colliderMap);
     PlayfieldColliderFactory.createSensors(world, layout, colliderMap);
-    // Sol analytique ACTIVÉ : le tapis Strangerthings est splitté en 2
+    // Sol analytique ACTIVÉ : le tapis GLB est splitté en 2
     // trimeshes avec une couture à Z≈-0.286 en plein couloir (+ lèvre ~3mm
     // sur Circle.001). Le strip lisse shadow la couture → launch fiable.
     PlayfieldColliderFactory.createShooterLane(world, layout, { includeFloor: true });
@@ -84,7 +84,7 @@ export class PlayfieldColliderFactory {
 
   /**
    * Couloir plongeur analytique : murs + guide (+ sol optionnel).
-   * Sur Strangerthings le sol analytique est REQUIS : le tapis GLB est
+   * Quand le sol GLB est multi-mesh, le sol analytique est REQUIS : le tapis GLB est
    * splitté en 2 trimeshes (Mesh_1 / Circle.001) avec une couture + lèvre
    * ~3mm à Z≈-0.286 en plein couloir → la bille montante déviait. Le strip
    * lisse (createShooterLaneFloor) shadow la couture. includeFloor: true.
