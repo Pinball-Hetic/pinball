@@ -32,6 +32,9 @@ export interface MapManifest {
   sounds?: Record<string, { url: string; volume?: number }>
   /** Libellés des compteurs (GameStats.counters) par id, pour le recap backglass. */
   counterLabels?: Record<string, string>
+  /** Clés de mapState pilotables par l'outil de debug (dev). Permet au debug
+   *  d'éditer le mapState d'une map sans clés en dur. */
+  debugMapState?: { numbers?: string[]; flags?: string[] }
   glb: string // relatif au dossier assets/ du package
   scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
   rules: {

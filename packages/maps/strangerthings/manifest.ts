@@ -30,6 +30,8 @@ export const manifest: MapManifest = {
   },
   // Libellés des compteurs (recap backglass).
   counterLabels: { demogorgons: 'DEMOGORGONS', portals: 'PORTAILS', hetic: 'HETIC' },
+  // Clés de mapState éditables par l'outil de debug (dev).
+  debugMapState: { numbers: ['hetic'], flags: ['fever'] },
   glb: 'playfield/newStrangerthings.glb',
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {

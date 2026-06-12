@@ -23,6 +23,9 @@ const CINEMATIC_CLIPS = [
   'hall_of_fame' as CinematicClip,
   'skill_shot' as CinematicClip,
 ]
+// Clés de mapState éditables, déclarées par la map (pas de clé en dur).
+const MAP_STATE_NUMBERS = MAP_PKG?.manifest.debugMapState?.numbers ?? []
+const MAP_STATE_FLAGS = MAP_PKG?.manifest.debugMapState?.flags ?? []
 
 const PLAYER = 'DEBUG'
 const DEBUG_STATS: GameStats = {
@@ -42,7 +45,10 @@ export default function DebugPage() {
   const [combo, setCombo] = useState(6)
   const [multi, setMulti] = useState(3)
   const [lives, setLives] = useState(2)
-  const [hetic, setHetic] = useState(3)
+  // mapState numérique générique (clés = MAP_STATE_NUMBERS de la map).
+  const [mapNums, setMapNums] = useState<Record<string, number>>(() =>
+    Object.fromEntries(MAP_STATE_NUMBERS.map((k) => [k, 0])),
+  )
   const udRef = useRef(ud)
   udRef.current = ud
 
@@ -66,20 +72,26 @@ export default function DebugPage() {
 
   const pushDisplay = (d: DmdDisplay) => socketRef.current?.emit('dmd:display', d)
 
+  // Construit le mapState générique (numériques + flags à false) pour les events.
+  const mapStateOf = (nums: Record<string, number>) => ({
+    ...nums,
+    ...Object.fromEntries(MAP_STATE_FLAGS.map((f) => [f, false])),
+  })
+
   const scoreSnap = () => ({
     player: PLAYER,
     score,
     combo,
     multiplier: multi,
     lives,
-    mapState: { hetic, fever: false },
+    mapState: mapStateOf(mapNums),
     alternateWorld: udRef.current,
   })
 
   const addScore = (amount: number) =>
     socketRef.current?.emit('dev:trigger-game-event', { type: 'DEBUG_ADD_SCORE', amount })
 
-  const heticComplete = async () => {
+  const dropTargetCompleteX5 = async () => {
     for (let i = 0; i < 5; i++) {
       triggerEvent('DROP_TARGET_COMPLETE')
       // eslint-disable-next-line no-await-in-loop
@@ -127,7 +139,7 @@ export default function DebugPage() {
         combo: i,
         multiplier: 1 + Math.floor(i / 3),
         lives: 3,
-        mapState: { hetic: 0, fever: false },
+        mapState: mapStateOf(Object.fromEntries(MAP_STATE_NUMBERS.map((k) => [k, 0]))),
       })
       // eslint-disable-next-line no-await-in-loop
       await wait(150)
@@ -188,7 +200,14 @@ export default function DebugPage() {
             <NumIn label="combo" value={combo} onChange={setCombo} />
             <NumIn label="multi" value={multi} onChange={setMulti} />
             <NumIn label="lives" value={lives} onChange={setLives} />
-            <NumIn label="hetic" value={hetic} onChange={setHetic} />
+            {MAP_STATE_NUMBERS.map((k) => (
+              <NumIn
+                key={k}
+                label={k}
+                value={mapNums[k] ?? 0}
+                onChange={(n) => setMapNums((prev) => ({ ...prev, [k]: n }))}
+              />
+            ))}
           </div>
           <Btn onClick={() => pushDisplay({ mode: 'SCORE', ...scoreSnap() })}>SCORE</Btn>
           <Btn
@@ -245,11 +264,11 @@ export default function DebugPage() {
           <Btn onClick={() => addScore(30000)}>+30 000</Btn>
         </Group>
 
-        <Group title="HETIC">
+        <Group title="Drop targets / collecte">
           <Btn onClick={() => triggerEvent('DROP_TARGET_COMPLETE')}>
-            LETTRE +1 (drop complete)
+            DROP COMPLETE +1
           </Btn>
-          <Btn onClick={heticComplete}>HETIC COMPLET (×5)</Btn>
+          <Btn onClick={dropTargetCompleteX5}>DROP COMPLETE (×5)</Btn>
         </Group>
 
         <Group title="Partie simulée">
