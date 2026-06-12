@@ -33,6 +33,8 @@ export const bossDefinitions: BossDefinition[] = [
     unlocksReturnPortal: false,
     revealSoundUrl: '/audio/spawnDG.mp3',
     revealSoundVolume: 100,
+    // Eleven aide pendant le fight (cf. DemogorgonReveal émet ASSIST id 'eleven').
+    assist: { id: 'eleven' },
     targetMeshTheme: {
       ring: {
         color: 0xff2244,

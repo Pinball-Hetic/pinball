@@ -86,6 +86,9 @@ export type BossDefinition = {
   revealSoundUrl?: string;
   /** Volume du son de reveal (0–100+, relatif au bus). Défaut 100. */
   revealSoundVolume?: number;
+  /** Assist périodique associé à ce boss (allié qui aide pendant le fight).
+   *  `id` est matché contre ASSIST.assistId. Absent → ce boss n'a pas d'assist. */
+  assist?: { id: string };
 };
 
 /** Contexte minimal pour évaluer le gate de reveal d'un boss (score + monde alternatif). */

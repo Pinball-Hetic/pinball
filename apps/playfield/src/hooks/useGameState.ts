@@ -45,8 +45,6 @@ export interface ScoringCallbacks {
   onAtmosphereChange?: (alternateWorldActive: boolean) => void;
   onMilestone?: (threshold: number) => void;
   onBossArmed?: (bossId: BossId) => void; // palier franchi → le nid s'éveille (1×/partie)
-  onHeticLetter?: (letterIndex: number) => void; // 1-4
-  onHeticComplete?: () => void;
   onFeverEnd?: () => void;
 }
 
@@ -145,7 +143,9 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
   const lastEventTimeRef = useRef(0);
   const playerRef = useRef(player);
   const victoryTimersRef = useRef<Partial<Record<BossId, number>>>({});
-  const elevenTimerRef = useRef<number | null>(null);
+  // Timer du flash d'assist (générique : le boss propriétaire est déduit de
+  // sa def via `assist`). Un seul assist actif à la fois.
+  const assistTimerRef = useRef<number | null>(null);
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
   const alternateWorldHintTimerRef = useRef<number | null>(null);
@@ -219,12 +219,14 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       window.clearTimeout(timer);
       delete victoryTimersRef.current[id];
     }
-    if (id === "demogorgon" && elevenTimerRef.current !== null) {
-      window.clearTimeout(elevenTimerRef.current);
-      elevenTimerRef.current = null;
+    // Annule le flash d'assist si CE boss en possède un (plus de nom en dur).
+    const def = getBossById(bosses, id);
+    if (def?.assist && assistTimerRef.current !== null) {
+      window.clearTimeout(assistTimerRef.current);
+      assistTimerRef.current = null;
     }
     setBossHud((prev) => ({ ...prev, [id]: initialBossHudEntry() }));
-  }, []);
+  }, [bosses]);
 
   const clearAllBossHud = useCallback(() => {
     for (const id of bossIds) {
@@ -234,14 +236,19 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
 
   const clearAlternateWorldSession = useCallback(() => {
     clearAlternateWorldHint();
-    clearBossHud("vecna");
+    // Boss liés au monde alternatif (reveal gaté requiresAlternateWorld) : reset
+    // HUD + ré-armement, sans nom en dur. Ils se ré-annoncent à la prochaine
+    // entrée dans le monde alternatif.
+    for (const def of bosses) {
+      if (!def.reveal.requiresAlternateWorld) continue;
+      clearBossHud(def.id);
+      bossArmedFiredRef.current.delete(def.id);
+    }
     callbacks?.onAtmosphereChange?.(false);
     setAlternateWorldActive(false);
     alternateWorldActiveRef.current = false;
     alternateWorldBaselineRef.current = 0;
-    // Le nid de vecna pourra se ré-annoncer à la prochaine entrée monde alternatif.
-    bossArmedFiredRef.current.delete("vecna");
-  }, [clearAlternateWorldHint, clearBossHud, callbacks]);
+  }, [clearAlternateWorldHint, clearBossHud, callbacks, bosses]);
 
   const updateGameState = (state: GameState) => {
     gameStateRef.current = state;
@@ -353,7 +360,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
 
         // Éveil du nid : palier de boss franchi → onBossArmed une fois par partie.
         // Le set garde l'unicité ; le gate monde alternatif/baseline est porté par
-        // bossThresholdMet (généricité demogorgon + vecna).
+        // bossThresholdMet (générique pour tout boss, gate monde alternatif inclus).
         for (const id of bossIds) {
           if (bossArmedFiredRef.current.has(id)) continue;
           const def = getBossById(bosses, id); if (!def) continue;
@@ -438,24 +445,25 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         }));
       }
       if (event.type === "ASSIST") {
-        setBossHud((prev) => ({
-          ...prev,
-          demogorgon: {
-            ...prev.demogorgon,
-            active: true,
-            assistFlash: true,
-          },
-        }));
-        if (elevenTimerRef.current !== null) {
-          window.clearTimeout(elevenTimerRef.current);
-        }
-        elevenTimerRef.current = window.setTimeout(() => {
-          elevenTimerRef.current = null;
+        // Boss propriétaire de l'assist déduit de sa def (assist.id), pas en dur.
+        const assistBoss = bosses.find((b) => b.assist?.id === event.assistId);
+        if (assistBoss) {
+          const bossId = assistBoss.id;
           setBossHud((prev) => ({
             ...prev,
-            demogorgon: { ...prev.demogorgon, assistFlash: false },
+            [bossId]: { ...prev[bossId], active: true, assistFlash: true },
           }));
-        }, 900);
+          if (assistTimerRef.current !== null) {
+            window.clearTimeout(assistTimerRef.current);
+          }
+          assistTimerRef.current = window.setTimeout(() => {
+            assistTimerRef.current = null;
+            setBossHud((prev) => ({
+              ...prev,
+              [bossId]: { ...prev[bossId], assistFlash: false },
+            }));
+          }, 900);
+        }
       }
       if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
         comboRef.current = 0;
@@ -468,8 +476,8 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
           clearAllBossHud();
         }
       }
-      // DROP_TARGET_COMPLETE (compteur hetic + cinématiques) : géré par le
-      // module de map.
+      // DROP_TARGET_COMPLETE (compteur de collecte + cinématiques) : géré par
+      // le module de map.
       if (event.type === "BALL_LAUNCHED") {
         if (gameStartRef.current === 0) gameStartRef.current = now;
         if (gameStateRef.current === "idle") callbacks?.onGameStart?.();
