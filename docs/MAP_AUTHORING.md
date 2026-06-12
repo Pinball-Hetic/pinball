@@ -31,6 +31,21 @@ Règles :
   signalé une fois (`MeshRoleResolver.warnUnresolvedOnce`). Mettre `vis_`
   devant tout décor pour faire taire l'avertissement.
 
+### Préfixer le groupe parent (recommandé)
+
+On nomme l'**objet Blender** (le nœud parent), pas chaque primitive. À
+l'export glTF, un objet multi-matériaux est splitté en primitives nommées
+automatiquement (`Circle.018` → `Mesh_8/9/10`) : ces enfants n'ont pas à être
+renommés, ils **héritent** du rôle du parent.
+
+`MeshRoleResolver.resolveFromAncestry([mesh, parent, …, racine])` remonte la
+hiérarchie : le préfixe le plus **spécifique** gagne. Donc :
+- préfixer le groupe → tous ses enfants prennent le rôle ;
+- un enfant nommé explicitement **surcharge** le rôle de son groupe.
+
+Exemple : objet `wall_rail_left` contenant `Mesh_8/9/10` → les 3 primitives
+sont des murs. Pas besoin de toucher aux `Mesh_N`.
+
 ### Tuning par élément (`manifest.elements`)
 
 Certains rôles ont des variantes physiques. Les exprimer dans
@@ -108,9 +123,11 @@ faut leur attribuer un rôle explicite au ré-export :
 - **`Mesh_1`** (murs moulés plein plateau) : `wall_main` +
   `manifest.elements.wall_main.singleSided: 1` (normales vers l'intérieur).
 - **Groupes `Circle.xxx` / `Cylinder.008` / `Plane.008` / `Cube.xxx` /
-  `Sphere.001`** (rails, guides, plastiques — `Mesh_2…Mesh_58`) : aujourd'hui
-  filtrés par taille (`RAIL_SUBMESH_MIN_PHYS_DIM` = 25 mm ; les sous-meshes
-  dont les 2 plus petites dimensions < 25 mm sont décoratifs). Au ré-export :
+  `Sphere.001`** (rails, guides, plastiques) : ce sont les **objets parents**
+  ; renommer l'objet, pas les `Mesh_N` enfants (primitives héritées).
+  Aujourd'hui filtrés par taille (`RAIL_SUBMESH_MIN_PHYS_DIM` = 25 mm ; les
+  sous-meshes dont les 2 plus petites dimensions < 25 mm sont décoratifs). Au
+  ré-export, donner le préfixe au groupe :
   - rails/guides structurels (≥ 25 mm) → `wall_<id>`
   - détails fins (vis, clips, anneaux) → `vis_<id>`
 

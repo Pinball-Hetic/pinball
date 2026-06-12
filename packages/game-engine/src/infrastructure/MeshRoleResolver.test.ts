@@ -37,6 +37,31 @@ describe('MeshRoleResolver.resolve', () => {
   });
 });
 
+describe('MeshRoleResolver.resolveFromAncestry', () => {
+  test('hérite du préfixe du parent (groupe)', () => {
+    const r = new MeshRoleResolver();
+    // Mesh_8 (primitive) sans rôle, mais son parent Circle.018 → wall_rail_left.
+    expect(r.resolveFromAncestry(['Mesh_8', 'wall_rail_left'])).toEqual({
+      role: 'wall',
+      id: 'rail_left',
+    });
+  });
+
+  test('le plus spécifique gagne (enfant surcharge le groupe)', () => {
+    const r = new MeshRoleResolver();
+    expect(r.resolveFromAncestry(['target_left_1', 'vis_decor_group'])).toEqual({
+      role: 'target',
+      id: 'left_1',
+    });
+  });
+
+  test('aucun ancêtre résolu → null + mesh enregistré', () => {
+    const r = new MeshRoleResolver();
+    expect(r.resolveFromAncestry(['Mesh_8', 'Circle.018', 'Pinballmap'])).toBeNull();
+    expect(r.getUnresolved()).toEqual(['Mesh_8']);
+  });
+});
+
 describe('MeshRoleResolver aliases', () => {
   test('alias appliqué avant le matching de préfixe', () => {
     const r = new MeshRoleResolver({

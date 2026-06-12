@@ -62,18 +62,39 @@ export class MeshRoleResolver {
     }
   }
 
-  /** Rôle + id du mesh, ou null si non reconnu (enregistré pour warn agrégé). */
-  resolve(meshName: string): ResolvedRole | null {
-    const norm = normalizeMeshName(meshName);
+  /** Matche un seul nom (alias + préfixe), sans effet de bord. */
+  private match(name: string): ResolvedRole | null {
+    const norm = normalizeMeshName(name);
     const canonical = this.aliases[norm] ?? norm;
-
     for (const [prefix, role] of PREFIXES) {
       if (canonical.startsWith(prefix)) {
         return { role, id: canonical.slice(prefix.length) };
       }
     }
+    return null;
+  }
 
-    this.unresolved.add(meshName);
+  /** Rôle + id du mesh, ou null si non reconnu (enregistré pour warn agrégé). */
+  resolve(meshName: string): ResolvedRole | null {
+    const r = this.match(meshName);
+    if (!r) this.unresolved.add(meshName);
+    return r;
+  }
+
+  /**
+   * Résout en remontant la hiérarchie : noms du mesh vers la racine, premier
+   * préfixe reconnu gagne (le plus spécifique d'abord). Permet de préfixer un
+   * GROUPE parent une seule fois pour tous ses enfants — les primitives
+   * issues d'un split par matériau (ex. `Circle.018` → `Mesh_8/9/10`)
+   * héritent du rôle du parent. Un enfant nommé peut surcharger son groupe.
+   */
+  resolveFromAncestry(namesFromSelfToRoot: string[]): ResolvedRole | null {
+    for (const name of namesFromSelfToRoot) {
+      const r = this.match(name);
+      if (r) return r;
+    }
+    // Aucun ancêtre résolu → enregistre le nom le plus spécifique (le mesh).
+    if (namesFromSelfToRoot.length > 0) this.unresolved.add(namesFromSelfToRoot[0]);
     return null;
   }
 
