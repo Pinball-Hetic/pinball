@@ -7,7 +7,7 @@ import type {
   GameOver,
   CinematicClip,
 } from '@pinball/shared-types'
-import { CLIP_SHOW_MS } from '@pinball/shared-types'
+import { clipShowMs } from '@pinball/shared-types'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
@@ -172,11 +172,10 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       upsideDownRef.current = d.upsideDown ?? false
       if ('fever' in d) feverRef.current = d.fever
       if (d.mode === 'CINEMATIC') {
-        // Garde kiosk : un clip absent/inconnu (event serveur malformé)
-        // donnerait CLIP_SHOW_MS[clip] = undefined → expiresAt NaN →
-        // takeover figé. Aucun throw ⇒ l'ErrorBoundary ne le rattrape pas,
-        // donc on filtre ici avant de polluer la pile.
-        if (d.clip == null || CLIP_SHOW_MS[d.clip] == null) return
+        // Garde kiosk : event serveur malformé sans clip. Un clip inconnu
+        // ne crashe plus (clipShowMs garantit un nombre → jamais de NaN sur
+        // expiresAt) : il tombe sur la branche default → scène générique.
+        if (d.clip == null) return
         markActivity()
         const now = performance.now()
         const pushTk = (durationMs: number) =>
@@ -213,8 +212,10 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
             feverRef.current = true
             break
           default:
-            // demogorgon_rises/slain, portal_swallow, last_chance, hall_of_fame
-            pushTk(CLIP_SHOW_MS[d.clip])
+            // demogorgon_rises/slain, portal_swallow, last_chance,
+            // hall_of_fame + tout clip inconnu (scène générique via
+            // CinematicTakeover, durée SHOW gardée par clipShowMs).
+            pushTk(clipShowMs(d.clip))
             if (d.clip === 'demogorgon_rises') pushJoyce('RUN')
             if (d.clip === 'last_chance') pushJoyce('DERNIERE VIE')
         }

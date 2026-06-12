@@ -58,19 +58,15 @@ export interface ScoreUpdate {
   fever: boolean
 }
 
-export type CinematicClip =
-  | 'demogorgon_rises' // 1er reveal boss
-  | 'portal_swallow' // entrée Upside Down (transition existante 4s)
-  | 'demogorgon_slain' // victoire boss
-  | 'last_chance' // dernière vie engagée
-  | 'hall_of_fame' // game over qualifiant
-  | 'milestone_5k'
-  | 'milestone_15k'
-  | 'milestone_30k'
-  | 'milestone_big'
-  | 'hetic_letter'
-  | 'hetic_complete'
-  | 'skill_shot' // réservé (implémentation plus tard)
+// Identifiant de clip cinématique. Type ouvert (string) : une map définit
+// ses propres clips sans éditer shared-types. Les noms ci-dessous (ST) ne
+// sont plus une union fermée — ils vivent désormais dans les tables de
+// timing, qui migreront dans le package map en phase 5.
+export type ClipId = string
+
+// Alias transitoire (limite le churn des imports existants). À retirer
+// quand tous les consommateurs auront migré vers ClipId.
+export type CinematicClip = ClipId
 
 export type DmdDisplay =
   | { mode: 'INTRO'; player: string; upsideDown: boolean }
@@ -137,7 +133,7 @@ export interface SensorInput {
 
 // Durée du SHOW : combien de temps DMD/backglass jouent le clip (peut
 // dépasser le gel → phase célébration pendant que le jeu a repris).
-export const CLIP_SHOW_MS: Record<CinematicClip, number> = {
+export const CLIP_SHOW_MS: Record<ClipId, number> = {
   demogorgon_rises: 10_000, // 6s gel + 4s célébration
   portal_swallow: 4_000,
   demogorgon_slain: 15_000, // 8s gel + 7s célébration
@@ -155,12 +151,12 @@ export const CLIP_SHOW_MS: Record<CinematicClip, number> = {
 // Durée d'occupation de la pile DMD (segment plein écran). Par défaut =
 // CLIP_SHOW_MS ; surchargé quand le visuel est plus court que le SHOW (ex.
 // hetic_complete : 10s de cinématique puis 30s d'état fever en mode SCORE).
-export const CLIP_TAKEOVER_MS: Partial<Record<CinematicClip, number>> = {
+export const CLIP_TAKEOVER_MS: Partial<Record<ClipId, number>> = {
   hetic_complete: 10_000,
 }
 
 // Durée du GEL physique playfield (0 = pas de pause du gameplay).
-export const CLIP_FREEZE_MS: Record<CinematicClip, number> = {
+export const CLIP_FREEZE_MS: Record<ClipId, number> = {
   demogorgon_rises: 6_000,
   portal_swallow: 4_000,
   demogorgon_slain: 8_000,
@@ -173,4 +169,23 @@ export const CLIP_FREEZE_MS: Record<CinematicClip, number> = {
   hetic_letter: 2_000,
   hetic_complete: 10_000,
   skill_shot: 2_000,
+}
+
+// Durée SHOW par défaut pour un clip absent des tables (clip inconnu ou
+// défini par une map sans timing explicite). Le jeu ne crashe jamais : il
+// rend un visuel générique pendant cette durée.
+export const DEFAULT_CLIP_SHOW_MS = 4_000
+
+// Lookups gardés — source de vérité unique. Un clip absent retombe sur des
+// valeurs sûres (jamais undefined → jamais de NaN downstream).
+export function clipShowMs(id: ClipId): number {
+  return CLIP_SHOW_MS[id] ?? DEFAULT_CLIP_SHOW_MS
+}
+
+export function clipFreezeMs(id: ClipId): number {
+  return CLIP_FREEZE_MS[id] ?? 0
+}
+
+export function clipTakeoverMs(id: ClipId): number | undefined {
+  return CLIP_TAKEOVER_MS[id]
 }

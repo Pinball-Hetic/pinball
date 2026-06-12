@@ -93,7 +93,7 @@ import type {
   CinematicClip,
   DevGameEventTrigger,
 } from "@pinball/shared-types";
-import { CLIP_FREEZE_MS } from "@pinball/shared-types";
+import { clipFreezeMs } from "@pinball/shared-types";
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -414,7 +414,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       clip: CinematicClip,
       opts?: { once?: boolean; value?: number; onEnd?: () => void },
     ): boolean => {
-      const freezeMs = CLIP_FREEZE_MS[clip];
+      const freezeMs = clipFreezeMs(clip);
       // Clip avec gel → passe par le director (pause physique). Sans gel
       // (freeze 0) → simple push DMD, le jeu continue.
       if (freezeMs > 0) {

@@ -8,7 +8,7 @@ import type {
   GameStats,
   CinematicClip,
 } from '@pinball/shared-types';
-import { CLIP_SHOW_MS, CLIP_TAKEOVER_MS } from '@pinball/shared-types';
+import { clipShowMs, clipTakeoverMs } from '@pinball/shared-types';
 import type { GameEvent } from '@pinball/game-engine';
 import { getBossDefinition } from '@pinball/game-engine';
 
@@ -231,7 +231,7 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       push(
         { mode: 'CINEMATIC', clip, player, score, value },
         // Segment plein écran : le mode SCORE reprend après (fever en SCORE).
-        { priority: PRIO.CINEMATIC, duration: CLIP_TAKEOVER_MS[clip] ?? CLIP_SHOW_MS[clip] },
+        { priority: PRIO.CINEMATIC, duration: clipTakeoverMs(clip) ?? clipShowMs(clip) },
       );
     },
 
