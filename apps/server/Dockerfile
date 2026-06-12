@@ -18,7 +18,12 @@ RUN bun run --filter @pinball/server prisma:generate
 # Build du serveur
 RUN bun run --filter @pinball/server build
 
+# Entrypoint : applique les migrations Prisma avant de lancer le CMD
+RUN chmod +x /app/apps/server/docker-entrypoint.sh
+
 EXPOSE 3001
 
-# Lancement direct avec bun
+# ENTRYPOINT s'exécute toujours (même si le compose dev override le CMD) →
+# migrations appliquées dans les deux environnements.
+ENTRYPOINT ["/app/apps/server/docker-entrypoint.sh"]
 CMD ["bun", "apps/server/src/interface/index.ts"]
