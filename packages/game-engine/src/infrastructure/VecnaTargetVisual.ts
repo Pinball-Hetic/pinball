@@ -24,6 +24,10 @@ import {
   updateSkinnedBindPose,
 } from './SkinnedModelFit';
 
+// Scratch vector reused every frame in cameraFacingY() to avoid per-frame
+// allocation during the fight/settle phases (mirrors DemogorgonTargetVisual).
+const _vecnaFacingPos = new THREE.Vector3();
+
 export class VecnaTargetVisual {
   private anchor: THREE.Group | null = null;
   private camera: THREE.Camera | null = null;
@@ -181,17 +185,6 @@ export class VecnaTargetVisual {
     this.syncFacing();
   }
 
-  stopWalk(): void {
-    this.walking = false;
-    this.walkElapsed = 0;
-    this.settling = false;
-    if (this.walkAction) {
-      this.walkAction.stop();
-      this.walkAction.time = 0;
-      this.walkAction.clampWhenFinished = false;
-    }
-  }
-
   playHit(): void {
     this.hitFlash = 0.18;
   }
@@ -338,10 +331,9 @@ export class VecnaTargetVisual {
   private cameraFacingY(): number | null {
     if (!this.anchor || !this.camera) return null;
 
-    const anchorPos = new THREE.Vector3();
-    this.anchor.getWorldPosition(anchorPos);
-    const dx = this.camera.position.x - anchorPos.x;
-    const dz = this.camera.position.z - anchorPos.z;
+    this.anchor.getWorldPosition(_vecnaFacingPos);
+    const dx = this.camera.position.x - _vecnaFacingPos.x;
+    const dz = this.camera.position.z - _vecnaFacingPos.z;
     return Math.atan2(dx, dz) + VECNA_MODEL_YAW;
   }
 }

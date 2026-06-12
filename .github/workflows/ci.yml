@@ -28,4 +28,4 @@ jobs:
         run: bun run build
 
       - name: Test all packages
-        run: bun run test || echo "No tests yet"
+        run: bun run test

@@ -1,4 +1,4 @@
-import type { BossId, BossDefinition } from '../domain/BossRegistry';
+import type { BossId } from '../domain/BossRegistry';
 import { BOSS_IDS, getBossByColliderRole, getBossDefinition } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import { BossTargetSensor } from './BossTargetSensor';
@@ -52,12 +52,25 @@ export class BossFightManager {
     state.sensor.beginFight(targetArmed);
   }
 
+  /** True if any boss OTHER than `except` is currently in an active (scoreable)
+   *  fight. Used to keep at most one boss armed at a time — the boss target
+   *  sensors physically overlap, so two simultaneously-armed bosses would let a
+   *  single ball pass double-credit hits. */
+  private anyOtherFightActive(except: BossId): boolean {
+    for (const [id, state] of this.states) {
+      if (id !== except && state.sensor.fightActive) return true;
+    }
+    return false;
+  }
+
   tryReveal(id: BossId, context: BossRevealContext): void {
     const def = getBossDefinition(id);
     const state = this.states.get(id);
     if (!state) return;
     if (context.gameState !== 'playing') return;
     if (state.triggered) return;
+    // One boss fight at a time — don't reveal while another is still active.
+    if (this.anyOtherFightActive(id)) return;
     if (def.reveal.requiresUpsideDown && !context.upsideDownActive) return;
 
     const score = def.reveal.useUpsideDownScoreBaseline
@@ -79,14 +92,6 @@ export class BossFightManager {
     }
   }
 
-  prepareDebugFight(id: BossId, score: number, upsideDown: { active: boolean; baseline: number }): void {
-    if (getBossDefinition(id).reveal.requiresUpsideDown) {
-      upsideDown.active = true;
-      upsideDown.baseline = score;
-    }
-    this.beginFight(id, false);
-  }
-
   handleTargetCollision(role: string, started: boolean, gameState: string): boolean {
     const def = getBossByColliderRole(role);
     if (!def) return false;
@@ -106,9 +111,5 @@ export class BossFightManager {
       },
     });
     return true;
-  }
-
-  getDefinition(id: BossId): BossDefinition {
-    return getBossDefinition(id);
   }
 }

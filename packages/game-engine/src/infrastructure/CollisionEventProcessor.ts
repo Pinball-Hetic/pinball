@@ -66,28 +66,12 @@ export class CollisionEventProcessor {
     this.resetBossFight('vecna');
   }
 
-  tryBossReveal(id: BossId, totalScore: number, gameState: string): void {
-    this.bossFights.tryReveal(id, {
-      totalScore,
-      gameState,
-      upsideDownActive: this.upsideDownActive,
-      upsideDownScoreBaseline: this.upsideDownScoreBaseline,
-    });
-  }
-
   tryAllBossReveals(totalScore: number, gameState: string): void {
     this.bossFights.tryAllReveals({
       totalScore,
       gameState,
       upsideDownActive: this.upsideDownActive,
       upsideDownScoreBaseline: this.upsideDownScoreBaseline,
-    });
-  }
-
-  prepareBossDebugFight(id: BossId, score: number): void {
-    this.bossFights.prepareDebugFight(id, score, {
-      active: this.upsideDownActive,
-      baseline: this.upsideDownScoreBaseline,
     });
   }
 

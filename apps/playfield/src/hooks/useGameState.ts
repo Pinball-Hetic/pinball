@@ -360,7 +360,8 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           tone: "target",
         });
         const victory = event.hitCount >= def.targetHits;
-        if (victory && event.bossId === "demogorgon") demogorgonsRef.current += 1;
+        // Counts ANY boss defeated (field GameStats.demogorgons = "boss vaincus").
+        if (victory) demogorgonsRef.current += 1;
         setBossHud((prev) => ({
           ...prev,
           [event.bossId]: {

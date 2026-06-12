@@ -220,6 +220,10 @@ export class DemogorgonReveal implements BossRevealController {
 
   update(dt: number): void {
     this.demogorgonVisual.update(dt);
+    // Advance the shade-breathe clock read in the flicker phase. The target
+    // pulse moved into BossTargetPulse (its own clock); this drives only the
+    // atmosphere breathe term and must keep ticking or breathe stays at 0.
+    this.pulseT += dt;
     this.billboard.sync();
     this.targetPulse?.update(
       dt,

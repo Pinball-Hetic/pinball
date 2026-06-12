@@ -81,7 +81,11 @@ function measureSkinnedVertexBounds(
     const hasSkin = obj.geometry.attributes.skinIndex && obj.geometry.attributes.skinWeight;
     if (!pos) return;
     obj.skeleton.update();
-    for (let i = 0; i < pos.count; i++) {
+    // Decimate: an axis-aligned bbox needs only a few hundred samples. A full
+    // per-vertex skin pass (applyBoneTransform + 2 matrix transforms each) on a
+    // 10k+ vert model is a needless load-time CPU spike, ×2 boss models.
+    const step = Math.max(1, Math.floor(pos.count / 800));
+    for (let i = 0; i < pos.count; i += step) {
       _v.fromBufferAttribute(pos, i);
       if (hasSkin) obj.applyBoneTransform(i, _v);
       obj.localToWorld(_v);
