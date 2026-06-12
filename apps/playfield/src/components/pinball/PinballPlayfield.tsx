@@ -1065,9 +1065,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           const stVisuals = mapModule as MapModule & {
             garlands?: GarlandLights | null;
             bumperVisuals?: BumperVisuals | null;
+            atmosphere?: UpsideDownAtmosphere | null;
           };
           garlandLights = stVisuals.garlands ?? null;
           bumperVisuals = stVisuals.bumperVisuals ?? null;
+          upsideDownAtmosphere = stVisuals.atmosphere ?? null;
           garlandLightsRef.current = garlandLights;
         }
 
@@ -1311,7 +1313,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           // bumperVisuals + garlands : onGameEvent géré par le module de map.
           bossReveals?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
-          upsideDownAtmosphere?.onGameEvent(event);
+          // upsideDownAtmosphere : onGameEvent géré par le module de map.
           mapModule?.onGameEvent(event);
 
           // ── Screen shake par event (juice) ───────────────────────────────────
@@ -1437,20 +1439,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           onOpenChange: (open) => collisionProcessor?.setPortalOpen(open),
         });
 
-        upsideDownAtmosphere = new UpsideDownAtmosphere();
-        upsideDownAtmosphere.setup({
-          root: playfieldRoot,
-          garlandLights,
-          bumperVisuals,
-          lighting: {
-            scene,
-            renderer,
-            ambient: ambientLight,
-            hemi: hemiLight,
-            dir: dirLight,
-            fill: fillLight,
-          },
-        });
+        // upsideDownAtmosphere créé/possédé par le module de map (récupéré
+        // plus haut via le bridge). On garde ici le binding vecna + les resets.
         vecnaReveal?.bindUpsideDownAtmosphere(upsideDownAtmosphere);
 
         onPortalEnter = () => {
@@ -1751,7 +1741,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       garlandLights?.setFever(isFeverActive());
       bossReveals?.update(dt);
       nestMarker?.update(dt);
-      upsideDownAtmosphere?.update(dt);
+      // upsideDownAtmosphere : update(dt) géré par mapModule.update.
       upsideDownPortal?.update(dt);
 
       // Hint tardif : nid armé > 45 s sans reveal → pulse amplifié + bandeau DMD
@@ -2141,7 +2131,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       shooterLaneGateRef.current = null;
       upsideDownPortal?.dispose();
       upsideDownTransition?.dispose();
-      upsideDownAtmosphere?.dispose();
+      // upsideDownAtmosphere : dispose géré par mapModule.dispose.
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();
