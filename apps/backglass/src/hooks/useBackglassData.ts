@@ -24,16 +24,31 @@ export function useBackglassData() {
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
+    // Kiosk : une réponse d'erreur (JSON {error}, 5xx HTML, déconnexion)
+    // ne doit JAMAIS remplacer un état valide. On valide statut + forme,
+    // sinon on garde les données précédentes (ou EMPTY_STATS).
     const fetchLeaderboard = () =>
       fetch('/api/leaderboard')
-        .then((res) => res.json())
-        .then(setEntries)
+        .then((res) => {
+          if (!res.ok) throw new Error(`leaderboard ${res.status}`)
+          return res.json()
+        })
+        .then((data) => {
+          if (!Array.isArray(data)) throw new Error('leaderboard shape')
+          setEntries(data)
+        })
         .catch(() => {})
 
     const fetchStats = () =>
       fetch('/api/stats')
-        .then((res) => res.json())
-        .then(setStats)
+        .then((res) => {
+          if (!res.ok) throw new Error(`stats ${res.status}`)
+          return res.json()
+        })
+        .then((data) => {
+          if (typeof data?.totalGames !== 'number') throw new Error('stats shape')
+          setStats(data as GlobalStats)
+        })
         .catch(() => {})
 
     fetchLeaderboard()
@@ -46,7 +61,11 @@ export function useBackglassData() {
 
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
-    socket.on('leaderboard:refresh', (data) => setEntries(data))
+    // Même garde que le fetch : un refresh socket malformé ne remplace
+    // pas un classement valide (entries doit toujours rester un tableau).
+    socket.on('leaderboard:refresh', (data) => {
+      if (Array.isArray(data)) setEntries(data)
+    })
     // les agrégats ont changé : on re-fetch /api/stats
     socket.on('game:over', () => {
       fetchStats()

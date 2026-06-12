@@ -172,6 +172,11 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       upsideDownRef.current = d.upsideDown ?? false
       if ('fever' in d) feverRef.current = d.fever
       if (d.mode === 'CINEMATIC') {
+        // Garde kiosk : un clip absent/inconnu (event serveur malformé)
+        // donnerait CLIP_SHOW_MS[clip] = undefined → expiresAt NaN →
+        // takeover figé. Aucun throw ⇒ l'ErrorBoundary ne le rattrape pas,
+        // donc on filtre ici avant de polluer la pile.
+        if (d.clip == null || CLIP_SHOW_MS[d.clip] == null) return
         markActivity()
         const now = performance.now()
         const pushTk = (durationMs: number) =>
