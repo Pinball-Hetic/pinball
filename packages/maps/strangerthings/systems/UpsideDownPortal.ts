@@ -80,7 +80,7 @@ export class UpsideDownPortal {
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
   private anchorPos = new THREE.Vector3();
-  private upsideDownActive = false;
+  private alternateWorldActive = false;
   private revealed = false;
   private revealing = false;
   private revealT = 0;
@@ -148,7 +148,7 @@ export class UpsideDownPortal {
   }
 
   setUpsideDownActive(active: boolean): void {
-    this.upsideDownActive = active;
+    this.alternateWorldActive = active;
   }
 
   onGameEvent(event: GameEvent): void {
@@ -157,11 +157,11 @@ export class UpsideDownPortal {
     const def = getBossDefinition(event.bossId);
     if (event.hitCount < def.targetHits) return;
 
-    if (def.unlocksPortal && !this.upsideDownActive) {
+    if (def.unlocksPortal && !this.alternateWorldActive) {
       this.beginReveal();
       return;
     }
-    if (def.unlocksReturnPortal && this.upsideDownActive) {
+    if (def.unlocksReturnPortal && this.alternateWorldActive) {
       this.beginReveal();
     }
   }

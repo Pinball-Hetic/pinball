@@ -43,7 +43,7 @@ export interface ScoringCallbacks {
   onGameOver?: (finalScore: number, stats: GameStats) => void;
   onGameStart?: () => void;
   onIdleReset?: () => void;
-  onAtmosphereChange?: (upsideDownActive: boolean) => void;
+  onAtmosphereChange?: (alternateWorldActive: boolean) => void;
   onMilestone?: (threshold: number) => void;
   onBossArmed?: (bossId: BossId) => void; // palier franchi → le nid s'éveille (1×/partie)
   onHeticLetter?: (letterIndex: number) => void; // 1-4
@@ -121,12 +121,12 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
   const [player, setPlayer] = useState<string>(() => generatePlayerName());
   const [bossHud, setBossHud] = useState<BossHudState>(initialBossHud);
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
-  const [upsideDownActive, setUpsideDownActive] = useState(false);
+  const [alternateWorldActive, setUpsideDownActive] = useState(false);
   const [upsideDownHint, setUpsideDownHint] = useState(false);
   const [fever, setFever] = useState(false);
 
   const milestonesPassedRef = useRef<Set<number>>(new Set());
-  const upsideDownActiveRef = useRef(false);
+  const alternateWorldActiveRef = useRef(false);
   const normalWorldBaselineRef = useRef(0);
   const upsideDownBaselineRef = useRef(0);
   const bossArmedFiredRef = useRef<Set<BossId>>(new Set());
@@ -231,7 +231,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     clearBossHud("vecna");
     callbacks?.onAtmosphereChange?.(false);
     setUpsideDownActive(false);
-    upsideDownActiveRef.current = false;
+    alternateWorldActiveRef.current = false;
     upsideDownBaselineRef.current = 0;
     // Le nid de vecna pourra se ré-annoncer à la prochaine entrée Upside Down.
     bossArmedFiredRef.current.delete("vecna");
@@ -292,7 +292,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     setMultiplier(1);
     milestonesPassedRef.current.clear();
     bossArmedFiredRef.current.clear();
-    upsideDownActiveRef.current = false;
+    alternateWorldActiveRef.current = false;
     normalWorldBaselineRef.current = 0;
     upsideDownBaselineRef.current = 0;
     feverUntilRef.current = 0;
@@ -353,9 +353,9 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
           const def = getBossDefinition(id);
           const met = bossThresholdMet(def, {
             totalScore: scoreRef.current,
-            upsideDownActive: upsideDownActiveRef.current,
+            alternateWorldActive: alternateWorldActiveRef.current,
             normalWorldScoreBaseline: normalWorldBaselineRef.current,
-            upsideDownScoreBaseline: upsideDownBaselineRef.current,
+            alternateWorldScoreBaseline: upsideDownBaselineRef.current,
           });
           if (met) {
             bossArmedFiredRef.current.add(id);
@@ -496,7 +496,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       }
       if (event.type === "PORTAL_TRANSITION_END") {
         setUpsideDownActive(true);
-        upsideDownActiveRef.current = true;
+        alternateWorldActiveRef.current = true;
         upsideDownBaselineRef.current = scoreRef.current;
         setUpsideDownHint(true);
         if (upsideDownHintTimerRef.current !== null) {
@@ -520,7 +520,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       if (event.type === "WORLD_CYCLE_COMPLETE") {
         clearAllBossHud();
         normalWorldBaselineRef.current = scoreRef.current;
-        upsideDownActiveRef.current = false;
+        alternateWorldActiveRef.current = false;
         upsideDownBaselineRef.current = 0;
         bossArmedFiredRef.current.clear();
       }
@@ -541,7 +541,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     playerRef,
     bossHud,
     scorePops,
-    upsideDownActive,
+    alternateWorldActive,
     upsideDownHint,
     fever,
     isFeverActive,

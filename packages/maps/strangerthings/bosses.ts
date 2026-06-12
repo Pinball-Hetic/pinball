@@ -13,13 +13,13 @@ export const bossDefinitions: BossDefinition[] = [
     reveal: {
       scoreThreshold: 3000,
       scoreIncrement: 150,
-      requiresUpsideDown: false,
+      requiresAlternateWorld: false,
     },
     hud: {
       label: 'Cible Demogorgon',
       victoryLabel: 'Demogorgon vaincu !',
       dmdLabel: 'DEMOGORGON',
-      requiresUpsideDown: false,
+      requiresAlternateWorld: false,
       bottomClass: 'bottom-8',
       borderClass: 'border-red-500/40',
       subtitleClass: 'text-red-300/90',
@@ -73,13 +73,13 @@ export const bossDefinitions: BossDefinition[] = [
     reveal: {
       scoreThreshold: 3000,
       scoreIncrement: 200,
-      requiresUpsideDown: true,
+      requiresAlternateWorld: true,
     },
     hud: {
       label: 'Cible Vecna',
       victoryLabel: 'Vecna vaincu !',
       dmdLabel: 'VECNA',
-      requiresUpsideDown: true,
+      requiresAlternateWorld: true,
       bottomClass: 'bottom-24',
       borderClass: 'border-violet-500/45',
       subtitleClass: 'text-violet-300/90',

@@ -10,12 +10,12 @@ function boss(over: Partial<BossDefinition> & Pick<BossDefinition, 'id' | 'colli
     target: { x: 0, y: 1, z: 0 },
     targetHits: 5,
     scoreTargetHit: 250,
-    reveal: { scoreThreshold: 3000, scoreIncrement: 150, requiresUpsideDown: false },
+    reveal: { scoreThreshold: 3000, scoreIncrement: 150, requiresAlternateWorld: false },
     hud: {
       label: '',
       victoryLabel: '',
       dmdLabel: '',
-      requiresUpsideDown: false,
+      requiresAlternateWorld: false,
       bottomClass: '',
       borderClass: '',
       subtitleClass: '',
@@ -54,7 +54,7 @@ const BOSS_B = boss({
   colliderRole: 'b_target',
   targetHits: 10,
   scoreTargetHit: 300,
-  reveal: { scoreThreshold: 3000, scoreIncrement: 200, requiresUpsideDown: true },
+  reveal: { scoreThreshold: 3000, scoreIncrement: 200, requiresAlternateWorld: true },
   unlocksReturnPortal: true,
 });
 
@@ -66,15 +66,15 @@ function make() {
 
 const PLAYING = (over: Partial<{
   totalScore: number;
-  upsideDownActive: boolean;
+  alternateWorldActive: boolean;
   normalWorldScoreBaseline: number;
-  upsideDownScoreBaseline: number;
+  alternateWorldScoreBaseline: number;
 }> = {}) => ({
   totalScore: 0,
   gameState: 'playing',
-  upsideDownActive: false,
+  alternateWorldActive: false,
   normalWorldScoreBaseline: 0,
-  upsideDownScoreBaseline: 0,
+  alternateWorldScoreBaseline: 0,
   ...over,
 });
 
@@ -94,7 +94,7 @@ test('boss_a requires score since normal world entry', () => {
 
 test('boss_a does not reveal in the Upside Down', () => {
   const { mgr, events } = make();
-  mgr.tryReveal('boss_a', PLAYING({ totalScore: 9000, upsideDownActive: true }));
+  mgr.tryReveal('boss_a', PLAYING({ totalScore: 9000, alternateWorldActive: true }));
   expect(events).toHaveLength(0);
 });
 
@@ -114,29 +114,29 @@ test('reveal is once-only', () => {
 
 test('boss_b requires the Upside Down and a baseline-adjusted score', () => {
   const { mgr, events } = make();
-  mgr.tryReveal('boss_b', PLAYING({ totalScore: 9999, upsideDownActive: false }));
+  mgr.tryReveal('boss_b', PLAYING({ totalScore: 9999, alternateWorldActive: false }));
   expect(events).toHaveLength(0);
-  mgr.tryReveal('boss_b', PLAYING({ totalScore: 5000, upsideDownActive: true, upsideDownScoreBaseline: 4000 }));
+  mgr.tryReveal('boss_b', PLAYING({ totalScore: 5000, alternateWorldActive: true, alternateWorldScoreBaseline: 4000 }));
   expect(events).toHaveLength(0);
-  mgr.tryReveal('boss_b', PLAYING({ totalScore: 7000, upsideDownActive: true, upsideDownScoreBaseline: 4000 }));
+  mgr.tryReveal('boss_b', PLAYING({ totalScore: 7000, alternateWorldActive: true, alternateWorldScoreBaseline: 4000 }));
   expect(events).toEqual([{ type: 'BOSS_REVEAL', bossId: 'boss_b', scoreIncrement: 200 }]);
 });
 
 test('boss_b requires score since Upside Down entry on each cycle', () => {
   const { mgr, events } = make();
-  mgr.tryReveal('boss_b', PLAYING({ totalScore: 20000, upsideDownActive: true, upsideDownScoreBaseline: 20000 }));
+  mgr.tryReveal('boss_b', PLAYING({ totalScore: 20000, alternateWorldActive: true, alternateWorldScoreBaseline: 20000 }));
   expect(events).toHaveLength(0);
-  mgr.tryReveal('boss_b', PLAYING({ totalScore: 23000, upsideDownActive: true, upsideDownScoreBaseline: 20000 }));
+  mgr.tryReveal('boss_b', PLAYING({ totalScore: 23000, alternateWorldActive: true, alternateWorldScoreBaseline: 20000 }));
   expect(events).toEqual([{ type: 'BOSS_REVEAL', bossId: 'boss_b', scoreIncrement: 200 }]);
 });
 
 test('mutual exclusion: cannot reveal a second boss while another fight is active', () => {
   const { mgr, events } = make();
   mgr.tryReveal('boss_a', PLAYING({ totalScore: 3000 })); // boss_a fight now active
-  mgr.tryReveal('boss_b', PLAYING({ totalScore: 7000, upsideDownActive: true, upsideDownScoreBaseline: 4000 }));
+  mgr.tryReveal('boss_b', PLAYING({ totalScore: 7000, alternateWorldActive: true, alternateWorldScoreBaseline: 4000 }));
   expect(events).toHaveLength(1); // boss_b blocked
   mgr.setFightActive('boss_a', false);
-  mgr.tryReveal('boss_b', PLAYING({ totalScore: 7000, upsideDownActive: true, upsideDownScoreBaseline: 4000 }));
+  mgr.tryReveal('boss_b', PLAYING({ totalScore: 7000, alternateWorldActive: true, alternateWorldScoreBaseline: 4000 }));
   expect(events).toHaveLength(2);
   expect(events[1]).toEqual({ type: 'BOSS_REVEAL', bossId: 'boss_b', scoreIncrement: 200 });
 });

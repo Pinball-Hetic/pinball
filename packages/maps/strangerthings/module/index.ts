@@ -137,7 +137,7 @@ export function createModule(): MapModule {
         portal?.reset()
         portal?.setUpsideDownActive(true)
         ctx.resetPortalTrigger()
-        ctx.enterUpsideDown()
+        ctx.enterAlternateWorld()
         nestMarker?.setUpsideDown(true)
       }
       // Game over en drainant : fin de tous les combats boss.
@@ -261,7 +261,7 @@ export function createModule(): MapModule {
       // revealed ; sinon palier atteint → armed ; sinon locked. Idempotent.
       if (nestMarker) {
         const gate = ctx.bossGateContext()
-        nestMarker.setUpsideDown(gate.upsideDownActive)
+        nestMarker.setUpsideDown(gate.alternateWorldActive)
         for (const boss of ctx.layout.bosses) {
           if (ctx.isBossTriggered(boss.id)) {
             nestMarker.setState(boss.id, 'revealed')

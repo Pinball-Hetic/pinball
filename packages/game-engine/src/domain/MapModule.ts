@@ -49,7 +49,7 @@ export interface MapContext {
   /** Réinitialise le détecteur de bille bloquée. */
   resetStuck(): void;
   /** Notifie l'entrée dans l'Upside Down (baseline de score core). */
-  enterUpsideDown(): void;
+  enterAlternateWorld(): void;
   /** Joue un son par identifiant (mappé côté app). */
   playSound(id: string): void;
   /** Ré-émet le snapshot score courant (DMD) — ex. reprise après fever. */

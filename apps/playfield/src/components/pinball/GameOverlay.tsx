@@ -14,7 +14,7 @@ interface GameOverlayProps {
   initialLives: number;
   bossHud: BossHudState;
   scorePops: ScorePop[];
-  upsideDownActive: boolean;
+  alternateWorldActive: boolean;
   upsideDownHint: boolean;
   atmosphereBannerLabel: string;
   atmosphereHintLabel: string;
@@ -32,7 +32,7 @@ export default function GameOverlay({
   initialLives,
   bossHud,
   scorePops,
-  upsideDownActive,
+  alternateWorldActive,
   upsideDownHint,
   atmosphereBannerLabel,
   atmosphereHintLabel,
@@ -53,7 +53,7 @@ export default function GameOverlay({
     bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
 
   const showUpsideDownBanner =
-    bootPhase === "in_game" && gameState === "playing" && upsideDownActive;
+    bootPhase === "in_game" && gameState === "playing" && alternateWorldActive;
 
   const showUpsideDownHint =
     bootPhase === "in_game" && gameState === "playing" && upsideDownHint;
@@ -121,7 +121,7 @@ export default function GameOverlay({
           bootPhase === "in_game" &&
           gameState === "playing" &&
           hud.active &&
-          (!def.hud.requiresUpsideDown || upsideDownActive);
+          (!def.hud.requiresAlternateWorld || alternateWorldActive);
 
         if (!showBossHud) return null;
 

@@ -459,7 +459,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     gameStateRef,
     bossHud,
     scorePops,
-    upsideDownActive,
+    alternateWorldActive,
     upsideDownHint,
     scoreRef,
     livesRef,
@@ -553,9 +553,9 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         mapState: buildMapState(false),
       });
     },
-    onAtmosphereChange: (upsideDownActive) => {
-      dmd.setAtmosphere(upsideDownActive);
-      atmosphereUpsideRef.current = upsideDownActive;
+    onAtmosphereChange: (alternateWorldActive) => {
+      dmd.setAtmosphere(alternateWorldActive);
+      atmosphereUpsideRef.current = alternateWorldActive;
       // nestMarker.setUpsideDown géré par le module (réconciliation onGameEvent).
     },
     // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
@@ -954,7 +954,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             resetPortalTrigger: () => collisionProcessor?.resetPortalTrigger(),
             completeWorldCycle: () => collisionProcessor?.completeWorldCycle(scoreRef.current),
             resetStuck: () => stuckDetector.reset(),
-            enterUpsideDown: () => collisionProcessor?.onUpsideDownEntered(scoreRef.current),
+            enterAlternateWorld: () => collisionProcessor?.onAlternateWorldEntered(scoreRef.current),
             playSound: (id) => {
               if (id === "upside_down_appear") playUpsideDownAppearSound();
             },
@@ -988,9 +988,9 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
               collisionProcessor?.setBossTargetArmed(bossId as BossId, armed),
             bossGateContext: () => ({
               totalScore: scoreRef.current,
-              upsideDownActive: collisionProcessor?.isUpsideDownActive() ?? false,
+              alternateWorldActive: collisionProcessor?.isAlternateWorldActive() ?? false,
               normalWorldScoreBaseline: collisionProcessor?.getNormalWorldScoreBaseline() ?? 0,
-              upsideDownScoreBaseline: collisionProcessor?.getUpsideDownScoreBaseline() ?? 0,
+              alternateWorldScoreBaseline: collisionProcessor?.getAlternateWorldScoreBaseline() ?? 0,
             }),
             isBossTriggered: (bossId) =>
               collisionProcessor?.isBossTriggered(bossId as BossId) ?? false,
@@ -1217,7 +1217,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         });
         const releaseUpsideDownWorld = () => {
           mapModule?.releaseWorld?.();
-          collisionProcessor?.resetUpsideDownSession();
+          collisionProcessor?.resetAlternateWorldSession();
           clearUpsideDownSession();
         };
         // Réconciliation des marqueurs de nid : gérée par le module de map
@@ -1952,7 +1952,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           initialLives={INITIAL_LIVES}
           bossHud={bossHud}
           scorePops={scorePops}
-          upsideDownActive={upsideDownActive}
+          alternateWorldActive={alternateWorldActive}
           upsideDownHint={upsideDownHint}
           atmosphereBannerLabel={mapLayout.atmosphere.bannerLabel}
           atmosphereHintLabel={mapLayout.atmosphere.hintLabel}

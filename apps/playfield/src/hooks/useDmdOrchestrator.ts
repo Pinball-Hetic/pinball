@@ -70,7 +70,7 @@ export interface DmdOrchestrator {
   pushMultiFlash: (multiplier: number, combo: number, snap: ScoreUpdate) => void;
   pushLifeLost: (livesRemaining: number, score: number, player: string) => void;
   pushGameOver: (player: string, finalScore: number) => void;
-  setAtmosphere: (upsideDownActive: boolean) => void;
+  setAtmosphere: (alternateWorldActive: boolean) => void;
 }
 
 // Labels lisibles pour les events highlight :
@@ -236,9 +236,9 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       );
     },
 
-    setAtmosphere: (upsideDownActive) => {
-      if (atmosphereRef.current === upsideDownActive) return;
-      atmosphereRef.current = upsideDownActive;
+    setAtmosphere: (alternateWorldActive) => {
+      if (atmosphereRef.current === alternateWorldActive) return;
+      atmosphereRef.current = alternateWorldActive;
       // Re-pousse le display courant avec la nouvelle atmosphere.
       lastSentRef.current = '';
       sendCurrent();

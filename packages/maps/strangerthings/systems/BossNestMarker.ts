@@ -36,7 +36,7 @@ type Marker = {
   geo: THREE.RingGeometry;
   armedColor: THREE.Color;
   lockedColor: THREE.Color;
-  requiresUpsideDown: boolean;
+  requiresAlternateWorld: boolean;
   state: NestMarkerState;
   t: number; // horloge de pulse
   revealT: number; // horloge de fondu reveal
@@ -51,7 +51,7 @@ export type BossNestMarkerSetup = {
 
 export class BossNestMarker {
   private markers = new Map<BossId, Marker>();
-  private upsideDownActive = false;
+  private alternateWorldActive = false;
   private root: THREE.Object3D | null = null;
 
   setup(config: BossNestMarkerSetup): void {
@@ -87,7 +87,7 @@ export class BossNestMarker {
         geo,
         armedColor,
         lockedColor,
-        requiresUpsideDown: def.hud.requiresUpsideDown,
+        requiresAlternateWorld: def.hud.requiresAlternateWorld,
         state: 'locked',
         t: 0,
         revealT: 0,
@@ -98,9 +98,9 @@ export class BossNestMarker {
     }
   }
 
-  /** Gate Upside Down : les marqueurs `requiresUpsideDown` restent cachés hors UD. */
+  /** Gate Upside Down : les marqueurs `requiresAlternateWorld` restent cachés hors UD. */
   setUpsideDown(active: boolean): void {
-    this.upsideDownActive = active;
+    this.alternateWorldActive = active;
   }
 
   setState(id: BossId, state: NestMarkerState): void {
@@ -148,7 +148,7 @@ export class BossNestMarker {
       if (m.flashT > 0) m.flashT = Math.max(0, m.flashT - dt);
 
       // Gate Upside Down : marqueur de boss UD invisible hors Upside Down.
-      if (m.requiresUpsideDown && !this.upsideDownActive) {
+      if (m.requiresAlternateWorld && !this.alternateWorldActive) {
         m.mesh.visible = false;
         continue;
       }

@@ -52,7 +52,7 @@ export type BossHudConfig = {
   label: string;
   victoryLabel: string;
   dmdLabel: string;
-  requiresUpsideDown: boolean;
+  requiresAlternateWorld: boolean;
   bottomClass: string;
   borderClass: string;
   subtitleClass: string;
@@ -67,7 +67,7 @@ export type BossHudConfig = {
 export type BossRevealConfig = {
   scoreThreshold: number;
   scoreIncrement: number;
-  requiresUpsideDown: boolean;
+  requiresAlternateWorld: boolean;
 };
 
 export type BossDefinition = {
@@ -87,23 +87,23 @@ export type BossDefinition = {
 /** Contexte minimal pour évaluer le gate de reveal d'un boss (score + Upside Down). */
 export type BossGateContext = {
   totalScore: number;
-  upsideDownActive: boolean;
+  alternateWorldActive: boolean;
   normalWorldScoreBaseline: number;
-  upsideDownScoreBaseline: number;
+  alternateWorldScoreBaseline: number;
 };
 
 /** Score effectif d'un boss depuis l'entrée dans son monde. */
 export function bossEffectiveScore(def: BossDefinition, ctx: BossGateContext): number {
-  const baseline = def.reveal.requiresUpsideDown
-    ? ctx.upsideDownScoreBaseline
+  const baseline = def.reveal.requiresAlternateWorld
+    ? ctx.alternateWorldScoreBaseline
     : ctx.normalWorldScoreBaseline;
   return ctx.totalScore - baseline;
 }
 
 /** True si le palier de score du boss est franchi ET son gate Upside Down satisfait. */
 export function bossThresholdMet(def: BossDefinition, ctx: BossGateContext): boolean {
-  if (def.reveal.requiresUpsideDown && !ctx.upsideDownActive) return false;
-  if (!def.reveal.requiresUpsideDown && ctx.upsideDownActive) return false;
+  if (def.reveal.requiresAlternateWorld && !ctx.alternateWorldActive) return false;
+  if (!def.reveal.requiresAlternateWorld && ctx.alternateWorldActive) return false;
   return bossEffectiveScore(def, ctx) >= def.reveal.scoreThreshold;
 }
 

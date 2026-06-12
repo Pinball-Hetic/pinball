@@ -32,9 +32,9 @@ export class CollisionEventProcessor {
   private bumpLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
   private portalOpen = false;
   private portalTriggered = false;
-  private upsideDownActive = false;
+  private alternateWorldActive = false;
   private normalWorldScoreBaseline = 0;
-  private upsideDownScoreBaseline = 0;
+  private alternateWorldScoreBaseline = 0;
   private lastTotalScore = 0;
   // Throttle des events « nid verrouillé » par boss (anti-spam, 2 s).
   private lockedHitLastMs: Partial<Record<BossId, number>> = {};
@@ -42,9 +42,9 @@ export class CollisionEventProcessor {
   private gateContext() {
     return {
       totalScore: this.lastTotalScore,
-      upsideDownActive: this.upsideDownActive,
+      alternateWorldActive: this.alternateWorldActive,
       normalWorldScoreBaseline: this.normalWorldScoreBaseline,
-      upsideDownScoreBaseline: this.upsideDownScoreBaseline,
+      alternateWorldScoreBaseline: this.alternateWorldScoreBaseline,
     };
   }
 
@@ -53,12 +53,12 @@ export class CollisionEventProcessor {
   }
 
   /** Baseline de score Upside Down (pour recalculer l'état des marqueurs de nid). */
-  getUpsideDownScoreBaseline(): number {
-    return this.upsideDownScoreBaseline;
+  getAlternateWorldScoreBaseline(): number {
+    return this.alternateWorldScoreBaseline;
   }
 
-  isUpsideDownActive(): boolean {
-    return this.upsideDownActive;
+  isAlternateWorldActive(): boolean {
+    return this.alternateWorldActive;
   }
 
   isBossTriggered(id: BossId): boolean {
@@ -90,29 +90,29 @@ export class CollisionEventProcessor {
     this.bossFights.resetAll();
   }
 
-  onUpsideDownEntered(score: number): void {
-    this.upsideDownActive = true;
-    this.upsideDownScoreBaseline = score;
+  onAlternateWorldEntered(score: number): void {
+    this.alternateWorldActive = true;
+    this.alternateWorldScoreBaseline = score;
   }
 
-  resetUpsideDownSession(): void {
-    this.upsideDownActive = false;
-    this.upsideDownScoreBaseline = 0;
+  resetAlternateWorldSession(): void {
+    this.alternateWorldActive = false;
+    this.alternateWorldScoreBaseline = 0;
     // Réinitialise les combats des boss du monde Upside Down (génériquement,
-    // ceux dont reveal.requiresUpsideDown — sans id ST en dur).
+    // ceux dont reveal.requiresAlternateWorld — sans id ST en dur).
     for (const b of this.layout.bosses) {
-      if (b.reveal.requiresUpsideDown) this.resetBossFight(b.id);
+      if (b.reveal.requiresAlternateWorld) this.resetBossFight(b.id);
     }
   }
 
   resetScoreBaselines(): void {
     this.normalWorldScoreBaseline = 0;
-    this.upsideDownScoreBaseline = 0;
+    this.alternateWorldScoreBaseline = 0;
   }
 
   completeWorldCycle(score: number): void {
-    this.upsideDownActive = false;
-    this.upsideDownScoreBaseline = 0;
+    this.alternateWorldActive = false;
+    this.alternateWorldScoreBaseline = 0;
     this.normalWorldScoreBaseline = score;
     this.portalTriggered = false;
     this.resetAllBossFights();
@@ -123,9 +123,9 @@ export class CollisionEventProcessor {
     this.bossFights.tryAllReveals({
       totalScore,
       gameState,
-      upsideDownActive: this.upsideDownActive,
+      alternateWorldActive: this.alternateWorldActive,
       normalWorldScoreBaseline: this.normalWorldScoreBaseline,
-      upsideDownScoreBaseline: this.upsideDownScoreBaseline,
+      alternateWorldScoreBaseline: this.alternateWorldScoreBaseline,
     });
   }
 
@@ -156,7 +156,7 @@ export class CollisionEventProcessor {
       const boss = this.bossByRole.get(role);
       if (
         boss
-        && boss.reveal.requiresUpsideDown === this.upsideDownActive
+        && boss.reveal.requiresAlternateWorld === this.alternateWorldActive
         && started
         && gameState === 'playing'
         && !this.bossFights.isTriggered(boss.id)
@@ -182,7 +182,7 @@ export class CollisionEventProcessor {
       if (role === 'portal_enter') {
         if (started && gameState === 'playing' && this.portalOpen && !this.portalTriggered) {
           this.portalTriggered = true;
-          if (this.upsideDownActive) {
+          if (this.alternateWorldActive) {
             this.emit({ type: 'RETURN_PORTAL_ENTER', scoreIncrement: RETURN_PORTAL_ENTER_SCORE });
           } else {
             this.emit({ type: 'PORTAL_ENTER', scoreIncrement: PORTAL_ENTER_SCORE });
