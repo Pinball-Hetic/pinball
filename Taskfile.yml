@@ -48,6 +48,11 @@ tasks:
     cmds:
       - docker compose -f docker-compose.dev.yml exec -T db pg_restore -U dev_user -d pinball_dev --clean --if-exists < {{.CLI_ARGS}}
 
+  "check:leaks":
+    desc: Grep-guard anti-fuite map (termes forbiddenInCore hors packages/maps)
+    cmds:
+      - bash scripts/check-map-leaks.sh
+
   clean:
     desc: Supprimer artefacts de build et node_modules
     cmds:
