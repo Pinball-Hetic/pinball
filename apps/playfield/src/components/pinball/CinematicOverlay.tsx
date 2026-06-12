@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { CinematicClip, CinematicFamily } from '@pinball/shared-types'
-import { OVERLAY_FILES } from '@/overlays-manifest'
 
 interface CinematicOverlayProps {
   clip: CinematicClip | null
   /** Mapping clipId → famille (fourni par le manifest de la map). */
   clipFamilies?: Record<string, CinematicFamily>
+  /** Vidéos/images d'overlay par clipId (sinon fallback CSS). */
+  overlayFiles?: Record<string, string>
 }
 
 const FADE_MS = 250
@@ -18,7 +19,7 @@ function isVideo(file: string): boolean {
 // Overlay DOM joué pendant les gels cinématiques (au-dessus du canvas 3D,
 // sous le GameOverlay). Asset animé si présent (manifest), sinon fallback CSS
 // générique par famille. Un re-render par cinématique — jamais par frame.
-export default function CinematicOverlay({ clip, clipFamilies }: CinematicOverlayProps) {
+export default function CinematicOverlay({ clip, clipFamilies, overlayFiles }: CinematicOverlayProps) {
   const [shown, setShown] = useState<CinematicClip | null>(null)
   const [visible, setVisible] = useState(false)
 
@@ -36,7 +37,7 @@ export default function CinematicOverlay({ clip, clipFamilies }: CinematicOverla
 
   if (!shown) return null
 
-  const file = OVERLAY_FILES[shown]
+  const file = overlayFiles?.[shown]
   const family = clipFamilies?.[shown] ?? 'other'
 
   const wrapStyle: CSSProperties = {

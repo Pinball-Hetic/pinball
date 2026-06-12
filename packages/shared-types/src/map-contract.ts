@@ -24,6 +24,10 @@ export interface MapManifest {
   clipFamilies?: Record<string, CinematicFamily>
   /** Variables CSS de thème (ex. couleurs de flair) appliquées sur le stage. */
   theme?: Record<string, string>
+  /** Assets à précharger (chemins relatifs à public/) — consommé par la page. */
+  preload?: string[]
+  /** Vidéos/images d'overlay cinématique par clipId (sinon fallback CSS). */
+  overlayFiles?: Record<string, string>
   glb: string // relatif au dossier assets/ du package
   scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
   rules: {

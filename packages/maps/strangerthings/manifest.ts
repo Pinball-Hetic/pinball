@@ -20,6 +20,8 @@ export const manifest: MapManifest = {
     milestone_30k: 'milestone',
     milestone_big: 'milestone',
   },
+  // Assets préchargés par la page playfield (chemins relatifs à public/).
+  preload: ['playfield/demogorgon.glb', 'playfield/demogorgon.png'],
   glb: 'playfield/newStrangerthings.glb',
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {

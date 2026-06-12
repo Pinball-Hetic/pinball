@@ -1,5 +1,6 @@
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import { getMapPackage } from '@pinball/maps';
 import '@/audio/pinballAudio';
 
 const PinballPlayfield = dynamic(
@@ -7,13 +8,25 @@ const PinballPlayfield = dynamic(
   { ssr: false },
 );
 
+const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? 'strangerthings';
+const PRELOAD = getMapPackage(MAP_ID)?.manifest.preload ?? [];
+
+// Type de ressource <link rel=preload> inféré depuis l'extension.
+function preloadAs(path: string): string {
+  if (/\.(glb|gltf|bin)$/i.test(path)) return 'fetch';
+  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(path)) return 'image';
+  if (/\.(mp3|ogg|wav)$/i.test(path)) return 'audio';
+  return 'fetch';
+}
+
 export default function PinballPage() {
   return (
     <>
       <Head>
         <link rel="preload" href="/audio/early-sound.mp3" as="audio" type="audio/mpeg" />
-        <link rel="preload" href="/playfield/demogorgon.glb" as="fetch" />
-        <link rel="preload" href="/playfield/demogorgon.png" as="image" />
+        {PRELOAD.map((p) => (
+          <link key={p} rel="preload" href={`/${p}`} as={preloadAs(p)} />
+        ))}
       </Head>
       <PinballPlayfield />
     </>
