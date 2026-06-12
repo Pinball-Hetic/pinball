@@ -56,8 +56,6 @@ import {
   ballCenterOnSurface,
   DROP_TARGETS,
   PlungerPhysics,
-  BossRevealOrchestrator,
-  BossNestMarker,
   type BossId,
   CinematicDirector,
   ScreenShake,
@@ -72,7 +70,6 @@ import {
   SCORE_DEMOGORGON_REVEAL,
   SCORE_DEMOGORGON_TARGET,
   type GameEvent,
-  UpsideDownPortal,
   ShooterLaneGate,
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
@@ -543,7 +540,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       cinematics.resetGame();
       resetPinballAudioForNewGame();
       mapModuleRef.current?.onGameReset();
-      nestMarkerRef.current?.reset();
       shooterLaneGateRef.current?.open();
       dmd.pushIntro(playerRef.current);
       dmd.emitScoreSnapshot({
@@ -558,7 +554,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     onAtmosphereChange: (upsideDownActive) => {
       dmd.setAtmosphere(upsideDownActive);
       atmosphereUpsideRef.current = upsideDownActive;
-      nestMarkerRef.current?.setUpsideDown(upsideDownActive);
+      // nestMarker.setUpsideDown géré par le module (réconciliation onGameEvent).
     },
     // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
     // module de map (events MILESTONE / BOSS_ARMED).
@@ -593,7 +589,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     fever,
   });
 
-  const nestMarkerRef = useRef<BossNestMarker | null>(null);
   const shooterLaneGateRef = useRef<ShooterLaneGate | null>(null);
   const screenShakeRef = useRef<ScreenShake | null>(null);
   if (!screenShakeRef.current) screenShakeRef.current = new ScreenShake();
@@ -738,10 +733,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     // Hoisté : le MapContext (construit tôt) le référence via closures, mais il
     // n'est assigné qu'une fois le pipeline d'events prêt (plus bas).
     let emit: GameEventListener;
-    let bossReveals: BossRevealOrchestrator | null = null;
-    let nestMarker: BossNestMarker | null = null;
     let ballTrail: BallTrail | null = null;
-    let upsideDownPortal: UpsideDownPortal | null = null;
     let shooterLaneGate: ShooterLaneGate | null = null;
 
     // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
@@ -960,6 +952,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             resetPortalTrigger: () => collisionProcessor?.resetPortalTrigger(),
             completeWorldCycle: () => collisionProcessor?.completeWorldCycle(scoreRef.current),
             resetStuck: () => stuckDetector.reset(),
+            enterUpsideDown: () => collisionProcessor?.onUpsideDownEntered(scoreRef.current),
             playSound: (id) => {
               if (id === "upside_down_appear") playUpsideDownAppearSound();
             },
@@ -1018,29 +1011,15 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             setAtmosphere: (active) => {
               dmd.setAtmosphere(active);
               atmosphereUpsideRef.current = active;
-              nestMarkerRef.current?.setUpsideDown(active);
+              // nestMarker.setUpsideDown géré par le module (réconciliation).
             },
             emitGameEvent: (e) => emit(e),
           };
           mapModule.setup(mapCtx);
-          // Bridge transitoire : récupère les systèmes visuels créés par le
-          // module pour les systèmes Upside Down (encore ici) + le ref qui
-          // pilote celebrate/setFever. Disparaît au cluster Upside Down.
-          const stVisuals = mapModule as MapModule & {
-            portal?: UpsideDownPortal | null;
-            nestMarker?: BossNestMarker | null;
-            bossReveals?: BossRevealOrchestrator | null;
-          };
-          upsideDownPortal = stVisuals.portal ?? null;
-          nestMarker = stVisuals.nestMarker ?? null;
-          bossReveals = stVisuals.bossReveals ?? null;
-          nestMarkerRef.current = nestMarker;
-          // Préchargement des reveals boss (async) — gardé ici (module.setup
-          // est synchrone). Bloque le chargement comme avant.
-          await bossReveals?.preloadAll(renderer, scene, camera).catch((err) => {
-            console.warn("[BossReveals] preload failed:", err);
-          });
         }
+        // Préchargement asynchrone du module (ex. reveals boss) — bloque le
+        // chargement comme avant.
+        await mapModule?.preload?.();
 
         shooterLaneGate = new ShooterLaneGate();
         shooterLaneGate.bind(world);
@@ -1273,7 +1252,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           ) {
             collisionProcessor?.resetAllBossFights();
             collisionProcessor?.resetScoreBaselines();
-            bossReveals?.endAllFights();
+            // bossReveals.endAllFights géré par le module (DRAIN/BOTTOM_OUT game-over).
           }
           if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
             if (
@@ -1290,12 +1269,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           if (event.type === "RETURN_PORTAL_ENTER") {
             dmd.pushCinematic("portal_swallow");
           }
-          if (event.type === "PORTAL_TRANSITION_END") {
-            upsideDownPortal?.reset();
-            upsideDownPortal?.setUpsideDownActive(true);
-            collisionProcessor?.resetPortalTrigger();
-            collisionProcessor?.onUpsideDownEntered(scoreRef.current);
-          }
+          // PORTAL_TRANSITION_END (portail actif + baseline + nid) géré par le
+          // module de map.
           if (event.type === "BALL_LAUNCHED") {
             collisionProcessor?.resetPortalTrigger();
             bottomOutBallUC?.resetLatch();
@@ -1926,7 +1901,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
       // bumperVisuals + garlands + bossReveals + nestMarker : dispose géré par
       // mapModule.dispose.
-      nestMarkerRef.current = null;
       ballTrail?.dispose();
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;

@@ -139,6 +139,13 @@ export function createModule(): StModule {
       bossReveals.register(demogorgonReveal).register(vecnaReveal)
       vecnaReveal.bindUpsideDownAtmosphere(atmosphere)
     },
+    async preload(): Promise<void> {
+      const ctx = ctxRef
+      if (!ctx || !bossReveals) return
+      await bossReveals
+        .preloadAll(ctx.lighting.renderer, ctx.scene, ctx.camera)
+        .catch((err) => console.warn('[BossReveals] preload failed:', err))
+    },
     onGameEvent(e: GameEvent): void {
       bumperVisuals?.onGameEvent(e)
       garlands?.onGameEvent(e)
@@ -166,6 +173,19 @@ export function createModule(): StModule {
         ctx.playCinematic(clip, { value: e.threshold })
         garlands?.celebrate()
         ctx.screenShake(0.4)
+      }
+      // Entrée Upside Down confirmée (fin de transition) : portail actif +
+      // baseline core + nid en mode Upside Down.
+      if (e.type === 'PORTAL_TRANSITION_END') {
+        portal?.reset()
+        portal?.setUpsideDownActive(true)
+        ctx.resetPortalTrigger()
+        ctx.enterUpsideDown()
+        nestMarker?.setUpsideDown(true)
+      }
+      // Game over en drainant : fin de tous les combats boss.
+      if ((e.type === 'DRAIN' || e.type === 'BOTTOM_OUT') && ctx.gameState() === 'game_over') {
+        bossReveals?.endAllFights()
       }
       // Le nid s'éveille : bandeau DMD + celebrate + shake + horodatage hint.
       if (e.type === 'BOSS_ARMED') {
@@ -354,6 +374,7 @@ export function createModule(): StModule {
       hetic = 0
       for (const k of Object.keys(armedAt)) delete armedAt[k]
       hintFired.clear()
+      nestMarker?.reset()
       ctxRef?.setMapState({ demogorgons: 0, portals: 0, hetic: 0 })
     },
     dispose(): void {

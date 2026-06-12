@@ -48,6 +48,8 @@ export interface MapContext {
   completeWorldCycle(): void;
   /** Réinitialise le détecteur de bille bloquée. */
   resetStuck(): void;
+  /** Notifie l'entrée dans l'Upside Down (baseline de score core). */
+  enterUpsideDown(): void;
   /** Joue un son par identifiant (mappé côté app). */
   playSound(id: string): void;
   /** Ré-émet le snapshot score courant (DMD) — ex. reprise après fever. */
@@ -99,6 +101,8 @@ export interface MapContext {
 export interface MapModule {
   /** Appelé une fois après le chargement du GLB. */
   setup(ctx: MapContext): void;
+  /** Préchargement asynchrone optionnel (ex. modèles boss) — awaité au load. */
+  preload?(): Promise<void>;
   /** Chaque GameEvent du jeu (le module réagit à ceux qui le concernent). */
   onGameEvent(e: GameEvent): void;
   /** Boucle d'animation (dt en secondes). */
