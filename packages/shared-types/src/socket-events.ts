@@ -36,15 +36,16 @@ export interface DevGameEventTrigger {
     | 'SLINGSHOT_HIT'
     | 'RAMP_HIT'
     | 'DROP_TARGET_COMPLETE'
-    | 'DEMOGORGON_REVEAL'
-    | 'DEMOGORGON_TARGET_HIT'
+    | 'BOSS_REVEAL'
+    | 'BOSS_TARGET_HIT'
     | 'PORTAL_ENTER'
     | 'DRAIN'
     | 'BOTTOM_OUT'
     | 'BALL_LAUNCHED'
-    | 'ELEVEN_ASSIST'
+    | 'ASSIST'
     | 'DEBUG_ADD_SCORE' // injecte du score brut (franchir les paliers)
-  hitCount?: number // pour DEMOGORGON_TARGET_HIT
+  bossId?: string // pour BOSS_REVEAL / BOSS_TARGET_HIT (id de boss de la map)
+  hitCount?: number // pour BOSS_TARGET_HIT
   amount?: number // pour DEBUG_ADD_SCORE
 }
 

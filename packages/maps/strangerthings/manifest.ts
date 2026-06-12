@@ -13,6 +13,8 @@ export const manifest: MapManifest = {
   clipFamilies: {
     demogorgon_rises: 'boss',
     demogorgon_slain: 'boss',
+    portal_swallow: 'other',
+    last_chance: 'other',
     hetic_letter: 'collect',
     hetic_complete: 'collect',
     milestone_5k: 'milestone',

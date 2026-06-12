@@ -96,23 +96,27 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
       return { type: "RAMP_HIT", scoreIncrement: SCORE_RAMP };
     case "DROP_TARGET_COMPLETE":
       return { type: "DROP_TARGET_COMPLETE", side: "left", scoreIncrement: SCORE_DROP_COMPLETE };
-    case "DEMOGORGON_REVEAL":
+    case "BOSS_REVEAL": {
+      const bossId = d.bossId ?? MAP_BOSSES[0]?.id ?? "";
       return {
         type: "BOSS_REVEAL",
-        bossId: "demogorgon",
-        scoreIncrement: getBossById(MAP_BOSSES, "demogorgon")?.reveal.scoreIncrement ?? 150,
+        bossId,
+        scoreIncrement: getBossById(MAP_BOSSES, bossId)?.reveal.scoreIncrement ?? 150,
       };
-    case "DEMOGORGON_TARGET_HIT":
+    }
+    case "BOSS_TARGET_HIT": {
+      const bossId = d.bossId ?? MAP_BOSSES[0]?.id ?? "";
       return {
         type: "BOSS_TARGET_HIT",
-        bossId: "demogorgon",
+        bossId,
         hitCount: d.hitCount ?? 1,
-        scoreIncrement: getBossById(MAP_BOSSES, "demogorgon")?.scoreTargetHit ?? 250,
+        scoreIncrement: getBossById(MAP_BOSSES, bossId)?.scoreTargetHit ?? 250,
       };
+    }
     case "PORTAL_ENTER":
       return { type: "PORTAL_ENTER", scoreIncrement: PORTAL_ENTER_SCORE };
-    case "ELEVEN_ASSIST":
-      return { type: "ASSIST", assistId: "eleven", scoreIncrement: ASSIST_SCORE };
+    case "ASSIST":
+      return { type: "ASSIST", assistId: "assist", scoreIncrement: ASSIST_SCORE };
     case "DEBUG_ADD_SCORE":
       // Score brut → le pipeline score/paliers réagit naturellement.
       return { type: "ZONE_HIT", zone: "debug", scoreIncrement: d.amount ?? 1000 };
