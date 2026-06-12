@@ -12,12 +12,18 @@ export interface ClipTimings {
 // game-engine : shared-types reste neutre. Les interfaces runtime (MapModule,
 // MapContext, contenus DMD/backglass) vivent dans game-engine et les apps
 // (phases 2-5).
+export type CinematicFamily = 'boss' | 'collect' | 'milestone' | 'other'
+
 export interface MapManifest {
   id: string
   name: string
   version: number
   /** Sous-titre d'écran d'attract (branding de la map, ex. lab fictif). */
   attractTagline?: string
+  /** Mapping clipId → famille de cinématique générique (boss/collect/milestone/other). */
+  clipFamilies?: Record<string, CinematicFamily>
+  /** Variables CSS de thème (ex. couleurs de flair) appliquées sur le stage. */
+  theme?: Record<string, string>
   glb: string // relatif au dossier assets/ du package
   scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
   rules: {

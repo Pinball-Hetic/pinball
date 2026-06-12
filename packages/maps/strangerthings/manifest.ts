@@ -9,6 +9,17 @@ export const manifest: MapManifest = {
   name: 'Stranger Things',
   version: 1,
   attractTagline: 'Hawkins National Laboratory',
+  // Familles de cinématique (overlay fallback générique). Non listé → 'other'.
+  clipFamilies: {
+    demogorgon_rises: 'boss',
+    demogorgon_slain: 'boss',
+    hetic_letter: 'collect',
+    hetic_complete: 'collect',
+    milestone_5k: 'milestone',
+    milestone_15k: 'milestone',
+    milestone_30k: 'milestone',
+    milestone_big: 'milestone',
+  },
   glb: 'playfield/newStrangerthings.glb',
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {

@@ -1984,7 +1984,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           </div>
         )}
 
-        <CinematicOverlay clip={cinematicClip} />
+        <CinematicOverlay clip={cinematicClip} clipFamilies={mapManifest.clipFamilies} />
 
         <main
           ref={mountRef}
