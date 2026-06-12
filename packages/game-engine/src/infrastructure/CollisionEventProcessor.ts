@@ -145,8 +145,17 @@ export class CollisionEventProcessor {
 
       // Contact avec une cible de boss encore verrouillée (palier non atteint) :
       // pédagogie « ENCORE X PTS » plutôt qu'un hit silencieux. Throttle 2 s.
+      // Uniquement pour le boss du monde courant : sinon on afficherait un
+      // décompte de points trompeur (le vrai blocage est le mauvais monde, pas
+      // le score) — ex. cible Demogorgon touchée dans l'Upside Down.
       const boss = getBossByColliderRole(role);
-      if (boss && started && gameState === 'playing' && !this.bossFights.isTriggered(boss.id)) {
+      if (
+        boss
+        && boss.reveal.requiresUpsideDown === this.upsideDownActive
+        && started
+        && gameState === 'playing'
+        && !this.bossFights.isTriggered(boss.id)
+      ) {
         const ctx = this.gateContext();
         if (!bossThresholdMet(boss, ctx)) {
           const now = performance.now();
