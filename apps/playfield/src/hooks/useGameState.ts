@@ -497,6 +497,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         }
         callbacks?.onAtmosphereChange?.(false);
       }
+      if (event.type === "WORLD_CYCLE_COMPLETE") {
+        clearAllBossHud();
+      }
     };
 
   return {

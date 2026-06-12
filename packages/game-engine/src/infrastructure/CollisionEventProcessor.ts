@@ -67,6 +67,13 @@ export class CollisionEventProcessor {
     this.resetBossFight('vecna');
   }
 
+  completeWorldCycle(): void {
+    this.upsideDownActive = false;
+    this.upsideDownScoreBaseline = 0;
+    this.portalTriggered = false;
+    this.resetAllBossFights();
+  }
+
   tryAllBossReveals(totalScore: number, gameState: string): void {
     this.bossFights.tryAllReveals({
       totalScore,

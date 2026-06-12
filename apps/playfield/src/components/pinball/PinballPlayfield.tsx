@@ -1345,16 +1345,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               upsideDownPortal?.reset();
               upsideDownPortal?.setUpsideDownActive(false);
               upsideDownAtmosphere?.reset();
-              collisionProcessor?.resetPortalTrigger();
-              collisionProcessor?.resetUpsideDownSession();
-              vecnaReveal?.endFight();
-              clearUpsideDownSession();
+              collisionProcessor?.completeWorldCycle();
+              bossReveals?.endAllFights();
               stuckDetector.reset();
               if (ballMesh && ballPhysicsInst) {
                 ballPhysicsInst.syncToMesh(ballMesh);
                 ballMesh.visible = true;
                 ballMesh.scale.setScalar(1);
               }
+              emit({ type: "WORLD_CYCLE_COMPLETE" });
               emit({ type: "RETURN_PORTAL_TRANSITION_END" });
             },
           );
