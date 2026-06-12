@@ -8,7 +8,7 @@ export const manifest: MapManifest = {
   id: 'strangerthings',
   name: 'Stranger Things',
   version: 1,
-  glb: 'playfield/Strangerthings.glb',
+  glb: 'playfield/newStrangerthings.glb',
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {
     bumper: 100, // SCORE_BUMPER
@@ -29,6 +29,24 @@ export const manifest: MapManifest = {
     milestones: [5_000, 15_000, 30_000], // MILESTONES
     milestoneRepeatEvery: 25_000, // MILESTONE_REPEAT_EVERY
     comboDecayMs: 2_000, // COMBO_DECAY_MS
+  },
+  // Nuances matière par mesh (clé = nom conventionné). Reprend la classif
+  // historique de PlayfieldTrimeshBuilder. Défaut wall_ non listé :
+  // restitution 0.35, friction 0.15, double-sided, lissage Laplacien.
+  //   physics:'analytic' → pas de trimesh (le sol lisse analytique gère)
+  //   singleSided:1      → trimesh single-sided (normales vers l'intérieur)
+  //   doubleSided:0/1    → force le double-sided
+  //   smooth:0/1         → lissage Laplacien
+  elements: {
+    floor_main: { physics: 'analytic' }, // ex-Mesh_0 : sol analytique lisse
+    wall_main: { singleSided: 1, restitution: 0.35, friction: 0.12 }, // ex-Mesh_1
+    wall_slingshot: { restitution: 0, friction: 0.1 }, // ex no-bounce (Cylinder.008)
+    wall_bottom: { restitution: 0, friction: 0.1 }, // ex no-bounce (Plane.008)
+    wall_top: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.001)
+    wall_under_top: { restitution: 0.35, friction: 0.12 }, // rail (Circle.034)
+    wall_middle_left: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.011)
+    wall_middle_right: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.018)
+    wall_guide_lane: { restitution: 0.2, friction: 0.15, smooth: 0 }, // ex-Fix-Start
   },
   // Termes ST traqués par le grep-guard anti-fuite (phase 2.6).
   forbiddenInCore: [
