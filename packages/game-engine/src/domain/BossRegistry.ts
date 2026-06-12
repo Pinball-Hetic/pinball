@@ -76,6 +76,7 @@ export type BossDefinition = {
   reveal: BossRevealConfig;
   hud: BossHudConfig;
   unlocksPortal: boolean;
+  unlocksReturnPortal: boolean;
   targetMeshTheme: BossTargetMeshTheme;
   targetPulse: BossTargetPulseConfig;
 };
@@ -109,6 +110,7 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       victoryClearMs: 1400,
     },
     unlocksPortal: true,
+    unlocksReturnPortal: false,
     targetMeshTheme: {
       ring: {
         color: 0xff2244,
@@ -167,6 +169,7 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       victoryClearMs: 1600,
     },
     unlocksPortal: false,
+    unlocksReturnPortal: true,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,
