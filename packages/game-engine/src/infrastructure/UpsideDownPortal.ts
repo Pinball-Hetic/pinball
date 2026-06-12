@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEvent } from '../domain/GameEvents';
+import { getBossDefinition } from '../domain/BossRegistry';
 import {
-  DEMOGORGON_TARGET_HITS,
   PORTAL_COVER_RADIUS,
   PORTAL_HOLE_RADIUS,
   PORTAL_MAGNET_RADIUS,
@@ -148,8 +148,10 @@ export class UpsideDownPortal {
 
   onGameEvent(event: GameEvent): void {
     if (this.revealed || this.revealing) return;
-    if (event.type !== 'DEMOGORGON_TARGET_HIT') return;
-    if (event.hitCount < DEMOGORGON_TARGET_HITS) return;
+    if (event.type !== 'BOSS_TARGET_HIT') return;
+    const def = getBossDefinition(event.bossId);
+    if (!def.unlocksPortal) return;
+    if (event.hitCount < def.targetHits) return;
     this.beginReveal();
   }
 

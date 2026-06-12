@@ -9,6 +9,11 @@ import {
 } from '../domain/Ball';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
+// Mur de fermeture du couloir : posé un poil à droite du bord gauche du couloir,
+// fin (le but est de boucher l'ouverture, pas de rebondir).
+const GATE_X_INSET = 0.005;
+const GATE_THICKNESS = 0.01;
+
 export class ShooterLaneGate {
   private world: RAPIER.World | null = null;
   private body: RAPIER.RigidBody | null = null;
@@ -37,10 +42,10 @@ export class ShooterLaneGate {
   close(): void {
     if (!this.world || this.collider) return;
 
-    const x = SHOOTER_LANE_X_MIN + 0.005;
+    const x = SHOOTER_LANE_X_MIN + GATE_X_INSET;
     const zTop = SHOOTER_LANE_TOP_Z;
     const zBot = SHOOTER_LANE_LEFT_WALL_TOP_Z;
-    const thickness = 0.01;
+    const thickness = GATE_THICKNESS;
     const midZ = (zTop + zBot) / 2;
     const halfZ = (zBot - zTop) / 2;
     const yTop = surfaceYAtZ(zTop);
