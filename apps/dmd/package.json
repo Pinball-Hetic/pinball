@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@pinball/dmd-core": "workspace:*",
-    "@pinball/map-strangerthings": "workspace:*",
+    "@pinball/maps": "workspace:*",
     "@pinball/shared-types": "workspace:*",
     "@pinball/ui": "workspace:*",
     "next": "^16.2.1",

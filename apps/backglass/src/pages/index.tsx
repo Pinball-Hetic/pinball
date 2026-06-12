@@ -3,7 +3,7 @@ import { NoSignal } from '@pinball/ui'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
-import { JoyceWall, SideArt } from '@pinball/map-strangerthings/backglass'
+import { JoyceWall, SideArt } from '@/map/content'
 import HallOfFame from '@/components/HallOfFame'
 import StatsBanner from '@/components/StatsBanner'
 import ReactorFx from '@/components/ReactorFx'
@@ -56,7 +56,7 @@ export default function BackglassPage() {
   const sideAgitation = alternateWorld ? 1 : Math.max(0.15, agitation)
 
   return (
-    <div className={`stage-fit ${alternateWorld ? 'upside-down' : ''} ${fever ? 'fever' : ''}`}>
+    <div className={`stage-fit ${alternateWorld ? 'alternate-world' : ''} ${fever ? 'fever' : ''}`}>
       <main className="stage" ref={stageRef}>
         <div className="vignette" style={{ opacity: 1 + agitation * 0.8 }} />
         <div className="vignette-heat" />
@@ -68,7 +68,7 @@ export default function BackglassPage() {
 
         <section className="zone-side">
           <SideArt
-            mood={alternateWorld ? 'upsideDown' : 'normal'}
+            mood={alternateWorld ? 'alternate' : 'normal'}
             agitation={sideAgitation}
             reactor={reactor}
           />

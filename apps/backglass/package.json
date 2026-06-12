@@ -8,7 +8,7 @@
     "lint": "eslint src --ext .ts,.tsx"
   },
   "dependencies": {
-    "@pinball/map-strangerthings": "workspace:*",
+    "@pinball/maps": "workspace:*",
     "@pinball/shared-types": "workspace:*",
     "@pinball/ui": "workspace:*",
     "next": "^16.2.1",

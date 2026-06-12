@@ -326,17 +326,17 @@ body {
   color: rgba(237, 228, 211, 0.7);
 }
 
-/* ===================== Upside Down ===================== */
-.upside-down {
+/* ============ Monde alternatif (thème map : à extraire) ============ */
+.alternate-world {
   --glow: #b14dff;
   --vignette: #1a0640;
 }
-.upside-down .stage {
+.alternate-world .stage {
   background: radial-gradient(ellipse at 50% 38%, #1a0a2a 0%, #06040c 60%, #000 100%);
   filter: hue-rotate(8deg) saturate(1.1);
   transition: background 0.6s ease, filter 0.6s ease;
 }
-.upside-down .joyce-wall {
+.alternate-world .joyce-wall {
   background: linear-gradient(180deg, #150a22 0%, #0b0614 100%);
 }
 

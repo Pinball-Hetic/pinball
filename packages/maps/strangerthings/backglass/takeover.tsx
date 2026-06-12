@@ -25,7 +25,7 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
         <Vhs className="tk-cine-rises">
           <div className="cine-blackout" />
           <div className="cine-giant-side">
-            <SideArt mood="upsideDown" agitation={1} />
+            <SideArt mood="alternate" agitation={1} />
           </div>
           <div className="tk-center">
             <div className="glitch-text cine-run" data-text="RUN">

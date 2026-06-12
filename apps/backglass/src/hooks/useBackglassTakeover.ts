@@ -7,7 +7,7 @@ import type {
   GameOver,
 } from '@pinball/shared-types'
 import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
-import { clipBehavior, eventTakeovers } from '@pinball/map-strangerthings/backglass'
+import { clipBehavior, eventTakeovers } from '@/map/content'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 

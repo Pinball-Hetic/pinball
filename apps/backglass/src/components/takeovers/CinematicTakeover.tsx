@@ -1,5 +1,5 @@
 import type { GameOver, LeaderboardEntry } from '@pinball/shared-types'
-import { renderMapTakeover } from '@pinball/map-strangerthings/backglass'
+import { renderMapTakeover } from '@/map/content'
 import VhsGlitch from '../VhsGlitch'
 import HighScoreTakeover from './HighScoreTakeover'
 import RecapTakeover from './RecapTakeover'

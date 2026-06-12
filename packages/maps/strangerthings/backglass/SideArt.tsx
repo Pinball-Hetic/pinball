@@ -2,13 +2,15 @@ import { useEffect, useRef } from 'react'
 import type { Reactor } from './reactor'
 
 interface SideArtProps {
-  mood: 'normal' | 'upsideDown'
+  // API générique (normal / monde alternatif) : l'app ne connaît pas l'Upside
+  // Down. Le rendu ST est interne à la map.
+  mood: 'normal' | 'alternate'
   agitation: number // 0..1 — vitesse/amplitude des animations
   reactor?: Reactor
 }
 
 export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
-  const upside = mood === 'upsideDown'
+  const upside = mood === 'alternate'
   const beamRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

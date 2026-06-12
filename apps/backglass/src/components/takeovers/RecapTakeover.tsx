@@ -1,5 +1,5 @@
 import type { GameOver } from '@pinball/shared-types'
-import { counterLabels } from '@pinball/map-strangerthings/backglass'
+import { counterLabels } from '@/map/content'
 import VhsGlitch from '../VhsGlitch'
 
 interface Props {

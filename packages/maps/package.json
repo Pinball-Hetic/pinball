@@ -4,14 +4,27 @@
   "private": true,
   "main": "index.ts",
   "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./backglass": "./backglass.ts",
+    "./dmd": "./dmd.ts"
+  },
   "scripts": {
-    "lint": "eslint . --ext .ts --ignore-pattern strangerthings",
+    "lint": "eslint . --ext .ts,.tsx --ignore-pattern strangerthings",
     "build": "tsc --noEmit",
     "test": "bun test"
   },
   "dependencies": {
     "@pinball/shared-types": "workspace:*",
     "@pinball/game-engine": "workspace:*",
+    "@pinball/dmd-core": "workspace:*",
     "@pinball/map-strangerthings": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "react": "^19.2.4"
   }
 }

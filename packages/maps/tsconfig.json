@@ -1,5 +1,8 @@
 {
   "extends": "../config/tsconfig.json",
-  "include": ["index.ts"],
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  },
+  "include": ["index.ts", "backglass.ts", "dmd.ts"],
   "exclude": ["node_modules", "strangerthings"]
 }

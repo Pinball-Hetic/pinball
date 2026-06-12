@@ -9,5 +9,18 @@
     "plugin:@typescript-eslint/recommended"
   ],
   "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint"]
+  "plugins": ["@typescript-eslint"],
+  "rules": {
+    "@typescript-eslint/no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["@pinball/map-*", "@pinball/map-*/**"],
+            "message": "Importer les maps via le registry @pinball/maps (./backglass, ./dmd), jamais @pinball/map-* en direct. Point de composition unique (packages/maps/)."
+          }
+        ]
+      }
+    ]
+  }
 }
