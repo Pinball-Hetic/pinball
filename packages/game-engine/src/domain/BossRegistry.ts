@@ -113,11 +113,15 @@ export function bossPointsRemaining(def: BossDefinition, ctx: BossGateContext): 
   return Math.max(0, Math.ceil(gap / 100) * 100);
 }
 
-// Helper générique de lookup par rôle de collider, sur un jeu de définitions
-// injecté (le moteur ne possède plus de registry boss).
+// Helpers génériques de lookup sur un jeu de définitions injecté (le moteur ne
+// possède plus de registry boss — les apps passent layout.bosses).
 export function findBossByColliderRole(
   bosses: BossDefinition[],
   role: string,
 ): BossDefinition | undefined {
   return bosses.find((boss) => boss.colliderRole === role);
+}
+
+export function getBossById(bosses: BossDefinition[], id: BossId): BossDefinition | undefined {
+  return bosses.find((boss) => boss.id === id);
 }

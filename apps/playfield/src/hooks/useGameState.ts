@@ -4,7 +4,7 @@ import {
   bossThresholdMet,
   type BossId,
 } from "@pinball/game-engine";
-import { BOSS_IDS, getBossDefinition } from "@/map/activeMapBosses";
+import { getBossById, type BossDefinition } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
 import type { GameStats } from "@pinball/shared-types";
 import { handlePinballSoundEvent, playGameOverSound } from "../audio/pinballAudio";
@@ -93,8 +93,8 @@ const initialBossHudEntry = (): BossHudEntry => ({
   assistFlash: false,
 });
 
-const initialBossHud = (): BossHudState =>
-  Object.fromEntries(BOSS_IDS.map((id) => [id, initialBossHudEntry()])) as BossHudState;
+const initialBossHud = (bosses: BossDefinition[]): BossHudState =>
+  Object.fromEntries(bosses.map((b) => [b.id, initialBossHudEntry()])) as BossHudState;
 
 export interface GameStateOptions {
   /** Ancre écran des pop de score portail (depuis layout.sensors.portal). */
@@ -103,12 +103,16 @@ export interface GameStateOptions {
   bumperAnchors?: { x: number; z: number }[];
   /** Délai avant le hint d'atmosphère (depuis layout.atmosphere.hintMs). */
   atmosphereHintMs?: number;
+  /** Définitions de boss de la map active (layout.bosses). */
+  bosses?: BossDefinition[];
 }
 
 export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptions) {
   const portalAnchor = opts?.portalAnchor ?? { x: 0, z: 0 };
   const bumperAnchors = opts?.bumperAnchors ?? [];
   const atmosphereHintMs = opts?.atmosphereHintMs ?? 45_000;
+  const bosses = opts?.bosses ?? [];
+  const bossIds = bosses.map((b) => b.id);
   // `callbacks` est un objet littéral recréé à chaque render → on le lit via
   // un ref pour ne PAS remettre l'interval 250ms (decay combo + expiration
   // fever) à zéro à chaque render (sinon il pourrait ne jamais se déclencher).
@@ -121,7 +125,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
   const [combo, setCombo] = useState(0);
   const [multiplier, setMultiplier] = useState(1);
   const [player, setPlayer] = useState<string>(() => generatePlayerName());
-  const [bossHud, setBossHud] = useState<BossHudState>(initialBossHud);
+  const [bossHud, setBossHud] = useState<BossHudState>(() => initialBossHud(bosses));
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
   const [alternateWorldActive, setUpsideDownActive] = useState(false);
   const [upsideDownHint, setUpsideDownHint] = useState(false);
@@ -223,7 +227,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
   }, []);
 
   const clearAllBossHud = useCallback(() => {
-    for (const id of BOSS_IDS) {
+    for (const id of bossIds) {
       clearBossHud(id);
     }
   }, [clearBossHud]);
@@ -315,7 +319,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
 
   const buildEmit = (hideBall: () => void): GameEventListener =>
     (event) => {
-      handlePinballSoundEvent(event);
+      handlePinballSoundEvent(event, bosses);
 
       const now = performance.now();
 
@@ -350,9 +354,9 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         // Éveil du nid : palier de boss franchi → onBossArmed une fois par partie.
         // Le set garde l'unicité ; le gate Upside Down/baseline est porté par
         // bossThresholdMet (généricité demogorgon + vecna).
-        for (const id of BOSS_IDS) {
+        for (const id of bossIds) {
           if (bossArmedFiredRef.current.has(id)) continue;
-          const def = getBossDefinition(id);
+          const def = getBossById(bosses, id); if (!def) continue;
           const met = bossThresholdMet(def, {
             totalScore: scoreRef.current,
             alternateWorldActive: alternateWorldActiveRef.current,
@@ -380,7 +384,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         }
       }
       if (event.type === "BOSS_TARGET_HIT") {
-        const def = getBossDefinition(event.bossId);
+        const def = getBossById(bosses, event.bossId); if (!def) return;
         const point = jitterScreenPoint(
           playfieldToScreenPercent(def.target.x, def.target.z),
           4,

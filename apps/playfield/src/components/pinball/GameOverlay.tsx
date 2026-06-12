@@ -1,4 +1,4 @@
-import { BOSS_IDS, getBossDefinition } from "@/map/activeMapBosses";
+import type { BossDefinition } from "@pinball/game-engine";
 import type { BossHudState, ScorePop } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
 import PlungerPowerBar from "./PlungerPowerBar";
@@ -19,6 +19,7 @@ interface GameOverlayProps {
   atmosphereBannerLabel: string;
   atmosphereHintLabel: string;
   attractTagline: string;
+  bosses: BossDefinition[];
   cabinetMode?: boolean;
   onAttractInteract?: () => void;
 }
@@ -37,6 +38,7 @@ export default function GameOverlay({
   atmosphereBannerLabel,
   atmosphereHintLabel,
   attractTagline,
+  bosses,
   cabinetMode = false,
   onAttractInteract,
 }: GameOverlayProps) {
@@ -114,8 +116,8 @@ export default function GameOverlay({
         </div>
       )}
 
-      {BOSS_IDS.map((bossId) => {
-        const def = getBossDefinition(bossId);
+      {bosses.map((def) => {
+        const bossId = def.id;
         const hud = bossHud[bossId];
         const showBossHud =
           bootPhase === "in_game" &&

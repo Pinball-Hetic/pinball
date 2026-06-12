@@ -66,7 +66,7 @@ import {
   type GameEvent,
   ShooterLaneGate,
 } from "@pinball/game-engine";
-import { getBossDefinition } from "@/map/activeMapBosses";
+import { getBossById } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import { NoSignal } from "@pinball/ui";
 import { MeshRoleResolver, LayoutResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
@@ -82,6 +82,8 @@ const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? "strangerthings";
 // Résolu au niveau module (MAP_ID = constante build-time) → permet un garde
 // NO SIGNAL en 1ère ligne du composant, avant tout hook.
 const RESOLVED_MAP = getMapPackage(MAP_ID);
+// Définitions de boss de la map active (point de composition unique).
+const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -98,14 +100,14 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
       return {
         type: "BOSS_REVEAL",
         bossId: "demogorgon",
-        scoreIncrement: getBossDefinition("demogorgon").reveal.scoreIncrement,
+        scoreIncrement: getBossById(MAP_BOSSES, "demogorgon")?.reveal.scoreIncrement ?? 150,
       };
     case "DEMOGORGON_TARGET_HIT":
       return {
         type: "BOSS_TARGET_HIT",
         bossId: "demogorgon",
         hitCount: d.hitCount ?? 1,
-        scoreIncrement: getBossDefinition("demogorgon").scoreTargetHit,
+        scoreIncrement: getBossById(MAP_BOSSES, "demogorgon")?.scoreTargetHit ?? 250,
       };
     case "PORTAL_ENTER":
       return { type: "PORTAL_ENTER", scoreIncrement: PORTAL_ENTER_SCORE };
@@ -485,7 +487,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       // Chaque event fait switcher l'affichage. Exclusif, par priorité
       // décroissante : event labellisé → EVENT ; nouveau multiplier →
       // MULTI ; sinon combo en cours → COMBO.
-      const label = eventLabel(event);
+      const label = eventLabel(event, MAP_BOSSES);
       if (label) {
         dmd.pushEvent(label, finalPoints, snap);
       } else if (previousMultiplier !== newMultiplier) {
@@ -577,6 +579,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     portalAnchor: mapLayout.sensors.portal,
     bumperAnchors: mapLayout.bumpers,
     atmosphereHintMs: mapLayout.atmosphere.hintMs,
+    bosses: MAP_BOSSES,
   });
 
   // Patches de mapState poussés par le module de map (ctx.setMapState). Fusionnés
@@ -1959,6 +1962,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           atmosphereBannerLabel={mapLayout.atmosphere.bannerLabel}
           atmosphereHintLabel={mapLayout.atmosphere.hintLabel}
           attractTagline={mapManifest.attractTagline ?? mapManifest.name}
+          bosses={MAP_BOSSES}
           cabinetMode={cabinetMode}
           onAttractInteract={() => {
             if (physicsReady && !sessionStarted) beginSession();

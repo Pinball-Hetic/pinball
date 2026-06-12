@@ -1,5 +1,5 @@
 import type { GameEvent } from "@pinball/game-engine";
-import { getBossDefinition } from "@/map/activeMapBosses";
+import { getBossById, type BossDefinition } from "@pinball/game-engine";
 import { installAudioBootstrap } from "./AudioBootstrap";
 import { EarlySoundController } from "./EarlySoundController";
 import {
@@ -106,7 +106,7 @@ export function playGameOverSound(): void {
   void samples.playOneShotBuffer(GAME_OVER_URL, soundLevel("gameOver"));
 }
 
-export function handlePinballSoundEvent(event: GameEvent): void {
+export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition[]): void {
   switch (event.type) {
     case "BALL_LAUNCHED":
       sfx.playLaunch();
@@ -121,9 +121,9 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       }
       break;
     case "BOSS_TARGET_HIT": {
-      const def = getBossDefinition(event.bossId);
+      const def = getBossById(bosses, event.bossId);
       sfx.playTargetHit(event.hitCount);
-      if (event.hitCount >= def.targetHits) {
+      if (def && event.hitCount >= def.targetHits) {
         window.setTimeout(() => sfx.playVictory(), 80);
       }
       break;

@@ -9,11 +9,8 @@ import type {
   CinematicClip,
 } from '@pinball/shared-types';
 import { clipShowMs, clipTakeoverMs } from '@pinball/shared-types';
-import type { GameEvent } from '@pinball/game-engine';
-import { getBossDefinition, ACTIVE_BOSSES } from '@/map/activeMapBosses';
-
-// Libellé d'assist fourni par la map (boss portant un hud.assistLabel).
-const ASSIST_LABEL = ACTIVE_BOSSES.find((b) => b.hud.assistLabel)?.hud.assistLabel ?? 'ASSIST';
+import type { GameEvent, BossDefinition } from '@pinball/game-engine';
+import { getBossById } from '@pinball/game-engine';
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -73,23 +70,28 @@ export interface DmdOrchestrator {
   setAtmosphere: (alternateWorldActive: boolean) => void;
 }
 
-// Labels lisibles pour les events highlight :
-function eventLabel(event: GameEvent): string | null {
+// Labels lisibles pour les events highlight (boss defs injectées par la map) :
+function eventLabel(event: GameEvent, bosses: BossDefinition[]): string | null {
   switch (event.type) {
     case 'BOSS_REVEAL':
-      return getBossDefinition(event.bossId).hud.dmdLabel;
+      return getBossById(bosses, event.bossId)?.hud.dmdLabel ?? event.bossId.toUpperCase();
     case 'BOSS_TARGET_HIT': {
-      const def = getBossDefinition(event.bossId);
-      return event.hitCount >= def.targetHits
-        ? `${def.hud.dmdLabel} VAINCU`
-        : `${def.hud.dmdLabel} HIT ${event.hitCount}/${def.targetHits}`;
+      const def = getBossById(bosses, event.bossId);
+      const label = def?.hud.dmdLabel ?? event.bossId.toUpperCase();
+      const hits = def?.targetHits ?? event.hitCount;
+      return event.hitCount >= hits
+        ? `${label} VAINCU`
+        : `${label} HIT ${event.hitCount}/${hits}`;
     }
     case 'PORTAL_ENTER': return 'PORTAL';
     case 'RETURN_PORTAL_ENTER': return 'RETOUR';
     case 'WORLD_CYCLE_COMPLETE': return 'CYCLE COMPLET';
     case 'RAMP_HIT': return 'RAMP';
     case 'DROP_TARGET_COMPLETE': return `DROP ${event.side.toUpperCase()}`;
-    case 'ASSIST': return ASSIST_LABEL.toUpperCase();
+    case 'ASSIST': {
+      const label = bosses.find((b) => b.hud.assistLabel)?.hud.assistLabel ?? 'ASSIST';
+      return label.toUpperCase();
+    }
     default: return null; // bumpers/slingshots/zones → pas de highlight, juste score
   }
 }
