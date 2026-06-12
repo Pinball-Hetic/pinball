@@ -15,13 +15,10 @@ export const FLIPPER_RIGHT_PIVOT_X =  -0.02;
 export const FLIPPER_PIVOT_Y       =  0.00;
 export const FLIPPER_PIVOT_Z       =  -0.018;
 
-// Zone flipper (PlayfieldGeometry + BallDiagnostics)
+// Zone flipper Z (PlayfieldGeometry + BallDiagnostics). Les bornes X sont
+// désormais dérivées des bbox mesh au chargement (cf. FlipperZones.ts).
 export const FLIPPER_Z_MIN = 0.20;
 export const FLIPPER_Z_MAX = 0.33;
-export const FLIPPER_LEFT_X_MIN  = -0.085;
-export const FLIPPER_LEFT_X_MAX  =  0.015;
-export const FLIPPER_RIGHT_X_MIN = -0.015;
-export const FLIPPER_RIGHT_X_MAX =  0.055;
 
 // ── Physique contact ──────────────────────────────────────────────────────────
 export const FLIPPER_POWER       = 0.138;   // conservé pour compatibilité (inutilisé)

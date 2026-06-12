@@ -1,5 +1,10 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { BossId } from '../domain/BossRegistry';
+import {
+  bossPointsRemaining,
+  bossThresholdMet,
+  getBossByColliderRole,
+} from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import {
   BUMPER_POSITIONS,
@@ -31,6 +36,35 @@ export class CollisionEventProcessor {
   private upsideDownActive = false;
   private normalWorldScoreBaseline = 0;
   private upsideDownScoreBaseline = 0;
+  private lastTotalScore = 0;
+  // Throttle des events « nid verrouillé » par boss (anti-spam, 2 s).
+  private lockedHitLastMs: Partial<Record<BossId, number>> = {};
+
+  private gateContext() {
+    return {
+      totalScore: this.lastTotalScore,
+      upsideDownActive: this.upsideDownActive,
+      normalWorldScoreBaseline: this.normalWorldScoreBaseline,
+      upsideDownScoreBaseline: this.upsideDownScoreBaseline,
+    };
+  }
+
+  getNormalWorldScoreBaseline(): number {
+    return this.normalWorldScoreBaseline;
+  }
+
+  /** Baseline de score Upside Down (pour recalculer l'état des marqueurs de nid). */
+  getUpsideDownScoreBaseline(): number {
+    return this.upsideDownScoreBaseline;
+  }
+
+  isUpsideDownActive(): boolean {
+    return this.upsideDownActive;
+  }
+
+  isBossTriggered(id: BossId): boolean {
+    return this.bossFights.isTriggered(id);
+  }
 
   setPortalOpen(open: boolean): void {
     this.portalOpen = open;
@@ -82,6 +116,7 @@ export class CollisionEventProcessor {
   }
 
   tryAllBossReveals(totalScore: number, gameState: string): void {
+    this.lastTotalScore = totalScore;
     this.bossFights.tryAllReveals({
       totalScore,
       gameState,
@@ -107,6 +142,24 @@ export class CollisionEventProcessor {
     eventQueue.drainCollisionEvents((h1, h2, started) => {
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
+
+      // Contact avec une cible de boss encore verrouillée (palier non atteint) :
+      // pédagogie « ENCORE X PTS » plutôt qu'un hit silencieux. Throttle 2 s.
+      const boss = getBossByColliderRole(role);
+      if (boss && started && gameState === 'playing' && !this.bossFights.isTriggered(boss.id)) {
+        const ctx = this.gateContext();
+        if (!bossThresholdMet(boss, ctx)) {
+          const now = performance.now();
+          if (now - (this.lockedHitLastMs[boss.id] ?? 0) >= 2000) {
+            this.lockedHitLastMs[boss.id] = now;
+            this.emit({
+              type: 'BOSS_LOCKED_HIT',
+              bossId: boss.id,
+              remaining: bossPointsRemaining(boss, ctx),
+            });
+          }
+        }
+      }
 
       if (this.bossFights.handleTargetCollision(role, started, gameState)) {
         return;

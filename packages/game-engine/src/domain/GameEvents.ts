@@ -10,6 +10,7 @@ export type GameEvent =
   | { type: 'ZONE_HIT'; zone: string; scoreIncrement: number }
   | { type: 'BOSS_REVEAL'; bossId: BossId; scoreIncrement: number }
   | { type: 'BOSS_TARGET_HIT'; bossId: BossId; hitCount: number; scoreIncrement: number }
+  | { type: 'BOSS_LOCKED_HIT'; bossId: BossId; remaining: number }
   | { type: 'ELEVEN_ASSIST'; scoreIncrement: number }
   | { type: 'PORTAL_ENTER'; scoreIncrement: number }
   | { type: 'PORTAL_TREMOR' }

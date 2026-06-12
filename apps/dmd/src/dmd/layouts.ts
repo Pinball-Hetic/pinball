@@ -47,6 +47,13 @@ function drawCentered(
 // Flash plein cadre scale 2 : une ligne si ça tient (≤ 8 chars), sinon
 // label + valeur sur deux lignes.
 function drawFlash(grid: Uint8Array, label: string, value: string, color: number): void {
+  // Bandeau informatif sans valeur (« LE NID S EVEILLE », « ENCORE X PTS ») :
+  // une seule ligne, échelle réduite si nécessaire pour tenir dans le cadre.
+  if (!value) {
+    const scale = measureText(label, FONT_5X7, 1, 2) <= GRID_W ? 2 : 1
+    drawCentered(grid, label, 9, FONT_5X7, color, 1, scale)
+    return
+  }
   const oneLine = `${label} ${value}`
   if (measureText(oneLine, FONT_5X7, 1, 2) <= GRID_W) {
     drawCentered(grid, oneLine, 9, FONT_5X7, color, 1, 2)
@@ -296,7 +303,7 @@ function layoutIntro(grid: Uint8Array, display: DmdDisplay, clockMs: number): vo
 function layoutEvent(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'EVENT'>
   if (flickerSkip(clockMs, 60, -0.7)) return
-  drawFlash(grid, d.label, `+${d.points}`, DOT.event)
+  drawFlash(grid, d.label, d.points > 0 ? `+${d.points}` : '', DOT.event)
 }
 
 function layoutComboFlash(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {

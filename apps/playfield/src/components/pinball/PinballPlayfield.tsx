@@ -32,12 +32,6 @@ import {
   SWING_SMOOTH,
   FLIPPER_RESTITUTION,
   FLIPPER_FRICTION,
-  FLIPPER_Z_MIN,
-  FLIPPER_Z_MAX,
-  FLIPPER_LEFT_X_MIN,
-  FLIPPER_LEFT_X_MAX,
-  FLIPPER_RIGHT_X_MIN,
-  FLIPPER_RIGHT_X_MAX,
   FLIPPER_MIN_LAUNCH_VZ,
   FLIPPER_MIN_LAUNCH_ANGVEL,
   computeSurfaceSnap,
@@ -47,6 +41,8 @@ import {
   resolvePlayfieldFlippers,
   attachFlipperAtHinge,
   applyFlipperSwing,
+  computeFlipperZones,
+  type FlipperZones,
   type FlipperPivot,
   CollisionEventProcessor,
   StuckBallDetector,
@@ -66,6 +62,11 @@ import {
   DemogorgonReveal,
   VecnaReveal,
   BossRevealOrchestrator,
+  BossNestMarker,
+  BOSS_IDS,
+  getBossDefinition,
+  bossThresholdMet,
+  type BossId,
   CinematicDirector,
   ScreenShake,
   BallTrail,
@@ -526,6 +527,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     onIdleReset: () => {
       cinematics.resetGame();
       resetPinballAudioForNewGame();
+      nestMarkerRef.current?.reset();
+      bossArmedAtRef.current = {};
+      bossLateHintFiredRef.current.clear();
       shooterLaneGateRef.current?.open();
       dmd.pushIntro(playerRef.current);
       dmd.emitScoreSnapshot({
@@ -541,6 +545,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     onAtmosphereChange: (upsideDownActive) => {
       dmd.setAtmosphere(upsideDownActive);
       atmosphereUpsideRef.current = upsideDownActive;
+      nestMarkerRef.current?.setUpsideDown(upsideDownActive);
     },
     onMilestone: (threshold) => {
       const clip: CinematicClip =
@@ -554,6 +559,22 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       playCinematic(clip, { value: threshold });
       garlandLightsRef.current?.celebrate();
       screenShakeRef.current?.add(0.4); // shake du gel palier
+    },
+    onBossArmed: (bossId) => {
+      // Le nid s'éveille : marqueur armé + bandeau DMD + frisson garlands.
+      bossArmedAtRef.current[bossId] = performance.now();
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: comboRef.current,
+        multiplier: multiplierRef.current,
+        lives: livesRef.current,
+        hetic: heticRef.current,
+        fever: isFeverActive(),
+      };
+      dmd.pushEvent("LE NID S EVEILLE", 0, snap);
+      garlandLightsRef.current?.celebrate();
+      screenShakeRef.current?.add(0.3);
     },
     onHeticLetter: (n) => playCinematic("hetic_letter", { value: n }),
     onHeticComplete: () => {
@@ -594,6 +615,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   });
 
   const garlandLightsRef = useRef<GarlandLights | null>(null);
+  const nestMarkerRef = useRef<BossNestMarker | null>(null);
+  const bossArmedAtRef = useRef<Partial<Record<BossId, number>>>({});
+  const bossLateHintFiredRef = useRef<Set<BossId>>(new Set());
   const shooterLaneGateRef = useRef<ShooterLaneGate | null>(null);
   const screenShakeRef = useRef<ScreenShake | null>(null);
   if (!screenShakeRef.current) screenShakeRef.current = new ScreenShake();
@@ -681,6 +705,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let rightFlipperPivot: FlipperPivot | null = null;
     let leftFlipperObj: THREE.Object3D | null = null;
     let rightFlipperObj: THREE.Object3D | null = null;
+    let flipperZones: FlipperZones | null = null;
     let leftSwing = 0, rightSwing = 0;
     let prevLeftSwing = 0, prevRightSwing = 0;
     let leftTarget = 0, rightTarget = 0;
@@ -735,6 +760,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
     let bossReveals: BossRevealOrchestrator | null = null;
+    let nestMarker: BossNestMarker | null = null;
     let ballTrail: BallTrail | null = null;
     let demogorgonReveal: DemogorgonReveal | null = null;
     let vecnaReveal: VecnaReveal | null = null;
@@ -883,6 +909,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         garlandLights = new GarlandLights();
         garlandLights.setup(playfieldRoot);
         garlandLightsRef.current = garlandLights;
+        nestMarker = new BossNestMarker();
+        nestMarker.setup({ root: playfieldRoot });
+        nestMarkerRef.current = nestMarker;
         ballTrail = new BallTrail();
         ballTrail.mount(scene);
         demogorgonReveal = new DemogorgonReveal();
@@ -952,6 +981,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", pinballmap);
           rightFlipperObj = rightFlipper;
           rightFlashMats = collectFlashMats(rightFlipper);
+        }
+
+        // Zones de garantie de lancement dérivées des bbox mesh (pose de repos).
+        if (leftFlipperObj && rightFlipperObj) {
+          flipperZones = computeFlipperZones(leftFlipperObj, rightFlipperObj, BALL_RADIUS);
         }
 
         // ── Physics ──────────────────────────────────────────────────────────
@@ -1163,6 +1197,29 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           vecnaReveal?.endFight();
           clearUpsideDownSession();
         };
+        // Réconcilie l'état visuel des marqueurs de nid avec la vérité du jeu :
+        // déclenché (reveal consommé) → revealed ; sinon palier atteint → armed,
+        // sinon locked. Idempotent (setState ignore l'état identique).
+        const syncNestMarkers = () => {
+          if (!nestMarker || !collisionProcessor) return;
+          const ctx = {
+            totalScore: scoreRef.current,
+            upsideDownActive: collisionProcessor.isUpsideDownActive(),
+            normalWorldScoreBaseline: collisionProcessor.getNormalWorldScoreBaseline(),
+            upsideDownScoreBaseline: collisionProcessor.getUpsideDownScoreBaseline(),
+          };
+          nestMarker.setUpsideDown(ctx.upsideDownActive);
+          for (const id of BOSS_IDS) {
+            if (collisionProcessor.isBossTriggered(id)) {
+              nestMarker.setState(id, "revealed");
+            } else {
+              nestMarker.setState(
+                id,
+                bossThresholdMet(getBossDefinition(id), ctx) ? "armed" : "locked",
+              );
+            }
+          }
+        };
         const emit: typeof baseEmit = (event) => {
           baseEmit(event);
           if (
@@ -1189,6 +1246,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           else if (event.type === "DROP_TARGET_COMPLETE") screenShake.add(0.6);
           else if (event.type === "BOSS_TARGET_HIT" && event.bossId === "demogorgon") {
             screenShake.add(0.5);
+          }
+
+          if (event.type === "BOSS_LOCKED_HIT") {
+            // Cible verrouillée frappée : flash gris + « ENCORE X PTS » au DMD.
+            nestMarker?.flashLocked(event.bossId);
+            dmd.pushEvent(`ENCORE ${event.remaining} PTS`, 0, {
+              player: playerRef.current,
+              score: scoreRef.current,
+              combo: comboRef.current,
+              multiplier: multiplierRef.current,
+              lives: livesRef.current,
+              hetic: heticRef.current,
+              fever: isFeverActive(),
+            });
           }
 
           if (event.type === "BOSS_REVEAL" && event.bossId === "demogorgon") {
@@ -1263,6 +1334,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               if (mesh) mesh.visible = true;
             }
           }
+
+          // État des marqueurs de nid recalculé après chaque event (reveal,
+          // reset de combat, franchissement de palier, entrée/sortie Upside Down).
+          syncNestMarkers();
         };
         launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
         bumperHitUC = new BumperHit(ballPhysicsInst, emit);
@@ -1600,8 +1675,40 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       garlandLights?.setFever(isFeverActive());
       garlandLights?.update(dt);
       bossReveals?.update(dt);
+      nestMarker?.update(dt);
       upsideDownAtmosphere?.update(dt);
       upsideDownPortal?.update(dt);
+
+      // Hint tardif : nid armé > 45 s sans reveal → pulse amplifié + bandeau DMD
+      // unique par partie (« LE DEMOGORGON SOMMEILLE… »).
+      if (gameStateRef.current === "playing") {
+        const nowMs = performance.now();
+        for (const id of BOSS_IDS) {
+          const armedAt = bossArmedAtRef.current[id];
+          if (
+            armedAt === undefined
+            || bossLateHintFiredRef.current.has(id)
+            || !nestMarker?.isArmed(id)
+            || nowMs - armedAt < 45000
+          ) {
+            continue;
+          }
+          bossLateHintFiredRef.current.add(id);
+          nestMarker.setLateHint(id, true);
+          const hint = getBossDefinition(id).hud.nestHintLabel;
+          if (hint) {
+            dmd.pushEvent(hint, 0, {
+              player: playerRef.current,
+              score: scoreRef.current,
+              combo: comboRef.current,
+              multiplier: multiplierRef.current,
+              lives: livesRef.current,
+              hetic: heticRef.current,
+              fever: isFeverActive(),
+            });
+          }
+        }
+      }
 
       cinematics.update(time);
       const transitionActive = upsideDownTransition?.isActive() ?? false;
@@ -1648,17 +1755,19 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // physique fait déjà mieux.
         // Seuil normalisé en vitesse angulaire (rad/s) : 0.004 * 60 = 0.24 rad/s,
         // indépendant du fps (évite que le seuil ne se déclenche jamais à 120+ Hz).
-        if (ballPhysicsInst && gameStateRef.current === 'playing') {
+        if (ballPhysicsInst && gameStateRef.current === 'playing' && flipperZones) {
           const bp = ballPhysicsInst.body.translation();
           const bv = ballPhysicsInst.body.linvel();
-          const inZ = bp.z > FLIPPER_Z_MIN && bp.z < FLIPPER_Z_MAX;
+          const { left: lz, right: rz } = flipperZones;
           const angVelL = (leftSwing  - prevLeftSwing) / dt;
           const angVelR = (rightSwing - prevRightSwing) / dt;
-          if (inZ && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
+          const inLeft  = bp.z > lz.zMin && bp.z < lz.zMax && bp.x > lz.xMin && bp.x < lz.xMax;
+          const inRight = bp.z > rz.zMin && bp.z < rz.zMax && bp.x > rz.xMin && bp.x < rz.xMax;
+          if (inLeft && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
             leftFlash = FLASH_DURATION; // hit-flash à la frappe
           }
-          if (inZ && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
+          if (inRight && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
             rightFlash = FLASH_DURATION;
           }
@@ -1950,6 +2059,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       bumperVisuals?.dispose();
       garlandLights?.dispose();
       bossReveals?.dispose();
+      nestMarker?.dispose();
+      nestMarkerRef.current = null;
       ballTrail?.dispose();
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;

@@ -17,7 +17,7 @@ const PHASES: { id: string; duration: number }[] = [
   { id: 'title', duration: 5000 },
   { id: 'marquee', duration: marqueeDuration },
   { id: 'coin', duration: 5000 },
-  { id: 'rules', duration: 8000 },
+  { id: 'rules', duration: 12000 },
   { id: 'ready', duration: 4000 },
 ]
 const TOTAL = PHASES.reduce((s, p) => s + p.duration, 0)
@@ -169,7 +169,7 @@ function drawCoin(grid: Uint8Array, cx: number, cy: number, squashed: boolean): 
 }
 
 // Phase 'rules' — pédagogie : cibles → rangée HETIC lettre par lettre →
-// FEVER X5. 3 sous-phases sur 8s.
+// FEVER X5 → le nid (déblocage du boss). 4 sous-phases sur 12s.
 function phaseRules(grid: Uint8Array, tLocal: number): void {
   if (tLocal < 2500) {
     drawCentered(grid, 'COMPLETE', 4, DOT.score, 2)
@@ -186,9 +186,20 @@ function phaseRules(grid: Uint8Array, tLocal: number): void {
     }
     return
   }
-  if (blinkOn(tLocal - 5500, 350, 350)) {
-    drawCentered(grid, 'FEVER X5 !', 9, DOT.event, 2)
+  if (tLocal < 8000) {
+    if (blinkOn(tLocal - 5500, 350, 350)) {
+      drawCentered(grid, 'FEVER X5 !', 9, DOT.event, 2)
+    }
+    return
   }
+  // Le nid : 3000 pts l'ouvre, puis où frapper. 2 écrans de 2s.
+  if (tLocal < 10000) {
+    drawCentered(grid, '3000 PTS', 4, DOT.event, fitScale('3000 PTS', 2))
+    drawCentered(grid, 'LE NID S OUVRE', 18, DOT.event, fitScale('LE NID S OUVRE', 2))
+    return
+  }
+  drawCentered(grid, 'FRAPPE LE NID', 4, DOT.heticOn, fitScale('FRAPPE LE NID', 2))
+  drawCentered(grid, 'ENTRE LES BUMPERS', 18, DOT.heticOn, fitScale('ENTRE LES BUMPERS', 2))
 }
 
 // Phase 'ready' — nom joueur + 'START !' blink.

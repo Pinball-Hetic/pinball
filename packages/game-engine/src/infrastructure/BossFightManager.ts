@@ -1,5 +1,10 @@
-import type { BossId } from '../domain/BossRegistry';
-import { BOSS_IDS, getBossByColliderRole, getBossDefinition } from '../domain/BossRegistry';
+import type { BossId, BossGateContext } from '../domain/BossRegistry';
+import {
+  BOSS_IDS,
+  bossThresholdMet,
+  getBossByColliderRole,
+  getBossDefinition,
+} from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import { BossTargetSensor } from './BossTargetSensor';
 
@@ -8,12 +13,8 @@ type BossFightState = {
   sensor: BossTargetSensor;
 };
 
-export type BossRevealContext = {
-  totalScore: number;
+export type BossRevealContext = BossGateContext & {
   gameState: string;
-  upsideDownActive: boolean;
-  normalWorldScoreBaseline: number;
-  upsideDownScoreBaseline: number;
 };
 
 export class BossFightManager {
@@ -53,6 +54,11 @@ export class BossFightManager {
     state.sensor.beginFight(targetArmed);
   }
 
+  /** True si le combat du boss est déclenché (reveal consommé, nid « ouvert »). */
+  isTriggered(id: BossId): boolean {
+    return this.states.get(id)?.triggered ?? false;
+  }
+
   /** True if any boss OTHER than `except` is currently in an active (scoreable)
    *  fight. Used to keep at most one boss armed at a time — the boss target
    *  sensors physically overlap, so two simultaneously-armed bosses would let a
@@ -72,14 +78,7 @@ export class BossFightManager {
     if (state.triggered) return;
     // One boss fight at a time — don't reveal while another is still active.
     if (this.anyOtherFightActive(id)) return;
-    if (def.reveal.requiresUpsideDown && !context.upsideDownActive) return;
-    if (!def.reveal.requiresUpsideDown && context.upsideDownActive) return;
-
-    const baseline = def.reveal.requiresUpsideDown
-      ? context.upsideDownScoreBaseline
-      : context.normalWorldScoreBaseline;
-    const score = context.totalScore - baseline;
-    if (score < def.reveal.scoreThreshold) return;
+    if (!bossThresholdMet(def, context)) return;
 
     this.beginFight(id, false);
     this.emit({
