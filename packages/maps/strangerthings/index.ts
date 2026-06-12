@@ -4,12 +4,12 @@ import { manifest } from './manifest'
 export { layout } from './layout'
 export { createModule } from './module'
 
-// Paquet de la map Stranger Things. hasModule passe à true (pipeline de
-// comportement actif, module vide pour l'instant — rempli en phase 4.3).
-// hasDmd/hasBackglass restent false (contenus écrans = phase 5).
+// Paquet de la map Stranger Things. Le contenu DMD est exposé via le
+// sous-chemin '@pinball/map-strangerthings/dmd' (gardé hors de l'index
+// principal pour ne pas alourdir le bundle playfield).
 export const mapPackage: MapPackage = {
   manifest,
   hasModule: true,
-  hasDmd: false,
+  hasDmd: true,
   hasBackglass: false,
 }

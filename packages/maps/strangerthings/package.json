@@ -4,6 +4,10 @@
   "private": true,
   "main": "index.ts",
   "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./dmd": "./dmd/index.ts"
+  },
   "scripts": {
     "lint": "eslint . --ext .ts",
     "build": "tsc --noEmit",
@@ -11,6 +15,7 @@
   },
   "dependencies": {
     "@pinball/shared-types": "workspace:*",
-    "@pinball/game-engine": "workspace:*"
+    "@pinball/game-engine": "workspace:*",
+    "@pinball/dmd-core": "workspace:*"
   }
 }

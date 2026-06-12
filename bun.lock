@@ -146,6 +146,7 @@
       "name": "@pinball/map-strangerthings",
       "version": "1.0.0",
       "dependencies": {
+        "@pinball/dmd-core": "workspace:*",
         "@pinball/game-engine": "workspace:*",
         "@pinball/shared-types": "workspace:*",
       },
