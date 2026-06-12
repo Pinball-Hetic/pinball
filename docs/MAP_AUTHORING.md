@@ -140,9 +140,40 @@ faut leur attribuer un rôle explicite au ré-export :
   - rails/guides structurels (≥ 25 mm) → `wall_<id>`
   - détails fins (vis, clips, anneaux) → `vis_<id>`
 
-> Pour produire la table complète `Mesh_N → rôle` par taille réelle, je peux
-> écrire un script jetable qui dumpe la bounding box de chaque mesh du GLB
-> (mêmes seuils que `PlayfieldTrimeshBuilder`). Demander si utile.
+### Table dérivée du GLB (script de dump)
+
+`python3 scripts/dump-glb-meshes.py` dumpe taille/centre monde de chaque mesh
++ rôle par seuil 25 mm. Le **seuil seul** ne distingue pas décor et structure
+(une guirlande est grosse mais décorative) → croiser avec la sémantique. Noms
+recommandés **par groupe parent** (les `Mesh_N` enfants héritent) :
+
+| Groupe (nœud parent) | Nom recommandé | elements / note |
+|----------------------|----------------|-----------------|
+| `Pinballmap/Mesh_0` (530×102×970) | `floor_main` | `physics: 'analytic'` (sol lisse, anti ghost-collision) |
+| `Pinballmap/Mesh_1` (530×109×710) | `wall_main` | `singleSided: 1` (murs moulés) |
+| `Circle.001` (Mesh_2/3/4) | `wall_perimeter_top` | rail haut du périmètre |
+| `Circle.011` (Mesh_5/6/7) | `wall_rail_left` | |
+| `Circle.018` (Mesh_8/9/10) | `wall_rail_right` | Mesh_11/12/13 (<25mm) → `vis_` |
+| `Circle.034` (Mesh_43/44/45) | `wall_rail_mid` | Mesh_46/47/48 (<25mm) → `vis_` |
+| `Cylinder.008` (Mesh_28-35) | `wall_lower` | zone slingshot/flippers (vérifier en jeu) |
+| `Plane.008` (Mesh_49/50/51) | `wall_lower_plane` | no-bounce historique (`restitution: 0`) |
+| `Sphere.001` (Mesh_14/15/16) | `lane_shooter` | côté plongeur (X≈+0.24) — vérifier |
+| `Cube.002/Mesh_17` | `wall_bottom` | bord bas |
+| `Mesh_52/53/54` (Strangerthings) | `wall_outlane_l/r` / `wall_drain` | coins bas |
+| `Circle.015/022/032` (petits) | `vis_decor_top` | détails fins (majorité <25mm) |
+| `Bumper-1/2/3` | `bumper_1/2/3` | colliders analytiques (`layout.bumpers`) |
+| `drop_target_left_1/2`, `right_1/2/3` | `target_left_1/2`, `target_right_1/2/3` | |
+| `flipper-left/right` | `flipper_left/right` | |
+| `guirlande-1…10` | `vis_guirlande_1…10` | décor (lumières pilotées à part) |
+| `cassette-1/2` (Mesh_55-58) | `vis_cassette_1/2` | décor |
+| `demogorgon_portal_rig` + enfants | `vis_demogorgon_portal` | modèle visuel (reveal = module) |
+| `Fix-Start` | `lane_fixstart` | guide lissage couloir |
+| `Mesh1.0` | `wall_guide_topleft` | plaque-guide |
+
+Les lignes "vérifier en jeu" (`Cylinder.008`, `Plane.008`, `Sphere.001`)
+demandent un coup d'œil sur le modèle : leur fonction se déduit mal de la
+seule bounding box. `task` : lancer le script, recouper visuellement, figer
+les noms, ré-exporter.
 
 ### Après le ré-export
 
