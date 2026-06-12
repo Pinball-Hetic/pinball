@@ -56,7 +56,7 @@ export interface DmdOrchestrator {
   // Score broadcast bas niveau (DMD data sync, indépendant du mode display)
   emitScoreSnapshot: (s: ScoreUpdate) => void;
   emitGameStart: (player: string) => void;
-  emitGameOver: (player: string, finalScore: number, stats: GameStats) => void;
+  emitGameOver: (player: string, finalScore: number, mapId: string, stats: GameStats) => void;
   // Clip cinématique plein écran (prio max) — synchro avec playfield/backglass.
   pushCinematic: (clip: CinematicClip, value?: number) => void;
   // DMD high-level : push une display, l'orchestrator décide quoi montrer
@@ -152,8 +152,8 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       socketRef.current?.emit('score:update', s);
     },
     emitGameStart: (player) => socketRef.current?.emit('game:start', { player }),
-    emitGameOver: (player, finalScore, stats) =>
-      socketRef.current?.emit('game:over', { player, finalScore, stats }),
+    emitGameOver: (player, finalScore, mapId, stats) =>
+      socketRef.current?.emit('game:over', { player, finalScore, mapId, stats }),
 
     pushIntro: (player) => {
       // Reset complet : l'INTRO ne s'affiche qu'au repos (ball non lancée),

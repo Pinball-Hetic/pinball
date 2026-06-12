@@ -9,19 +9,22 @@ const HETIC = 'HETIC'.split('')
 
 export default function RecapTakeover({ payload }: Props) {
   const s = payload.stats
+  // TODO phase 5 : libellés des counters fournis par le contenu de la map.
+  const counters = s.counters
+  const hetic = counters.hetic ?? 0
   const qualifying = payload.rank <= 10
 
   const cells: { label: string; value: React.ReactNode }[] = [
     { label: 'COMBO MAX', value: `x${s.maxCombo}` },
     { label: 'MULTIPLIER MAX', value: `x${s.maxMultiplier}` },
-    { label: 'DEMOGORGONS', value: s.demogorgons },
-    { label: 'PORTAILS', value: s.portals },
+    { label: 'DEMOGORGONS', value: counters.demogorgons ?? 0 },
+    { label: 'PORTAILS', value: counters.portals ?? 0 },
     {
       label: 'HETIC',
       value: (
         <span className="hetic-slots">
           {HETIC.map((c, i) => (
-            <span key={i} className={i < s.hetic ? 'hetic-on' : 'hetic-off'}>
+            <span key={i} className={i < hetic ? 'hetic-on' : 'hetic-off'}>
               {c}
             </span>
           ))}

@@ -18,11 +18,11 @@ function fmt(n: number | undefined | null): string {
 }
 
 function buildSlides(stats: GlobalStats, entries: LeaderboardEntry[]): string[] {
-  const slides: string[] = [
-    `PARTIES JOUÉES : ${fmt(stats.totalGames)}`,
-    `DEMOGORGONS VAINCUS : ${fmt(stats.totalDemogorgons)}`,
-    `PORTAILS EMPRUNTÉS : ${fmt(stats.totalPortals)}`,
-  ]
+  const slides: string[] = [`PARTIES JOUÉES : ${fmt(stats.totalGames)}`]
+  // Totaux par compteur (label fourni par la map en phase 5 ; key pour l'instant).
+  for (const t of stats.totals) {
+    slides.push(`${t.label.toUpperCase()} : ${fmt(t.value)}`)
+  }
   if (stats.bestCombo) {
     slides.push(`BEST COMBO : x${stats.bestCombo.value} — ${stats.bestCombo.player}`)
   }

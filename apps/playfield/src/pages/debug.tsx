@@ -15,9 +15,7 @@ const PLAYER = 'DEBUG'
 const DEBUG_STATS: GameStats = {
   maxCombo: 12,
   maxMultiplier: 5,
-  demogorgons: 2,
-  portals: 1,
-  hetic: 5,
+  counters: { demogorgons: 2, portals: 1, hetic: 5 },
   durationS: 88,
 }
 
@@ -79,6 +77,7 @@ export default function DebugPage() {
     socketRef.current?.emit('game:over', {
       player: PLAYER,
       finalScore: 3200,
+      mapId: 'strangerthings',
       stats: DEBUG_STATS,
       debug: true,
     })
@@ -95,6 +94,7 @@ export default function DebugPage() {
     socketRef.current?.emit('game:over', {
       player: PLAYER,
       finalScore: tenth + 1000,
+      mapId: 'strangerthings',
       stats: DEBUG_STATS,
       debug: true,
     })

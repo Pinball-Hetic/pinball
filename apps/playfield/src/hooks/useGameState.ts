@@ -265,9 +265,12 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       const stats: GameStats = {
         maxCombo: maxComboRef.current,
         maxMultiplier: maxMultiplierRef.current,
-        demogorgons: demogorgonsRef.current,
-        portals: portalsRef.current,
-        hetic: heticRef.current,
+        // Compteurs ST (clés spécifiques map). Une autre map en aurait d'autres.
+        counters: {
+          demogorgons: demogorgonsRef.current,
+          portals: portalsRef.current,
+          hetic: heticRef.current,
+        },
         durationS: gameStartRef.current
           ? Math.round((performance.now() - gameStartRef.current) / 1000)
           : 0,

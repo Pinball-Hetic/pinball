@@ -108,15 +108,17 @@ export interface GameStart {
 export interface GameStats {
   maxCombo: number
   maxMultiplier: number
-  demogorgons: number // boss vaincus dans la partie
-  portals: number // entrées Upside Down
-  hetic: number // lettres allumées 0..5
+  // Compteurs spécifiques à la map (ST : demogorgons, portals, hetic). Une
+  // autre map aura d'autres clés. Les libellés d'affichage viennent du contenu
+  // de la map (phase 5).
+  counters: Record<string, number>
   durationS: number // durée de la partie en secondes
 }
 
 export interface GameOver {
   player: string
   finalScore: number
+  mapId: string
   stats: GameStats
   // Émis depuis /debug → relay seul, PAS de persistence (ne pollue pas le leaderboard).
   debug?: boolean
@@ -131,8 +133,9 @@ export interface LeaderboardEntry {
 
 export interface GlobalStats {
   totalGames: number
-  totalDemogorgons: number
-  totalPortals: number
+  // Totaux génériques par compteur (key = clé du counter, label fourni par la
+  // map en phase 5, value = somme). Remplace totalDemogorgons/totalPortals.
+  totals: { key: string; label: string; value: number }[]
   bestCombo: { value: number; player: string } | null
   bestToday: { score: number; player: string } | null
 }
