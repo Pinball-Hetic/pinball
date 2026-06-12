@@ -20,13 +20,30 @@ packages/
 └── config/         # TSconfig + ESLint partagés
 ```
 
-> **Refacto multi-maps en cours** (branche `refacto/p1-types-ouverts`) : le
-> moteur devient générique, les maps sont des packages plugins. Une map
-> fournit `manifest` (scoring/rules/glb/elements/meshAliases) + `layout`
-> (positions sans mesh) + à terme un `module` (comportement). `getMapPackage(id)`
-> (registry) est le SEUL importeur de `@pinball/map-*`. Sens des dépendances :
-> `maps → game-engine + shared-types`. Conventions de nommage GLB par préfixe
-> de rôle : voir `docs/MAP_AUTHORING.md`.
+> **Multi-maps** : le moteur est générique, les maps sont des packages
+> plugins (`packages/maps/<id>`). Une map fournit `manifest`
+> (scoring/rules/glb/elements/meshAliases/**clips**/sounds/preload/
+> clipFamilies/counterLabels/debugMapState) + `layout` (positions sans mesh :
+> spawns/couloir/**bosses**) + optionnellement `module` (comportement
+> playfield), `dmd/`, `backglass/` (contenus d'écran ; absents → **NO SIGNAL**).
+>
+> **Registry par surface** (`packages/maps/`) = SEUL importeur de
+> `@pinball/map-*` : `index.ts` (core, `getMapPackage`), `backglass.ts`
+> (`getBackglassContent`), `dmd.ts` (`getDmdContent`). Les apps résolvent via
+> `@pinball/maps[/backglass|/dmd]` — import direct de `@pinball/map-*`
+> **interdit** (règle ESLint `no-restricted-imports`). Sens des dépendances :
+> `maps → game-engine + shared-types` (game-engine n'importe JAMAIS de map).
+>
+> **Assets** : co-localisés dans `packages/maps/<id>/assets/`, synchronisés
+> vers `apps/playfield/public/maps/<id>/` au dev/build
+> (`scripts/sync-map-assets.sh`, `apps/*/public/maps/` gitignoré). URLs via
+> `mapAssetUrl(id, rel)` → `/maps/<id>/…`, depuis `manifest.id` (zéro littéral).
+>
+> **Id par défaut** : `DEFAULT_MAP_ID` (shared-types) — pas de sélecteur,
+> `NEXT_PUBLIC_MAP_ID` non défini → cette map. **Anti-fuite** : `task
+> check:leaks` (bloquant en CI) interdit les termes `manifest.forbiddenInCore`
+> hors `packages/maps/` (whitelist étroite documentée). Conventions GLB +
+> authoring : `docs/MAP_AUTHORING.md`.
 
 ### `packages/game-engine` — Physics, game logic, no React
 Clean architecture: domain / infrastructure / use-cases.

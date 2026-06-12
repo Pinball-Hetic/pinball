@@ -82,16 +82,30 @@ elements: {
 
 1. Créer `packages/maps/<id>/` (`package.json`, `tsconfig.json`,
    `manifest.ts`, `layout.ts`, `index.ts`) — copier `strangerthings`.
-2. Déposer le GLB + textures dans `assets/`.
-3. Renseigner `manifest` (scoring, rules, glb, meshAliases, clips,
-   forbiddenInCore) et `layout` (positions sans mesh : spawns, couloir).
-4. Enregistrer la map dans `packages/maps/index.ts` (registry).
-5. `task maps:sync` → copie les assets vers `apps/playfield/public/maps/<id>/`.
-6. `task maps:validate -- <id>` (phase 7) → vérifie manifest + GLB.
-7. `NEXT_PUBLIC_MAP_ID=<id>` → tester en jeu.
+2. Déposer le GLB + textures + sons dans `assets/` (sous-dossiers libres,
+   ex. `assets/playfield/`, `assets/audio/`). Les URLs publiques sont
+   `/maps/<id>/<chemin>` via `mapAssetUrl(id, rel)` (helper shared-types) —
+   construire les chemins depuis `manifest.id`, jamais en dur. Le package
+   expose un helper `mapAsset(rel)` lié à son id (cf. `manifest.ts`).
+3. Renseigner `manifest` (scoring, rules, glb, meshAliases, **clips**,
+   sounds, preload, clipFamilies, counterLabels, debugMapState,
+   forbiddenInCore) et `layout` (positions sans mesh : spawns, couloir,
+   bosses). Les timings de cinématiques vivent dans `manifest.clips`
+   (showMs/freezeMs/takeoverMs), plus dans le core.
+4. Enregistrer la map dans le registry par surface de `packages/maps/` :
+   `index.ts` (core : manifest+layout+module), `backglass.ts`
+   (`getBackglassContent`), `dmd.ts` (`getDmdContent`). Les apps importent
+   TOUJOURS via `@pinball/maps[/backglass|/dmd]`, jamais `@pinball/map-*`
+   en direct (règle ESLint `no-restricted-imports`).
+5. `task maps:sync-assets -- <id>` → copie `assets/` vers
+   `apps/playfield/public/maps/<id>/` (lancé aussi par `bun run dev/build`).
+6. `task maps:validate -- <id>` → vérifie manifest + GLB.
+7. `NEXT_PUBLIC_MAP_ID=<id>` → tester en jeu (défaut : `DEFAULT_MAP_ID`).
 
 Contenus `module/` (comportement playfield), `dmd/`, `backglass/` sont
-optionnels : absents → fallback **NO SIGNAL** (phase 5).
+optionnels : absents → fallback **NO SIGNAL**. Le grep-guard
+`task check:leaks` est **bloquant** : aucun terme de `forbiddenInCore`
+ne doit fuiter dans le core/apps (hors whitelist documentée).
 
 ---
 
