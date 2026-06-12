@@ -89,6 +89,24 @@ function fmtNum(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
+// Cadre étoilé procédural (hall_of_fame) : étoiles CONFINÉES aux bords
+// (bandes x<8 / x>GRID_W-8 / y<2 / y>GRID_H-3) → jamais sur la zone centrale
+// du titre. Scintillement déterministe via seeded (pas de Math.random).
+function drawStarBorder(grid: Uint8Array, ms: number): void {
+  const phase = Math.floor(ms / 350)
+  for (let y = 0; y < GRID_H; y++) {
+    const edgeY = y < 2 || y >= GRID_H - 2
+    for (let x = 0; x < GRID_W; x++) {
+      const edgeX = x < 8 || x >= GRID_W - 8
+      if (!edgeY && !edgeX) continue
+      if (seeded(x * 7.1 + y * 131.3) >= 0.1) continue
+      const lit = (Math.floor(seeded(x + y * 3) * 4) + phase) % 4 === 0
+      if (!lit) continue
+      plot(grid, x, y, x % 2 ? DOT.score : DOT.marquee)
+    }
+  }
+}
+
 // Chenillard orange/cyan défilant sur une rangée.
 function drawChenillard(grid: Uint8Array, clockMs: number, y: number): void {
   const off = Math.floor(clockMs / 60)
@@ -375,14 +393,14 @@ function layoutCinematic(grid: Uint8Array, display: DmdDisplay, clockMs: number)
   if (d.clip === 'hall_of_fame') {
     // 3.5s de cadre étoilé, puis le compteur roule de 0 au score en 1.5s.
     if (clockMs < 3500) {
-      drawClipFrame(grid, clip, clockMs)
+      drawStarBorder(grid, clockMs)
       drawCentered(grid, 'HALL OF FAME', 13, FONT_5X7, DOT.marquee)
     } else {
       const t = Math.min(1, (clockMs - 3500) / 1500)
       const eased = 1 - Math.pow(1 - t, 3)
       const shown = Math.round(d.score * eased)
-      drawCentered(grid, 'HALL OF FAME', 2, FONT_5X7, DOT.marquee)
-      drawCentered(grid, String(shown), 11, FONT_12X22, DOT.score)
+      drawCentered(grid, 'HALL OF FAME', 1, FONT_5X7, DOT.marquee)
+      drawCentered(grid, String(shown), 9, FONT_12X22, DOT.score)
     }
     return
   }
