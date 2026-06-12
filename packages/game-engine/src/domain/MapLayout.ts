@@ -132,6 +132,10 @@ export interface AtmosphereLayout {
   blendStrobeHz: number;
   sporeCount: number;
   hintMs: number;
+  /** Libellé de la bannière d'atmosphère active (ex. « Upside Down »). */
+  bannerLabel: string;
+  /** Libellé du hint d'entrée dans l'atmosphère (ex. « Le monde s'est inversé… »). */
+  hintLabel: string;
 }
 
 export interface MapLayout {

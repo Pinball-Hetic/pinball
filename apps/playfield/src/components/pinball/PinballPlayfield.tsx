@@ -1954,6 +1954,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           scorePops={scorePops}
           upsideDownActive={upsideDownActive}
           upsideDownHint={upsideDownHint}
+          atmosphereBannerLabel={mapLayout.atmosphere.bannerLabel}
+          atmosphereHintLabel={mapLayout.atmosphere.hintLabel}
           cabinetMode={cabinetMode}
           onAttractInteract={() => {
             if (physicsReady && !sessionStarted) beginSession();

@@ -188,5 +188,7 @@ export const layout: MapLayout = {
     blendStrobeHz: UPSIDE_DOWN_ATMOSPHERE_BLEND_STROBE_HZ,
     sporeCount: UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT,
     hintMs: UPSIDE_DOWN_HINT_MS,
+    bannerLabel: 'Upside Down',
+    hintLabel: 'Le monde s\'est inversé…',
   },
 }

@@ -16,6 +16,8 @@ interface GameOverlayProps {
   scorePops: ScorePop[];
   upsideDownActive: boolean;
   upsideDownHint: boolean;
+  atmosphereBannerLabel: string;
+  atmosphereHintLabel: string;
   cabinetMode?: boolean;
   onAttractInteract?: () => void;
 }
@@ -31,6 +33,8 @@ export default function GameOverlay({
   scorePops,
   upsideDownActive,
   upsideDownHint,
+  atmosphereBannerLabel,
+  atmosphereHintLabel,
   cabinetMode = false,
   onAttractInteract,
 }: GameOverlayProps) {
@@ -94,7 +98,7 @@ export default function GameOverlay({
         <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-10 flex justify-center">
           <div className="rounded border border-violet-500/25 bg-black/45 px-3 py-1 font-mono backdrop-blur-sm">
             <p className="text-[10px] uppercase tracking-[0.45em] text-violet-300/80 drop-shadow-[0_0_10px_rgba(140,80,200,0.45)]">
-              Upside Down
+              {atmosphereBannerLabel}
             </p>
           </div>
         </div>
@@ -103,7 +107,7 @@ export default function GameOverlay({
       {showUpsideDownHint && (
         <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center px-6">
           <p className="animate-pulse text-center font-mono text-xs uppercase tracking-[0.22em] text-violet-200/75 drop-shadow-[0_0_12px_rgba(150,90,220,0.55)] sm:text-sm">
-            Le monde s&apos;est inversé…
+            {atmosphereHintLabel}
           </p>
         </div>
       )}
