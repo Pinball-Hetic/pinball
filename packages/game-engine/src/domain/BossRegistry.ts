@@ -58,6 +58,8 @@ export type BossHudConfig = {
   victoryClass: string;
   assistLabel?: string;
   victoryClearMs: number;
+  /** Bandeau DMD du hint tardif (nid armé > 45 s sans reveal). Absent → pas de hint. */
+  nestHintLabel?: string;
 };
 
 export type BossRevealConfig = {
@@ -107,6 +109,7 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       victoryClass: 'text-amber-300 drop-shadow-[0_0_20px_rgba(255,200,80,0.9)]',
       assistLabel: 'Eleven +100',
       victoryClearMs: 1400,
+      nestHintLabel: 'LE DEMOGORGON SOMMEILLE PRES DES BUMPERS',
     },
     unlocksPortal: true,
     targetMeshTheme: {
@@ -196,6 +199,32 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
     },
   },
 };
+
+/** Contexte minimal pour évaluer le gate de reveal d'un boss (score + Upside Down). */
+export type BossGateContext = {
+  totalScore: number;
+  upsideDownActive: boolean;
+  upsideDownScoreBaseline: number;
+};
+
+/** Score effectif d'un boss (ajusté de la baseline Upside Down si applicable). */
+export function bossEffectiveScore(def: BossDefinition, ctx: BossGateContext): number {
+  return def.reveal.useUpsideDownScoreBaseline
+    ? ctx.totalScore - ctx.upsideDownScoreBaseline
+    : ctx.totalScore;
+}
+
+/** True si le palier de score du boss est franchi ET son gate Upside Down satisfait. */
+export function bossThresholdMet(def: BossDefinition, ctx: BossGateContext): boolean {
+  if (def.reveal.requiresUpsideDown && !ctx.upsideDownActive) return false;
+  return bossEffectiveScore(def, ctx) >= def.reveal.scoreThreshold;
+}
+
+/** Points restants avant le palier, arrondis à la centaine supérieure (≥ 0). */
+export function bossPointsRemaining(def: BossDefinition, ctx: BossGateContext): number {
+  const gap = def.reveal.scoreThreshold - bossEffectiveScore(def, ctx);
+  return Math.max(0, Math.ceil(gap / 100) * 100);
+}
 
 export function getBossDefinition(id: BossId): BossDefinition {
   return BOSS_REGISTRY[id];
