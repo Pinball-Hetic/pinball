@@ -4,3 +4,4 @@ export * from './palette';
 export * from './fonts';
 export * from './DmdRenderer';
 export * from './effects';
+export * from './AsciiClipPlayer';

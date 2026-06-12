@@ -4,13 +4,8 @@ import { FONT_5X7, FONT_12X22, drawText, measureText } from '@pinball/dmd-core'
 import { GRID_W, GRID_H } from '@pinball/dmd-core'
 import { DOT } from '@pinball/dmd-core'
 import { attractFrame } from './attract'
-import {
-  clipFor,
-  drawClipFrame,
-  revealRadial,
-  dissolve,
-  HERO_FRAME,
-} from './AsciiClipPlayer'
+import { drawClipFrame, revealRadial, dissolve } from '@pinball/dmd-core'
+import { clipFor, HERO_FRAME } from './AsciiClipPlayer'
 
 // Palette du demogorgon (rouge + accent jaune) pour les transfos procédurales.
 const HERO_MAP = { ':': DOT.heticOff, '#': DOT.lives, '@': DOT.gameOver, '!': DOT.event }
