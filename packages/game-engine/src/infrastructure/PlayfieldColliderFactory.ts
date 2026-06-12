@@ -49,6 +49,22 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createSensors(world, layout, colliderMap);
   }
 
+  /**
+   * Colliders analytiques pour une map conventionnée (GLB role-driven) : sol
+   * lisse + bumpers + sensors + couloir plongeur. Les murs viennent des
+   * trimeshes wall_ (PlayfieldTrimeshBuilder.buildRoleDriven), pas d'ici.
+   */
+  static createForMap(
+    world: RAPIER.World,
+    layout: MapLayout,
+    colliderMap: Map<number, string>,
+  ): void {
+    PlayfieldColliderFactory.createPlayfieldFloor(world);
+    PlayfieldColliderFactory.createBumpers(world, layout, colliderMap);
+    PlayfieldColliderFactory.createSensors(world, layout, colliderMap);
+    PlayfieldColliderFactory.createShooterLane(world, layout, { includeFloor: true });
+  }
+
   private static createPinballmap(
     world: RAPIER.World,
     layout: MapLayout,

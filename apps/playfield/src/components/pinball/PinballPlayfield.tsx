@@ -37,7 +37,6 @@ import {
   computeSurfaceSnap,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
-  playfieldUsesCollOnlyCollision,
   resolvePlayfieldFlippers,
   attachFlipperAtHinge,
   applyFlipperSwing,
@@ -88,6 +87,7 @@ import {
   ShooterLaneGate,
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
+import { MeshRoleResolver } from "@pinball/game-engine";
 import type {
   ButtonAction,
   ButtonId,
@@ -149,7 +149,6 @@ import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 
-const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
 
 type UpsideDownPersistence = "until_game_over" | "until_drain";
 const UPSIDE_DOWN_PERSISTENCE: UpsideDownPersistence = "until_game_over";
@@ -421,6 +420,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     mapPackageRef.current = resolved;
   }
   const mapLayout = mapPackageRef.current.layout;
+  const mapManifest = mapPackageRef.current.manifest;
+  const playfieldUrl = `/${mapManifest.glb}`;
 
   const playCinematic = useCallback(
     (
@@ -895,7 +896,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const maxAttempts = 3;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          return await loader.loadAsync(PLAYFIELD_URL);
+          return await loader.loadAsync(playfieldUrl);
         } catch (err) {
           console.warn(`[Playfield] GLB load attempt ${attempt}/${maxAttempts} failed`, err);
           if (attempt === maxAttempts) throw err;
@@ -1013,20 +1014,17 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         const colliderMap = new Map<number, string>();
 
-        // colliderMap est créé avant le build du trimesh pour que les bumps
-        // (Bump-left / Bump-right) puissent y être taggés directement.
-        PlayfieldTrimeshBuilder.build(playfieldRoot, world, colliderMap);
-
-        const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
-        PlayfieldColliderFactory.createAll(
-          world,
-          mapLayout,
-          colliderMap,
+        // GLB conventionné role-driven : les murs (wall_/lane_) sont des
+        // trimeshes classés par rôle ; le sol/bumpers/sensors/couloir sont
+        // analytiques (positions du layout).
+        const meshResolver = new MeshRoleResolver(mapManifest.meshAliases);
+        PlayfieldTrimeshBuilder.buildRoleDriven(
           playfieldRoot,
-          collOnly
-            ? { laneFloor: false, walls: false, bumpers: false }
-            : undefined,
+          world,
+          meshResolver,
+          mapManifest.elements ?? {},
         );
+        PlayfieldColliderFactory.createForMap(world, mapLayout, colliderMap);
 
         upsideDownTransition = new UpsideDownTransition();
         upsideDownTransition.setup({
