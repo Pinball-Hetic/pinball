@@ -7,13 +7,12 @@ import {
 } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import {
-  BUMPER_POSITIONS,
   BUMP_EJECT_SCALE,
   BUMP_HIT_COOLDOWN_MS,
-  DROP_TARGETS,
   RETURN_PORTAL_ENTER_SCORE,
   PORTAL_ENTER_SCORE,
 } from '../domain/Ball';
+import type { MapLayout } from '../domain/MapLayout';
 import {
   SCORE_SLINGSHOT,
   SCORE_POP_ZONE,
@@ -127,6 +126,7 @@ export class CollisionEventProcessor {
   }
 
   constructor(
+    private readonly layout: MapLayout,
     private readonly colliderMap: Map<number, string>,
     private readonly bumperHitUC: BumperHit,
     private readonly bumpHitUC: BumpHit,
@@ -135,7 +135,7 @@ export class CollisionEventProcessor {
     private readonly emit: GameEventListener,
   ) {
     this.bossFights = new BossFightManager(emit);
-    for (const dt of DROP_TARGETS) this.dropTargetDown[dt.id] = false;
+    for (const dt of this.layout.dropTargets) this.dropTargetDown[dt.id] = false;
   }
 
   process(eventQueue: RAPIER.EventQueue, gameState: string): void {
@@ -190,7 +190,7 @@ export class CollisionEventProcessor {
 
       if (role.startsWith('bumper_')) {
         const idx = parseInt(role.split('_')[1], 10);
-        const pos = BUMPER_POSITIONS[idx];
+        const pos = this.layout.bumpers[idx];
         if (pos) {
           this.bumperHitUC.execute(idx, pos);
         }
@@ -235,7 +235,7 @@ export class CollisionEventProcessor {
   }
 
   resetDropTargets(): void {
-    for (const dt of DROP_TARGETS) {
+    for (const dt of this.layout.dropTargets) {
       this.dropTargetDown[dt.id] = false;
     }
     this.emit({ type: 'DROP_TARGET_RESET' });
@@ -247,10 +247,10 @@ export class CollisionEventProcessor {
     this.dropTargetDown[role] = true;
     this.emit({ type: 'DROP_TARGET_HIT', targetId: role, scoreIncrement: SCORE_DROP_TARGET });
 
-    const target = DROP_TARGETS.find((t) => t.id === role);
+    const target = this.layout.dropTargets.find((t) => t.id === role);
     if (!target) return;
 
-    const sideTargets = DROP_TARGETS.filter((t) => t.side === target.side);
+    const sideTargets = this.layout.dropTargets.filter((t) => t.side === target.side);
     const allDown = sideTargets.every((t) => this.dropTargetDown[t.id]);
     if (!allDown) return;
 

@@ -1359,6 +1359,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         bottomOutBallUC = new BottomOutBall(ballPhysicsInst, emit);
 
         collisionProcessor = new CollisionEventProcessor(
+          mapLayout,
           colliderMap,
           bumperHitUC,
           bumpHitUC,
