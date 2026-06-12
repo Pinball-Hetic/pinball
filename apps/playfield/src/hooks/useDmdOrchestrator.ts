@@ -8,7 +8,7 @@ import type {
   GameStats,
   CinematicClip,
 } from '@pinball/shared-types';
-import { clipShowMs, clipTakeoverMs } from '@pinball/shared-types';
+import { clipShowMs, clipTakeoverMs, type ClipTimings } from '@pinball/shared-types';
 import type { GameEvent, BossDefinition } from '@pinball/game-engine';
 import { getBossById } from '@pinball/game-engine';
 
@@ -98,7 +98,13 @@ function eventLabel(event: GameEvent, bosses: BossDefinition[]): string | null {
 
 export { eventLabel }; // exporté pour tests
 
-export function useDmdOrchestrator(): DmdOrchestrator {
+export function useDmdOrchestrator(
+  clips?: Record<string, ClipTimings>,
+): DmdOrchestrator {
+  // Table de clips de la map (manifest.clips), lue via ref pour rester à jour
+  // sans recréer l'orchestrateur.
+  const clipsRef = useRef(clips);
+  clipsRef.current = clips;
   const socketRef = useRef<PinballSocket | null>(null);
   const stackRef = useRef<PendingDisplay[]>([]);
   const lastSentRef = useRef<string>(''); // JSON.stringify de la dernière display envoyée
@@ -234,7 +240,10 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       push(
         { mode: 'CINEMATIC', clip, player, score, value },
         // Segment plein écran : le mode SCORE reprend après (fever en SCORE).
-        { priority: PRIO.CINEMATIC, duration: clipTakeoverMs(clip) ?? clipShowMs(clip) },
+        {
+          priority: PRIO.CINEMATIC,
+          duration: clipTakeoverMs(clipsRef.current, clip) ?? clipShowMs(clipsRef.current, clip),
+        },
       );
     },
 

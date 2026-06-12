@@ -8,5 +8,8 @@ export type { Reactor, Reaction } from './reactor'
 export { renderMapTakeover, clipBehavior, eventTakeovers } from './takeover'
 export type { MapTakeoverContext, ClipBehavior, EventTakeover } from './takeover'
 import { manifest } from '../manifest'
-// Libellés des compteurs ST (recap) — depuis le manifest (data légère).
+import type { ClipTimings } from '@pinball/shared-types'
+// Data légère du manifest exposée au backglass (pas de getMapPackage lourd).
 export const counterLabels: Record<string, string> = manifest.counterLabels ?? {}
+// Timings des clips (manifest.clips) — durées de takeover backglass.
+export const clips: Record<string, ClipTimings> = manifest.clips ?? {}

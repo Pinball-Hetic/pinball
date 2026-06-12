@@ -1,12 +1,4 @@
-import type { ClipId } from './socket-events'
-
-// Timings d'un clip cinématique (équivalent des tables CLIP_*_MS, mais
-// par map). Migration des tables ST vers manifest.clips en phase 5.
-export interface ClipTimings {
-  showMs: number
-  freezeMs: number
-  takeoverMs?: number
-}
+import type { ClipId, ClipTimings } from './socket-events'
 
 // Contrat de données SÉRIALISABLE d'une map. Aucune dépendance Three/React/
 // game-engine : shared-types reste neutre. Les interfaces runtime (MapModule,

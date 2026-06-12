@@ -7,7 +7,7 @@ import type {
   GameOver,
 } from '@pinball/shared-types'
 import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
-import { clipBehavior, eventTakeovers } from '@/map/content'
+import { clipBehavior, eventTakeovers, clips } from '@/map/content'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
@@ -197,7 +197,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         // (porteur de fever) n'arrive, on l'active donc ici sans retard.
         if (b?.fever) feverRef.current = true
         if (b?.joyce) pushJoyce(typeof b.joyce === 'function' ? b.joyce(d.value) : b.joyce)
-        if (!b?.noTakeover) pushTk(b?.takeoverMs ?? clipShowMs(clip))
+        if (!b?.noTakeover) pushTk(b?.takeoverMs ?? clipShowMs(clips, clip))
         return
       }
       if (d.mode === 'EVENT') {

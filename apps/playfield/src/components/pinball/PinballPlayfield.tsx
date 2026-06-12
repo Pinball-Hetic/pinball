@@ -84,6 +84,7 @@ const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? "strangerthings";
 const RESOLVED_MAP = getMapPackage(MAP_ID);
 // Définitions de boss de la map active (point de composition unique).
 const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
+const MAP_CLIPS = RESOLVED_MAP?.manifest.clips;
 // URLs de sons spécifiques à la map (reveal boss + sons d'event) à précharger.
 const MAP_SOUND_URLS: string[] = [
   ...MAP_BOSSES.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
@@ -412,7 +413,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     notifyBootPhase(bootPhase);
   }, [bootPhase]);
 
-  const dmd = useDmdOrchestrator();
+  const dmd = useDmdOrchestrator(MAP_CLIPS);
 
   // Directeur de cinématiques (stable). Ref → accessible depuis les
   // callbacks render-scope (onLifeLost) et la boucle animate (useEffect).
@@ -436,7 +437,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       clip: CinematicClip,
       opts?: { once?: boolean; value?: number; onEnd?: () => void },
     ): boolean => {
-      const freezeMs = clipFreezeMs(clip);
+      const freezeMs = clipFreezeMs(mapManifest.clips, clip);
       // Clip avec gel → passe par le director (pause physique). Sans gel
       // (freeze 0) → simple push DMD, le jeu continue.
       if (freezeMs > 0) {

@@ -158,61 +158,37 @@ export interface SensorInput {
   value: number
 }
 
-// Durée du SHOW : combien de temps DMD/backglass jouent le clip (peut
-// dépasser le gel → phase célébration pendant que le jeu a repris).
-export const CLIP_SHOW_MS: Record<ClipId, number> = {
-  demogorgon_rises: 10_000, // 6s gel + 4s célébration
-  portal_swallow: 4_000,
-  demogorgon_slain: 15_000, // 8s gel + 7s célébration
-  last_chance: 2_000,
-  hall_of_fame: 25_000,
-  milestone_5k: 4_000,
-  milestone_15k: 8_000,
-  milestone_30k: 13_000,
-  milestone_big: 15_000,
-  hetic_letter: 5_000,
-  hetic_complete: 40_000, // 10s cinématique + 30s fever
-  skill_shot: 5_000,
+// Timings d'un clip cinématique, fournis par la map (manifest.clips) :
+//   showMs   — durée du SHOW : combien de temps DMD/backglass jouent le clip
+//              (peut dépasser le gel → célébration pendant que le jeu a repris).
+//   freezeMs — durée du GEL physique playfield (0 = pas de pause du gameplay).
+//   takeoverMs — durée d'occupation plein écran de la pile DMD (défaut showMs ;
+//              surchargé quand le visuel est plus court, ex. hetic_complete :
+//              10s de cinématique puis fever en mode SCORE).
+export interface ClipTimings {
+  showMs: number
+  freezeMs: number
+  takeoverMs?: number
 }
 
-// Durée d'occupation de la pile DMD (segment plein écran). Par défaut =
-// CLIP_SHOW_MS ; surchargé quand le visuel est plus court que le SHOW (ex.
-// hetic_complete : 10s de cinématique puis 30s d'état fever en mode SCORE).
-export const CLIP_TAKEOVER_MS: Partial<Record<ClipId, number>> = {
-  hetic_complete: 10_000,
-}
-
-// Durée du GEL physique playfield (0 = pas de pause du gameplay).
-export const CLIP_FREEZE_MS: Record<ClipId, number> = {
-  demogorgon_rises: 6_000,
-  portal_swallow: 4_000,
-  demogorgon_slain: 8_000,
-  last_chance: 0,
-  hall_of_fame: 0,
-  milestone_5k: 0,
-  milestone_15k: 3_000,
-  milestone_30k: 5_000,
-  milestone_big: 5_000,
-  hetic_letter: 2_000,
-  hetic_complete: 10_000,
-  skill_shot: 2_000,
-}
-
-// Durée SHOW par défaut pour un clip absent des tables (clip inconnu ou
-// défini par une map sans timing explicite). Le jeu ne crashe jamais : il
-// rend un visuel générique pendant cette durée.
+// Durée SHOW par défaut pour un clip absent de manifest.clips (clip inconnu
+// ou map sans timing explicite). Le jeu ne crashe jamais : visuel générique
+// pendant cette durée.
 export const DEFAULT_CLIP_SHOW_MS = 4_000
 
-// Lookups gardés — source de vérité unique. Un clip absent retombe sur des
-// valeurs sûres (jamais undefined → jamais de NaN downstream).
-export function clipShowMs(id: ClipId): number {
-  return CLIP_SHOW_MS[id] ?? DEFAULT_CLIP_SHOW_MS
+// Lookups génériques sur la table de clips d'une map (manifest.clips). Un clip
+// absent retombe sur des valeurs sûres (jamais undefined → jamais de NaN).
+export function clipShowMs(clips: Record<string, ClipTimings> | undefined, id: ClipId): number {
+  return clips?.[id]?.showMs ?? DEFAULT_CLIP_SHOW_MS
 }
 
-export function clipFreezeMs(id: ClipId): number {
-  return CLIP_FREEZE_MS[id] ?? 0
+export function clipFreezeMs(clips: Record<string, ClipTimings> | undefined, id: ClipId): number {
+  return clips?.[id]?.freezeMs ?? 0
 }
 
-export function clipTakeoverMs(id: ClipId): number | undefined {
-  return CLIP_TAKEOVER_MS[id]
+export function clipTakeoverMs(
+  clips: Record<string, ClipTimings> | undefined,
+  id: ClipId,
+): number | undefined {
+  return clips?.[id]?.takeoverMs
 }

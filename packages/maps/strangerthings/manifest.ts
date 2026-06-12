@@ -38,6 +38,21 @@ export const manifest: MapManifest = {
   counterLabels: { demogorgons: 'DEMOGORGONS', portals: 'PORTAILS', hetic: 'HETIC' },
   // Clés de mapState éditables par l'outil de debug (dev).
   debugMapState: { numbers: ['hetic'], flags: ['fever'] },
+  // Timings des clips (ex-tables CLIP_*_MS) : showMs / freezeMs / takeoverMs.
+  clips: {
+    demogorgon_rises: { showMs: 10_000, freezeMs: 6_000 }, // 6s gel + 4s célébration
+    portal_swallow: { showMs: 4_000, freezeMs: 4_000 },
+    demogorgon_slain: { showMs: 15_000, freezeMs: 8_000 }, // 8s gel + 7s célébration
+    last_chance: { showMs: 2_000, freezeMs: 0 },
+    hall_of_fame: { showMs: 25_000, freezeMs: 0 },
+    milestone_5k: { showMs: 4_000, freezeMs: 0 },
+    milestone_15k: { showMs: 8_000, freezeMs: 3_000 },
+    milestone_30k: { showMs: 13_000, freezeMs: 5_000 },
+    milestone_big: { showMs: 15_000, freezeMs: 5_000 },
+    hetic_letter: { showMs: 5_000, freezeMs: 2_000 },
+    hetic_complete: { showMs: 40_000, freezeMs: 10_000, takeoverMs: 10_000 }, // 10s ciné + 30s fever
+    skill_shot: { showMs: 5_000, freezeMs: 2_000 },
+  },
   glb: mapAsset('playfield/newStrangerthings.glb'),
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {

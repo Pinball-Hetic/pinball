@@ -20,4 +20,5 @@ export const {
   clipBehavior,
   eventTakeovers,
   counterLabels,
+  clips,
 } = content
