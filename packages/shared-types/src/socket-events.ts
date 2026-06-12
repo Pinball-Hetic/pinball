@@ -80,7 +80,7 @@ export type ClipId = string
 export type CinematicClip = ClipId
 
 // Champs partagés par les variantes "snapshot" (SCORE/EVENT/COMBO/MULTI).
-// upsideDown reste ici (traité en phase 5) ; mapState remplace hetic/fever.
+// alternateWorld (monde alternatif) ; mapState remplace les compteurs map.
 interface SnapshotFields {
   player: string
   score: number
@@ -88,18 +88,18 @@ interface SnapshotFields {
   multiplier: number
   lives: number
   mapState: MapState
-  upsideDown: boolean
+  alternateWorld: boolean
 }
 
 export type DmdDisplay =
-  | { mode: 'INTRO'; player: string; upsideDown: boolean }
-  | { mode: 'CINEMATIC'; clip: CinematicClip; player: string; score: number; value?: number; upsideDown: boolean }
+  | { mode: 'INTRO'; player: string; alternateWorld: boolean }
+  | { mode: 'CINEMATIC'; clip: CinematicClip; player: string; score: number; value?: number; alternateWorld: boolean }
   | ({ mode: 'SCORE' } & SnapshotFields)
   | ({ mode: 'EVENT'; label: string; points: number } & SnapshotFields)
   | ({ mode: 'COMBO_FLASH' } & SnapshotFields)
   | ({ mode: 'MULTI_FLASH' } & SnapshotFields)
-  | { mode: 'LIFE_LOST'; livesRemaining: number; score: number; player: string; upsideDown: boolean }
-  | { mode: 'GAME_OVER'; player: string; finalScore: number; upsideDown: boolean }
+  | { mode: 'LIFE_LOST'; livesRemaining: number; score: number; player: string; alternateWorld: boolean }
+  | { mode: 'GAME_OVER'; player: string; finalScore: number; alternateWorld: boolean }
 
 export interface GameStart {
   player: string

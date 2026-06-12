@@ -45,7 +45,7 @@ const DURATIONS = {
 // stocke les displays sans ce champ. Omit distributif sur l'union.
 type DisplayBase = DmdDisplay extends infer T
   ? T extends DmdDisplay
-    ? Omit<T, 'upsideDown'>
+    ? Omit<T, 'alternateWorld'>
     : never
   : never;
 
@@ -132,7 +132,7 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       .slice()
       .sort((a, b) => b.priority - a.priority)[0]!;
     // upsideDown injecté ici → l'atmosphere voyage dans chaque display.
-    const payload = { ...top.display, upsideDown: atmosphereRef.current } as DmdDisplay;
+    const payload = { ...top.display, alternateWorld: atmosphereRef.current } as DmdDisplay;
     const serialized = JSON.stringify(payload);
     if (serialized === lastSentRef.current) return;
     lastSentRef.current = serialized;

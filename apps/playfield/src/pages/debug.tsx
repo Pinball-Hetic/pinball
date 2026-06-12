@@ -58,7 +58,7 @@ export default function DebugPage() {
     multiplier: multi,
     lives,
     mapState: { hetic, fever: false },
-    upsideDown: udRef.current,
+    alternateWorld: udRef.current,
   })
 
   const addScore = (amount: number) =>
@@ -157,7 +157,7 @@ export default function DebugPage() {
         </Group>
 
         <Group title="DMD direct">
-          <Btn onClick={() => pushDisplay({ mode: 'INTRO', player: PLAYER, upsideDown: ud })}>
+          <Btn onClick={() => pushDisplay({ mode: 'INTRO', player: PLAYER, alternateWorld: ud })}>
             INTRO
           </Btn>
           <div className="grid grid-cols-5 gap-1 my-1">
@@ -188,14 +188,14 @@ export default function DebugPage() {
           </Btn>
           <Btn
             onClick={() =>
-              pushDisplay({ mode: 'LIFE_LOST', livesRemaining: lives, score, player: PLAYER, upsideDown: ud })
+              pushDisplay({ mode: 'LIFE_LOST', livesRemaining: lives, score, player: PLAYER, alternateWorld: ud })
             }
           >
             LIFE_LOST
           </Btn>
           <Btn
             onClick={() =>
-              pushDisplay({ mode: 'GAME_OVER', player: PLAYER, finalScore: score, upsideDown: ud })
+              pushDisplay({ mode: 'GAME_OVER', player: PLAYER, finalScore: score, alternateWorld: ud })
             }
           >
             GAME_OVER
@@ -219,7 +219,7 @@ export default function DebugPage() {
             <Btn
               key={clip}
               onClick={() =>
-                pushDisplay({ mode: 'CINEMATIC', clip, player: PLAYER, score, value, upsideDown: ud })
+                pushDisplay({ mode: 'CINEMATIC', clip, player: PLAYER, score, value, alternateWorld: ud })
               }
             >
               CINEMATIC: {clip}

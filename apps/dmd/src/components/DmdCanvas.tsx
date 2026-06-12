@@ -7,8 +7,8 @@ import { mapDmdContent } from '@/dmd/mapContent'
 const GLITCH_MS = 350
 // Contenu DMD de la map résolu au chargement (constante module).
 const LAYOUTS = makeLayouts(mapDmdContent)
-const UPSIDE_PALETTE = mapDmdContent.paletteUpsideDown ?? PALETTE_NORMAL
-const BURST_MS = mapDmdContent.upsideDownBurstMs ?? 1200
+const UPSIDE_PALETTE = mapDmdContent.paletteAlternateWorld ?? PALETTE_NORMAL
+const BURST_MS = mapDmdContent.alternateWorldBurstMs ?? 1200
 
 interface Props {
   display: DmdDisplay

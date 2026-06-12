@@ -8,7 +8,7 @@ import type {
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-const INTRO: DmdDisplay = { mode: 'INTRO', player: '—', upsideDown: false };
+const INTRO: DmdDisplay = { mode: 'INTRO', player: '—', alternateWorld: false };
 
 export function useDmdState() {
   const socketRef = useRef<PinballSocket | null>(null);
@@ -31,7 +31,7 @@ export function useDmdState() {
   }, []);
 
   // Dérivé du dernier display reçu — state-driven, pas d'event séparé.
-  const upsideDown = display.upsideDown;
+  const upsideDown = display.alternateWorld;
 
   return { display, upsideDown, connected };
 }

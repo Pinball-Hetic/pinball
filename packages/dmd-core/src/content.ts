@@ -23,8 +23,8 @@ export type AttractRenderer = (
 ) => void;
 
 export interface DmdMapContent {
-  /** Palette alternative (ex. Upside Down) appliquée quand display.upsideDown. */
-  paletteUpsideDown?: Record<DotColor, string>;
+  /** Palette alternative appliquée quand display.alternateWorld. */
+  paletteAlternateWorld?: Record<DotColor, string>;
   /** Handlers de cinématiques par clipId (priment sur les défauts du moteur). */
   cinematicHandlers?: Record<string, ClipHandler>;
   /** Overlay dessiné par-dessus le mode SCORE (ex. rangée HETIC). */
@@ -34,5 +34,5 @@ export interface DmdMapContent {
   /** Rendu complet de l'attract mode (sinon défaut minimal du moteur). */
   attract?: AttractRenderer;
   /** Durée du burst Game Over (effet de sortie, ms). */
-  upsideDownBurstMs?: number;
+  alternateWorldBurstMs?: number;
 }

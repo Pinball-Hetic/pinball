@@ -169,7 +169,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
     })
 
     socket.on('dmd:display', (d) => {
-      upsideDownRef.current = d.upsideDown ?? false
+      upsideDownRef.current = d.alternateWorld ?? false
       if ('mapState' in d) feverRef.current = mapStateFlag(d.mapState, 'fever')
       if (d.mode === 'CINEMATIC') {
         // Garde kiosk : event serveur malformé sans clip. Un clip inconnu
