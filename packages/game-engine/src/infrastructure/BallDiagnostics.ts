@@ -1,13 +1,4 @@
-import {
-  SHOOTER_LANE_X_MIN,
-  SHOOTER_LANE_X_MAX,
-  SHOOTER_LANE_TOP_Z,
-  SHOOTER_LANE_BOTTOM_Z,
-  SHOOTER_LANE_EXIT_X,
-  SHOOTER_LANE_FAIL_Z,
-  SHOOTER_LANE_WALL_THICKNESS,
-  SHOOTER_LANE_LEFT_WALL_TOP_Z,
-} from '../domain/Ball';
+import type { MapLayout } from '../domain/MapLayout';
 import {
   BALL_LOST_Y_THRESHOLD,
   isBallOutOfBounds,
@@ -82,12 +73,10 @@ export const LOST_LABELS: Record<BallLostReason, string> = {
 };
 
 // ── Traceur de traversée du mur gauche du couloir ──────────────────────────────
-// Le mur gauche du couloir est centré sur SHOOTER_LANE_X_MIN, épaisseur
-// SHOOTER_LANE_WALL_THICKNESS → faces internes/externes à ±épaisseur/2. On trace
-// la bille dès qu'elle entre dans une bande X large autour du mur, et on signale
-// tout franchissement frame-à-frame (interne→externe ou inverse).
-const WALL_FACE_INNER = SHOOTER_LANE_X_MIN - SHOOTER_LANE_WALL_THICKNESS / 2; // ≈ 0.196
-const WALL_FACE_OUTER = SHOOTER_LANE_X_MIN + SHOOTER_LANE_WALL_THICKNESS / 2; // ≈ 0.216
+// Le mur gauche du couloir est centré sur lane.xMin, épaisseur lane.wallThickness
+// → faces internes/externes à ±épaisseur/2 (calculées dans le constructeur). On
+// trace la bille dès qu'elle entre dans une bande X large autour du mur, et on
+// signale tout franchissement frame-à-frame (interne→externe ou inverse).
 const WALL_BAND_X_MIN = 0.17;
 const WALL_BAND_X_MAX = 0.23;
 
@@ -100,6 +89,16 @@ export class BallDiagnostics {
   /** Active les logs console (trace LaneFlight, apogée, pertes, resets).
    *  Piloté par le toggle HUD `[J]` côté playfield → silence total en prod. */
   verbose = false;
+
+  private readonly lane: MapLayout['shooterLane'];
+  private readonly wallFaceInner: number;
+  private readonly wallFaceOuter: number;
+
+  constructor(layout: MapLayout) {
+    this.lane = layout.shooterLane;
+    this.wallFaceInner = this.lane.xMin - this.lane.wallThickness / 2; // ≈ 0.196
+    this.wallFaceOuter = this.lane.xMin + this.lane.wallThickness / 2; // ≈ 0.216
+  }
 
   private snapshot: BallDiagnosticsSnapshot = {
     pos: { x: 0, y: 0, z: 0 },
@@ -232,7 +231,7 @@ export class BallDiagnostics {
     this.traceFrame++;
 
     // Sortie réussie du couloir : la balle est passée dans le terrain (X bas).
-    if (p.x < SHOOTER_LANE_EXIT_X) {
+    if (p.x < this.lane.exitX) {
       this.traceActive = false;
       if (this.verbose) {
         // eslint-disable-next-line no-console
@@ -245,7 +244,7 @@ export class BallDiagnostics {
     }
 
     // Retombée en bas du couloir sans être sortie → échec de lancement.
-    if (p.z > SHOOTER_LANE_FAIL_Z && this.traceSampleCount > 3) {
+    if (p.z > this.lane.failZ && this.traceSampleCount > 3) {
       this.traceActive = false;
       if (this.verbose) {
         // eslint-disable-next-line no-console
@@ -307,12 +306,12 @@ export class BallDiagnostics {
 
     if (Number.isNaN(prev)) return;
 
-    const crossedOutward = prev < WALL_FACE_INNER && p.x > WALL_FACE_OUTER;
-    const crossedInward = prev > WALL_FACE_OUTER && p.x < WALL_FACE_INNER;
+    const crossedOutward = prev < this.wallFaceInner && p.x > this.wallFaceOuter;
+    const crossedInward = prev > this.wallFaceOuter && p.x < this.wallFaceInner;
     if (!crossedOutward && !crossedInward) return;
 
     // Franchissement détecté : warn TOUJOURS + compteur snapshot (sentinelle).
-    const side = p.z < SHOOTER_LANE_LEFT_WALL_TOP_Z ? 'above_top' : 'below_top';
+    const side = p.z < this.lane.leftWallTopZ ? 'above_top' : 'below_top';
     this.snapshot = {
       ...this.snapshot,
       wallCrossCount: this.snapshot.wallCrossCount + 1,
@@ -369,10 +368,10 @@ export class BallDiagnostics {
   private classifyZone(p: Vec3): BallZone {
     if (isBallOutOfBounds(p.x, p.z)) return 'out_of_bounds';
     if (
-      p.x >= SHOOTER_LANE_X_MIN &&
-      p.x <= SHOOTER_LANE_X_MAX &&
-      p.z >= SHOOTER_LANE_TOP_Z &&
-      p.z <= SHOOTER_LANE_BOTTOM_Z
+      p.x >= this.lane.xMin &&
+      p.x <= this.lane.xMax &&
+      p.z >= this.lane.topZ &&
+      p.z <= this.lane.bottomZ
     ) {
       return 'lane';
     }

@@ -828,7 +828,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
     const stuckDetector = new StuckBallDetector();
     const bottomOutDetector = new DetectBottomOut();
-    const diag = new BallDiagnostics();
+    const diag = new BallDiagnostics(mapLayout);
     let lastDebugPush = 0;
 
     // ── Debug : déplacer la bille à la souris (toggle `M`) ───────────────────
