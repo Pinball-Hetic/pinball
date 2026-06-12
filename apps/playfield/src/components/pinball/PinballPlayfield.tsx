@@ -70,8 +70,6 @@ import {
   ScreenShake,
   BallTrail,
   QualityGovernor,
-  DEMOGORGON_TARGET,
-  DEMOGORGON_TARGET_HITS,
   PORTAL_ENTER_SCORE,
   ELEVEN_ASSIST_SCORE,
   SCORE_BUMPER,
@@ -1326,30 +1324,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             });
           }
 
-          if (event.type === "BOSS_REVEAL" && event.bossId === "demogorgon") {
-            playCinematic("demogorgon_rises", { once: true });
-          }
-          if (
-            event.type === "BOSS_TARGET_HIT"
-            && event.bossId === "demogorgon"
-            && event.hitCount >= DEMOGORGON_TARGET_HITS
-          ) {
-            // Slow-mo 400ms (physique ÷3) AVANT la cinématique de victoire.
-            // Timer local (plus simple que d'ajouter une phase au director ;
-            // le director enchaîne ensuite avec le gel).
-            physicsWorld?.setTimeScale(1 / 3);
-            window.setTimeout(() => {
-              physicsWorld?.setTimeScale(1);
-              playCinematic("demogorgon_slain", {
-                // Reprise "avec un bang" : impulse radial depuis le target.
-                onEnd: () =>
-                  ballPhysicsInst?.applyEjectionForce({
-                    x: DEMOGORGON_TARGET.x,
-                    z: DEMOGORGON_TARGET.z,
-                  }),
-              });
-            }, 400);
-          }
+          // Cinématiques boss Demogorgon (reveal + victoire) : gérées par le
+          // module de map (mapModule.onGameEvent).
           if (
             (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
             && gameStateRef.current === "game_over"
