@@ -8,8 +8,8 @@ import {
   PORTAL_MAGNET_RADIUS,
   PORTAL_MAGNET_STRENGTH,
   PORTAL_SENSOR_RADIUS,
-  PORTAL_UPSIDE_DOWN,
 } from '@pinball/game-engine';
+import { layout } from '../layout';
 import { PLAYFIELD_TILT } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
@@ -100,7 +100,7 @@ export class UpsideDownPortal {
     if (anchor) {
       anchor.getWorldPosition(this.anchorPos);
     } else {
-      this.anchorPos.set(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.y, PORTAL_UPSIDE_DOWN.z);
+      this.anchorPos.set(layout.sensors.portal.x, layout.sensors.portal.y, layout.sensors.portal.z);
     }
     this.baseY = this.anchorPos.y + 0.0015;
 

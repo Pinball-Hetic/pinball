@@ -77,12 +77,8 @@ export {
   VECNA_TARGET_HITS,
 } from './BossRegistry';
 
-export const PORTAL_UPSIDE_DOWN = {
-  x: -0.000751,
-  y: 1.015191,
-  z: -0.064818,
-} as const;
-
+// PORTAL_UPSIDE_DOWN (position) déplacé en littéral dans le layout de la map
+// (layout.sensors.portal). Les rayons/scores portail restent génériques ici.
 export const PORTAL_HOLE_RADIUS = 0.02;
 export const PORTAL_COVER_RADIUS = 0.021;
 export const PORTAL_SENSOR_RADIUS = 0.017;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { PORTAL_UPSIDE_DOWN } from '@pinball/game-engine';
+import { layout } from '../layout';
 import {
   UPSIDE_DOWN_TRANSITION_BLACKOUT,
   UPSIDE_DOWN_TRANSITION_HOLD,
@@ -66,9 +66,9 @@ export class UpsideDownTransition {
       flashColor: 0x9933ff,
       flashIntensity: 2.4,
       flashPosition: new THREE.Vector3(
-        PORTAL_UPSIDE_DOWN.x,
-        PORTAL_UPSIDE_DOWN.y + 0.12,
-        PORTAL_UPSIDE_DOWN.z,
+        layout.sensors.portal.x,
+        layout.sensors.portal.y + 0.12,
+        layout.sensors.portal.z,
       ),
     });
 

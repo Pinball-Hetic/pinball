@@ -2,7 +2,6 @@ import type { MapLayout } from '@pinball/game-engine'
 import {
   BUMPER_POSITIONS,
   DROP_TARGETS,
-  PORTAL_UPSIDE_DOWN,
   BALL_SPAWN_POSITION,
   SHOOTER_LANE_X_MIN,
   SHOOTER_LANE_X_MAX,
@@ -89,7 +88,8 @@ export const layout: MapLayout = {
     ],
     rocket: { x: 0.193, y: 1.021, z: -0.13 },
     demogorgon: { x: -0.0195, y: 1.0575, z: -0.269 },
-    portal: { ...PORTAL_UPSIDE_DOWN },
+    // sensor_portal (Ø sensor 1.7 cm) — littéral en attendant le mesh.
+    portal: { x: -0.000751, y: 1.015191, z: -0.064818 },
   },
   // Spawns : analytiques (pas de mesh attendu — hors couloir/hinge).
   spawns: {

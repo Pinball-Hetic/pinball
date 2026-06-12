@@ -6,7 +6,6 @@ import {
   bossThresholdMet,
   type BossId,
   BUMPER_POSITIONS,
-  PORTAL_UPSIDE_DOWN,
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
@@ -100,7 +99,13 @@ const initialBossHudEntry = (): BossHudEntry => ({
 const initialBossHud = (): BossHudState =>
   Object.fromEntries(BOSS_IDS.map((id) => [id, initialBossHudEntry()])) as BossHudState;
 
-export function useGameState(callbacks?: ScoringCallbacks) {
+export interface GameStateOptions {
+  /** Ancre écran des pop de score portail (depuis layout.sensors.portal). */
+  portalAnchor?: { x: number; z: number };
+}
+
+export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptions) {
+  const portalAnchor = opts?.portalAnchor ?? { x: 0, z: 0 };
   // `callbacks` est un objet littéral recréé à chaque render → on le lit via
   // un ref pour ne PAS remettre l'interval 250ms (decay combo + expiration
   // fever) à zéro à chaque render (sinon il pourrait ne jamais se déclencher).
@@ -466,7 +471,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       if (event.type === "PORTAL_ENTER") {
         // Compteur "portals" : tenu par le module de map (mapState).
         const point = jitterScreenPoint(
-          playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
+          playfieldToScreenPercent(portalAnchor.x, portalAnchor.z),
           3,
         );
         pushScorePop({
@@ -478,7 +483,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       }
       if (event.type === "RETURN_PORTAL_ENTER") {
         const point = jitterScreenPoint(
-          playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
+          playfieldToScreenPercent(portalAnchor.x, portalAnchor.z),
           3,
         );
         pushScorePop({
