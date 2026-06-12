@@ -1035,6 +1035,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             },
             resolve: (name) => findObjectByNormalizedName(playfieldRoot, name) ?? null,
             setPortalGateOpen: (open) => collisionProcessor?.setPortalOpen(open),
+            setBossFightActive: (bossId, active) =>
+              collisionProcessor?.setBossFightActive(bossId as BossId, active),
+            setBossTargetArmed: (bossId, armed) =>
+              collisionProcessor?.setBossTargetArmed(bossId as BossId, armed),
             addScore: (points, label) =>
               emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
             setMapState: (patch) => {

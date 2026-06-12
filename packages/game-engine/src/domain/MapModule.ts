@@ -35,6 +35,11 @@ export interface MapContext {
   /** Ouvre/ferme la « porte » d'un sensor de portail côté traitement collision. */
   setPortalGateOpen(open: boolean): void;
 
+  /** Active/désactive le combat d'un boss côté traitement collision. */
+  setBossFightActive(bossId: string, active: boolean): void;
+  /** Arme/désarme la cible d'un boss côté traitement collision. */
+  setBossTargetArmed(bossId: string, armed: boolean): void;
+
   /** Ajoute du score (+ label DMD optionnel) via le scoring du jeu. */
   addScore(points: number, label?: string): void;
 
