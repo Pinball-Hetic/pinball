@@ -2,15 +2,8 @@ import type { MapLayout } from '@pinball/game-engine'
 import {
   BUMPER_POSITIONS,
   DROP_TARGETS,
-  POP_ZONE_SENSORS,
-  ROCKET_SENSOR,
-  DEMOGORGON_SENSOR,
   PORTAL_UPSIDE_DOWN,
   BALL_SPAWN_POSITION,
-  UPSIDE_DOWN_SPAWN,
-  UPSIDE_DOWN_SPAWN_IMPULSE,
-  NORMAL_WORLD_RETURN_SPAWN,
-  NORMAL_WORLD_RETURN_IMPULSE,
   SHOOTER_LANE_X_MIN,
   SHOOTER_LANE_X_MAX,
   SHOOTER_LANE_BOTTOM_Z,
@@ -85,18 +78,26 @@ import {
 export const layout: MapLayout = {
   bumpers: BUMPER_POSITIONS.map((b) => ({ ...b })),
   dropTargets: DROP_TARGETS.map((d) => ({ ...d })),
+  // TODO(blender): dériver du GLB quand les meshes sensor_* existeront
+  // (sensor_pop_1/2/3, sensor_rocket, sensor_demogorgon). Littéraux explicites
+  // en attendant — pas de mesh dans le GLB actuel.
   sensors: {
-    popZones: POP_ZONE_SENSORS.map((s) => ({ ...s })),
-    rocket: { ...ROCKET_SENSOR },
-    demogorgon: { ...DEMOGORGON_SENSOR },
+    popZones: [
+      { x: -0.0225, y: 1.057, z: -0.448 },
+      { x: -0.087, y: 1.056, z: -0.438 },
+      { x: 0.042, y: 1.056, z: -0.438 },
+    ],
+    rocket: { x: 0.193, y: 1.021, z: -0.13 },
+    demogorgon: { x: -0.0195, y: 1.0575, z: -0.269 },
     portal: { ...PORTAL_UPSIDE_DOWN },
   },
+  // Spawns : analytiques (pas de mesh attendu — hors couloir/hinge).
   spawns: {
     ball: { ...BALL_SPAWN_POSITION },
-    upsideDown: { ...UPSIDE_DOWN_SPAWN },
-    upsideDownImpulse: { ...UPSIDE_DOWN_SPAWN_IMPULSE },
-    normalReturn: { ...NORMAL_WORLD_RETURN_SPAWN },
-    normalReturnImpulse: { ...NORMAL_WORLD_RETURN_IMPULSE },
+    upsideDown: { x: -0.0225, z: -0.48 },
+    upsideDownImpulse: { x: 0, y: 0, z: 0.055 },
+    normalReturn: { x: -0.0225, z: -0.12 },
+    normalReturnImpulse: { x: 0, y: 0, z: 0.05 },
   },
   shooterLane: {
     xMin: SHOOTER_LANE_X_MIN,

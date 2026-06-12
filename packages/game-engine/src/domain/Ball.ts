@@ -70,12 +70,6 @@ export const BUMPER_POSITIONS = [
   { x: -0.097406, y: 1.0621, z: -0.30509 },
   { x:  0.059483, y: 1.0621, z: -0.30509 },
 ] as const;
-export const DEMOGORGON_SENSOR = {
-  x: -0.0195,
-  y: 1.0575,
-  z: -0.269,
-} as const;
-
 export {
   DEMOGORGON_TARGET,
   DEMOGORGON_TARGET_HITS,
@@ -97,17 +91,8 @@ export const PORTAL_MAGNET_STRENGTH = 0.0055;
 export const PORTAL_ENTER_SCORE = 500;
 export const RETURN_PORTAL_ENTER_SCORE = 500;
 
-export const UPSIDE_DOWN_SPAWN = {
-  x: -0.0225,
-  z: -0.48,
-} as const;
-export const UPSIDE_DOWN_SPAWN_IMPULSE = { x: 0, y: 0, z: 0.055 } as const;
-
-export const NORMAL_WORLD_RETURN_SPAWN = {
-  x: -0.0225,
-  z: -0.12,
-} as const;
-export const NORMAL_WORLD_RETURN_IMPULSE = { x: 0, y: 0, z: 0.05 } as const;
+// Spawns upside-down / retour : déplacés en littéraux dans le layout de la map
+// (packages/maps/strangerthings/layout.ts) — plus de constante ST ici.
 
 export const ELEVEN_ASSIST_SCORE = 100;
 export const ELEVEN_ASSIST_INTERVAL = 3.2;
@@ -136,8 +121,8 @@ export const WALL_BOTTOM_Z  =  0.418;
 export const WALL_HEIGHT    =  0.06;
 export const WALL_THICKNESS =  0.006;
 
-// Drain — exact GLB switch_out center
-export const DRAIN_SWITCH_CENTER = { x: -0.0219, y: 0.9990, z: 0.0989 } as const;
+// Drain — seuil analytique (DRAIN_Z_THRESHOLD dans PlayfieldGeometry, dérivé de
+// la géométrie). DRAIN_SWITCH_CENTER supprimé (mort, zéro consommateur).
 
 // Slingshots — from GLB slingshot center=[−0.0225,1.032,0.1162] size=[0.2881,_,0.1132]
 // Y lowered to surface level so ball doesn't land on top
@@ -145,15 +130,8 @@ export const SLINGSHOT_LEFT_CENTER  = { x: -0.166, y: 1.005, z: 0.116 } as const
 export const SLINGSHOT_RIGHT_CENTER = { x:  0.121, y: 1.005, z: 0.116 } as const;
 export const SLINGSHOT_RESTITUTION  = 0.8;
 
-// Pop bumper zone sensors — from GLB switch positions
-export const POP_ZONE_SENSORS = [
-  { x: -0.0225, y: 1.057, z: -0.448 },
-  { x: -0.087,  y: 1.056, z: -0.438 },
-  { x:  0.042,  y: 1.056, z: -0.438 },
-] as const;
-
-// Rocket ramp sensor
-export const ROCKET_SENSOR = { x: 0.193, y: 1.021, z: -0.130 } as const;
+// Pop-zone + rocket sensors : déplacés en littéraux dans le layout de la map
+// (pas de mesh sensor_ dans le GLB → TODO blender). Plus de constante ici.
 
 // Drop targets — from GLB
 export const DROP_TARGETS = [

@@ -2,11 +2,11 @@ import * as THREE from 'three';
 import type { GameEvent, GameEventListener } from '@pinball/game-engine';
 import { getBossDefinition } from '@pinball/game-engine';
 import {
-  DEMOGORGON_SENSOR,
   DEMOGORGON_TARGET,
   ELEVEN_ASSIST_SCORE,
   ELEVEN_ASSIST_INTERVAL,
 } from '@pinball/game-engine';
+import { layout } from '../layout';
 import { PLAYFIELD_TILT } from '@pinball/game-engine';
 import { easeIn, easeOut, strobeOn } from '@pinball/game-engine';
 import { CameraBillboardSprite } from '@pinball/game-engine';
@@ -122,9 +122,9 @@ export class DemogorgonReveal implements BossRevealController {
       flashColor: 0xff1122,
       flashIntensity: FLASH_INTENSITY,
       flashPosition: new THREE.Vector3(
-        DEMOGORGON_SENSOR.x,
-        DEMOGORGON_SENSOR.y + 0.12,
-        DEMOGORGON_SENSOR.z,
+        layout.sensors.demogorgon.x,
+        layout.sensors.demogorgon.y + 0.12,
+        layout.sensors.demogorgon.z,
       ),
     });
 

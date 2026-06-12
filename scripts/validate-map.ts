@@ -99,6 +99,22 @@ for (const dt of layout.dropTargets) {
   }
 }
 
+// ── Dette TODO(blender) : éléments en littéral alors qu'un mesh est prévu ────
+// Documente automatiquement la dette : si le layout porte des sensors mais que
+// le GLB n'a aucun mesh 'sensor_', les positions sont des littéraux explicites
+// (cf. // TODO(blender) dans layout.ts) → warning, pas erreur.
+const sensorIds = roles.get('sensor') ?? new Set()
+const layoutSensorCount =
+  (layout.sensors?.popZones?.length ?? 0) +
+  (layout.sensors?.rocket ? 1 : 0) +
+  (layout.sensors?.demogorgon ? 1 : 0)
+if (layoutSensorCount > 0 && sensorIds.size === 0) {
+  warnings.push(
+    `layout.sensors en littéral (${layoutSensorCount}) — aucun mesh 'sensor_' dans le GLB ` +
+      '(dette TODO(blender) : ajouter sensor_* pour dériver les positions)',
+  )
+}
+
 // ── Rapport ─────────────────────────────────────────────────────────────────
 console.log(`Validation map '${id}' (GLB: ${manifest.glb})`)
 console.log(`  rôles détectés : ${[...roles.keys()].sort().join(', ') || '(aucun)'}`)
