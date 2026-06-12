@@ -3,6 +3,7 @@ import {
   INITIAL_LIVES,
   BOSS_IDS,
   getBossDefinition,
+  bossThresholdMet,
   type BossId,
   BUMPER_POSITIONS,
   PORTAL_UPSIDE_DOWN,
@@ -47,6 +48,7 @@ export interface ScoringCallbacks {
   onIdleReset?: () => void;
   onAtmosphereChange?: (upsideDownActive: boolean) => void;
   onMilestone?: (threshold: number) => void;
+  onBossArmed?: (bossId: BossId) => void; // palier franchi → le nid s'éveille (1×/partie)
   onHeticLetter?: (letterIndex: number) => void; // 1-4
   onHeticComplete?: () => void;
   onFeverEnd?: () => void;
@@ -120,6 +122,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
 
   const heticRef = useRef(0);
   const milestonesPassedRef = useRef<Set<number>>(new Set());
+  const upsideDownActiveRef = useRef(false);
+  const upsideDownBaselineRef = useRef(0);
+  const bossArmedFiredRef = useRef<Set<BossId>>(new Set());
   const feverUntilRef = useRef(0);
   const scoreRef = useRef(0);
   const livesRef = useRef(INITIAL_LIVES);
@@ -223,6 +228,10 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     clearBossHud("vecna");
     callbacks?.onAtmosphereChange?.(false);
     setUpsideDownActive(false);
+    upsideDownActiveRef.current = false;
+    upsideDownBaselineRef.current = 0;
+    // Le nid de vecna pourra se ré-annoncer à la prochaine entrée Upside Down.
+    bossArmedFiredRef.current.delete("vecna");
   }, [clearUpsideDownHint, clearBossHud, callbacks]);
 
   const updateGameState = (state: GameState) => {
@@ -281,6 +290,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     heticRef.current = 0;
     setHetic(0);
     milestonesPassedRef.current.clear();
+    bossArmedFiredRef.current.clear();
+    upsideDownActiveRef.current = false;
+    upsideDownBaselineRef.current = 0;
     feverUntilRef.current = 0;
     setFever(false);
     lastEventTimeRef.current = 0;
@@ -332,6 +344,23 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         // Paliers de score (nextMilestone marque déjà tous les seuils franchis)
         const crossed = nextMilestone(prevScore, scoreRef.current, milestonesPassedRef.current);
         if (crossed) callbacks?.onMilestone?.(crossed);
+
+        // Éveil du nid : palier de boss franchi → onBossArmed une fois par partie.
+        // Le set garde l'unicité ; le gate Upside Down/baseline est porté par
+        // bossThresholdMet (généricité demogorgon + vecna).
+        for (const id of BOSS_IDS) {
+          if (bossArmedFiredRef.current.has(id)) continue;
+          const def = getBossDefinition(id);
+          const met = bossThresholdMet(def, {
+            totalScore: scoreRef.current,
+            upsideDownActive: upsideDownActiveRef.current,
+            upsideDownScoreBaseline: upsideDownBaselineRef.current,
+          });
+          if (met) {
+            bossArmedFiredRef.current.add(id);
+            callbacks?.onBossArmed?.(id);
+          }
+        }
       }
       if (event.type === "BUMPER_HIT") {
         const bumper = BUMPER_POSITIONS[event.bumperIndex];
@@ -466,6 +495,8 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       }
       if (event.type === "PORTAL_TRANSITION_END") {
         setUpsideDownActive(true);
+        upsideDownActiveRef.current = true;
+        upsideDownBaselineRef.current = scoreRef.current;
         setUpsideDownHint(true);
         if (upsideDownHintTimerRef.current !== null) {
           window.clearTimeout(upsideDownHintTimerRef.current);

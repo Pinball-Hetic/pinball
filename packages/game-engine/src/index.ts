@@ -33,6 +33,7 @@ export * from './infrastructure/BossFightManager';
 export * from './infrastructure/BossTargetPulse';
 export * from './infrastructure/BossRevealController';
 export * from './infrastructure/BossRevealOrchestrator';
+export * from './infrastructure/BossNestMarker';
 export * from './infrastructure/BallDiagnostics';
 export * from './infrastructure/GltfNodeNames';
 export * from './infrastructure/FlipperPhysics';
