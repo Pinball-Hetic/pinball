@@ -87,7 +87,7 @@ import {
   ShooterLaneGate,
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
-import { MeshRoleResolver, type MapContext, type MapModule } from "@pinball/game-engine";
+import { MeshRoleResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
 import type {
   ButtonAction,
   ButtonId,
@@ -777,6 +777,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let bottomOutBallUC: BottomOutBall | null = null;
     let collisionProcessor: CollisionEventProcessor | null = null;
     const mapModule: MapModule | null = mapPackageRef.current?.module?.() ?? null;
+    // Hoisté : le MapContext (construit tôt) le référence via closures, mais il
+    // n'est assigné qu'une fois le pipeline d'events prêt (plus bas).
+    let emit: GameEventListener;
     let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
     let bossReveals: BossRevealOrchestrator | null = null;
@@ -1012,6 +1015,44 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         physicsWorld = await PhysicsWorld.create();
         const world = physicsWorld.world;
 
+        // ── MapContext : construit TÔT (avant UpsideDownTransition L~1034) pour
+        // que module.setup puisse créer ses systèmes avant qu'ils soient
+        // consommés. emit est hoisté (assigné plus bas) → utilisé via closures.
+        if (mapModule) {
+          const mapCtx: MapContext = {
+            scene,
+            root: playfieldRoot,
+            camera,
+            physics: physicsWorld,
+            layout: mapLayout,
+            manifest: mapManifest,
+            resolve: (name) => findObjectByNormalizedName(playfieldRoot, name) ?? null,
+            addScore: (points, label) =>
+              emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
+            setMapState: (patch) => {
+              Object.assign(mapStateExtraRef.current, patch);
+            },
+            forceMultiplier: (_value, durationMs) => startFever(durationMs),
+            pushDmdEvent: (label, points) =>
+              dmd.pushEvent(label, points, {
+                player: playerRef.current,
+                score: scoreRef.current,
+                combo: comboRef.current,
+                multiplier: multiplierRef.current,
+                lives: livesRef.current,
+                mapState: buildMapState(),
+              }),
+            playCinematic: (clipId) => playCinematic(clipId),
+            setAtmosphere: (active) => {
+              dmd.setAtmosphere(active);
+              atmosphereUpsideRef.current = active;
+              nestMarkerRef.current?.setUpsideDown(active);
+            },
+            emitGameEvent: (e) => emit(e),
+          };
+          mapModule.setup(mapCtx);
+        }
+
         shooterLaneGate = new ShooterLaneGate();
         shooterLaneGate.bind(world);
         shooterLaneGateRef.current = shooterLaneGate;
@@ -1238,7 +1279,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             }
           }
         };
-        const emit: typeof baseEmit = (event) => {
+        emit = (event) => {
           baseEmit(event);
           if (
             "scoreIncrement" in event
@@ -1372,42 +1413,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           bottomOutBallUC,
           emit,
         );
-
-        // ── MapContext : leviers du game loop exposés au module de map ────────
-        if (mapModule) {
-          const mapCtx: MapContext = {
-            scene,
-            root: playfieldRoot,
-            camera,
-            physics: physicsWorld!,
-            layout: mapLayout,
-            manifest: mapManifest,
-            resolve: (name) => findObjectByNormalizedName(playfieldRoot, name) ?? null,
-            addScore: (points, label) =>
-              emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
-            setMapState: (patch) => {
-              Object.assign(mapStateExtraRef.current, patch);
-            },
-            forceMultiplier: (_value, durationMs) => startFever(durationMs),
-            pushDmdEvent: (label, points) =>
-              dmd.pushEvent(label, points, {
-                player: playerRef.current,
-                score: scoreRef.current,
-                combo: comboRef.current,
-                multiplier: multiplierRef.current,
-                lives: livesRef.current,
-                mapState: buildMapState(),
-              }),
-            playCinematic: (clipId) => playCinematic(clipId),
-            setAtmosphere: (active) => {
-              dmd.setAtmosphere(active);
-              atmosphereUpsideRef.current = active;
-              nestMarkerRef.current?.setUpsideDown(active);
-            },
-            emitGameEvent: (e) => emit(e),
-          };
-          mapModule.setup(mapCtx);
-        }
 
         upsideDownPortal = new UpsideDownPortal();
         upsideDownPortal.setup({
