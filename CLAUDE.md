@@ -13,10 +13,20 @@ apps/
 └── server/         # Backend API + WebSocket (Express + Prisma)
 
 packages/
-├── game-engine/    # Physique Rapier, pas de React
+├── game-engine/    # Physique Rapier + contrats génériques, pas de React
 ├── shared-types/   # Types Socket.io/score partagés
+├── maps/           # Registry (@pinball/maps) + packages de map plugins
+│   └── strangerthings/   # @pinball/map-strangerthings (1ère map)
 └── config/         # TSconfig + ESLint partagés
 ```
+
+> **Refacto multi-maps en cours** (branche `refacto/p1-types-ouverts`) : le
+> moteur devient générique, les maps sont des packages plugins. Une map
+> fournit `manifest` (scoring/rules/glb/elements/meshAliases) + `layout`
+> (positions sans mesh) + à terme un `module` (comportement). `getMapPackage(id)`
+> (registry) est le SEUL importeur de `@pinball/map-*`. Sens des dépendances :
+> `maps → game-engine + shared-types`. Conventions de nommage GLB par préfixe
+> de rôle : voir `docs/MAP_AUTHORING.md`.
 
 ### `packages/game-engine` — Physics, game logic, no React
 Clean architecture: domain / infrastructure / use-cases.
@@ -101,10 +111,19 @@ Never put physics code in React components. Never put React code in game-engine.
 
 ## GLB Model
 
-File: `apps/playfield/public/playfield/Pinballmap.glb`
-- Node names use underscores in Three.js (e.g. `pop_bumper`, not `pop bumper`)
-- Playfield surface Y formula: `1.068 - ((z + 0.552) / 0.970) * 0.110`
+Le GLB est **fourni par la map** (`manifest.glb`). ST : `newStrangerthings.glb`
+(conventionné role-driven). Les rôles physiques sont déduits du **préfixe** de
+mesh (`floor_`/`wall_`/`flipper_`/`bumper_`/`slingshot_`/`target_`/`sensor_`/
+`lane_`/`vis_`) via `MeshRoleResolver` (préfixe sur le groupe parent, le plus
+spécifique gagne). Tuning matière par mesh dans `manifest.elements`.
+**Conventions complètes + checklist export Blender : `docs/MAP_AUTHORING.md`.**
+Outils : `python3 scripts/dump-glb-meshes.py <glb>` (rôles résolus),
+`task maps:validate -- <id>` (contrat manifest + GLB).
+
+- Playfield surface Y (ST) : `1.068 - ((z + 0.552) / 0.970) * 0.110`
+  (`layout.geometry.coefficients`)
 - Playfield X range: [-0.265, 0.265], Z range: [-0.552, 0.418]
+  (`layout.geometry.bounds`)
 
 ## Ports
 
