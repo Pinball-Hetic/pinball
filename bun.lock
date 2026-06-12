@@ -35,6 +35,7 @@
       "name": "@pinball/dmd",
       "version": "1.0.0",
       "dependencies": {
+        "@pinball/dmd-core": "workspace:*",
         "@pinball/shared-types": "workspace:*",
         "next": "^16.2.1",
         "react": "^19.2.4",
@@ -109,6 +110,16 @@
     "packages/config": {
       "name": "@pinball/config",
       "version": "1.0.0",
+    },
+    "packages/dmd-core": {
+      "name": "@pinball/dmd-core",
+      "version": "1.0.0",
+      "dependencies": {
+        "@pinball/shared-types": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
     },
     "packages/game-engine": {
       "name": "@pinball/game-engine",
@@ -316,6 +327,8 @@
     "@pinball/config": ["@pinball/config@workspace:packages/config"],
 
     "@pinball/dmd": ["@pinball/dmd@workspace:apps/dmd"],
+
+    "@pinball/dmd-core": ["@pinball/dmd-core@workspace:packages/dmd-core"],
 
     "@pinball/game-engine": ["@pinball/game-engine@workspace:packages/game-engine"],
 

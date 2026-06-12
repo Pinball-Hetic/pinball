@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { DmdDisplay } from '@pinball/shared-types'
-import { DmdRenderer, GRID_W, GRID_H } from '@/dmd/DmdRenderer'
+import { DmdRenderer, GRID_W, GRID_H, applyGlitch, MatrixRain } from '@pinball/dmd-core'
 import { layouts } from '@/dmd/layouts'
-import { applyGlitch, MatrixRain } from '@/dmd/effects'
 
 const GLITCH_MS = 350
 const BURST_MS = 1200

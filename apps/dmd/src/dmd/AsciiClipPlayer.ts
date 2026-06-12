@@ -1,6 +1,6 @@
 import type { CinematicClip } from '@pinball/shared-types'
-import { GRID_W, GRID_H } from './DmdRenderer'
-import { DOT } from './palette'
+import { GRID_W, GRID_H } from '@pinball/dmd-core'
+import { DOT } from '@pinball/dmd-core'
 import { RAW_CLIPS } from './clips'
 import { DEMOGORGON_HERO } from './clips/demogorgonHero'
 

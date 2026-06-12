@@ -1,8 +1,8 @@
 import type { DmdDisplay } from '@pinball/shared-types'
 import { mapStateNumber, mapStateFlag } from '@pinball/shared-types'
-import { FONT_5X7, FONT_12X22, drawText, measureText } from './fonts'
-import { GRID_W, GRID_H } from './DmdRenderer'
-import { DOT } from './palette'
+import { FONT_5X7, FONT_12X22, drawText, measureText } from '@pinball/dmd-core'
+import { GRID_W, GRID_H } from '@pinball/dmd-core'
+import { DOT } from '@pinball/dmd-core'
 import { attractFrame } from './attract'
 import {
   clipFor,

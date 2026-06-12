@@ -1,7 +1,7 @@
-import { FONT_5X7, drawText, measureText } from './fonts'
-import { GRID_W, GRID_H } from './DmdRenderer'
-import { DOT } from './palette'
-import { applyGlitch } from './effects'
+import { FONT_5X7, drawText, measureText } from '@pinball/dmd-core'
+import { GRID_W, GRID_H } from '@pinball/dmd-core'
+import { DOT } from '@pinball/dmd-core'
+import { applyGlitch } from '@pinball/dmd-core'
 
 // Attract mode : state machine PURE pilotée par l'horloge. Aucun état
 // persistant — tout dérive de clockMs, donc résiste aux re-renders et aux
