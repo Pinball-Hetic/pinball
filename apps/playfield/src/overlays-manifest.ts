@@ -6,5 +6,5 @@ import type { CinematicClip } from '@pinball/shared-types'
 // Formats supportés : .webm (video) > .webp / .gif (img). Premier listé gagne.
 //
 // Exemple une fois un asset déposé :
-//   demogorgon_rises: 'demogorgon_rises.webm',
+//   <clipId>: '<clipId>.webm',
 export const OVERLAY_FILES: Partial<Record<CinematicClip, string>> = {}
