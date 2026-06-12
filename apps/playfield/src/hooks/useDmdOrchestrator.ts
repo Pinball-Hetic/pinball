@@ -10,7 +10,7 @@ import type {
 } from '@pinball/shared-types';
 import { clipShowMs, clipTakeoverMs } from '@pinball/shared-types';
 import type { GameEvent } from '@pinball/game-engine';
-import { getBossDefinition } from '@pinball/game-engine';
+import { getBossDefinition } from '@/map/activeMapBosses';
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 

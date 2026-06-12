@@ -1,4 +1,4 @@
-import { BOSS_IDS, getBossDefinition } from "@pinball/game-engine";
+import { BOSS_IDS, getBossDefinition } from "@/map/activeMapBosses";
 import type { BossHudState, ScorePop } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
 import PlungerPowerBar from "./PlungerPowerBar";

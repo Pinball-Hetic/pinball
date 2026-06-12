@@ -98,7 +98,11 @@ export class CollisionEventProcessor {
   resetUpsideDownSession(): void {
     this.upsideDownActive = false;
     this.upsideDownScoreBaseline = 0;
-    this.resetBossFight('vecna');
+    // Réinitialise les combats des boss du monde Upside Down (génériquement,
+    // ceux dont reveal.requiresUpsideDown — sans id ST en dur).
+    for (const b of this.layout.bosses) {
+      if (b.reveal.requiresUpsideDown) this.resetBossFight(b.id);
+    }
   }
 
   resetScoreBaselines(): void {
@@ -148,7 +152,7 @@ export class CollisionEventProcessor {
       // pédagogie « ENCORE X PTS » plutôt qu'un hit silencieux. Throttle 2 s.
       // Uniquement pour le boss du monde courant : sinon on afficherait un
       // décompte de points trompeur (le vrai blocage est le mauvais monde, pas
-      // le score) — ex. cible Demogorgon touchée dans l'Upside Down.
+      // le score) — ex. cible d'un boss du monde normal touchée dans l'Upside Down.
       const boss = this.bossByRole.get(role);
       if (
         boss

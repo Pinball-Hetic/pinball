@@ -69,12 +69,8 @@ export const PLAYFIELD_SURFACE_Y = 1.0681; // top of playfield mesh = 1.0171 + 0
 
 // BUMPER_POSITIONS déplacé en littéral dans le layout de la map (collider
 // tuné, centre Box3 mesh non fiable). Plus de constante ici.
-export {
-  DEMOGORGON_TARGET,
-  DEMOGORGON_TARGET_HITS,
-  VECNA_TARGET,
-  VECNA_TARGET_HITS,
-} from './BossRegistry';
+// Positions des cibles boss : fournies par les définitions de boss de la map
+// (layout.bosses) — plus de re-export spécifique à une map ici.
 
 // PORTAL_UPSIDE_DOWN (position) déplacé en littéral dans le layout de la map
 // (layout.sensors.portal). Les rayons/scores portail restent génériques ici.

@@ -99,7 +99,7 @@ export const layout: MapLayout = {
       { x: 0.042, y: 1.056, z: -0.438 },
     ],
     rocket: { x: 0.193, y: 1.021, z: -0.13 },
-    demogorgon: { x: -0.0195, y: 1.0575, z: -0.269 },
+    bossReveal: { x: -0.0195, y: 1.0575, z: -0.269 },
     // sensor_portal (Ø sensor 1.7 cm) — littéral en attendant le mesh.
     portal: { x: -0.000751, y: 1.015191, z: -0.064818 },
   },

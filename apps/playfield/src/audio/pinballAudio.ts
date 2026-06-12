@@ -1,5 +1,5 @@
 import type { GameEvent } from "@pinball/game-engine";
-import { getBossDefinition } from "@pinball/game-engine";
+import { getBossDefinition } from "@/map/activeMapBosses";
 import { installAudioBootstrap } from "./AudioBootstrap";
 import { EarlySoundController } from "./EarlySoundController";
 import {

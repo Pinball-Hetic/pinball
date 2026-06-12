@@ -1,12 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
   INITIAL_LIVES,
-  BOSS_IDS,
-  getBossDefinition,
   bossThresholdMet,
   type BossId,
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
+import { BOSS_IDS, getBossDefinition } from "@/map/activeMapBosses";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
 import type { GameStats } from "@pinball/shared-types";
 import { handlePinballSoundEvent, playGameOverSound } from "../audio/pinballAudio";

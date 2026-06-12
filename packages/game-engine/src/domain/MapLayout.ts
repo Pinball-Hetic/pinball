@@ -24,10 +24,10 @@ export interface DropTargetDef {
 }
 
 export interface SensorLayout {
-  popZones: MapPoint3[]; // POP_ZONE_SENSORS
-  rocket: MapPoint3; // ROCKET_SENSOR
-  demogorgon: MapPoint3; // DEMOGORGON_SENSOR
-  portal: MapPoint3; // PORTAL_UPSIDE_DOWN
+  popZones: MapPoint3[]; // capteurs de zone pop-bumper
+  rocket: MapPoint3; // capteur de rampe
+  bossReveal: MapPoint3; // ancre de flash du reveal boss (monde normal)
+  portal: MapPoint3; // ancre du portail Upside Down
 }
 
 export interface SpawnLayout {

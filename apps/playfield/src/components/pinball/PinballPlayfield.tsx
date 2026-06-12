@@ -66,11 +66,10 @@ import {
   SCORE_SLINGSHOT,
   SCORE_RAMP,
   SCORE_DROP_COMPLETE,
-  SCORE_DEMOGORGON_REVEAL,
-  SCORE_DEMOGORGON_TARGET,
   type GameEvent,
   ShooterLaneGate,
 } from "@pinball/game-engine";
+import { getBossDefinition } from "@/map/activeMapBosses";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import { NoSignal } from "@pinball/ui";
 import { MeshRoleResolver, LayoutResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
@@ -99,13 +98,17 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
     case "DROP_TARGET_COMPLETE":
       return { type: "DROP_TARGET_COMPLETE", side: "left", scoreIncrement: SCORE_DROP_COMPLETE };
     case "DEMOGORGON_REVEAL":
-      return { type: "BOSS_REVEAL", bossId: "demogorgon", scoreIncrement: SCORE_DEMOGORGON_REVEAL };
+      return {
+        type: "BOSS_REVEAL",
+        bossId: "demogorgon",
+        scoreIncrement: getBossDefinition("demogorgon").reveal.scoreIncrement,
+      };
     case "DEMOGORGON_TARGET_HIT":
       return {
         type: "BOSS_TARGET_HIT",
         bossId: "demogorgon",
         hitCount: d.hitCount ?? 1,
-        scoreIncrement: SCORE_DEMOGORGON_TARGET,
+        scoreIncrement: getBossDefinition("demogorgon").scoreTargetHit,
       };
     case "PORTAL_ENTER":
       return { type: "PORTAL_ENTER", scoreIncrement: PORTAL_ENTER_SCORE };
