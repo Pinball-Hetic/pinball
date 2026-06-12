@@ -12,26 +12,10 @@ import {
 import { bossThresholdMet } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 
-// Module de comportement Stranger Things. Extraction progressive (phase 4.3),
-// validée en jeu. Cluster actuel : VISUALS (garlands + bumperVisuals).
-//
-// Bridge transitoire : le module expose `garlands`/`bumperVisuals` car les
-// systèmes Upside Down (transition/atmosphere) — encore dans PinballPlayfield —
-// les consomment + le garlandLightsRef pilote celebrate/setFever. Ils
-// déménageront au cluster Upside Down (suivant), supprimant ce bridge.
-export interface StModule extends MapModule {
-  garlands: GarlandLights | null
-  bumperVisuals: BumperVisuals | null
-  atmosphere: UpsideDownAtmosphere | null
-  portal: UpsideDownPortal | null
-  transition: UpsideDownTransition | null
-  nestMarker: BossNestMarker | null
-  bossReveals: BossRevealOrchestrator | null
-  demogorgonReveal: DemogorgonReveal | null
-  vecnaReveal: VecnaReveal | null
-}
-
-export function createModule(): StModule {
+// Module de comportement Stranger Things. Possède tous ses systèmes en
+// closure ; n'expose que le contrat MapModule (aucun bridge vers le
+// composant playfield).
+export function createModule(): MapModule {
   let ctxRef: MapContext | null = null
   // Compteurs ST (alimentent mapState + GameStats.counters).
   let demogorgons = 0
@@ -50,33 +34,6 @@ export function createModule(): StModule {
   let demogorgonReveal: DemogorgonReveal | null = null
   let vecnaReveal: VecnaReveal | null = null
   return {
-    get garlands() {
-      return garlands
-    },
-    get bumperVisuals() {
-      return bumperVisuals
-    },
-    get atmosphere() {
-      return atmosphere
-    },
-    get portal() {
-      return portal
-    },
-    get transition() {
-      return transition
-    },
-    get nestMarker() {
-      return nestMarker
-    },
-    get bossReveals() {
-      return bossReveals
-    },
-    get demogorgonReveal() {
-      return demogorgonReveal
-    },
-    get vecnaReveal() {
-      return vecnaReveal
-    },
     setup(ctx: MapContext): void {
       ctxRef = ctx
       bumperVisuals = new BumperVisuals()
