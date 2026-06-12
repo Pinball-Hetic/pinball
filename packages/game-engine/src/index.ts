@@ -7,6 +7,8 @@ export * from './domain/UpsideDownConstants';
 export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
 export * from './domain/ScoringConstants';
+export * from './domain/BossRegistry';
+export * from './domain/VecnaConstants';
 export * from './domain/LiveGameSnapshot';
 
 // Use-cases
@@ -27,6 +29,10 @@ export * from './infrastructure/PlayfieldColliderFactory';
 export * from './infrastructure/LauncherLaneBounds';
 export * from './infrastructure/FlipperSplitter';
 export * from './infrastructure/CollisionEventProcessor';
+export * from './infrastructure/BossFightManager';
+export * from './infrastructure/BossTargetPulse';
+export * from './infrastructure/BossRevealController';
+export * from './infrastructure/BossRevealOrchestrator';
 export * from './infrastructure/BallDiagnostics';
 export * from './infrastructure/GltfNodeNames';
 export * from './infrastructure/FlipperPhysics';
@@ -35,6 +41,7 @@ export * from './infrastructure/GltfDisplay';
 export * from './infrastructure/BumperVisuals';
 export * from './infrastructure/GarlandLights';
 export * from './infrastructure/DemogorgonReveal';
+export * from './infrastructure/VecnaReveal';
 export * from './infrastructure/CinematicDirector';
 export * from './infrastructure/ScreenShake';
 export * from './infrastructure/BallTrail';

@@ -1,13 +1,17 @@
 import RAPIER from '@dimforge/rapier3d-compat';
+import type { BossId } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
-import { BUMPER_POSITIONS, BUMP_EJECT_SCALE, BUMP_HIT_COOLDOWN_MS, DROP_TARGETS, DEMOGORGON_TARGET_HITS, PORTAL_ENTER_SCORE } from '../domain/Ball';
+import {
+  BUMPER_POSITIONS,
+  BUMP_EJECT_SCALE,
+  BUMP_HIT_COOLDOWN_MS,
+  DROP_TARGETS,
+  PORTAL_ENTER_SCORE,
+} from '../domain/Ball';
 import {
   SCORE_SLINGSHOT,
   SCORE_POP_ZONE,
   SCORE_RAMP,
-  SCORE_DEMOGORGON_REVEAL,
-  DEMOGORGON_REVEAL_SCORE,
-  SCORE_DEMOGORGON_TARGET,
   SCORE_DROP_TARGET,
   SCORE_DROP_COMPLETE,
 } from '../domain/ScoringConstants';
@@ -15,19 +19,16 @@ import type { BumperHit } from '../use-cases/BumperHit';
 import type { BumpHit } from '../use-cases/BumpHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
+import { BossFightManager } from './BossFightManager';
 
 export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
+  private readonly bossFights: BossFightManager;
   private bumpLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
-  private demogorgonTriggered = false;
-  private demogorgonFightActive = false;
-  private demogorgonTargetArmed = false;
-  private demogorgonTargetBallInside = false;
-  private demogorgonTargetLatchIgnore = false;
-  private demogorgonTargetHits = 0;
-  private demogorgonTargetLastHitMs = 0;
   private portalOpen = false;
   private portalTriggered = false;
+  private upsideDownActive = false;
+  private upsideDownScoreBaseline = 0;
 
   setPortalOpen(open: boolean): void {
     this.portalOpen = open;
@@ -38,42 +39,40 @@ export class CollisionEventProcessor {
     this.portalTriggered = false;
   }
 
-  setDemogorgonFightActive(active: boolean): void {
-    this.demogorgonFightActive = active;
-    if (!active) {
-      this.demogorgonTargetArmed = false;
-      this.demogorgonTargetLatchIgnore = false;
-    }
+  setBossFightActive(id: BossId, active: boolean): void {
+    this.bossFights.setFightActive(id, active);
   }
 
-  setDemogorgonTargetArmed(armed: boolean): void {
-    this.demogorgonTargetArmed = armed;
-    if (armed && this.demogorgonTargetBallInside) {
-      this.demogorgonTargetLatchIgnore = true;
-    }
+  setBossTargetArmed(id: BossId, armed: boolean): void {
+    this.bossFights.setTargetArmed(id, armed);
   }
 
-  resetDemogorgonFight(): void {
-    this.demogorgonTriggered = false;
-    this.demogorgonFightActive = false;
-    this.demogorgonTargetArmed = false;
-    this.demogorgonTargetLatchIgnore = false;
-    this.demogorgonTargetBallInside = false;
-    this.demogorgonTargetHits = 0;
-    this.demogorgonTargetLastHitMs = 0;
+  resetBossFight(id: BossId): void {
+    this.bossFights.resetBoss(id);
   }
 
-  tryScoreReveal(totalScore: number, gameState: string): void {
-    if (gameState !== 'playing') return;
-    if (this.demogorgonTriggered) return;
-    if (totalScore < DEMOGORGON_REVEAL_SCORE) return;
-    this.demogorgonTriggered = true;
-    this.demogorgonFightActive = true;
-    this.demogorgonTargetArmed = false;
-    this.demogorgonTargetLatchIgnore = false;
-    this.demogorgonTargetHits = 0;
-    this.demogorgonTargetLastHitMs = 0;
-    this.emit({ type: 'DEMOGORGON_REVEAL', scoreIncrement: SCORE_DEMOGORGON_REVEAL });
+  resetAllBossFights(): void {
+    this.bossFights.resetAll();
+  }
+
+  onUpsideDownEntered(score: number): void {
+    this.upsideDownActive = true;
+    this.upsideDownScoreBaseline = score;
+  }
+
+  resetUpsideDownSession(): void {
+    this.upsideDownActive = false;
+    this.upsideDownScoreBaseline = 0;
+    this.resetBossFight('vecna');
+  }
+
+  tryAllBossReveals(totalScore: number, gameState: string): void {
+    this.bossFights.tryAllReveals({
+      totalScore,
+      gameState,
+      upsideDownActive: this.upsideDownActive,
+      upsideDownScoreBaseline: this.upsideDownScoreBaseline,
+    });
   }
 
   constructor(
@@ -84,6 +83,7 @@ export class CollisionEventProcessor {
     private readonly bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
   ) {
+    this.bossFights = new BossFightManager(emit);
     for (const dt of DROP_TARGETS) this.dropTargetDown[dt.id] = false;
   }
 
@@ -92,8 +92,7 @@ export class CollisionEventProcessor {
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
 
-      if (role === 'demogorgon_target') {
-        this.handleDemogorgonTargetSensor(started, gameState);
+      if (this.bossFights.handleTargetCollision(role, started, gameState)) {
         return;
       }
 
@@ -116,8 +115,6 @@ export class CollisionEventProcessor {
       }
 
       if (started && (role === 'bump_right' || role === 'bump_left') && gameState === 'playing') {
-        // started uniquement (pas la fin de contact) + cooldown par côté :
-        // évite le double-trigger (start+stop) et le farm quand la balle vibre.
         const side = role === 'bump_right' ? 'right' as const : 'left' as const;
         const now = performance.now();
         if (now - this.bumpLastHitMs[side] >= BUMP_HIT_COOLDOWN_MS) {
@@ -160,32 +157,6 @@ export class CollisionEventProcessor {
       this.dropTargetDown[dt.id] = false;
     }
     this.emit({ type: 'DROP_TARGET_RESET' });
-  }
-
-  private handleDemogorgonTargetSensor(started: boolean, gameState: string): void {
-    if (started) {
-      this.demogorgonTargetBallInside = true;
-      if (gameState !== 'playing' || !this.demogorgonFightActive || !this.demogorgonTargetArmed) return;
-      if (this.demogorgonTargetLatchIgnore) return;
-
-      const now = performance.now();
-      if (now - this.demogorgonTargetLastHitMs < 450) return;
-      this.demogorgonTargetLastHitMs = now;
-      this.demogorgonTargetHits += 1;
-      this.emit({
-        type: 'DEMOGORGON_TARGET_HIT',
-        hitCount: this.demogorgonTargetHits,
-        scoreIncrement: SCORE_DEMOGORGON_TARGET,
-      });
-      if (this.demogorgonTargetHits >= DEMOGORGON_TARGET_HITS) {
-        this.demogorgonFightActive = false;
-        this.demogorgonTargetArmed = false;
-      }
-      return;
-    }
-
-    this.demogorgonTargetBallInside = false;
-    this.demogorgonTargetLatchIgnore = false;
   }
 
   private handleDropTarget(role: string): void {

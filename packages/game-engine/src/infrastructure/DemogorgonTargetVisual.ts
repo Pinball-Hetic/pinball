@@ -5,25 +5,24 @@ import {
   DEMOGORGON_ANIM_IDLE,
   DEMOGORGON_ANIM_VICTORY,
   DEMOGORGON_ANIM_VICTORY_FALLBACK,
+  DEMOGORGON_MODEL_FIT_FRAMES,
+  DEMOGORGON_MODEL_FLOOR_CLEARANCE,
   DEMOGORGON_MODEL_HEIGHT,
   DEMOGORGON_MODEL_URL,
   DEMOGORGON_MODEL_FOOT_LIFT,
   DEMOGORGON_MODEL_YAW,
 } from '../domain/DemogorgonConstants';
 import { PLAYFIELD_TILT, surfaceYAtZ } from '../domain/PlayfieldGeometry';
+import { findGltfAnimationClip } from './GltfAnimationClips';
 import { createGltfLoader } from './GltfDisplay';
+import {
+  applySkinnedModelFit,
+  fitSkinnedModelWithRetry,
+} from './SkinnedModelFit';
 
 type AnimState = 'idle' | 'hit' | 'victory';
 
 const _facingPos = new THREE.Vector3();
-
-function findAnimationClip(clips: THREE.AnimationClip[], token: string): THREE.AnimationClip | undefined {
-  const needle = token.toLowerCase();
-  return clips.find((clip) => {
-    const name = clip.name.toLowerCase();
-    return name === needle || name.endsWith(`|${needle}`);
-  });
-}
 
 export class DemogorgonTargetVisual {
   private anchor: THREE.Group | null = null;
@@ -122,7 +121,7 @@ export class DemogorgonTargetVisual {
   }
 
   update(dt: number): void {
-    if (this.pendingFit) this.tryApplyFit();
+    if (this.pendingFit) this.applyFit();
     if (!this.anchor?.visible) return;
 
     this.mixer?.update(dt);
@@ -163,20 +162,27 @@ export class DemogorgonTargetVisual {
       if (!this.anchor) return;
       this.fitModel(gltf.scene, gltf.animations);
       this.syncFacing();
-      this.resolveFit();
-      if (this.pendingFit) {
-        await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
-        if (!this.anchor) return;
-        this.resolveFit();
-      }
-      if (this.anchor.visible) this.playIdle();
+      await fitSkinnedModelWithRetry(
+        () => this.applyFit(),
+        DEMOGORGON_MODEL_FIT_FRAMES,
+        () => this.anchor !== null,
+      );
+      if (this.anchor?.visible) this.playIdle();
     } catch (err) {
       console.error('[Demogorgon] load error:', err);
     }
   }
 
-  private resolveFit(): void {
-    if (this.pendingFit) this.tryApplyFit();
+  private preparePoseForFit(): void {
+    if (this.idleAction) {
+      this.idleAction.play();
+      this.idleAction.time = 0;
+    }
+    this.mixer?.update(0);
+    this.pendingFit?.updateWorldMatrix(true, true);
+    this.pendingFit?.traverse((obj) => {
+      if (obj instanceof THREE.SkinnedMesh) obj.skeleton.update();
+    });
   }
 
   private syncFacing(): void {
@@ -188,40 +194,21 @@ export class DemogorgonTargetVisual {
     this.rig.rotation.y = Math.atan2(dx, dz) + DEMOGORGON_MODEL_YAW;
   }
 
-  private tryApplyFit(): void {
+  private applyFit(): boolean {
     const model = this.pendingFit;
-    if (!model || !this.rig || !this.offset || !this.anchor) return;
+    if (!model || !this.rig || !this.offset || !this.anchor) return false;
 
-    model.updateWorldMatrix(true, true);
-
-    const box = new THREE.Box3();
-    const v = new THREE.Vector3();
-    model.traverse((obj) => {
-      if (obj instanceof THREE.SkinnedMesh) {
-        const pos = obj.geometry.attributes.position;
-        const hasSkin = obj.geometry.attributes.skinIndex && obj.geometry.attributes.skinWeight;
-        if (!pos) return;
-        obj.skeleton.update();
-        const step = Math.max(1, Math.floor(pos.count / 800));
-        for (let i = 0; i < pos.count; i += step) {
-          v.fromBufferAttribute(pos, i);
-          if (hasSkin) obj.applyBoneTransform(i, v);
-          obj.localToWorld(v);
-          this.anchor!.worldToLocal(v);
-          box.expandByPoint(v);
-        }
-      }
+    const ok = applySkinnedModelFit({
+      model,
+      rig: this.rig,
+      offset: this.offset,
+      anchor: this.anchor,
+      targetHeight: DEMOGORGON_MODEL_HEIGHT,
+      floorClearance: DEMOGORGON_MODEL_FLOOR_CLEARANCE,
+      beforeMeasure: () => this.preparePoseForFit(),
     });
-    if (box.isEmpty()) return;
-
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    if (Math.max(Math.abs(center.x), Math.abs(center.y), Math.abs(center.z)) > 4) return;
-
-    const height = Math.max(size.y, 1e-4);
-    this.offset.position.set(-center.x, -box.min.y + 0.006, -center.z);
-    this.rig.scale.setScalar(DEMOGORGON_MODEL_HEIGHT / height);
-    this.pendingFit = null;
+    if (ok) this.pendingFit = null;
+    return ok;
   }
 
   private fitModel(model: THREE.Object3D, clips: THREE.AnimationClip[]): void {
@@ -257,11 +244,11 @@ export class DemogorgonTargetVisual {
     });
 
     this.mixer = new THREE.AnimationMixer(model);
-    const idleClip = findAnimationClip(clips, DEMOGORGON_ANIM_IDLE);
-    const hitClip = findAnimationClip(clips, DEMOGORGON_ANIM_HIT);
+    const idleClip = findGltfAnimationClip(clips, DEMOGORGON_ANIM_IDLE);
+    const hitClip = findGltfAnimationClip(clips, DEMOGORGON_ANIM_HIT);
     const victoryClip =
-      findAnimationClip(clips, DEMOGORGON_ANIM_VICTORY) ??
-      findAnimationClip(clips, DEMOGORGON_ANIM_VICTORY_FALLBACK);
+      findGltfAnimationClip(clips, DEMOGORGON_ANIM_VICTORY) ??
+      findGltfAnimationClip(clips, DEMOGORGON_ANIM_VICTORY_FALLBACK);
 
     if (idleClip) {
       this.idleAction = this.mixer.clipAction(idleClip);
@@ -283,8 +270,6 @@ export class DemogorgonTargetVisual {
         this.playIdle();
       }
     });
-
-    this.playIdle();
   }
 
   private playIdle(): void {

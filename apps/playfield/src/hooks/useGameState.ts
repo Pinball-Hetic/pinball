@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
   INITIAL_LIVES,
-  DEMOGORGON_TARGET_HITS,
+  BOSS_IDS,
+  getBossDefinition,
+  type BossId,
   BUMPER_POSITIONS,
-  DEMOGORGON_TARGET,
   PORTAL_UPSIDE_DOWN,
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
@@ -22,12 +23,14 @@ export type ScorePop = {
   tone: "bumper" | "target";
 };
 
-export type DemogorgonHud = {
+export type BossHudEntry = {
   active: boolean;
   hits: number;
   victory: boolean;
-  elevenFlash: boolean;
+  assistFlash: boolean;
 };
+
+export type BossHudState = Record<BossId, BossHudEntry>;
 
 export interface ScoringCallbacks {
   onScoreEvent?: (info: {
@@ -85,12 +88,15 @@ function generatePlayerName(): string {
   return `PLAYER${n}`;
 }
 
-const initialDemogorgonHud = (): DemogorgonHud => ({
+const initialBossHudEntry = (): BossHudEntry => ({
   active: false,
   hits: 0,
   victory: false,
-  elevenFlash: false,
+  assistFlash: false,
 });
+
+const initialBossHud = (): BossHudState =>
+  Object.fromEntries(BOSS_IDS.map((id) => [id, initialBossHudEntry()])) as BossHudState;
 
 export function useGameState(callbacks?: ScoringCallbacks) {
   // `callbacks` est un objet littéral recréé à chaque render → on le lit via
@@ -105,7 +111,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const [combo, setCombo] = useState(0);
   const [multiplier, setMultiplier] = useState(1);
   const [player, setPlayer] = useState<string>(() => generatePlayerName());
-  const [demogorgonHud, setDemogorgonHud] = useState<DemogorgonHud>(initialDemogorgonHud);
+  const [bossHud, setBossHud] = useState<BossHudState>(initialBossHud);
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
   const [upsideDownActive, setUpsideDownActive] = useState(false);
   const [upsideDownHint, setUpsideDownHint] = useState(false);
@@ -122,20 +128,18 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const multiplierRef = useRef(1);
   const lastEventTimeRef = useRef(0);
   const playerRef = useRef(player);
-  const victoryTimerRef = useRef<number | null>(null);
+  const victoryTimersRef = useRef<Partial<Record<BossId, number>>>({});
   const elevenTimerRef = useRef<number | null>(null);
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
   const upsideDownHintTimerRef = useRef<number | null>(null);
 
-  // Compteurs de stats de partie (reset dans resetGame, lus au game over)
   const maxComboRef = useRef(0);
   const maxMultiplierRef = useRef(1);
   const demogorgonsRef = useRef(0);
   const portalsRef = useRef(0);
   const gameStartRef = useRef(0);
 
-  // Sync ref to state when player change
   useEffect(() => {
     playerRef.current = player;
   }, [player]);
@@ -195,23 +199,31 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     setUpsideDownHint(false);
   }, []);
 
-  const clearUpsideDownSession = useCallback(() => {
-    clearUpsideDownHint();
-    callbacks?.onAtmosphereChange?.(false);
-    setUpsideDownActive(false);
-  }, [clearUpsideDownHint, callbacks]);
-
-  const clearDemogorgonHud = useCallback(() => {
-    if (victoryTimerRef.current !== null) {
-      window.clearTimeout(victoryTimerRef.current);
-      victoryTimerRef.current = null;
+  const clearBossHud = useCallback((id: BossId) => {
+    const timer = victoryTimersRef.current[id];
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      delete victoryTimersRef.current[id];
     }
-    if (elevenTimerRef.current !== null) {
+    if (id === "demogorgon" && elevenTimerRef.current !== null) {
       window.clearTimeout(elevenTimerRef.current);
       elevenTimerRef.current = null;
     }
-    setDemogorgonHud(initialDemogorgonHud());
+    setBossHud((prev) => ({ ...prev, [id]: initialBossHudEntry() }));
   }, []);
+
+  const clearAllBossHud = useCallback(() => {
+    for (const id of BOSS_IDS) {
+      clearBossHud(id);
+    }
+  }, [clearBossHud]);
+
+  const clearUpsideDownSession = useCallback(() => {
+    clearUpsideDownHint();
+    clearBossHud("vecna");
+    callbacks?.onAtmosphereChange?.(false);
+    setUpsideDownActive(false);
+  }, [clearUpsideDownHint, clearBossHud, callbacks]);
 
   const updateGameState = (state: GameState) => {
     gameStateRef.current = state;
@@ -280,7 +292,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     const newName = generatePlayerName();
     setPlayer(newName);
     playerRef.current = newName;
-    clearDemogorgonHud();
+    clearAllBossHud();
     clearScorePops();
     clearUpsideDownSession();
     updateGameState("idle");
@@ -335,9 +347,10 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           });
         }
       }
-      if (event.type === "DEMOGORGON_TARGET_HIT") {
+      if (event.type === "BOSS_TARGET_HIT") {
+        const def = getBossDefinition(event.bossId);
         const point = jitterScreenPoint(
-          playfieldToScreenPercent(DEMOGORGON_TARGET.x, DEMOGORGON_TARGET.z),
+          playfieldToScreenPercent(def.target.x, def.target.z),
           4,
         );
         pushScorePop({
@@ -346,41 +359,67 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           y: point.y,
           tone: "target",
         });
-        const victory = event.hitCount >= DEMOGORGON_TARGET_HITS;
+        const victory = event.hitCount >= def.targetHits;
+        // Counts ANY boss defeated (field GameStats.demogorgons = "boss vaincus").
         if (victory) demogorgonsRef.current += 1;
-        setDemogorgonHud((prev) => ({
+        setBossHud((prev) => ({
           ...prev,
-          active: true,
-          hits: event.hitCount,
-          victory,
-          elevenFlash: false,
+          [event.bossId]: {
+            ...prev[event.bossId],
+            active: true,
+            hits: event.hitCount,
+            victory,
+            assistFlash: false,
+          },
         }));
         if (victory) {
-          victoryTimerRef.current = window.setTimeout(() => {
-            victoryTimerRef.current = null;
-            setDemogorgonHud(initialDemogorgonHud());
-          }, 1400);
+          const existing = victoryTimersRef.current[event.bossId];
+          if (existing !== undefined) {
+            window.clearTimeout(existing);
+          }
+          victoryTimersRef.current[event.bossId] = window.setTimeout(() => {
+            delete victoryTimersRef.current[event.bossId];
+            setBossHud((prev) => ({
+              ...prev,
+              [event.bossId]: initialBossHudEntry(),
+            }));
+          }, def.hud.victoryClearMs);
         }
       }
-      if (event.type === "DEMOGORGON_REVEAL") {
-        if (victoryTimerRef.current !== null) {
-          window.clearTimeout(victoryTimerRef.current);
-          victoryTimerRef.current = null;
+      if (event.type === "BOSS_REVEAL") {
+        const existing = victoryTimersRef.current[event.bossId];
+        if (existing !== undefined) {
+          window.clearTimeout(existing);
+          delete victoryTimersRef.current[event.bossId];
         }
-        setDemogorgonHud({ active: true, hits: 0, victory: false, elevenFlash: false });
+        setBossHud((prev) => ({
+          ...prev,
+          [event.bossId]: {
+            active: true,
+            hits: 0,
+            victory: false,
+            assistFlash: false,
+          },
+        }));
       }
       if (event.type === "ELEVEN_ASSIST") {
-        setDemogorgonHud((prev) => ({
+        setBossHud((prev) => ({
           ...prev,
-          active: true,
-          elevenFlash: true,
+          demogorgon: {
+            ...prev.demogorgon,
+            active: true,
+            assistFlash: true,
+          },
         }));
         if (elevenTimerRef.current !== null) {
           window.clearTimeout(elevenTimerRef.current);
         }
         elevenTimerRef.current = window.setTimeout(() => {
           elevenTimerRef.current = null;
-          setDemogorgonHud((prev) => ({ ...prev, elevenFlash: false }));
+          setBossHud((prev) => ({
+            ...prev,
+            demogorgon: { ...prev.demogorgon, assistFlash: false },
+          }));
         }, 900);
       }
       if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
@@ -391,7 +430,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         clearScorePops();
         handleDrain(hideBall);
         if (livesRef.current <= 0) {
-          clearDemogorgonHud();
+          clearAllBossHud();
         }
       }
       if (event.type === "DROP_TARGET_COMPLETE") {
@@ -452,7 +491,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     comboRef,
     multiplierRef,
     playerRef,
-    demogorgonHud,
+    bossHud,
     scorePops,
     upsideDownActive,
     upsideDownHint,
