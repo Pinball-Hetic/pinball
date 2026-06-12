@@ -52,6 +52,8 @@ export interface MapContext {
   playSound(id: string): void;
   /** Ré-émet le snapshot score courant (DMD) — ex. reprise après fever. */
   refreshScoreSnapshot(): void;
+  /** Secousse d'écran (juice), amount ∈ ~[0..1]. */
+  screenShake(amount: number): void;
 
   /** Résout un objet de la scène par nom (applique meshAliases). */
   resolve(name: string): THREE.Object3D | null;

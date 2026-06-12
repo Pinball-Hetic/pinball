@@ -62,8 +62,6 @@ import {
   VecnaReveal,
   BossRevealOrchestrator,
   BossNestMarker,
-  BOSS_IDS,
-  getBossDefinition,
   type BossId,
   CinematicDirector,
   ScreenShake,
@@ -424,6 +422,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const mapPackageRef = useRef<ResolvedMap>(RESOLVED_MAP!);
   // Ref vers le module (accessible depuis les callbacks render-scope, ex. reset).
   const mapModuleRef = useRef<MapModule | null>(null);
+  // emit (défini dans l'effet) exposé aux callbacks useGameState render-scope.
+  const emitRef = useRef<GameEventListener | null>(null);
   const mapLayout = mapPackageRef.current.layout;
   const mapManifest = mapPackageRef.current.manifest;
   const playfieldUrl = `/${mapManifest.glb}`;
@@ -550,8 +550,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       resetPinballAudioForNewGame();
       mapModuleRef.current?.onGameReset();
       nestMarkerRef.current?.reset();
-      bossArmedAtRef.current = {};
-      bossLateHintFiredRef.current.clear();
       shooterLaneGateRef.current?.open();
       dmd.pushIntro(playerRef.current);
       dmd.emitScoreSnapshot({
@@ -568,34 +566,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       atmosphereUpsideRef.current = upsideDownActive;
       nestMarkerRef.current?.setUpsideDown(upsideDownActive);
     },
-    onMilestone: (threshold) => {
-      const clip: CinematicClip =
-        threshold === 5000
-          ? "milestone_5k"
-          : threshold === 15000
-            ? "milestone_15k"
-            : threshold === 30000
-              ? "milestone_30k"
-              : "milestone_big";
-      playCinematic(clip, { value: threshold });
-      garlandLightsRef.current?.celebrate();
-      screenShakeRef.current?.add(0.4); // shake du gel palier
-    },
-    onBossArmed: (bossId) => {
-      // Le nid s'éveille : marqueur armé + bandeau DMD + frisson garlands.
-      bossArmedAtRef.current[bossId] = performance.now();
-      const snap = {
-        player: playerRef.current,
-        score: scoreRef.current,
-        combo: comboRef.current,
-        multiplier: multiplierRef.current,
-        lives: livesRef.current,
-        mapState: buildMapState(),
-      };
-      dmd.pushEvent("LE NID S EVEILLE", 0, snap);
-      garlandLightsRef.current?.celebrate();
-      screenShakeRef.current?.add(0.3);
-    },
+    // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
+    // module de map (events MILESTONE / BOSS_ARMED).
+    onMilestone: (threshold) => emitRef.current?.({ type: "MILESTONE", threshold }),
+    onBossArmed: (bossId) => emitRef.current?.({ type: "BOSS_ARMED", bossId }),
     // hetic (lettres + complete + fever) géré par le module de map.
     onFeverEnd: () => {
       // Re-émet un snapshot fever:false pour que DMD/backglass retombent.
@@ -627,8 +601,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
   const garlandLightsRef = useRef<GarlandLights | null>(null);
   const nestMarkerRef = useRef<BossNestMarker | null>(null);
-  const bossArmedAtRef = useRef<Partial<Record<BossId, number>>>({});
-  const bossLateHintFiredRef = useRef<Set<BossId>>(new Set());
   const shooterLaneGateRef = useRef<ShooterLaneGate | null>(null);
   const screenShakeRef = useRef<ScreenShake | null>(null);
   if (!screenShakeRef.current) screenShakeRef.current = new ScreenShake();
@@ -1014,6 +986,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
               dmd.emitScoreSnapshot(snap);
               dmd.pushScore(snap);
             },
+            screenShake: (amount) => screenShakeRef.current?.add(amount),
             lighting: {
               renderer,
               ambient: ambientLight,
@@ -1366,6 +1339,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
           // État des marqueurs de nid : recalculé par le module de map.
         };
+        emitRef.current = emit; // expose aux callbacks useGameState (milestone/boss-armed)
         launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
         bumperHitUC = new BumperHit(ballPhysicsInst, emit);
         bumpHitUC = new BumpHit(ballPhysicsInst, emit);
@@ -1635,35 +1609,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       // bossReveals + nestMarker + upsideDownAtmosphere + upsideDownPortal :
       // update(dt) géré par mapModule.update.
 
-      // Hint tardif : nid armé > 45 s sans reveal → pulse amplifié + bandeau DMD
-      // unique par partie (« LE DEMOGORGON SOMMEILLE… »).
-      if (gameStateRef.current === "playing") {
-        const nowMs = performance.now();
-        for (const id of BOSS_IDS) {
-          const armedAt = bossArmedAtRef.current[id];
-          if (
-            armedAt === undefined
-            || bossLateHintFiredRef.current.has(id)
-            || !nestMarker?.isArmed(id)
-            || nowMs - armedAt < 45000
-          ) {
-            continue;
-          }
-          bossLateHintFiredRef.current.add(id);
-          nestMarker.setLateHint(id, true);
-          const hint = getBossDefinition(id).hud.nestHintLabel;
-          if (hint) {
-            dmd.pushEvent(hint, 0, {
-              player: playerRef.current,
-              score: scoreRef.current,
-              combo: comboRef.current,
-              multiplier: multiplierRef.current,
-              lives: livesRef.current,
-              mapState: buildMapState(),
-            });
-          }
-        }
-      }
+      // Hint tardif du nid : géré par le module de map (mapModule.update).
 
       cinematics.update(time);
       mapModule?.update(dt);

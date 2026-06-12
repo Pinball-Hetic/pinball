@@ -37,6 +37,9 @@ export function createModule(): StModule {
   let demogorgons = 0
   let portals = 0
   let hetic = 0
+  // Nid : armé depuis (ms) + hint tardif déjà émis, par boss.
+  const armedAt: Record<string, number> = {}
+  const hintFired = new Set<string>()
   let garlands: GarlandLights | null = null
   let bumperVisuals: BumperVisuals | null = null
   let atmosphere: UpsideDownAtmosphere | null = null
@@ -148,6 +151,27 @@ export function createModule(): StModule {
       if (e.type === 'BOSS_LOCKED_HIT') {
         nestMarker?.flashLocked(e.bossId)
         ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
+      }
+      // Palier de score : cinématique + frisson garlands + shake.
+      if (e.type === 'MILESTONE') {
+        const clip =
+          e.threshold === 5000
+            ? 'milestone_5k'
+            : e.threshold === 15000
+              ? 'milestone_15k'
+              : e.threshold === 30000
+                ? 'milestone_30k'
+                : 'milestone_big'
+        ctx.playCinematic(clip, { value: e.threshold })
+        garlands?.celebrate()
+        ctx.screenShake(0.4)
+      }
+      // Le nid s'éveille : bandeau DMD + celebrate + shake + horodatage hint.
+      if (e.type === 'BOSS_ARMED') {
+        armedAt[e.bossId] = performance.now()
+        ctx.pushDmdEvent('LE NID S EVEILLE', 0)
+        garlands?.celebrate()
+        ctx.screenShake(0.3)
       }
       // Cinématiques boss Demogorgon (reveal + victoire).
       if (e.type === 'BOSS_REVEAL' && e.bossId === 'demogorgon') {
@@ -278,6 +302,27 @@ export function createModule(): StModule {
       nestMarker?.update(dt)
       // transition.update reste piloté par PinballPlayfield (post-lecture
       // isActive, pour préserver l'ordre de décision du gel à 1 frame près).
+
+      // Hint tardif du nid : armé > 45 s sans reveal → bandeau DMD une fois.
+      const ctx = ctxRef
+      if (ctx && nestMarker) {
+        const now = performance.now()
+        for (const boss of ctx.layout.bosses) {
+          const at = armedAt[boss.id]
+          if (
+            at === undefined ||
+            hintFired.has(boss.id) ||
+            !nestMarker.isArmed(boss.id) ||
+            now - at < 45_000
+          ) {
+            continue
+          }
+          hintFired.add(boss.id)
+          nestMarker.setLateHint(boss.id, true)
+          const hint = boss.hud.nestHintLabel
+          if (hint) ctx.pushDmdEvent(hint, 0)
+        }
+      }
     },
     shouldFreezePhysics(): boolean {
       return transition?.isActive() ?? false
@@ -286,6 +331,8 @@ export function createModule(): StModule {
       demogorgons = 0
       portals = 0
       hetic = 0
+      for (const k of Object.keys(armedAt)) delete armedAt[k]
+      hintFired.clear()
       ctxRef?.setMapState({ demogorgons: 0, portals: 0, hetic: 0 })
     },
     dispose(): void {
