@@ -50,6 +50,8 @@ export interface MapContext {
   resetStuck(): void;
   /** Joue un son par identifiant (mappé côté app). */
   playSound(id: string): void;
+  /** Ré-émet le snapshot score courant (DMD) — ex. reprise après fever. */
+  refreshScoreSnapshot(): void;
 
   /** Résout un objet de la scène par nom (applique meshAliases). */
   resolve(name: string): THREE.Object3D | null;

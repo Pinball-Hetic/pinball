@@ -117,10 +117,8 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
   const [upsideDownActive, setUpsideDownActive] = useState(false);
   const [upsideDownHint, setUpsideDownHint] = useState(false);
-  const [hetic, setHetic] = useState(0);
   const [fever, setFever] = useState(false);
 
-  const heticRef = useRef(0);
   const milestonesPassedRef = useRef<Set<number>>(new Set());
   const upsideDownActiveRef = useRef(false);
   const normalWorldBaselineRef = useRef(0);
@@ -142,8 +140,6 @@ export function useGameState(callbacks?: ScoringCallbacks) {
 
   const maxComboRef = useRef(0);
   const maxMultiplierRef = useRef(1);
-  const demogorgonsRef = useRef(0);
-  const portalsRef = useRef(0);
   const gameStartRef = useRef(0);
 
   useEffect(() => {
@@ -265,12 +261,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       const stats: GameStats = {
         maxCombo: maxComboRef.current,
         maxMultiplier: maxMultiplierRef.current,
-        // Compteurs ST (clés spécifiques map). Une autre map en aurait d'autres.
-        counters: {
-          demogorgons: demogorgonsRef.current,
-          portals: portalsRef.current,
-          hetic: heticRef.current,
-        },
+        // Counters remplis par PinballPlayfield depuis le mapState (alimenté par
+        // le module de map). useGameState ne compte plus rien de ST.
+        counters: {},
         durationS: gameStartRef.current
           ? Math.round((performance.now() - gameStartRef.current) / 1000)
           : 0,
@@ -291,8 +284,6 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     multiplierRef.current = 1;
     setCombo(0);
     setMultiplier(1);
-    heticRef.current = 0;
-    setHetic(0);
     milestonesPassedRef.current.clear();
     bossArmedFiredRef.current.clear();
     upsideDownActiveRef.current = false;
@@ -303,8 +294,6 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     lastEventTimeRef.current = 0;
     maxComboRef.current = 0;
     maxMultiplierRef.current = 1;
-    demogorgonsRef.current = 0;
-    portalsRef.current = 0;
     gameStartRef.current = 0;
     const newName = generatePlayerName();
     setPlayer(newName);
@@ -395,8 +384,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           tone: "target",
         });
         const victory = event.hitCount >= def.targetHits;
-        // Counts ANY boss defeated (field GameStats.demogorgons = "boss vaincus").
-        if (victory) demogorgonsRef.current += 1;
+        // Compteur "boss vaincus" : tenu par le module de map (mapState).
         setBossHud((prev) => ({
           ...prev,
           [event.bossId]: {
@@ -468,26 +456,15 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           clearAllBossHud();
         }
       }
-      if (event.type === "DROP_TARGET_COMPLETE") {
-        heticRef.current += 1;
-        setHetic(heticRef.current);
-        if (heticRef.current < 5) {
-          callbacks?.onHeticLetter?.(heticRef.current); // 1..4
-        } else {
-          // complete émis AVANT le reset (snapshot montre encore 5/5), puis
-          // la boucle redevient collectable (re-jouable).
-          callbacks?.onHeticComplete?.();
-          heticRef.current = 0;
-          setHetic(0);
-        }
-      }
+      // DROP_TARGET_COMPLETE (compteur hetic + cinématiques) : géré par le
+      // module de map.
       if (event.type === "BALL_LAUNCHED") {
         if (gameStartRef.current === 0) gameStartRef.current = now;
         if (gameStateRef.current === "idle") callbacks?.onGameStart?.();
         updateGameState("playing");
       }
       if (event.type === "PORTAL_ENTER") {
-        portalsRef.current += 1;
+        // Compteur "portals" : tenu par le module de map (mapState).
         const point = jitterScreenPoint(
           playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
           3,
@@ -560,8 +537,6 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     scorePops,
     upsideDownActive,
     upsideDownHint,
-    hetic,
-    heticRef,
     fever,
     isFeverActive,
     startFever,

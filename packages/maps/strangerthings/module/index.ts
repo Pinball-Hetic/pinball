@@ -33,6 +33,10 @@ export interface StModule extends MapModule {
 
 export function createModule(): StModule {
   let ctxRef: MapContext | null = null
+  // Compteurs ST (alimentent mapState + GameStats.counters).
+  let demogorgons = 0
+  let portals = 0
+  let hetic = 0
   let garlands: GarlandLights | null = null
   let bumperVisuals: BumperVisuals | null = null
   let atmosphere: UpsideDownAtmosphere | null = null
@@ -165,59 +169,90 @@ export function createModule(): StModule {
         }
       }
 
+      // ── Compteurs ST (demogorgons / portals / hetic → mapState) ────────────
+      if (e.type === 'BOSS_TARGET_HIT') {
+        const boss = ctx.layout.bosses.find((b) => b.id === e.bossId)
+        if (boss && e.hitCount >= boss.targetHits) {
+          demogorgons += 1
+          ctx.setMapState({ demogorgons })
+        }
+      }
+      if (e.type === 'DROP_TARGET_COMPLETE') {
+        hetic += 1
+        if (hetic < 5) {
+          ctx.setMapState({ hetic })
+          ctx.playCinematic('hetic_letter', { value: hetic })
+        } else {
+          ctx.setMapState({ hetic: 5 })
+          ctx.playCinematic('hetic_complete', {
+            onEnd: () => {
+              // Fever 30s : multiplicateur forcé + reprise immédiate du SCORE.
+              ctx.forceMultiplier(5, 30_000)
+              ctx.refreshScoreSnapshot()
+            },
+          })
+          hetic = 0
+          ctx.setMapState({ hetic: 0 })
+        }
+      }
+
       // ── Cycle de monde : entrée Upside Down / retour monde normal ──────────
       if (e.type === 'PORTAL_ENTER') {
+        portals += 1
+        ctx.setMapState({ portals })
         const ball = ctx.ball
         const mesh = ctx.ballMesh
-        if (!ball || !mesh || !transition || transition.isActive()) return
-        ball.holdAtUpsideDownSpawn()
-        ball.syncToMesh(mesh)
-        transition.start(
-          {
-            ballMesh: mesh,
-            ballBody: ball.body,
-            onRevealStart: () => ctx.playSound('upside_down_appear'),
-            onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
-          },
-          () => {
-            ball.spawnFromUpsideDown()
-            ctx.resetPortalTrigger()
-            ctx.resetStuck()
-            ball.syncToMesh(mesh)
-            mesh.visible = true
-            mesh.scale.setScalar(1)
-            ctx.emitGameEvent({ type: 'PORTAL_TRANSITION_END' })
-          },
-        )
+        if (ball && mesh && transition && !transition.isActive()) {
+          ball.holdAtUpsideDownSpawn()
+          ball.syncToMesh(mesh)
+          transition.start(
+            {
+              ballMesh: mesh,
+              ballBody: ball.body,
+              onRevealStart: () => ctx.playSound('upside_down_appear'),
+              onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
+            },
+            () => {
+              ball.spawnFromUpsideDown()
+              ctx.resetPortalTrigger()
+              ctx.resetStuck()
+              ball.syncToMesh(mesh)
+              mesh.visible = true
+              mesh.scale.setScalar(1)
+              ctx.emitGameEvent({ type: 'PORTAL_TRANSITION_END' })
+            },
+          )
+        }
       }
       if (e.type === 'RETURN_PORTAL_ENTER') {
         const ball = ctx.ball
         const mesh = ctx.ballMesh
-        if (!ball || !mesh || !transition || transition.isActive()) return
-        ball.holdAtNormalReturnSpawn()
-        ball.syncToMesh(mesh)
-        transition.start(
-          {
-            ballMesh: mesh,
-            ballBody: ball.body,
-            onRevealStart: () => ctx.playSound('upside_down_appear'),
-            onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
-          },
-          () => {
-            ball.spawnFromNormalReturn()
-            portal?.reset()
-            portal?.setUpsideDownActive(false)
-            atmosphere?.reset()
-            ctx.completeWorldCycle()
-            bossReveals?.endAllFights()
-            ctx.resetStuck()
-            ball.syncToMesh(mesh)
-            mesh.visible = true
-            mesh.scale.setScalar(1)
-            ctx.emitGameEvent({ type: 'WORLD_CYCLE_COMPLETE' })
-            ctx.emitGameEvent({ type: 'RETURN_PORTAL_TRANSITION_END' })
-          },
-        )
+        if (ball && mesh && transition && !transition.isActive()) {
+          ball.holdAtNormalReturnSpawn()
+          ball.syncToMesh(mesh)
+          transition.start(
+            {
+              ballMesh: mesh,
+              ballBody: ball.body,
+              onRevealStart: () => ctx.playSound('upside_down_appear'),
+              onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
+            },
+            () => {
+              ball.spawnFromNormalReturn()
+              portal?.reset()
+              portal?.setUpsideDownActive(false)
+              atmosphere?.reset()
+              ctx.completeWorldCycle()
+              bossReveals?.endAllFights()
+              ctx.resetStuck()
+              ball.syncToMesh(mesh)
+              mesh.visible = true
+              mesh.scale.setScalar(1)
+              ctx.emitGameEvent({ type: 'WORLD_CYCLE_COMPLETE' })
+              ctx.emitGameEvent({ type: 'RETURN_PORTAL_TRANSITION_END' })
+            },
+          )
+        }
       }
 
       // Reconciliation des marqueurs de nid après chaque event : déclenché →
@@ -247,7 +282,12 @@ export function createModule(): StModule {
     shouldFreezePhysics(): boolean {
       return transition?.isActive() ?? false
     },
-    onGameReset(): void {},
+    onGameReset(): void {
+      demogorgons = 0
+      portals = 0
+      hetic = 0
+      ctxRef?.setMapState({ demogorgons: 0, portals: 0, hetic: 0 })
+    },
     dispose(): void {
       bumperVisuals?.dispose()
       garlands?.dispose()

@@ -411,6 +411,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   // Résolution de la map (une fois). null → throw explicite pour l'instant ;
   // le fallback NO SIGNAL plein écran arrivera en phase 5.
   const mapPackageRef = useRef<ResolvedMap | null>(null);
+  // Ref vers le module (accessible depuis les callbacks render-scope, ex. reset).
+  const mapModuleRef = useRef<MapModule | null>(null);
   if (!mapPackageRef.current) {
     const resolved = getMapPackage(MAP_ID);
     if (!resolved) throw new Error(`Map introuvable: ${MAP_ID}`);
@@ -465,7 +467,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     comboRef,
     multiplierRef,
     playerRef,
-    heticRef,
     isFeverActive,
     startFever,
     clearUpsideDownSession,
@@ -512,9 +513,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (livesRemaining === 1) playCinematic('last_chance');
     },
     onGameOver: (finalScore, stats) => {
+      // Counters spécifiques map : récupérés du mapState (alimenté par le
+      // module). useGameState ne compte plus rien de ST.
+      const counters: Record<string, number> = {};
+      for (const [k, v] of Object.entries(mapStateExtraRef.current)) {
+        if (typeof v === "number") counters[k] = v;
+      }
       // Pas d'affichage GAME_OVER sur le DMD : on garde le dernier SCORE
       // jusqu'au reset (INTRO). emitGameOver sert au backglass/leaderboard.
-      dmd.emitGameOver(playerRef.current, finalScore, MAP_ID, stats);
+      dmd.emitGameOver(playerRef.current, finalScore, MAP_ID, { ...stats, counters });
       // Clip poussé à CHAQUE game over ; DMD/backglass décident de
       // l'ampleur (le backglass connaît le rang → fanfare ou recap).
       dmd.pushCinematic('hall_of_fame');
@@ -535,6 +542,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     onIdleReset: () => {
       cinematics.resetGame();
       resetPinballAudioForNewGame();
+      mapModuleRef.current?.onGameReset();
       nestMarkerRef.current?.reset();
       bossArmedAtRef.current = {};
       bossLateHintFiredRef.current.clear();
@@ -582,27 +590,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       garlandLightsRef.current?.celebrate();
       screenShakeRef.current?.add(0.3);
     },
-    onHeticLetter: (n) => playCinematic("hetic_letter", { value: n }),
-    onHeticComplete: () => {
-      // FEVER démarre quand le GEL du clip se termine (onEnd du director).
-      // On émet aussitôt un snapshot fever pour rendre la main au mode SCORE
-      // (bandeau + score live) sans attendre le premier hit du joueur.
-      playCinematic("hetic_complete", {
-        onEnd: () => {
-          startFever(30_000);
-          const snap = {
-            player: playerRef.current,
-            score: scoreRef.current,
-            combo: comboRef.current,
-            multiplier: multiplierRef.current,
-            lives: livesRef.current,
-            mapState: buildMapState(true),
-          };
-          dmd.emitScoreSnapshot(snap);
-          dmd.pushScore(snap);
-        },
-      });
-    },
+    // hetic (lettres + complete + fever) géré par le module de map.
     onFeverEnd: () => {
       // Re-émet un snapshot fever:false pour que DMD/backglass retombent.
       const snap = {
@@ -624,9 +612,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   const mapStateExtraRef = useRef<Record<string, number | boolean>>({});
 
   // Construction unique du mapState injecté dans chaque snapshot DMD/score.
+  // hetic/demogorgons/portals viennent du module de map (mapStateExtraRef) ;
+  // fever reste piloté par useGameState (mécanisme multiplicateur).
   const buildMapState = (fever: boolean = isFeverActive()) => ({
     ...mapStateExtraRef.current,
-    hetic: heticRef.current,
     fever,
   });
 
@@ -774,6 +763,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let bottomOutBallUC: BottomOutBall | null = null;
     let collisionProcessor: CollisionEventProcessor | null = null;
     const mapModule: MapModule | null = mapPackageRef.current?.module?.() ?? null;
+    mapModuleRef.current = mapModule;
     // Hoisté : le MapContext (construit tôt) le référence via closures, mais il
     // n'est assigné qu'une fois le pipeline d'events prêt (plus bas).
     let emit: GameEventListener;
@@ -1005,6 +995,18 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             resetStuck: () => stuckDetector.reset(),
             playSound: (id) => {
               if (id === "upside_down_appear") playUpsideDownAppearSound();
+            },
+            refreshScoreSnapshot: () => {
+              const snap = {
+                player: playerRef.current,
+                score: scoreRef.current,
+                combo: comboRef.current,
+                multiplier: multiplierRef.current,
+                lives: livesRef.current,
+                mapState: buildMapState(),
+              };
+              dmd.emitScoreSnapshot(snap);
+              dmd.pushScore(snap);
             },
             lighting: {
               renderer,
