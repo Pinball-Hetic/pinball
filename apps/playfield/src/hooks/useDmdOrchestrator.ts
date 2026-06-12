@@ -10,7 +10,10 @@ import type {
 } from '@pinball/shared-types';
 import { clipShowMs, clipTakeoverMs } from '@pinball/shared-types';
 import type { GameEvent } from '@pinball/game-engine';
-import { getBossDefinition } from '@/map/activeMapBosses';
+import { getBossDefinition, ACTIVE_BOSSES } from '@/map/activeMapBosses';
+
+// Libellé d'assist fourni par la map (boss portant un hud.assistLabel).
+const ASSIST_LABEL = ACTIVE_BOSSES.find((b) => b.hud.assistLabel)?.hud.assistLabel ?? 'ASSIST';
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -86,8 +89,7 @@ function eventLabel(event: GameEvent): string | null {
     case 'WORLD_CYCLE_COMPLETE': return 'CYCLE COMPLET';
     case 'RAMP_HIT': return 'RAMP';
     case 'DROP_TARGET_COMPLETE': return `DROP ${event.side.toUpperCase()}`;
-    // TODO phase 5 : libellé fourni par le contenu DMD de la map (eventLabels).
-    case 'ASSIST': return 'ELEVEN +' + 100;
+    case 'ASSIST': return ASSIST_LABEL.toUpperCase();
     default: return null; // bumpers/slingshots/zones → pas de highlight, juste score
   }
 }
