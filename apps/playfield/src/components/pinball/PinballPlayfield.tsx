@@ -1362,7 +1362,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
         // upsideDownAtmosphere créé/possédé par le module de map (récupéré
         // plus haut via le bridge). On garde ici le binding vecna + les resets.
-        vecnaReveal?.bindUpsideDownAtmosphere(upsideDownAtmosphere);
+        // vecnaReveal.bindUpsideDownAtmosphere fait par le module (setup).
 
         // onPortalEnter / onReturnPortalEnter (bascule de monde) gérés par le
         // module de map (mapModule.onGameEvent sur PORTAL_ENTER/RETURN_PORTAL_ENTER).

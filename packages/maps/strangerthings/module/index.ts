@@ -137,6 +137,7 @@ export function createModule(): StModule {
       })
       bossReveals = new BossRevealOrchestrator()
       bossReveals.register(demogorgonReveal).register(vecnaReveal)
+      vecnaReveal.bindUpsideDownAtmosphere(atmosphere)
     },
     onGameEvent(e: GameEvent): void {
       bumperVisuals?.onGameEvent(e)
