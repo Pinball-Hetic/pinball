@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { GameEvent } from '../domain/GameEvents';
+import type { GameEvent } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY,
   UPSIDE_DOWN_ATMOSPHERE_BG,
@@ -24,11 +24,11 @@ import {
   UPSIDE_DOWN_ATMOSPHERE_SURFACE_TINT,
   UPSIDE_DOWN_ATMOSPHERE_TINT,
   UPSIDE_DOWN_ATMOSPHERE_WALL_TINT,
-} from '../domain/UpsideDownConstants';
+} from '@pinball/game-engine';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
-import { PlayfieldShadeOverlay } from './PlayfieldShadeOverlay';
-import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from './GltfNodeNames';
+import { PlayfieldShadeOverlay } from '@pinball/game-engine';
+import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from '@pinball/game-engine';
 
 type MaterialKind = 'surface' | 'wall' | 'decor' | 'default';
 

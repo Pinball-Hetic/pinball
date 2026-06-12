@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DEMOGORGON_TARGET } from '../domain/Ball';
+import { DEMOGORGON_TARGET } from '@pinball/game-engine';
 import {
   DEMOGORGON_ANIM_HIT,
   DEMOGORGON_ANIM_IDLE,
@@ -11,15 +11,15 @@ import {
   DEMOGORGON_MODEL_URL,
   DEMOGORGON_MODEL_FOOT_LIFT,
   DEMOGORGON_MODEL_YAW,
-} from '../domain/DemogorgonConstants';
-import { PLAYFIELD_TILT, surfaceYAtZ } from '../domain/PlayfieldGeometry';
-import { findGltfAnimationClip } from './GltfAnimationClips';
-import { createGltfLoader } from './GltfDisplay';
+} from './DemogorgonConstants';
+import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
+import { findGltfAnimationClip } from '@pinball/game-engine';
+import { createGltfLoader } from '@pinball/game-engine';
 import {
   applySkinnedModelFit,
   fitSkinnedModelWithRetry,
-} from './SkinnedModelFit';
-import { warmupObject3D } from './SkinnedModelWarmup';
+} from '@pinball/game-engine';
+import { warmupObject3D } from '@pinball/game-engine';
 
 type AnimState = 'idle' | 'hit' | 'victory';
 

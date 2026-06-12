@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { GameEvent } from '../domain/GameEvents';
-import { normalizeGltfName } from './GltfNodeNames';
+import type { GameEvent } from '@pinball/game-engine';
+import { normalizeGltfName } from '@pinball/game-engine';
 
 const GARLAND_NAME = /^guirlande-\d+$/;
 

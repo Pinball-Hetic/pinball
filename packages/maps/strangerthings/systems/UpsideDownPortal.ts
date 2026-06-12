@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import type { GameEvent } from '../domain/GameEvents';
-import { getBossDefinition } from '../domain/BossRegistry';
+import type { GameEvent } from '@pinball/game-engine';
+import { getBossDefinition } from '@pinball/game-engine';
 import {
   PORTAL_COVER_RADIUS,
   PORTAL_HOLE_RADIUS,
@@ -9,16 +9,16 @@ import {
   PORTAL_MAGNET_STRENGTH,
   PORTAL_SENSOR_RADIUS,
   PORTAL_UPSIDE_DOWN,
-} from '../domain/Ball';
-import { PLAYFIELD_TILT } from '../domain/PlayfieldGeometry';
+} from '@pinball/game-engine';
+import { PLAYFIELD_TILT } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
-} from '../domain/UpsideDownConstants';
-import { findObjectByNormalizedName } from './GltfNodeNames';
-import { GlowSprite } from './GlowSprite';
+} from '@pinball/game-engine';
+import { findObjectByNormalizedName } from '@pinball/game-engine';
+import { GlowSprite } from '@pinball/game-engine';
 
 type SetupConfig = {
   root: THREE.Object3D;

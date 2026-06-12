@@ -1,19 +1,19 @@
 import * as THREE from 'three';
-import type { GameEvent, GameEventListener } from '../domain/GameEvents';
-import { getBossDefinition } from '../domain/BossRegistry';
+import type { GameEvent, GameEventListener } from '@pinball/game-engine';
+import { getBossDefinition } from '@pinball/game-engine';
 import {
   DEMOGORGON_SENSOR,
   DEMOGORGON_TARGET,
   ELEVEN_ASSIST_SCORE,
   ELEVEN_ASSIST_INTERVAL,
-} from '../domain/Ball';
-import { PLAYFIELD_TILT } from '../domain/PlayfieldGeometry';
-import { easeIn, easeOut, strobeOn } from './CinematicEasing';
-import { CameraBillboardSprite } from './CameraBillboardSprite';
+} from '@pinball/game-engine';
+import { PLAYFIELD_TILT } from '@pinball/game-engine';
+import { easeIn, easeOut, strobeOn } from '@pinball/game-engine';
+import { CameraBillboardSprite } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
-import { createBossTargetMesh } from './BossTargetMesh';
-import { BossTargetPulse } from './BossTargetPulse';
+import { createBossTargetMesh } from '@pinball/game-engine';
+import { BossTargetPulse } from '@pinball/game-engine';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { DemogorgonTargetVisual } from './DemogorgonTargetVisual';
 import type { BossRevealController } from './BossRevealController';

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
-import { PlayfieldShadeOverlay, playfieldShadeStrobeOpacity } from './PlayfieldShadeOverlay';
+import { PlayfieldShadeOverlay, playfieldShadeStrobeOpacity } from '@pinball/game-engine';
 
 export type PlayfieldCinematicStrobeConfig = {
   shadeColor?: number;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BOSS_IDS, getBossDefinition, type BossId } from '../domain/BossRegistry';
+import { BOSS_IDS, getBossDefinition, type BossId } from '@pinball/game-engine';
 
 export type NestMarkerState = 'locked' | 'armed' | 'revealed';
 

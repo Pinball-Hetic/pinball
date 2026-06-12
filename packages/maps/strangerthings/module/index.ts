@@ -8,8 +8,8 @@ import {
   DemogorgonReveal,
   VecnaReveal,
   BossRevealOrchestrator,
-  bossThresholdMet,
-} from '@pinball/game-engine'
+} from '../systems'
+import { bossThresholdMet } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 
 // Module de comportement Stranger Things. Extraction progressive (phase 4.3),

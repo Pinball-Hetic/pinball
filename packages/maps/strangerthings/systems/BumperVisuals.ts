@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import type { GameEvent } from '../domain/GameEvents';
-import { BUMPER_POSITIONS } from '../domain/Ball';
-import { normalizeGltfName } from './GltfNodeNames';
-import { GlowSprite } from './GlowSprite';
+import type { GameEvent } from '@pinball/game-engine';
+import { BUMPER_POSITIONS } from '@pinball/game-engine';
+import { normalizeGltfName } from '@pinball/game-engine';
+import { GlowSprite } from '@pinball/game-engine';
 
 const LEGACY_BUMPER = /^bumper-st-\d+$/;
 const GLTF_BUMPER = /^bumper-\d+$/;

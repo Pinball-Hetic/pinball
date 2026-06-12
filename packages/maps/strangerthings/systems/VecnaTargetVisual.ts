@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { VECNA_TARGET } from '../domain/Ball';
+import { VECNA_TARGET } from '@pinball/game-engine';
 import {
   VECNA_ANIM_WALK,
   VECNA_MODEL_BIND_HEIGHT,
@@ -13,16 +13,16 @@ import {
   VECNA_WALK_DURATION,
   VECNA_WALK_FADE_OUT,
   VECNA_WALK_SETTLE_FACING,
-} from '../domain/VecnaConstants';
-import { PLAYFIELD_TILT, surfaceYAtZ } from '../domain/PlayfieldGeometry';
-import { easeOut } from './CinematicEasing';
-import { findGltfAnimationClip } from './GltfAnimationClips';
-import { createGltfLoader } from './GltfDisplay';
+} from './VecnaConstants';
+import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
+import { easeOut } from '@pinball/game-engine';
+import { findGltfAnimationClip } from '@pinball/game-engine';
+import { createGltfLoader } from '@pinball/game-engine';
 import {
   applySkinnedModelFit,
   fitSkinnedModelWithRetry,
   updateSkinnedBindPose,
-} from './SkinnedModelFit';
+} from '@pinball/game-engine';
 
 // Scratch vector reused every frame in cameraFacingY() to avoid per-frame
 // allocation during the fight/settle phases (mirrors DemogorgonTargetVisual).

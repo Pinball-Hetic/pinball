@@ -1,6 +1,6 @@
 import type * as THREE from 'three';
-import type { BossId } from '../domain/BossRegistry';
-import type { GameEvent } from '../domain/GameEvents';
+import type { BossId } from '@pinball/game-engine';
+import type { GameEvent } from '@pinball/game-engine';
 
 export interface BossRevealController {
   readonly bossId: BossId;

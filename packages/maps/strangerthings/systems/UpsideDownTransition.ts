@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { PORTAL_UPSIDE_DOWN } from '../domain/Ball';
+import { PORTAL_UPSIDE_DOWN } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_TRANSITION_BLACKOUT,
   UPSIDE_DOWN_TRANSITION_HOLD,
@@ -8,9 +8,9 @@ import {
   UPSIDE_DOWN_TRANSITION_REVEAL,
   UPSIDE_DOWN_TRANSITION_STROBE_HZ,
   UPSIDE_DOWN_TRANSITION_TREMOR,
-} from '../domain/UpsideDownConstants';
-import { easeIn, easeOut, strobeOn } from './CinematicEasing';
-import { CameraBillboardSprite } from './CameraBillboardSprite';
+} from '@pinball/game-engine';
+import { easeIn, easeOut, strobeOn } from '@pinball/game-engine';
+import { CameraBillboardSprite } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
