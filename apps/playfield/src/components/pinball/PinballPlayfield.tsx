@@ -1988,7 +1988,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
               : "h-screen w-full touch-none outline-none focus:outline-none"
           }
           tabIndex={0}
-          aria-label="Terrain de flipper — Q/D ou ← → pour les flippers, maintenir ESPACE et relâcher pour lancer"
+          aria-label="Terrain de flipper - Q/D ou fleches gauche/droite pour les flippers, maintenir ESPACE et relacher pour lancer"
         />
       </div>
     </div>
