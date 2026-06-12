@@ -54,3 +54,4 @@ export * from './infrastructure/PlayfieldShadeOverlay';
 export * from './infrastructure/UpsideDownPortal';
 export * from './infrastructure/UpsideDownTransition';
 export * from './infrastructure/UpsideDownAtmosphere';
+export * from './infrastructure/ShooterLaneGate';

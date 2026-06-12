@@ -19,6 +19,7 @@ import {
   applySkinnedModelFit,
   fitSkinnedModelWithRetry,
 } from './SkinnedModelFit';
+import { warmupObject3D } from './SkinnedModelWarmup';
 
 type AnimState = 'idle' | 'hit' | 'victory';
 
@@ -72,7 +73,20 @@ export class DemogorgonTargetVisual {
 
   async warmup(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
     if (!this.anchor) return;
-    await renderer.compileAsync(this.anchor, camera, scene);
+    await this.ensureReady();
+    await fitSkinnedModelWithRetry(
+      () => this.applyFit(),
+      DEMOGORGON_MODEL_FIT_FRAMES,
+      () => this.anchor !== null,
+    );
+    this.syncFacing();
+    const primeActions = [this.idleAction, this.hitAction, this.victoryAction].filter(
+      (action): action is THREE.AnimationAction => action !== null,
+    );
+    await warmupObject3D(renderer, scene, camera, this.anchor, {
+      mixer: this.mixer,
+      primeActions,
+    });
   }
 
   show(): void {
