@@ -1037,7 +1037,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           bumperVisuals,
         });
 
-        ballPhysicsInst = new BallPhysics(world);
+        ballPhysicsInst = new BallPhysics(world, mapLayout);
 
         // ── Flipper : corps cinématique + convex hull ─────────────────────────
         const makeFlipperBody = (

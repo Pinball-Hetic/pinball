@@ -6,14 +6,10 @@ import {
   BALL_FRICTION,
   BALL_LINEAR_DAMPING,
   BALL_ANGULAR_DAMPING,
-  BALL_SPAWN_POSITION,
   BUMPER_EJECT_IMPULSE,
-  UPSIDE_DOWN_SPAWN,
-  UPSIDE_DOWN_SPAWN_IMPULSE,
-  NORMAL_WORLD_RETURN_SPAWN,
-  NORMAL_WORLD_RETURN_IMPULSE,
   PLUNGER_IMPULSE_Z,
 } from '../domain/Ball';
+import type { MapLayout } from '../domain/MapLayout';
 import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
 import type { IBallPhysics } from '../use-cases/LaunchBall';
 import type { IBumperEject } from '../use-cases/BumperHit';
@@ -22,13 +18,20 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
   public readonly body: RAPIER.RigidBody;
   public readonly collider: RAPIER.Collider;
 
-  private spawnX: number = BALL_SPAWN_POSITION.x;
-  private spawnY: number = BALL_SPAWN_POSITION.y;
-  private spawnZ: number = BALL_SPAWN_POSITION.z;
+  private readonly spawns: MapLayout['spawns'];
+  private spawnX: number;
+  private spawnY: number;
+  private spawnZ: number;
 
-  constructor(world: RAPIER.World) {
+  constructor(world: RAPIER.World, layout: MapLayout) {
+    this.spawns = layout.spawns;
+    const ball = layout.spawns.ball;
+    this.spawnX = ball.x;
+    this.spawnY = ball.y;
+    this.spawnZ = ball.z;
+
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-      .setTranslation(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, BALL_SPAWN_POSITION.z)
+      .setTranslation(ball.x, ball.y, ball.z)
       .setLinearDamping(BALL_LINEAR_DAMPING)
       .setAngularDamping(BALL_ANGULAR_DAMPING)
       .setCcdEnabled(true);
@@ -72,11 +75,9 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
   }
 
   holdAtUpsideDownSpawn(): void {
-    const y = ballCenterOnSurface(UPSIDE_DOWN_SPAWN.z) + 0.004;
-    this.body.setTranslation(
-      { x: UPSIDE_DOWN_SPAWN.x, y, z: UPSIDE_DOWN_SPAWN.z },
-      true,
-    );
+    const s = this.spawns.upsideDown;
+    const y = ballCenterOnSurface(s.z) + 0.004;
+    this.body.setTranslation({ x: s.x, y, z: s.z }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.wakeUp();
@@ -84,22 +85,14 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
 
   spawnFromUpsideDown(): void {
     this.holdAtUpsideDownSpawn();
-    this.body.applyImpulse(
-      {
-        x: UPSIDE_DOWN_SPAWN_IMPULSE.x,
-        y: UPSIDE_DOWN_SPAWN_IMPULSE.y,
-        z: UPSIDE_DOWN_SPAWN_IMPULSE.z,
-      },
-      true,
-    );
+    const i = this.spawns.upsideDownImpulse;
+    this.body.applyImpulse({ x: i.x, y: i.y, z: i.z }, true);
   }
 
   holdAtNormalReturnSpawn(): void {
-    const y = ballCenterOnSurface(NORMAL_WORLD_RETURN_SPAWN.z) + 0.004;
-    this.body.setTranslation(
-      { x: NORMAL_WORLD_RETURN_SPAWN.x, y, z: NORMAL_WORLD_RETURN_SPAWN.z },
-      true,
-    );
+    const s = this.spawns.normalReturn;
+    const y = ballCenterOnSurface(s.z) + 0.004;
+    this.body.setTranslation({ x: s.x, y, z: s.z }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.wakeUp();
@@ -107,14 +100,8 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
 
   spawnFromNormalReturn(): void {
     this.holdAtNormalReturnSpawn();
-    this.body.applyImpulse(
-      {
-        x: NORMAL_WORLD_RETURN_IMPULSE.x,
-        y: NORMAL_WORLD_RETURN_IMPULSE.y,
-        z: NORMAL_WORLD_RETURN_IMPULSE.z,
-      },
-      true,
-    );
+    const i = this.spawns.normalReturnImpulse;
+    this.body.applyImpulse({ x: i.x, y: i.y, z: i.z }, true);
   }
 
   applyEjectionForce(bumperPos: { x: number; z: number }): void {
