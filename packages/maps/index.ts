@@ -1,6 +1,10 @@
 import type { MapLayout, MapModule } from '@pinball/game-engine'
 import type { MapPackage } from '@pinball/shared-types'
-import { mapPackage as stPackage, layout as stLayout } from '@pinball/map-strangerthings'
+import {
+  mapPackage as stPackage,
+  layout as stLayout,
+  createModule as stCreateModule,
+} from '@pinball/map-strangerthings'
 
 // Le layout + le module (types game-engine) ne peuvent pas vivre sur
 // MapPackage (shared-types ne dépend pas de game-engine). Le registry — qui,
@@ -16,7 +20,7 @@ export interface ResolvedMap extends MapPackage {
 export function getMapPackage(id: string): ResolvedMap | null {
   switch (id) {
     case 'strangerthings':
-      return { ...stPackage, layout: stLayout }
+      return { ...stPackage, layout: stLayout, module: stCreateModule }
     default:
       return null
   }

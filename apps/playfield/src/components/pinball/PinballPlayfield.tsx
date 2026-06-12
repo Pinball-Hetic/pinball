@@ -1377,6 +1377,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         if (mapModule) {
           const mapCtx: MapContext = {
             scene,
+            root: playfieldRoot,
+            camera,
             physics: physicsWorld!,
             layout: mapLayout,
             manifest: mapManifest,

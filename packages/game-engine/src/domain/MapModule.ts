@@ -10,6 +10,9 @@ import type { PhysicsWorld } from '../infrastructure/PhysicsWorld';
 // ne touche directement aux refs React ni au rendu bas niveau.
 export interface MapContext {
   scene: THREE.Scene;
+  /** Racine du GLB chargé (sous laquelle vivent les meshes de la map). */
+  root: THREE.Object3D;
+  camera: THREE.Camera;
   physics: PhysicsWorld;
   layout: MapLayout;
   manifest: MapManifest;
