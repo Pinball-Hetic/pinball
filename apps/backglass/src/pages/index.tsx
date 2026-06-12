@@ -3,7 +3,7 @@ import { NoSignal } from '@pinball/ui'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
-import { JoyceWall, SideArt, DemogorgonTakeover } from '@pinball/map-strangerthings/backglass'
+import { JoyceWall, SideArt } from '@pinball/map-strangerthings/backglass'
 import HallOfFame from '@/components/HallOfFame'
 import StatsBanner from '@/components/StatsBanner'
 import ReactorFx from '@/components/ReactorFx'
@@ -97,7 +97,13 @@ export default function BackglassPage() {
             {takeover.scene === 'RECAP' && takeover.payload && (
               <RecapTakeover payload={takeover.payload} />
             )}
-            {takeover.scene === 'DEMOGORGON' && <DemogorgonTakeover />}
+            {takeover.scene === 'MAP_EVENT' && takeover.clip && (
+              <CinematicTakeover
+                clip={takeover.clip}
+                payload={takeover.payload}
+                entries={entries}
+              />
+            )}
             {takeover.scene === 'ATTRACT' && (
               <AttractScene entries={entries} />
             )}

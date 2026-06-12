@@ -5,23 +5,23 @@ import type {
   ClientToServerEvents,
   LeaderboardEntry,
   GameOver,
-  CinematicClip,
 } from '@pinball/shared-types'
 import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
+import { clipBehavior, eventTakeovers } from '@pinball/map-strangerthings/backglass'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
 export type TakeoverScene =
   | 'HIGH_SCORE'
   | 'RECAP'
-  | 'DEMOGORGON'
+  | 'MAP_EVENT'
   | 'ATTRACT'
   | 'CINEMATIC'
 
 export interface Takeover {
   scene: TakeoverScene
   payload?: GameOver & { rank: number }
-  clip?: CinematicClip
+  clip?: string
 }
 
 // Chaînage : la scène suivante n'est poussée qu'à l'expiration de la
@@ -39,7 +39,7 @@ interface StackEntry {
   priority: number
   expiresAt: number
   payload?: GameOver & { rank: number }
-  clip?: CinematicClip
+  clip?: string
   followUp?: FollowUp
 }
 
@@ -67,7 +67,6 @@ const ATTRACT_IDLE_MS = 60_000
 const JOYCE_IDLE_MS = 90_000
 const HIGH_SCORE_MS = 5_000
 const RECAP_MS = 8_000
-const DEMOGORGON_MS = 3_000
 const HIGHLIGHT_MS = 4_000
 const AGITATION_MS = 1_500
 
@@ -178,59 +177,42 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         if (d.clip == null) return
         markActivity()
         const now = performance.now()
+        const clip = d.clip
+        const isHall = clip === 'hall_of_fame'
         const pushTk = (durationMs: number) =>
           stackRef.current.push({
             scene: 'CINEMATIC',
             priority: 110,
             expiresAt: now + durationMs,
-            clip: d.clip,
-            payload:
-              d.clip === 'hall_of_fame' ? lastGameOverRef.current ?? undefined : undefined,
+            clip,
+            // hall_of_fame n'a pas de stats via dmd:display : on rebranche le
+            // dernier game:over complet (HighScore/Recap).
+            payload: isHall ? lastGameOverRef.current ?? undefined : undefined,
           })
-        switch (d.clip) {
-          case 'milestone_5k':
-            goldWaveRef.current += 1 // onde dorée, pas de takeover
-            break
-          case 'milestone_15k':
-            goldWaveRef.current += 1
-            pushJoyce('BIEN')
-            break
-          case 'hetic_letter':
-            pushJoyce('HETIC'[(d.value ?? 1) - 1] ?? 'H')
-            break
-          case 'milestone_30k':
-            pushTk(4_000)
-            break
-          case 'milestone_big':
-            pushTk(6_000)
-            break
-          case 'hetic_complete':
-            pushTk(8_000) // +30s de fever pilotées par display.fever
-            // Le fever démarre dès le clip : pendant les 8s de CINEMATIC
-            // aucun display SCORE (porteur de fever) n'arrive, donc on
-            // l'active ici pour que la bordure/heat-lock ne soit pas en retard.
-            feverRef.current = true
-            break
-          default:
-            // demogorgon_rises/slain, portal_swallow, last_chance,
-            // hall_of_fame + tout clip inconnu (scène générique via
-            // CinematicTakeover, durée SHOW gardée par clipShowMs).
-            pushTk(clipShowMs(d.clip))
-            if (d.clip === 'demogorgon_rises') pushJoyce('RUN')
-            if (d.clip === 'last_chance') pushJoyce('DERNIERE VIE')
-        }
+        // Dispatch data-driven fourni par la map (joyce/onde/fever/takeover).
+        // hall_of_fame + clips inconnus : takeover générique via clipShowMs.
+        const b = clipBehavior[clip]
+        if (b?.goldWave) goldWaveRef.current += 1
+        // fever démarre dès le clip : pendant le CINEMATIC aucun display SCORE
+        // (porteur de fever) n'arrive, on l'active donc ici sans retard.
+        if (b?.fever) feverRef.current = true
+        if (b?.joyce) pushJoyce(typeof b.joyce === 'function' ? b.joyce(d.value) : b.joyce)
+        if (!b?.noTakeover) pushTk(b?.takeoverMs ?? clipShowMs(clip))
         return
       }
       if (d.mode === 'EVENT') {
         markActivity()
         agitationStartRef.current = performance.now()
-        if (d.label === 'DEMOGORGON VAINCU') {
+        // Event → takeover de map (label → scène), data-driven.
+        const ev = d.label ? eventTakeovers[d.label] : undefined
+        if (ev) {
           stackRef.current.push({
-            scene: 'DEMOGORGON',
-            priority: 60,
-            expiresAt: performance.now() + DEMOGORGON_MS,
+            scene: 'MAP_EVENT',
+            priority: ev.priority,
+            expiresAt: performance.now() + ev.durationMs,
+            clip: ev.clipKey,
           })
-          pushJoyce('RUN')
+          if (ev.joyce) pushJoyce(ev.joyce)
         }
       } else if (d.mode === 'COMBO_FLASH' || d.mode === 'MULTI_FLASH') {
         markActivity()
@@ -296,8 +278,10 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       )
       prevTopRef.current = top?.scene ?? null
 
+      // Clip qui retarde le flip 3D du hall of fame (ex. portal_swallow) —
+      // déclaré par la map via clipBehavior.holdsHallFlip.
       const portalActive = stackRef.current.some(
-        (e) => e.scene === 'CINEMATIC' && e.clip === 'portal_swallow',
+        (e) => e.scene === 'CINEMATIC' && e.clip != null && clipBehavior[e.clip]?.holdsHallFlip,
       )
 
       setState({
