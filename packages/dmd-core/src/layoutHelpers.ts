@@ -1,4 +1,4 @@
-import { FONT_5X7, FONT_12X22, drawText, measureText } from './fonts';
+import { FONT_5X7, drawText, measureText } from './fonts';
 import { GRID_W, GRID_H } from './DmdRenderer';
 import { DOT } from './palette';
 

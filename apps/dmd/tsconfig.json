@@ -17,6 +17,8 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
+      "@pinball/map-strangerthings/dmd": ["../../packages/maps/strangerthings/dmd"],
+      "@pinball/map-strangerthings": ["../../packages/maps/strangerthings/index.ts"],
       "@pinball/*": ["../../packages/*/src"]
     }
   },

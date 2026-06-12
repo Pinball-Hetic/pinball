@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { DmdDisplay } from '@pinball/shared-types'
-import { DmdRenderer, GRID_W, GRID_H, applyGlitch, MatrixRain } from '@pinball/dmd-core'
-import { layouts } from '@/dmd/layouts'
+import { DmdRenderer, GRID_W, GRID_H, applyGlitch, MatrixRain, PALETTE_NORMAL, makeLayouts } from '@pinball/dmd-core'
+import { mapDmdContent } from '@/dmd/mapContent'
 
 const GLITCH_MS = 350
-const BURST_MS = 1200
+// Contenu DMD de la map résolu au chargement (constante module).
+const LAYOUTS = makeLayouts(mapDmdContent)
+const UPSIDE_PALETTE = mapDmdContent.paletteUpsideDown ?? PALETTE_NORMAL
+const BURST_MS = mapDmdContent.upsideDownBurstMs ?? 1200
 
 interface Props {
   display: DmdDisplay
@@ -65,9 +68,9 @@ export default function DmdCanvas({ display, upsideDown }: Props) {
       // CINEMATIC : horloge relative à l'arrivée du mode (frames du clip).
       const clock = cinematic ? now - modeStartedAt : now
 
-      renderer.setPalette(upsideDownRef.current ? 'upsideDown' : 'normal')
+      renderer.setPalette(upsideDownRef.current ? UPSIDE_PALETTE : PALETTE_NORMAL)
       renderer.clearGrid()
-      layouts[d.mode](renderer.grid, d, clock)
+      LAYOUTS[d.mode](renderer.grid, d, clock)
       if (upsideDownRef.current) rain.drawBackground(renderer.grid)
       // Glitch/burst NE s'appliquent PAS pendant un clip (il se suffit).
       if (!cinematic && now < glitchUntil) {

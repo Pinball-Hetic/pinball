@@ -1,10 +1,9 @@
 import type { DmdDisplay } from '@pinball/shared-types';
-import { mapStateNumber, mapStateFlag } from '@pinball/shared-types';
+import { mapStateFlag } from '@pinball/shared-types';
 import { FONT_5X7, FONT_12X22, drawText } from './fonts';
 import { GRID_W, GRID_H } from './DmdRenderer';
 import { DOT } from './palette';
 import {
-  centerX,
   drawCentered,
   drawFlash,
   flickerSkip,
@@ -157,7 +156,6 @@ function defaultAttract(grid: Uint8Array, display: { player: string }, clockMs: 
   if (Math.floor(clockMs / 600) % 2 === 0) {
     drawCentered(grid, 'START !', 18, FONT_5X7, DOT.event, 1, 2);
   }
-  void centerX;
 }
 
 // Construit la table de layouts pour un contenu de map donné.
@@ -174,7 +172,6 @@ export function makeLayouts(content: DmdMapContent = {}): Record<DmdDisplay['mod
     drawCentered(grid, String(d.score), 1, FONT_12X22, DOT.score);
     drawLivesRow(grid, d.lives, 24);
     content.scoreOverlay?.(grid, d, clockMs);
-    void mapStateNumber;
   }
 
   function layoutIntro(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {

@@ -2,7 +2,6 @@ import {
   DOT,
   FONT_5X7,
   GRID_W,
-  GRID_H,
   drawText,
   drawCentered,
   parseClip,
@@ -87,7 +86,6 @@ function clipHeticComplete(grid: Uint8Array, ms: number): void {
       drawCentered(grid, 'X5', 18, FONT_5X7, DOT.combo, 1, 2)
     }
   }
-  void GRID_H
 }
 
 // Handlers de cinématiques Stranger Things (injectés dans le moteur DMD).

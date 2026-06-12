@@ -1,7 +1,7 @@
 import {
   INDEX_TO_COLOR,
-  paletteByName,
-  type PaletteName,
+  PALETTE_NORMAL,
+  type Palette,
 } from './palette'
 
 export const GRID_W = 96
@@ -27,7 +27,7 @@ export class DmdRenderer {
   private ctx: CanvasRenderingContext2D
   // sprites[colorIndex] = offscreen pré-rendu (null pour index 0 = éteint).
   private sprites: (HTMLCanvasElement | null)[] = []
-  private paletteName: PaletteName = 'normal'
+  private palette: Palette = PALETTE_NORMAL
 
   constructor(canvas: HTMLCanvasElement) {
     canvas.width = CANVAS_W
@@ -39,9 +39,9 @@ export class DmdRenderer {
     this.buildSprites()
   }
 
-  setPalette(name: PaletteName): void {
-    if (name === this.paletteName) return
-    this.paletteName = name
+  setPalette(palette: Palette): void {
+    if (palette === this.palette) return
+    this.palette = palette
     this.buildSprites()
   }
 
@@ -66,7 +66,7 @@ export class DmdRenderer {
   // Pré-rend un dot par couleur de la palette active. Halo via radial
   // gradient (PAS shadowBlur — trop cher par dot).
   private buildSprites(): void {
-    const palette = paletteByName(this.paletteName)
+    const palette = this.palette
     this.sprites = [null]
     for (const color of INDEX_TO_COLOR) {
       this.sprites.push(this.makeSprite(palette[color]))

@@ -28,20 +28,6 @@ export const PALETTE_NORMAL: Record<DotColor, string> = {
   rainGo: '#22CC44',
 }
 
-export const PALETTE_UPSIDE_DOWN: Record<DotColor, string> = {
-  score: '#C26BF0',
-  lives: '#FF2255',
-  heticOn: '#FF3366',
-  heticOff: '#2A1535',
-  combo: '#D946EF',
-  multi: '#A78BFA',
-  event: '#F0ABFC',
-  gameOver: '#FF2255',
-  marquee: '#B265E8',
-  rain: '#9944DD',
-  rainGo: '#22CC44',
-}
-
 // Mapping index → DotColor (1='score', 2='lives', …). L'index 0 = dot éteint.
 export const INDEX_TO_COLOR: DotColor[] = [
   'score',
@@ -71,8 +57,4 @@ export const DOT: Record<DotColor, number> = {
   rainGo: 11,
 }
 
-export type PaletteName = 'normal' | 'upsideDown'
-
-export function paletteByName(name: PaletteName): Record<DotColor, string> {
-  return name === 'upsideDown' ? PALETTE_UPSIDE_DOWN : PALETTE_NORMAL
-}
+export type Palette = Record<DotColor, string>;
