@@ -6,6 +6,7 @@ import {
   BUMP_EJECT_SCALE,
   BUMP_HIT_COOLDOWN_MS,
   DROP_TARGETS,
+  RETURN_PORTAL_ENTER_SCORE,
   PORTAL_ENTER_SCORE,
 } from '../domain/Ball';
 import {
@@ -99,7 +100,11 @@ export class CollisionEventProcessor {
       if (role === 'portal_enter') {
         if (started && gameState === 'playing' && this.portalOpen && !this.portalTriggered) {
           this.portalTriggered = true;
-          this.emit({ type: 'PORTAL_ENTER', scoreIncrement: PORTAL_ENTER_SCORE });
+          if (this.upsideDownActive) {
+            this.emit({ type: 'RETURN_PORTAL_ENTER', scoreIncrement: RETURN_PORTAL_ENTER_SCORE });
+          } else {
+            this.emit({ type: 'PORTAL_ENTER', scoreIncrement: PORTAL_ENTER_SCORE });
+          }
         }
         return;
       }

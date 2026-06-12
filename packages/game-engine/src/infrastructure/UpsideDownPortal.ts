@@ -80,6 +80,7 @@ export class UpsideDownPortal {
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
   private anchorPos = new THREE.Vector3();
+  private upsideDownActive = false;
   private revealed = false;
   private revealing = false;
   private revealT = 0;
@@ -146,13 +147,23 @@ export class UpsideDownPortal {
     this.suckBoost = boost;
   }
 
+  setUpsideDownActive(active: boolean): void {
+    this.upsideDownActive = active;
+  }
+
   onGameEvent(event: GameEvent): void {
     if (this.revealed || this.revealing) return;
     if (event.type !== 'BOSS_TARGET_HIT') return;
     const def = getBossDefinition(event.bossId);
-    if (!def.unlocksPortal) return;
     if (event.hitCount < def.targetHits) return;
-    this.beginReveal();
+
+    if (def.unlocksPortal && !this.upsideDownActive) {
+      this.beginReveal();
+      return;
+    }
+    if (def.unlocksReturnPortal && this.upsideDownActive) {
+      this.beginReveal();
+    }
   }
 
   applyMagnet(body: RAPIER.RigidBody): void {

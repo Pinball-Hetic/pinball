@@ -1156,6 +1156,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           diag.noteReset("game_over_hide");
         });
         const releaseUpsideDownWorld = () => {
+          upsideDownPortal?.setUpsideDownActive(false);
           upsideDownAtmosphere?.reset();
           collisionProcessor?.resetUpsideDownSession();
           vecnaReveal?.endFight();
@@ -1236,6 +1237,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           }
           if (event.type === "PORTAL_TRANSITION_END") {
             upsideDownPortal?.reset();
+            upsideDownPortal?.setUpsideDownActive(true);
             collisionProcessor?.resetPortalTrigger();
             collisionProcessor?.onUpsideDownEntered(scoreRef.current);
           }
