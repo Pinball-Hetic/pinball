@@ -53,6 +53,11 @@ tasks:
     cmds:
       - bash scripts/check-map-leaks.sh
 
+  "maps:validate":
+    desc: "Valide une map : task maps:validate -- <mapId> (défaut strangerthings)"
+    cmds:
+      - bun scripts/validate-map.ts {{.CLI_ARGS}}
+
   clean:
     desc: Supprimer artefacts de build et node_modules
     cmds:
