@@ -146,7 +146,7 @@ import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 
-const PLAYFIELD_URL = "/playfield/newStrangerthings.glb";
+const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
 
 type UpsideDownPersistence = "until_game_over" | "until_drain";
 const UPSIDE_DOWN_PERSISTENCE: UpsideDownPersistence = "until_game_over";
