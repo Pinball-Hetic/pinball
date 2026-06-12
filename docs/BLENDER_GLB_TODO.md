@@ -114,6 +114,27 @@ où la bille frappe). Deux façons, au choix de l'équipe :
 
 ---
 
+## 3. Orientation du nid Demogorgon (`vis_demogorgon_portal_rig`)
+
+Le « nid » qui couvre le trou du Demogorgon avant son apparition est un mesh
+**décoratif** du GLB (`vis_demogorgon_portal_rig`, rôle `vis_` → aucune
+physique). Il est rendu **tel quel**, le code n'y touche jamais (pas de
+rotation appliquée).
+
+**Constat** : il apparaît tourné sur l'axe Y (vu en jeu). Or les transforms de
+nœuds du GLB n'ont **aucune rotation Y** (uniquement l'inclinaison plateau sur
+X). Donc le yaw est **figé dans la géométrie du mesh** (modélisée/exportée de
+travers), pas dans une transform de nœud → invisible au dump, à corriger dans
+Blender.
+
+| Élément | Constat (GLB actuel) | Action Blender |
+|---|---|---|
+| `vis_demogorgon_portal_rig` | Géométrie orientée d'un yaw (rotation Y apparente), alors que les nœuds sont en rotation X seule | Redresser l'orientation du mesh (appliquer la rotation au niveau objet, `Ctrl+A` → Rotation, ou corriger le yaw de modélisation) pour qu'il soit droit, face au joueur |
+| Position du nid | Centré en (0.002, 1.017, **−0.064**) ; la cible Demogorgon est en (0, 1.012, **−0.02**) → décalé ~4 cm en profondeur | Vérifier que le nid couvre bien le trou de la cible (recentrer sur z ≈ −0.02 si besoin) |
+
+> Pas de correctif code : un `vis_` est du contenu visuel pur. Le redressage se
+> fait à l'export Blender (le moteur affiche la géométrie telle qu'elle vient).
+
 ## Checklist de validation post-réexport
 
 Après ré-export du GLB (sensors ajoutés et/ou origines bumpers corrigées) :
