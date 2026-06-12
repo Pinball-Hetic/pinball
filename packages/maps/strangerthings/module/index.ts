@@ -302,8 +302,7 @@ export function createModule(): StModule {
       portal?.update(dt)
       bossReveals?.update(dt)
       nestMarker?.update(dt)
-      // transition.update reste piloté par PinballPlayfield (post-lecture
-      // isActive, pour préserver l'ordre de décision du gel à 1 frame près).
+      transition?.update(dt) // no-op si inactif (gardé en interne)
 
       // Hint tardif du nid : armé > 45 s sans reveal → bandeau DMD une fois.
       const ctx = ctxRef
@@ -327,7 +326,27 @@ export function createModule(): StModule {
       }
     },
     shouldFreezePhysics(): boolean {
-      return transition?.isActive() ?? false
+      return (transition?.isActive() ?? false) || (bossReveals?.isGameplayFrozen() ?? false)
+    },
+    isIntroHolding(): boolean {
+      return bossReveals?.isGameplayFrozen() ?? false
+    },
+    applyBallMagnet(): void {
+      const body = ctxRef?.ball?.body
+      if (body && portal?.isOpen()) portal.applyMagnet(body)
+    },
+    setSporesEnabled(enabled: boolean): void {
+      atmosphere?.setSporesEnabled(enabled)
+    },
+    releaseWorld(): void {
+      portal?.setUpsideDownActive(false)
+      atmosphere?.reset()
+      vecnaReveal?.endFight()
+    },
+    resetWorld(): void {
+      portal?.reset()
+      atmosphere?.reset()
+      bossReveals?.endAllFights()
     },
     onGameReset(): void {
       demogorgons = 0

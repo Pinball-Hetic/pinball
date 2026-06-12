@@ -109,4 +109,14 @@ export interface MapModule {
   dispose(): void;
   /** true → le moteur gèle la physique cette frame (ex. transition de monde). */
   shouldFreezePhysics?(): boolean;
+  /** true → intro boss en cours (la bille doit être maintenue figée). */
+  isIntroHolding?(): boolean;
+  /** Applique l'aimant du portail à la bille si pertinent (appelé hors gel). */
+  applyBallMagnet?(): void;
+  /** Active/désactive les spores d'ambiance (pilotage qualité). */
+  setSporesEnabled?(enabled: boolean): void;
+  /** Relâche le monde Upside Down (reset des systèmes de la map). */
+  releaseWorld?(): void;
+  /** Reset dur des systèmes de la map (portail + ambiance + combats). */
+  resetWorld?(): void;
 }

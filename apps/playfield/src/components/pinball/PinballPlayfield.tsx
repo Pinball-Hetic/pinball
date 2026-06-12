@@ -56,7 +56,6 @@ import {
   ballCenterOnSurface,
   DROP_TARGETS,
   PlungerPhysics,
-  VecnaReveal,
   BossRevealOrchestrator,
   BossNestMarker,
   type BossId,
@@ -74,8 +73,6 @@ import {
   SCORE_DEMOGORGON_TARGET,
   type GameEvent,
   UpsideDownPortal,
-  UpsideDownTransition,
-  UpsideDownAtmosphere,
   ShooterLaneGate,
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
@@ -744,10 +741,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     let bossReveals: BossRevealOrchestrator | null = null;
     let nestMarker: BossNestMarker | null = null;
     let ballTrail: BallTrail | null = null;
-    let vecnaReveal: VecnaReveal | null = null;
     let upsideDownPortal: UpsideDownPortal | null = null;
-    let upsideDownTransition: UpsideDownTransition | null = null;
-    let upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
     let shooterLaneGate: ShooterLaneGate | null = null;
 
     // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
@@ -758,7 +752,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         mountRef.current?.clientHeight ?? clientHeight,
       );
       ballTrail?.setMaxSprites(tier.trailMax);
-      upsideDownAtmosphere?.setSporesEnabled(tier.sporesOn);
+      mapModuleRef.current?.setSporesEnabled?.(tier.sporesOn);
     });
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
@@ -1033,19 +1027,13 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           // module pour les systèmes Upside Down (encore ici) + le ref qui
           // pilote celebrate/setFever. Disparaît au cluster Upside Down.
           const stVisuals = mapModule as MapModule & {
-            atmosphere?: UpsideDownAtmosphere | null;
             portal?: UpsideDownPortal | null;
-            transition?: UpsideDownTransition | null;
             nestMarker?: BossNestMarker | null;
             bossReveals?: BossRevealOrchestrator | null;
-            vecnaReveal?: VecnaReveal | null;
           };
-          upsideDownAtmosphere = stVisuals.atmosphere ?? null;
           upsideDownPortal = stVisuals.portal ?? null;
-          upsideDownTransition = stVisuals.transition ?? null;
           nestMarker = stVisuals.nestMarker ?? null;
           bossReveals = stVisuals.bossReveals ?? null;
-          vecnaReveal = stVisuals.vecnaReveal ?? null;
           nestMarkerRef.current = nestMarker;
           // Préchargement des reveals boss (async) — gardé ici (module.setup
           // est synchrone). Bloque le chargement comme avant.
@@ -1242,10 +1230,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           diag.noteReset("game_over_hide");
         });
         const releaseUpsideDownWorld = () => {
-          upsideDownPortal?.setUpsideDownActive(false);
-          upsideDownAtmosphere?.reset();
+          mapModule?.releaseWorld?.();
           collisionProcessor?.resetUpsideDownSession();
-          vecnaReveal?.endFight();
           clearUpsideDownSession();
         };
         // Réconciliation des marqueurs de nid : gérée par le module de map
@@ -1416,9 +1402,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
                   resetGame();
                   collisionProcessor?.resetAllBossFights();
                   collisionProcessor?.resetScoreBaselines();
-                  bossReveals?.endAllFights();
-                  upsideDownPortal?.reset();
-                  upsideDownAtmosphere?.reset();
+                  mapModule?.resetWorld?.();
                   if (ballMesh) ballMesh.visible = true;
                   return;
                 }
@@ -1453,9 +1437,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
                 resetGame();
                 collisionProcessor?.resetAllBossFights();
                 collisionProcessor?.resetScoreBaselines();
-                bossReveals?.endAllFights();
-                upsideDownPortal?.reset();
-                upsideDownAtmosphere?.reset();
+                mapModule?.resetWorld?.();
                 if (ballMesh) ballMesh.visible = true;
               }
             }
@@ -1602,9 +1584,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
       cinematics.update(time);
       mapModule?.update(dt);
-      const transitionActive = upsideDownTransition?.isActive() ?? false;
-      const vecnaIntroActive = bossReveals?.isGameplayFrozen() ?? false;
-      const freezeFrame = transitionActive || cinematics.shouldFreeze() || vecnaIntroActive;
+      // Gel + intro boss pilotés par le module (shouldFreezePhysics inclut
+      // transition + intro vecna). transition.update est dans mapModule.update.
+      const vecnaIntroActive = mapModule?.isIntroHolding?.() ?? false;
+      const freezeFrame = (mapModule?.shouldFreezePhysics?.() ?? false) || cinematics.shouldFreeze();
 
       if (vecnaIntroActive && !vecnaIntroHolding && ballPhysicsInst) {
         const p = ballPhysicsInst.body.translation();
@@ -1621,9 +1604,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         vecnaIntroHolding = false;
       }
 
-      if (transitionActive) {
-        upsideDownTransition?.update(dt);
-      } else if (!freezeFrame) {
+      if (!freezeFrame) {
         // ── Flipper cinématique : Three.js → Rapier ───────────────────────────
         // Lissage normalisé à 60 FPS : Math.pow(1 - SWING_SMOOTH, dt * 60)
         // reproduit exactement le comportement 60 Hz sur tous les écrans
@@ -1705,13 +1686,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         }
       }
 
-      if (
-        ballPhysicsInst
-        && gameStateRef.current === "playing"
-        && !freezeFrame
-        && upsideDownPortal?.isOpen()
-      ) {
-        upsideDownPortal.applyMagnet(ballPhysicsInst.body);
+      if (ballPhysicsInst && gameStateRef.current === "playing" && !freezeFrame) {
+        mapModule?.applyBallMagnet?.();
       }
 
       // Ball sync
@@ -1861,7 +1837,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       }
 
       // ── OrbitControls update ─────────────────────────────────────────────
-      if (orbitControls && !transitionActive) orbitControls.update();
+      if (orbitControls && !freezeFrame) orbitControls.update();
 
       // ── Rapier debug render (tous colliders) ─────────────────────────────
       if (debugCollidersOn && physicsWorld) {
