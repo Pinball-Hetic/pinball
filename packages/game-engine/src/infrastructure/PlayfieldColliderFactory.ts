@@ -6,7 +6,6 @@ import {
   SLINGSHOT_RIGHT_CENTER,
 } from '../domain/Ball';
 import type { MapLayout } from '../domain/MapLayout';
-import { BOSS_IDS, getBossDefinition } from '../domain/BossRegistry';
 import { surfaceYAtZ, bottomOutLaneSepX, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
 import { hasPinballmapRoot } from './GltfNodeNames';
@@ -258,7 +257,7 @@ export class PlayfieldColliderFactory {
     PlayfieldColliderFactory.createSlingshotSensors(world, colliderMap);
     PlayfieldColliderFactory.createPopZoneSensors(world, layout, colliderMap);
     PlayfieldColliderFactory.createRocketSensor(world, layout, colliderMap);
-    PlayfieldColliderFactory.createBossTargets(world, colliderMap);
+    PlayfieldColliderFactory.createBossTargets(world, layout, colliderMap);
     PlayfieldColliderFactory.createDropTargets(world, layout, colliderMap);
     PlayfieldColliderFactory.createBottomOutSensor(world, layout, colliderMap);
     // Les bumps (Bump-left / Bump-right) sont détectés via leur trimesh GLB,
@@ -412,9 +411,12 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createBossTargets(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    for (const id of BOSS_IDS) {
-      const boss = getBossDefinition(id);
+  private static createBossTargets(
+    world: RAPIER.World,
+    layout: MapLayout,
+    colliderMap: Map<number, string>,
+  ): void {
+    for (const boss of layout.bosses) {
       const p = boss.target;
       const body = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),

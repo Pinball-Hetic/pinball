@@ -1,10 +1,5 @@
-import type { BossId, BossGateContext } from '../domain/BossRegistry';
-import {
-  BOSS_IDS,
-  bossThresholdMet,
-  getBossByColliderRole,
-  getBossDefinition,
-} from '../domain/BossRegistry';
+import type { BossId, BossGateContext, BossDefinition } from '../domain/BossRegistry';
+import { bossThresholdMet } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import { BossTargetSensor } from './BossTargetSensor';
 
@@ -19,10 +14,19 @@ export type BossRevealContext = BossGateContext & {
 
 export class BossFightManager {
   private readonly states = new Map<BossId, BossFightState>();
+  private readonly byId = new Map<BossId, BossDefinition>();
+  private readonly byRole = new Map<string, BossDefinition>();
 
-  constructor(private readonly emit: GameEventListener) {
-    for (const id of BOSS_IDS) {
-      this.states.set(id, { triggered: false, sensor: new BossTargetSensor() });
+  // Définitions de boss injectées par la map (layout.bosses) — le moteur ne
+  // connaît plus de boss en dur.
+  constructor(
+    private readonly emit: GameEventListener,
+    private readonly bosses: BossDefinition[],
+  ) {
+    for (const def of bosses) {
+      this.states.set(def.id, { triggered: false, sensor: new BossTargetSensor() });
+      this.byId.set(def.id, def);
+      this.byRole.set(def.colliderRole, def);
     }
   }
 
@@ -34,8 +38,8 @@ export class BossFightManager {
   }
 
   resetAll(): void {
-    for (const id of BOSS_IDS) {
-      this.resetBoss(id);
+    for (const def of this.bosses) {
+      this.resetBoss(def.id);
     }
   }
 
@@ -71,9 +75,9 @@ export class BossFightManager {
   }
 
   tryReveal(id: BossId, context: BossRevealContext): void {
-    const def = getBossDefinition(id);
+    const def = this.byId.get(id);
     const state = this.states.get(id);
-    if (!state) return;
+    if (!def || !state) return;
     if (context.gameState !== 'playing') return;
     if (state.triggered) return;
     // One boss fight at a time — don't reveal while another is still active.
@@ -89,13 +93,13 @@ export class BossFightManager {
   }
 
   tryAllReveals(context: BossRevealContext): void {
-    for (const id of BOSS_IDS) {
-      this.tryReveal(id, context);
+    for (const def of this.bosses) {
+      this.tryReveal(def.id, context);
     }
   }
 
   handleTargetCollision(role: string, started: boolean, gameState: string): boolean {
-    const def = getBossByColliderRole(role);
+    const def = this.byRole.get(role);
     if (!def) return false;
 
     const sensor = this.states.get(def.id)?.sensor;

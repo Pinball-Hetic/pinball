@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
-import { getBossDefinition } from '@pinball/game-engine';
-import { VECNA_TARGET } from '@pinball/game-engine';
+import { getBossDefinition } from '../bosses';
+import { VECNA_TARGET } from '../bosses';
 import { PLAYFIELD_TILT } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';

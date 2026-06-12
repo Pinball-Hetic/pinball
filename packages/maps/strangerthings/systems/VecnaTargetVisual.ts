@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { VECNA_TARGET } from '@pinball/game-engine';
+import { VECNA_TARGET } from '../bosses';
 import {
   VECNA_ANIM_WALK,
   VECNA_MODEL_BIND_HEIGHT,

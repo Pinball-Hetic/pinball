@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEvent } from '@pinball/game-engine';
-import { getBossDefinition } from '@pinball/game-engine';
+import { getBossDefinition } from '../bosses';
 import {
   PORTAL_COVER_RADIUS,
   PORTAL_HOLE_RADIUS,

@@ -1,9 +1,8 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import type { BossId } from '../domain/BossRegistry';
+import type { BossId, BossDefinition } from '../domain/BossRegistry';
 import {
   bossPointsRemaining,
   bossThresholdMet,
-  getBossByColliderRole,
 } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import {
@@ -29,6 +28,7 @@ import { BossFightManager } from './BossFightManager';
 export class CollisionEventProcessor {
   private dropTargetDown: Record<string, boolean> = {};
   private readonly bossFights: BossFightManager;
+  private readonly bossByRole = new Map<string, BossDefinition>();
   private bumpLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
   private portalOpen = false;
   private portalTriggered = false;
@@ -134,7 +134,8 @@ export class CollisionEventProcessor {
     private readonly bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
   ) {
-    this.bossFights = new BossFightManager(emit);
+    this.bossFights = new BossFightManager(emit, layout.bosses);
+    for (const b of layout.bosses) this.bossByRole.set(b.colliderRole, b);
     for (const dt of this.layout.dropTargets) this.dropTargetDown[dt.id] = false;
   }
 
@@ -148,7 +149,7 @@ export class CollisionEventProcessor {
       // Uniquement pour le boss du monde courant : sinon on afficherait un
       // décompte de points trompeur (le vrai blocage est le mauvais monde, pas
       // le score) — ex. cible Demogorgon touchée dans l'Upside Down.
-      const boss = getBossByColliderRole(role);
+      const boss = this.bossByRole.get(role);
       if (
         boss
         && boss.reveal.requiresUpsideDown === this.upsideDownActive

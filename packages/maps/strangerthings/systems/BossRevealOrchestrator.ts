@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
-import { BOSS_IDS, type BossId } from '@pinball/game-engine';
+import { type BossId } from '@pinball/game-engine';
+import { BOSS_IDS } from '../bosses';
 import type { GameEvent } from '@pinball/game-engine';
 import type { BossRevealController } from './BossRevealController';
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DEMOGORGON_TARGET } from '@pinball/game-engine';
+import { DEMOGORGON_TARGET } from '../bosses';
 import {
   DEMOGORGON_ANIM_HIT,
   DEMOGORGON_ANIM_IDLE,

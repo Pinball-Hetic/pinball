@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { GameEvent, GameEventListener } from '@pinball/game-engine';
-import { getBossDefinition } from '@pinball/game-engine';
+import { getBossDefinition } from '../bosses';
 import {
   DEMOGORGON_TARGET,
   ELEVEN_ASSIST_SCORE,

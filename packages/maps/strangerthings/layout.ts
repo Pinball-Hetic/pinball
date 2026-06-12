@@ -1,4 +1,5 @@
 import type { MapLayout } from '@pinball/game-engine'
+import { bossDefinitions } from './bosses'
 import {
   SHOOTER_LANE_X_MIN,
   SHOOTER_LANE_X_MAX,
@@ -30,7 +31,6 @@ import {
   PLAYFIELD_SHADE_Y,
   PLAYFIELD_SHADE_Z,
   PLAYFIELD_SHADE_MAX_OPACITY,
-  BOSS_REGISTRY,
   UPSIDE_DOWN_TRANSITION_DURATION,
   UPSIDE_DOWN_TRANSITION_BLACKOUT,
   UPSIDE_DOWN_TRANSITION_REVEAL,
@@ -136,7 +136,7 @@ export const layout: MapLayout = {
     y: FLIPPER_PIVOT_Y,
     z: FLIPPER_PIVOT_Z,
   },
-  bosses: [BOSS_REGISTRY.demogorgon, BOSS_REGISTRY.vecna],
+  bosses: bossDefinitions,
   geometry: {
     // surfaceYAtZ(z) = 1.068 - ((z + 0.552) / 0.970) * 0.110
     coefficients: { base: 1.068, zOffset: 0.552, zSpan: 0.97, yDrop: 0.11 },
