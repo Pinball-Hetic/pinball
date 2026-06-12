@@ -84,7 +84,7 @@ export type BossDefinition = {
   targetPulse: BossTargetPulseConfig;
 };
 
-/** Contexte minimal pour évaluer le gate de reveal d'un boss (score + Upside Down). */
+/** Contexte minimal pour évaluer le gate de reveal d'un boss (score + monde alternatif). */
 export type BossGateContext = {
   totalScore: number;
   alternateWorldActive: boolean;
@@ -100,7 +100,7 @@ export function bossEffectiveScore(def: BossDefinition, ctx: BossGateContext): n
   return ctx.totalScore - baseline;
 }
 
-/** True si le palier de score du boss est franchi ET son gate Upside Down satisfait. */
+/** True si le palier de score du boss est franchi ET son gate monde alternatif satisfait. */
 export function bossThresholdMet(def: BossDefinition, ctx: BossGateContext): boolean {
   if (def.reveal.requiresAlternateWorld && !ctx.alternateWorldActive) return false;
   if (!def.reveal.requiresAlternateWorld && ctx.alternateWorldActive) return false;

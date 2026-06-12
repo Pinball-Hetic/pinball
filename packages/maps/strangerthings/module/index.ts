@@ -205,7 +205,7 @@ export function createModule(): MapModule {
         const ball = ctx.ball
         const mesh = ctx.ballMesh
         if (ball && mesh && transition && !transition.isActive()) {
-          ball.holdAtUpsideDownSpawn()
+          ball.holdAtAlternateWorldSpawn()
           ball.syncToMesh(mesh)
           transition.start(
             {
@@ -215,7 +215,7 @@ export function createModule(): MapModule {
               onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
             },
             () => {
-              ball.spawnFromUpsideDown()
+              ball.spawnFromAlternateWorld()
               ctx.resetPortalTrigger()
               ctx.resetStuck()
               ball.syncToMesh(mesh)

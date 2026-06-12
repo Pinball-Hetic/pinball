@@ -48,7 +48,7 @@ function boss(over: Partial<BossDefinition> & Pick<BossDefinition, 'id' | 'colli
 
 // boss_a : monde normal, palier 3000, +150 reveal, 5 hits @250.
 const BOSS_A = boss({ id: 'boss_a', colliderRole: 'a_target', unlocksPortal: true });
-// boss_b : Upside Down, palier 3000, +200 reveal, 10 hits @300.
+// boss_b : monde alternatif, palier 3000, +200 reveal, 10 hits @300.
 const BOSS_B = boss({
   id: 'boss_b',
   colliderRole: 'b_target',
@@ -92,7 +92,7 @@ test('boss_a requires score since normal world entry', () => {
   expect(events).toEqual([{ type: 'BOSS_REVEAL', bossId: 'boss_a', scoreIncrement: 150 }]);
 });
 
-test('boss_a does not reveal in the Upside Down', () => {
+test('boss_a does not reveal in the monde alternatif', () => {
   const { mgr, events } = make();
   mgr.tryReveal('boss_a', PLAYING({ totalScore: 9000, alternateWorldActive: true }));
   expect(events).toHaveLength(0);
@@ -112,7 +112,7 @@ test('reveal is once-only', () => {
   expect(events).toHaveLength(1);
 });
 
-test('boss_b requires the Upside Down and a baseline-adjusted score', () => {
+test('boss_b requires the monde alternatif and a baseline-adjusted score', () => {
   const { mgr, events } = make();
   mgr.tryReveal('boss_b', PLAYING({ totalScore: 9999, alternateWorldActive: false }));
   expect(events).toHaveLength(0);
@@ -122,7 +122,7 @@ test('boss_b requires the Upside Down and a baseline-adjusted score', () => {
   expect(events).toEqual([{ type: 'BOSS_REVEAL', bossId: 'boss_b', scoreIncrement: 200 }]);
 });
 
-test('boss_b requires score since Upside Down entry on each cycle', () => {
+test('boss_b requires score since monde alternatif entry on each cycle', () => {
   const { mgr, events } = make();
   mgr.tryReveal('boss_b', PLAYING({ totalScore: 20000, alternateWorldActive: true, alternateWorldScoreBaseline: 20000 }));
   expect(events).toHaveLength(0);

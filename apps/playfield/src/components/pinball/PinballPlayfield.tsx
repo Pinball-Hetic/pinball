@@ -1855,7 +1855,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           dt,
           ballMesh ? ballMesh.position : { x: 0, y: 0, z: 0 },
           intensity,
-          { upsideDown: atmosphereUpsideRef.current, fever: feverNow },
+          { alternateWorld: atmosphereUpsideRef.current, fever: feverNow },
           camera.quaternion,
         );
       }

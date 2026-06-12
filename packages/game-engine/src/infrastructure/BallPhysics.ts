@@ -74,8 +74,8 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
     this.body.wakeUp();
   }
 
-  holdAtUpsideDownSpawn(): void {
-    const s = this.spawns.upsideDown;
+  holdAtAlternateWorldSpawn(): void {
+    const s = this.spawns.alternateWorld;
     const y = ballCenterOnSurface(s.z) + 0.004;
     this.body.setTranslation({ x: s.x, y, z: s.z }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -83,9 +83,9 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
     this.body.wakeUp();
   }
 
-  spawnFromUpsideDown(): void {
-    this.holdAtUpsideDownSpawn();
-    const i = this.spawns.upsideDownImpulse;
+  spawnFromAlternateWorld(): void {
+    this.holdAtAlternateWorldSpawn();
+    const i = this.spawns.alternateWorldImpulse;
     this.body.applyImpulse({ x: i.x, y: i.y, z: i.z }, true);
   }
 

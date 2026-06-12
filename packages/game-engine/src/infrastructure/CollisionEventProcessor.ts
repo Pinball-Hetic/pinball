@@ -52,7 +52,7 @@ export class CollisionEventProcessor {
     return this.normalWorldScoreBaseline;
   }
 
-  /** Baseline de score Upside Down (pour recalculer l'état des marqueurs de nid). */
+  /** Baseline de score monde alternatif (pour recalculer l'état des marqueurs de nid). */
   getAlternateWorldScoreBaseline(): number {
     return this.alternateWorldScoreBaseline;
   }
@@ -98,7 +98,7 @@ export class CollisionEventProcessor {
   resetAlternateWorldSession(): void {
     this.alternateWorldActive = false;
     this.alternateWorldScoreBaseline = 0;
-    // Réinitialise les combats des boss du monde Upside Down (génériquement,
+    // Réinitialise les combats des boss du monde monde alternatif (génériquement,
     // ceux dont reveal.requiresAlternateWorld — sans id ST en dur).
     for (const b of this.layout.bosses) {
       if (b.reveal.requiresAlternateWorld) this.resetBossFight(b.id);
@@ -152,7 +152,7 @@ export class CollisionEventProcessor {
       // pédagogie « ENCORE X PTS » plutôt qu'un hit silencieux. Throttle 2 s.
       // Uniquement pour le boss du monde courant : sinon on afficherait un
       // décompte de points trompeur (le vrai blocage est le mauvais monde, pas
-      // le score) — ex. cible d'un boss du monde normal touchée dans l'Upside Down.
+      // le score) — ex. cible d'un boss du monde normal touchée dans l'monde alternatif.
       const boss = this.bossByRole.get(role);
       if (
         boss

@@ -106,8 +106,8 @@ export const layout: MapLayout = {
   // Spawns : analytiques (pas de mesh attendu — hors couloir/hinge).
   spawns: {
     ball: { x: 0.2355, y: 1.01, z: 0.161 },
-    upsideDown: { x: -0.0225, z: -0.48 },
-    upsideDownImpulse: { x: 0, y: 0, z: 0.055 },
+    alternateWorld: { x: -0.0225, z: -0.48 },
+    alternateWorldImpulse: { x: 0, y: 0, z: 0.055 },
     normalReturn: { x: -0.0225, z: -0.12 },
     normalReturnImpulse: { x: 0, y: 0, z: 0.05 },
   },

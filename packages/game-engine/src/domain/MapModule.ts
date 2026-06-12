@@ -16,7 +16,7 @@ export interface CinematicOpts {
 // moteur reste générique : un module reçoit un MapContext (injecté par
 // PinballPlayfield) qui expose les leviers du game loop, sans que le module
 // ne touche directement aux refs React ni au rendu bas niveau.
-// Éclairage de la scène (manipulé par les ambiances de map, ex. Upside Down).
+// Éclairage de la scène (manipulé par les ambiances de map, ex. monde alternatif).
 export interface MapLighting {
   renderer: THREE.WebGLRenderer;
   ambient: THREE.AmbientLight;
@@ -48,7 +48,7 @@ export interface MapContext {
   completeWorldCycle(): void;
   /** Réinitialise le détecteur de bille bloquée. */
   resetStuck(): void;
-  /** Notifie l'entrée dans l'Upside Down (baseline de score core). */
+  /** Notifie l'entrée dans l'monde alternatif (baseline de score core). */
   enterAlternateWorld(): void;
   /** Joue un son par identifiant (mappé côté app). */
   playSound(id: string): void;
@@ -119,7 +119,7 @@ export interface MapModule {
   applyBallMagnet?(): void;
   /** Active/désactive les spores d'ambiance (pilotage qualité). */
   setSporesEnabled?(enabled: boolean): void;
-  /** Relâche le monde Upside Down (reset des systèmes de la map). */
+  /** Relâche le monde monde alternatif (reset des systèmes de la map). */
   releaseWorld?(): void;
   /** Reset dur des systèmes de la map (portail + ambiance + combats). */
   resetWorld?(): void;

@@ -72,7 +72,7 @@ export const PLAYFIELD_SURFACE_Y = 1.0681; // top of playfield mesh = 1.0171 + 0
 // Positions des cibles boss : fournies par les définitions de boss de la map
 // (layout.bosses) — plus de re-export spécifique à une map ici.
 
-// PORTAL_UPSIDE_DOWN (position) déplacé en littéral dans le layout de la map
+// Le portail (position) déplacé en littéral dans le layout de la map
 // (layout.sensors.portal). Les rayons/scores portail restent génériques ici.
 export const PORTAL_HOLE_RADIUS = 0.02;
 export const PORTAL_COVER_RADIUS = 0.021;
@@ -82,7 +82,7 @@ export const PORTAL_MAGNET_STRENGTH = 0.0055;
 export const PORTAL_ENTER_SCORE = 500;
 export const RETURN_PORTAL_ENTER_SCORE = 500;
 
-// Spawns upside-down / retour : déplacés en littéraux dans le layout de la map
+// Spawns de monde alternatif : déplacés en littéraux dans le layout de la map
 // (packages/maps/strangerthings/layout.ts) — plus de constante ST ici.
 
 export const ELEVEN_ASSIST_SCORE = 100;

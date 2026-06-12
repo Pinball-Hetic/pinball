@@ -27,15 +27,15 @@ export interface SensorLayout {
   popZones: MapPoint3[]; // capteurs de zone pop-bumper
   rocket: MapPoint3; // capteur de rampe
   bossReveal: MapPoint3; // ancre de flash du reveal boss (monde normal)
-  portal: MapPoint3; // ancre du portail Upside Down
+  portal: MapPoint3; // ancre du portail monde alternatif
 }
 
 export interface SpawnLayout {
-  ball: MapPoint3; // BALL_SPAWN_POSITION
-  upsideDown: MapPoint2; // UPSIDE_DOWN_SPAWN
-  upsideDownImpulse: MapPoint3; // UPSIDE_DOWN_SPAWN_IMPULSE
-  normalReturn: MapPoint2; // NORMAL_WORLD_RETURN_SPAWN
-  normalReturnImpulse: MapPoint3; // NORMAL_WORLD_RETURN_IMPULSE
+  ball: MapPoint3; // spawn couloir plongeur
+  alternateWorld: MapPoint2; // spawn monde alternatif
+  alternateWorldImpulse: MapPoint3; // impulsion d'entrée monde alternatif
+  normalReturn: MapPoint2; // spawn retour monde normal
+  normalReturnImpulse: MapPoint3; // impulsion de retour
 }
 
 export interface ShooterLaneLayout {
@@ -92,7 +92,7 @@ export interface GeometryLayout {
   };
 }
 
-// Tous les réglages d'ambiance Upside Down (UpsideDownConstants.ts).
+// Tous les réglages d'ambiance monde alternatif (UpsideDownConstants.ts).
 export interface AtmosphereLayout {
   transition: {
     durationS: number;
@@ -132,7 +132,7 @@ export interface AtmosphereLayout {
   blendStrobeHz: number;
   sporeCount: number;
   hintMs: number;
-  /** Libellé de la bannière d'atmosphère active (ex. « Upside Down »). */
+  /** Libellé de la bannière d'atmosphère active (ex. « monde alternatif »). */
   bannerLabel: string;
   /** Libellé du hint d'entrée dans l'atmosphère (ex. « Le monde s'est inversé… »). */
   hintLabel: string;
