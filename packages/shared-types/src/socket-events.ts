@@ -48,14 +48,25 @@ export interface DevGameEventTrigger {
   amount?: number // pour DEBUG_ADD_SCORE
 }
 
+// Sac d'état spécifique à la map (ST : hetic, fever — une autre map aura
+// d'autres clés, ex. wanted). Le core ne connaît aucune clé : il transporte
+// et theming/affichage sont fournis par le contenu de la map (phase 5).
+export type MapState = Record<string, number | boolean>
+
+// Lecture sûre : une clé absente ne casse jamais l'affichage.
+export const mapStateNumber = (s: MapState, k: string): number => {
+  const v = s[k]
+  return typeof v === 'number' ? v : 0
+}
+export const mapStateFlag = (s: MapState, k: string): boolean => s[k] === true
+
 export interface ScoreUpdate {
   player: string
   score: number
   combo: number
   multiplier: number
   lives: number
-  hetic: number
-  fever: boolean
+  mapState: MapState
 }
 
 // Identifiant de clip cinématique. Type ouvert (string) : une map définit
@@ -68,13 +79,25 @@ export type ClipId = string
 // quand tous les consommateurs auront migré vers ClipId.
 export type CinematicClip = ClipId
 
+// Champs partagés par les variantes "snapshot" (SCORE/EVENT/COMBO/MULTI).
+// upsideDown reste ici (traité en phase 5) ; mapState remplace hetic/fever.
+interface SnapshotFields {
+  player: string
+  score: number
+  combo: number
+  multiplier: number
+  lives: number
+  mapState: MapState
+  upsideDown: boolean
+}
+
 export type DmdDisplay =
   | { mode: 'INTRO'; player: string; upsideDown: boolean }
   | { mode: 'CINEMATIC'; clip: CinematicClip; player: string; score: number; value?: number; upsideDown: boolean }
-  | { mode: 'SCORE'; player: string; score: number; combo: number; multiplier: number; lives: number; hetic: number; fever: boolean; upsideDown: boolean }
-  | { mode: 'EVENT'; label: string; points: number; score: number; combo: number; multiplier: number; lives: number; player: string; hetic: number; fever: boolean; upsideDown: boolean }
-  | { mode: 'COMBO_FLASH'; combo: number; multiplier: number; score: number; lives: number; player: string; hetic: number; fever: boolean; upsideDown: boolean }
-  | { mode: 'MULTI_FLASH'; multiplier: number; combo: number; score: number; lives: number; player: string; hetic: number; fever: boolean; upsideDown: boolean }
+  | ({ mode: 'SCORE' } & SnapshotFields)
+  | ({ mode: 'EVENT'; label: string; points: number } & SnapshotFields)
+  | ({ mode: 'COMBO_FLASH' } & SnapshotFields)
+  | ({ mode: 'MULTI_FLASH' } & SnapshotFields)
   | { mode: 'LIFE_LOST'; livesRemaining: number; score: number; player: string; upsideDown: boolean }
   | { mode: 'GAME_OVER'; player: string; finalScore: number; upsideDown: boolean }
 

@@ -59,8 +59,7 @@ export default function DebugPage() {
     combo,
     multiplier: multi,
     lives,
-    hetic,
-    fever: false,
+    mapState: { hetic, fever: false },
     upsideDown: udRef.current,
   })
 
@@ -113,8 +112,7 @@ export default function DebugPage() {
         combo: i,
         multiplier: 1 + Math.floor(i / 3),
         lives: 3,
-        hetic: 0,
-        fever: false,
+        mapState: { hetic: 0, fever: false },
       })
       // eslint-disable-next-line no-await-in-loop
       await wait(150)

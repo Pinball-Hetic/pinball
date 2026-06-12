@@ -468,8 +468,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: comboRef.current,
         multiplier: multiplierRef.current,
         lives: livesRef.current,
-        hetic: heticRef.current,
-        fever: isFeverActive(),
+        mapState: buildMapState(),
       };
 
       dmd.emitScoreSnapshot(snap);
@@ -494,8 +493,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: livesRemaining,
-        hetic: heticRef.current,
-        fever: isFeverActive(),
+        mapState: buildMapState(),
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
@@ -518,8 +516,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: livesRef.current,
-        hetic: heticRef.current,
-        fever: isFeverActive(),
+        mapState: buildMapState(),
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
@@ -538,8 +535,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: 3,
-        hetic: heticRef.current,
-        fever: false,
+        mapState: buildMapState(false),
       });
     },
     onAtmosphereChange: (upsideDownActive) => {
@@ -569,8 +565,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: comboRef.current,
         multiplier: multiplierRef.current,
         lives: livesRef.current,
-        hetic: heticRef.current,
-        fever: isFeverActive(),
+        mapState: buildMapState(),
       };
       dmd.pushEvent("LE NID S EVEILLE", 0, snap);
       garlandLightsRef.current?.celebrate();
@@ -590,8 +585,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             combo: comboRef.current,
             multiplier: multiplierRef.current,
             lives: livesRef.current,
-            hetic: heticRef.current,
-            fever: true,
+            mapState: buildMapState(true),
           };
           dmd.emitScoreSnapshot(snap);
           dmd.pushScore(snap);
@@ -606,12 +600,18 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: comboRef.current,
         multiplier: multiplierRef.current,
         lives: livesRef.current,
-        hetic: heticRef.current,
-        fever: false,
+        mapState: buildMapState(false),
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
     },
+  });
+
+  // Construction unique du mapState ST (hetic/fever) injecté dans chaque
+  // snapshot DMD/score. Une autre map y mettrait d'autres clés (phase 5).
+  const buildMapState = (fever: boolean = isFeverActive()) => ({
+    hetic: heticRef.current,
+    fever,
   });
 
   const garlandLightsRef = useRef<GarlandLights | null>(null);
@@ -1257,8 +1257,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               combo: comboRef.current,
               multiplier: multiplierRef.current,
               lives: livesRef.current,
-              hetic: heticRef.current,
-              fever: isFeverActive(),
+              mapState: buildMapState(),
             });
           }
 
@@ -1703,8 +1702,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               combo: comboRef.current,
               multiplier: multiplierRef.current,
               lives: livesRef.current,
-              hetic: heticRef.current,
-              fever: isFeverActive(),
+              mapState: buildMapState(),
             });
           }
         }
