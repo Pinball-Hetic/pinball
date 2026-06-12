@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import type { GameEvent, GameEventListener } from '@pinball/game-engine';
 import { getBossDefinition, DEMOGORGON_TARGET } from '../bosses';
 import {
-  ELEVEN_ASSIST_SCORE,
-  ELEVEN_ASSIST_INTERVAL,
+  ASSIST_SCORE,
+  ASSIST_INTERVAL,
 } from '@pinball/game-engine';
 import { layout } from '../layout';
 import { PLAYFIELD_TILT } from '@pinball/game-engine';
@@ -381,14 +381,14 @@ export class DemogorgonReveal implements BossRevealController {
   private triggerElevenAssist(): void {
     this.elevenAssistActive = true;
     this.elevenAssistT = 0;
-    this.assistNextIn = ELEVEN_ASSIST_INTERVAL;
+    this.assistNextIn = ASSIST_INTERVAL;
     this.targetPulse?.flashHit();
     if (this.elevenShockOuter) this.elevenShockOuter.visible = true;
     if (this.elevenShockInner) this.elevenShockInner.visible = true;
     if (this.elevenAssistLight && this.root && !this.elevenAssistLight.parent) {
       this.root.add(this.elevenAssistLight);
     }
-    this.emit?.({ type: 'ASSIST', assistId: 'eleven', scoreIncrement: ELEVEN_ASSIST_SCORE });
+    this.emit?.({ type: 'ASSIST', assistId: 'eleven', scoreIncrement: ASSIST_SCORE });
   }
 
   private hideElevenAssist(): void {

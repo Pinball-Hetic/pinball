@@ -58,7 +58,7 @@ import {
   BallTrail,
   QualityGovernor,
   PORTAL_ENTER_SCORE,
-  ELEVEN_ASSIST_SCORE,
+  ASSIST_SCORE,
   SCORE_BUMPER,
   SCORE_SLINGSHOT,
   SCORE_RAMP,
@@ -110,7 +110,7 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
     case "PORTAL_ENTER":
       return { type: "PORTAL_ENTER", scoreIncrement: PORTAL_ENTER_SCORE };
     case "ELEVEN_ASSIST":
-      return { type: "ASSIST", assistId: "eleven", scoreIncrement: ELEVEN_ASSIST_SCORE };
+      return { type: "ASSIST", assistId: "eleven", scoreIncrement: ASSIST_SCORE };
     case "DEBUG_ADD_SCORE":
       // Score brut → le pipeline score/paliers réagit naturellement.
       return { type: "ZONE_HIT", zone: "debug", scoreIncrement: d.amount ?? 1000 };

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { PLAYFIELD_MAP_COLOR_DARKEN, PLAYFIELD_TONE_MAPPING_EXPOSURE } from '../domain/PlayfieldVisualConstants';
-import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from './GltfNodeNames';
+import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh } from './GltfNodeNames';
 
 const TEXTURE_KEYS = [
   'map',
@@ -16,11 +16,11 @@ const TEXTURE_KEYS = [
 function shouldDarkenMapMaterial(mesh: THREE.Mesh): boolean {
   if (isFlipperGltfMesh(mesh)) return false;
 
-  const raw = normalizeGltfName(mesh.name);
-  if (/^guirlande-\d+$/.test(raw)) return false;
-
   const n = canonicalGltfName(mesh.name);
-  if (/bumper-strangerthings/.test(n) || /^bumper_ring/.test(n) || /^bumper-\d+$/.test(n)) return false;
+  // Bumpers visuels exclus du darken (rendu vif). Les noms legacy spécifiques à
+  // une map ont été retirés : le GLB conventionné utilise des préfixes vis_
+  // (gérés en amont), ces patterns ne matchaient plus → retombée identique.
+  if (/^bumper_ring/.test(n) || /^bumper-\d+$/.test(n)) return false;
 
   if (n === 'playfield' || /^table(\.\d+)?$/.test(n) || n === 'pinballmap') return true;
 

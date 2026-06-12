@@ -50,10 +50,10 @@ export const PORTAL_ENTER_SCORE = 500;
 export const RETURN_PORTAL_ENTER_SCORE = 500;
 
 // Spawns de monde alternatif : déplacés en littéraux dans le layout de la map
-// (packages/maps/strangerthings/layout.ts) — plus de constante ST ici.
+// — plus de constante spécifique à une map ici.
 
-export const ELEVEN_ASSIST_SCORE = 100;
-export const ELEVEN_ASSIST_INTERVAL = 3.2;
+export const ASSIST_SCORE = 100;
+export const ASSIST_INTERVAL = 3.2;
 
 // Bump-right / Bump-left (mèches). La direction de poussée est fixe (côté), pas
 // dépendante de la position de contact → pas besoin des coords ici.
