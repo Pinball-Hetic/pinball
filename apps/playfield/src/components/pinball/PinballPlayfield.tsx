@@ -87,7 +87,7 @@ import {
   ShooterLaneGate,
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
-import { MeshRoleResolver } from "@pinball/game-engine";
+import { MeshRoleResolver, type MapContext, type MapModule } from "@pinball/game-engine";
 import type {
   ButtonAction,
   ButtonId,
@@ -621,9 +621,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     },
   });
 
-  // Construction unique du mapState ST (hetic/fever) injecté dans chaque
-  // snapshot DMD/score. Une autre map y mettrait d'autres clés (phase 5).
+  // Patches de mapState poussés par le module de map (ctx.setMapState). Fusionnés
+  // dans chaque snapshot. hetic/fever restent fournis par useGameState pour
+  // l'instant (migreront dans le module en phase 4.3d).
+  const mapStateExtraRef = useRef<Record<string, number | boolean>>({});
+
+  // Construction unique du mapState injecté dans chaque snapshot DMD/score.
   const buildMapState = (fever: boolean = isFeverActive()) => ({
+    ...mapStateExtraRef.current,
     hetic: heticRef.current,
     fever,
   });
@@ -771,6 +776,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let drainBallUC: DrainBall | null = null;
     let bottomOutBallUC: BottomOutBall | null = null;
     let collisionProcessor: CollisionEventProcessor | null = null;
+    const mapModule: MapModule | null = mapPackageRef.current?.module?.() ?? null;
     let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
     let bossReveals: BossRevealOrchestrator | null = null;
@@ -1250,6 +1256,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           bossReveals?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
+          mapModule?.onGameEvent(event);
 
           // ── Screen shake par event (juice) ───────────────────────────────────
           if (event.type === "BUMPER_HIT") screenShake.add(0.25);
@@ -1365,6 +1372,40 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           bottomOutBallUC,
           emit,
         );
+
+        // ── MapContext : leviers du game loop exposés au module de map ────────
+        if (mapModule) {
+          const mapCtx: MapContext = {
+            scene,
+            physics: physicsWorld!,
+            layout: mapLayout,
+            manifest: mapManifest,
+            resolve: (name) => findObjectByNormalizedName(playfieldRoot, name) ?? null,
+            addScore: (points, label) =>
+              emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
+            setMapState: (patch) => {
+              Object.assign(mapStateExtraRef.current, patch);
+            },
+            forceMultiplier: (_value, durationMs) => startFever(durationMs),
+            pushDmdEvent: (label, points) =>
+              dmd.pushEvent(label, points, {
+                player: playerRef.current,
+                score: scoreRef.current,
+                combo: comboRef.current,
+                multiplier: multiplierRef.current,
+                lives: livesRef.current,
+                mapState: buildMapState(),
+              }),
+            playCinematic: (clipId) => playCinematic(clipId),
+            setAtmosphere: (active) => {
+              dmd.setAtmosphere(active);
+              atmosphereUpsideRef.current = active;
+              nestMarkerRef.current?.setUpsideDown(active);
+            },
+            emitGameEvent: (e) => emit(e),
+          };
+          mapModule.setup(mapCtx);
+        }
 
         upsideDownPortal = new UpsideDownPortal();
         upsideDownPortal.setup({
@@ -1722,6 +1763,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       }
 
       cinematics.update(time);
+      mapModule?.update(dt);
       const transitionActive = upsideDownTransition?.isActive() ?? false;
       const vecnaIntroActive = bossReveals?.isGameplayFrozen() ?? false;
       const freezeFrame = transitionActive || cinematics.shouldFreeze() || vecnaIntroActive;
@@ -2058,6 +2100,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     return () => {
       cancelled = true;
       cancelAnimationFrame(frameId);
+      mapModule?.dispose();
       window.removeEventListener("resize", handleResize);
       renderer.domElement.removeEventListener("pointerdown", onBallDragDown);
       window.removeEventListener("pointermove", onBallDragMove);
