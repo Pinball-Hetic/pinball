@@ -997,6 +997,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             layout: mapLayout,
             manifest: mapManifest,
             colliderMap,
+            get ball() {
+              return ballPhysicsInst;
+            },
             lighting: {
               renderer,
               ambient: ambientLight,
@@ -1025,7 +1028,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 lives: livesRef.current,
                 mapState: buildMapState(),
               }),
-            playCinematic: (clipId) => playCinematic(clipId),
+            playCinematic: (clipId, opts) => playCinematic(clipId, opts),
             setAtmosphere: (active) => {
               dmd.setAtmosphere(active);
               atmosphereUpsideRef.current = active;

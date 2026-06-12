@@ -3,6 +3,13 @@ import type { MapManifest, MapState } from '@pinball/shared-types';
 import type { GameEvent } from './GameEvents';
 import type { MapLayout } from './MapLayout';
 import type { PhysicsWorld } from '../infrastructure/PhysicsWorld';
+import type { BallPhysics } from '../infrastructure/BallPhysics';
+
+export interface CinematicOpts {
+  once?: boolean;
+  value?: number;
+  onEnd?: () => void;
+}
 
 // Contrat runtime d'un module de map (comportement playfield custom). Le
 // moteur reste générique : un module reçoit un MapContext (injecté par
@@ -28,6 +35,8 @@ export interface MapContext {
   lighting: MapLighting;
   /** Map handle collider → rôle (pour créer des sensors taggés, ex. portail). */
   colliderMap: Map<number, string>;
+  /** Physique de la bille (null tant qu'elle n'est pas créée — dispo en jeu). */
+  readonly ball: BallPhysics | null;
 
   /** Résout un objet de la scène par nom (applique meshAliases). */
   resolve(name: string): THREE.Object3D | null;
@@ -53,7 +62,7 @@ export interface MapContext {
   pushDmdEvent(label: string, points: number): void;
 
   /** Joue une cinématique (gel + DMD + backglass, timings du manifest). */
-  playCinematic(clipId: string): void;
+  playCinematic(clipId: string, opts?: CinematicOpts): void;
 
   /** Active/désactive l'atmosphère custom (dim/strobe/fog). */
   setAtmosphere(active: boolean): void;
