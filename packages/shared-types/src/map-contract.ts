@@ -6,6 +6,11 @@ import type { ClipId, ClipTimings } from './socket-events'
 // (phases 2-5).
 export type CinematicFamily = 'boss' | 'collect' | 'milestone' | 'other'
 
+// Id de map par défaut (pas de sélecteur de map : NEXT_PUBLIC_MAP_ID non défini
+// → cette map). SEUL endroit où le littéral vit côté apps/serveur ; les
+// consommateurs l'importent au lieu de hardcoder. Whitelisté par le grep-guard.
+export const DEFAULT_MAP_ID = 'strangerthings'
+
 // URL publique d'un asset de map. Les assets vivent dans le package de map
 // (packages/maps/<id>/assets/) et sont synchronisés vers
 // apps/<app>/public/maps/<id>/ au build (scripts/sync-map-assets.sh). Le

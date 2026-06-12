@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Grep-guard anti-fuite map : détecte les termes spécifiques d'une map
-# (manifest.forbiddenInCore) qui apparaîtraient dans le core (game-engine)
-# ou les apps, hors packages/maps/.
+# (manifest.forbiddenInCore) qui apparaîtraient dans le core (game-engine) ou
+# les apps, hors packages/maps/.
 #
-# Phase 2-3 : mode WARNING (exit 0) — des résidus sont attendus tant que le
-# comportement n'est pas extrait. Phases 4-5 : ce script passera bloquant
-# (exit 1) pour game-engine + playfield, puis pour tout le repo.
+# BLOQUANT (exit 1) sur tout résidu NON whitelisté. La whitelist est étroite
+# (paire term|fichier, motif documenté) : faux positifs de branding ou
+# commentaires tolérés. Le littéral d'id de map par défaut vit dans
+# packages/shared-types (DEFAULT_MAP_ID), hors SEARCH_DIRS → non concerné.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -17,7 +18,25 @@ SEARCH_DIRS=(
   apps/server/src
 )
 
-total=0
+# Résidus légitimes tolérés : "<term>|<chemin>". Whitelist ÉTROITE — un
+# fichier par motif documenté.
+WHITELIST=(
+  "hetic|apps/playfield/src/hooks/usePhysicalInputs.ts"               # 'Fliphetic' (orchestrateur de borne)
+  "hetic|apps/dmd/src/pages/index.tsx"                                # 'PINBALL HETIC' (branding projet/borne)
+  "upside|apps/playfield/src/components/pinball/PinballPlayfield.tsx" # commentaires (objets monde alternatif possédés par le module de map)
+)
+
+is_whitelisted() { # term file
+  local key="$1|$2"
+  local w
+  for w in "${WHITELIST[@]}"; do
+    [ "$w" = "$key" ] && return 0
+  done
+  return 1
+}
+
+violations=0
+skipped=0
 
 for manifest in packages/maps/*/manifest.ts; do
   [ -f "$manifest" ] || continue
@@ -32,16 +51,25 @@ for manifest in packages/maps/*/manifest.ts; do
   for term in $terms; do
     hits=$(grep -rIil --include='*.ts' --include='*.tsx' "$term" "${SEARCH_DIRS[@]}" 2>/dev/null \
       | grep -v '/packages/maps/' || true)
-    if [ -n "$hits" ]; then
-      count=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
-      total=$((total + count))
-      echo "  ⚠ '$term' — $count fichier(s)"
-      printf '%s\n' "$hits" | sed 's/^/      /'
-    fi
+    [ -z "$hits" ] && continue
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      if is_whitelisted "$term" "$f"; then
+        skipped=$((skipped + 1))
+        continue
+      fi
+      echo "  ✖ '$term' — $f"
+      violations=$((violations + 1))
+    done <<< "$hits"
   done
   echo ""
 done
 
-echo "Total résidus (fichiers): $total"
-echo "Mode warning (phase 2-3) — exit 0. Les résidus = comportement pas encore extrait."
+if [ "$violations" -gt 0 ]; then
+  echo "ÉCHEC : $violations fuite(s) de map non whitelistée(s) dans le core/apps."
+  echo "→ Extraire le contenu vers packages/maps/<id>/, ou whitelister (motif documenté) si faux positif."
+  exit 1
+fi
+
+echo "OK : aucune fuite de map (${skipped} résidu(s) whitelisté(s) ignoré(s))."
 exit 0

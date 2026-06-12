@@ -1,6 +1,7 @@
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { getMapPackage } from '@pinball/maps';
+import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 import '@/audio/pinballAudio';
 
 const PinballPlayfield = dynamic(
@@ -8,7 +9,7 @@ const PinballPlayfield = dynamic(
   { ssr: false },
 );
 
-const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? 'strangerthings';
+const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 const PRELOAD = getMapPackage(MAP_ID)?.manifest.preload ?? [];
 
 // Type de ressource <link rel=preload> inféré depuis l'extension.

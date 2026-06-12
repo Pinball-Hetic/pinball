@@ -76,9 +76,9 @@ import type {
   CinematicClip,
   DevGameEventTrigger,
 } from "@pinball/shared-types";
-import { clipFreezeMs } from "@pinball/shared-types";
+import { clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
 
-const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? "strangerthings";
+const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 // Résolu au niveau module (MAP_ID = constante build-time) → permet un garde
 // NO SIGNAL en 1ère ligne du composant, avant tout hook.
 const RESOLVED_MAP = getMapPackage(MAP_ID);

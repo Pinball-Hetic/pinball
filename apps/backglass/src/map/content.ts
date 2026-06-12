@@ -1,9 +1,10 @@
+import { DEFAULT_MAP_ID } from '@pinball/shared-types'
 import { getBackglassContent } from '@pinball/maps/backglass'
 
 // Résolution UNIQUE du contenu backglass de la map active (build-time via
 // NEXT_PUBLIC_MAP_ID) par le registry. Les composants/hooks consomment ces
 // exports — aucun n'importe @pinball/map-* en direct.
-const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? 'strangerthings'
+const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID
 
 const content = getBackglassContent(MAP_ID)
 

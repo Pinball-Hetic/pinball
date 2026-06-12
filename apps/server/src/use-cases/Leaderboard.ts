@@ -1,7 +1,7 @@
-import type { LeaderboardEntry, GlobalStats } from '@pinball/shared-types';
+import { type LeaderboardEntry, type GlobalStats, DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { prisma } from '../infrastructure/prisma';
 
-export async function topTen(mapId = 'strangerthings'): Promise<LeaderboardEntry[]> {
+export async function topTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEntry[]> {
   const games = await prisma.game.findMany({
     where: { mapId },
     orderBy: { score: 'desc' },
@@ -22,7 +22,7 @@ function startOfToday(): Date {
   return d;
 }
 
-export async function globalStats(mapId = 'strangerthings'): Promise<GlobalStats> {
+export async function globalStats(mapId = DEFAULT_MAP_ID): Promise<GlobalStats> {
   // Agrégat des counters côté JS (volume faible, borne unique) — pas de raw SQL.
   const [games, topCombo, today] = await Promise.all([
     prisma.game.findMany({ where: { mapId }, select: { counters: true } }),

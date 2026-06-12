@@ -9,12 +9,13 @@ import type {
   LeaderboardEntry,
   CinematicClip,
 } from '@pinball/shared-types'
+import { DEFAULT_MAP_ID } from '@pinball/shared-types'
 import { getMapPackage } from '@pinball/maps'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
 // Map active : le debug est data-driven (boutons boss + clips depuis la map).
-const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? 'strangerthings'
+const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID
 const MAP_PKG = getMapPackage(MAP_ID)
 const BOSSES = MAP_PKG?.layout.bosses ?? []
 // Clips de la map (manifest.clipFamilies) + clips core génériques.
