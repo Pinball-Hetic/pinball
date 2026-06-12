@@ -28,6 +28,7 @@ export * from './infrastructure/PlayfieldTrimeshBuilder';
 export * from './infrastructure/PlayfieldColliderFactory';
 export * from './infrastructure/LauncherLaneBounds';
 export * from './infrastructure/FlipperSplitter';
+export * from './infrastructure/FlipperZones';
 export * from './infrastructure/CollisionEventProcessor';
 export * from './infrastructure/BossFightManager';
 export * from './infrastructure/BossTargetPulse';

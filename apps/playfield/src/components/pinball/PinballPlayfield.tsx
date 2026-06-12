@@ -32,12 +32,6 @@ import {
   SWING_SMOOTH,
   FLIPPER_RESTITUTION,
   FLIPPER_FRICTION,
-  FLIPPER_Z_MIN,
-  FLIPPER_Z_MAX,
-  FLIPPER_LEFT_X_MIN,
-  FLIPPER_LEFT_X_MAX,
-  FLIPPER_RIGHT_X_MIN,
-  FLIPPER_RIGHT_X_MAX,
   FLIPPER_MIN_LAUNCH_VZ,
   FLIPPER_MIN_LAUNCH_ANGVEL,
   computeSurfaceSnap,
@@ -47,6 +41,8 @@ import {
   resolvePlayfieldFlippers,
   attachFlipperAtHinge,
   applyFlipperSwing,
+  computeFlipperZones,
+  type FlipperZones,
   type FlipperPivot,
   CollisionEventProcessor,
   StuckBallDetector,
@@ -709,6 +705,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let rightFlipperPivot: FlipperPivot | null = null;
     let leftFlipperObj: THREE.Object3D | null = null;
     let rightFlipperObj: THREE.Object3D | null = null;
+    let flipperZones: FlipperZones | null = null;
     let leftSwing = 0, rightSwing = 0;
     let prevLeftSwing = 0, prevRightSwing = 0;
     let leftTarget = 0, rightTarget = 0;
@@ -984,6 +981,11 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", pinballmap);
           rightFlipperObj = rightFlipper;
           rightFlashMats = collectFlashMats(rightFlipper);
+        }
+
+        // Zones de garantie de lancement dérivées des bbox mesh (pose de repos).
+        if (leftFlipperObj && rightFlipperObj) {
+          flipperZones = computeFlipperZones(leftFlipperObj, rightFlipperObj, BALL_RADIUS);
         }
 
         // ── Physics ──────────────────────────────────────────────────────────
@@ -1713,17 +1715,19 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // physique fait déjà mieux.
         // Seuil normalisé en vitesse angulaire (rad/s) : 0.004 * 60 = 0.24 rad/s,
         // indépendant du fps (évite que le seuil ne se déclenche jamais à 120+ Hz).
-        if (ballPhysicsInst && gameStateRef.current === 'playing') {
+        if (ballPhysicsInst && gameStateRef.current === 'playing' && flipperZones) {
           const bp = ballPhysicsInst.body.translation();
           const bv = ballPhysicsInst.body.linvel();
-          const inZ = bp.z > FLIPPER_Z_MIN && bp.z < FLIPPER_Z_MAX;
+          const { left: lz, right: rz } = flipperZones;
           const angVelL = (leftSwing  - prevLeftSwing) / dt;
           const angVelR = (rightSwing - prevRightSwing) / dt;
-          if (inZ && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_LEFT_X_MIN  && bp.x < FLIPPER_LEFT_X_MAX  && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
+          const inLeft  = bp.z > lz.zMin && bp.z < lz.zMax && bp.x > lz.xMin && bp.x < lz.xMax;
+          const inRight = bp.z > rz.zMin && bp.z < rz.zMax && bp.x > rz.xMin && bp.x < rz.xMax;
+          if (inLeft && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
             leftFlash = FLASH_DURATION; // hit-flash à la frappe
           }
-          if (inZ && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bp.x > FLIPPER_RIGHT_X_MIN && bp.x < FLIPPER_RIGHT_X_MAX && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
+          if (inRight && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
             ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
             rightFlash = FLASH_DURATION;
           }
