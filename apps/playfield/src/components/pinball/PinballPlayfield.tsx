@@ -56,9 +56,6 @@ import {
   ballCenterOnSurface,
   DROP_TARGETS,
   PlungerPhysics,
-  BumperVisuals,
-  GarlandLights,
-  DemogorgonReveal,
   VecnaReveal,
   BossRevealOrchestrator,
   BossNestMarker,
@@ -599,7 +596,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     fever,
   });
 
-  const garlandLightsRef = useRef<GarlandLights | null>(null);
   const nestMarkerRef = useRef<BossNestMarker | null>(null);
   const shooterLaneGateRef = useRef<ShooterLaneGate | null>(null);
   const screenShakeRef = useRef<ScreenShake | null>(null);
@@ -745,7 +741,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     // Hoisté : le MapContext (construit tôt) le référence via closures, mais il
     // n'est assigné qu'une fois le pipeline d'events prêt (plus bas).
     let emit: GameEventListener;
-    let garlandLights: GarlandLights | null = null;
     let bossReveals: BossRevealOrchestrator | null = null;
     let nestMarker: BossNestMarker | null = null;
     let ballTrail: BallTrail | null = null;
@@ -987,6 +982,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
               dmd.pushScore(snap);
             },
             screenShake: (amount) => screenShakeRef.current?.add(amount),
+            isFeverActive: () => isFeverActive(),
+            gameState: () => gameStateRef.current,
             lighting: {
               renderer,
               ambient: ambientLight,
@@ -1036,24 +1033,19 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           // module pour les systèmes Upside Down (encore ici) + le ref qui
           // pilote celebrate/setFever. Disparaît au cluster Upside Down.
           const stVisuals = mapModule as MapModule & {
-            garlands?: GarlandLights | null;
-            bumperVisuals?: BumperVisuals | null;
             atmosphere?: UpsideDownAtmosphere | null;
             portal?: UpsideDownPortal | null;
             transition?: UpsideDownTransition | null;
             nestMarker?: BossNestMarker | null;
             bossReveals?: BossRevealOrchestrator | null;
-            demogorgonReveal?: DemogorgonReveal | null;
             vecnaReveal?: VecnaReveal | null;
           };
-          garlandLights = stVisuals.garlands ?? null;
           upsideDownAtmosphere = stVisuals.atmosphere ?? null;
           upsideDownPortal = stVisuals.portal ?? null;
           upsideDownTransition = stVisuals.transition ?? null;
           nestMarker = stVisuals.nestMarker ?? null;
           bossReveals = stVisuals.bossReveals ?? null;
           vecnaReveal = stVisuals.vecnaReveal ?? null;
-          garlandLightsRef.current = garlandLights;
           nestMarkerRef.current = nestMarker;
           // Préchargement des reveals boss (async) — gardé ici (module.setup
           // est synchrone). Bloque le chargement comme avant.
@@ -1603,11 +1595,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       const dt = prevFrameTime > 0 ? Math.min((time - prevFrameTime) / 1000, 0.05) : 0.016;
       prevFrameTime = time;
 
-      // bumperVisuals + garlands : update(dt) géré par mapModule.update.
-      // setFever reste piloté ici (l'état fever vit dans useGameState).
-      garlandLights?.setFever(isFeverActive());
-      // bossReveals + nestMarker + upsideDownAtmosphere + upsideDownPortal :
-      // update(dt) géré par mapModule.update.
+      // visuals + garlands (incl. setFever via ctx.isFeverActive) + bosses +
+      // upside-down : update(dt) géré par mapModule.update.
 
       // Hint tardif du nid : géré par le module de map (mapModule.update).
 

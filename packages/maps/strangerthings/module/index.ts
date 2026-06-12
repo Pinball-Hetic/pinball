@@ -296,6 +296,7 @@ export function createModule(): StModule {
     },
     update(dt: number): void {
       bumperVisuals?.update(dt)
+      garlands?.setFever(ctxRef?.isFeverActive() ?? false)
       garlands?.update(dt)
       atmosphere?.update(dt)
       portal?.update(dt)

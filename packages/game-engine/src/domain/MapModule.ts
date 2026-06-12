@@ -54,6 +54,10 @@ export interface MapContext {
   refreshScoreSnapshot(): void;
   /** Secousse d'écran (juice), amount ∈ ~[0..1]. */
   screenShake(amount: number): void;
+  /** True si le fever (multiplicateur forcé) est actif. */
+  isFeverActive(): boolean;
+  /** État de jeu courant ('idle' | 'playing' | 'game_over'). */
+  gameState(): string;
 
   /** Résout un objet de la scène par nom (applique meshAliases). */
   resolve(name: string): THREE.Object3D | null;
