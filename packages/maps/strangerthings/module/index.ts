@@ -1,4 +1,9 @@
-import { GarlandLights, BumperVisuals, UpsideDownAtmosphere } from '@pinball/game-engine'
+import {
+  GarlandLights,
+  BumperVisuals,
+  UpsideDownAtmosphere,
+  UpsideDownPortal,
+} from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 
 // Module de comportement Stranger Things. Extraction progressive (phase 4.3),
@@ -12,12 +17,14 @@ export interface StModule extends MapModule {
   garlands: GarlandLights | null
   bumperVisuals: BumperVisuals | null
   atmosphere: UpsideDownAtmosphere | null
+  portal: UpsideDownPortal | null
 }
 
 export function createModule(): StModule {
   let garlands: GarlandLights | null = null
   let bumperVisuals: BumperVisuals | null = null
   let atmosphere: UpsideDownAtmosphere | null = null
+  let portal: UpsideDownPortal | null = null
   return {
     get garlands() {
       return garlands
@@ -27,6 +34,9 @@ export function createModule(): StModule {
     },
     get atmosphere() {
       return atmosphere
+    },
+    get portal() {
+      return portal
     },
     setup(ctx: MapContext): void {
       bumperVisuals = new BumperVisuals()
@@ -47,25 +57,36 @@ export function createModule(): StModule {
           fill: ctx.lighting.fill,
         },
       })
+      portal = new UpsideDownPortal()
+      portal.setup({
+        root: ctx.root,
+        world: ctx.physics.world,
+        colliderMap: ctx.colliderMap,
+        onOpenChange: (open) => ctx.setPortalGateOpen(open),
+      })
     },
     onGameEvent(e: GameEvent): void {
       bumperVisuals?.onGameEvent(e)
       garlands?.onGameEvent(e)
       atmosphere?.onGameEvent(e)
+      portal?.onGameEvent(e)
     },
     update(dt: number): void {
       bumperVisuals?.update(dt)
       garlands?.update(dt)
       atmosphere?.update(dt)
+      portal?.update(dt)
     },
     onGameReset(): void {},
     dispose(): void {
       bumperVisuals?.dispose()
       garlands?.dispose()
       atmosphere?.dispose()
+      portal?.dispose()
       bumperVisuals = null
       garlands = null
       atmosphere = null
+      portal = null
     },
   }
 }
