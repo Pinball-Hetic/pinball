@@ -5,7 +5,6 @@ import {
   getBossDefinition,
   bossThresholdMet,
   type BossId,
-  BUMPER_POSITIONS,
   UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
@@ -102,10 +101,13 @@ const initialBossHud = (): BossHudState =>
 export interface GameStateOptions {
   /** Ancre écran des pop de score portail (depuis layout.sensors.portal). */
   portalAnchor?: { x: number; z: number };
+  /** Ancres écran des pop de score bumper (depuis layout.bumpers). */
+  bumperAnchors?: { x: number; z: number }[];
 }
 
 export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptions) {
   const portalAnchor = opts?.portalAnchor ?? { x: 0, z: 0 };
+  const bumperAnchors = opts?.bumperAnchors ?? [];
   // `callbacks` est un objet littéral recréé à chaque render → on le lit via
   // un ref pour ne PAS remettre l'interval 250ms (decay combo + expiration
   // fever) à zéro à chaque render (sinon il pourrait ne jamais se déclencher).
@@ -363,7 +365,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         }
       }
       if (event.type === "BUMPER_HIT") {
-        const bumper = BUMPER_POSITIONS[event.bumperIndex];
+        const bumper = bumperAnchors[event.bumperIndex];
         if (bumper) {
           const point = jitterScreenPoint(
             playfieldToScreenPercent(bumper.x, bumper.z),

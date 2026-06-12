@@ -1,6 +1,5 @@
 import type { MapLayout } from '@pinball/game-engine'
 import {
-  BUMPER_POSITIONS,
   SHOOTER_LANE_X_MIN,
   SHOOTER_LANE_X_MAX,
   SHOOTER_LANE_BOTTOM_Z,
@@ -73,7 +72,14 @@ import {
 // La bascule de propriété (literaux ici, suppression des constantes côté
 // game-engine) se fera consommateur par consommateur en phase 4.
 export const layout: MapLayout = {
-  bumpers: BUMPER_POSITIONS.map((b) => ({ ...b })),
+  // Bumpers : littéraux (collider tuné). Le centre Box3 des meshes bumper_*
+  // dévie de 11-15 mm (cap mushroom) → non dérivable. TODO(blender): ajouter
+  // bumper_anchor_1/2/3 (empty au point collider) pour dériver à terme.
+  bumpers: [
+    { x: -0.020586, y: 1.0482, z: -0.1967 },
+    { x: -0.097406, y: 1.0621, z: -0.30509 },
+    { x: 0.059483, y: 1.0621, z: -0.30509 },
+  ],
   // Drop targets : positions dérivées du GLB au runtime (LayoutResolver, meshes
   // target_*). Les littéraux ci-dessous = fallback (≤ 0.7 mm du dérivé).
   dropTargets: [

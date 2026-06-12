@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
-import { BUMPER_POSITIONS } from '@pinball/game-engine';
 import { normalizeGltfName } from '@pinball/game-engine';
+import { layout } from '../layout';
 import { GlowSprite } from '@pinball/game-engine';
 
 const LEGACY_BUMPER = /^bumper-st-\d+$/;
@@ -64,8 +64,8 @@ function cloneStandardMaterial(mesh: THREE.Mesh): THREE.MeshStandardMaterial {
 function nearestBumperIndex(pos: THREE.Vector3): number {
   let best = 0;
   let bestDist = Infinity;
-  for (let i = 0; i < BUMPER_POSITIONS.length; i++) {
-    const p = BUMPER_POSITIONS[i]!;
+  for (let i = 0; i < layout.bumpers.length; i++) {
+    const p = layout.bumpers[i]!;
     const dx = pos.x - p.x;
     const dy = pos.y - p.y;
     const dz = pos.z - p.z;

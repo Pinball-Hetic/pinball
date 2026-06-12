@@ -67,11 +67,8 @@ export const SHOOTER_GUIDE_ANGLE_END = Math.PI * 2;
 export const PLAYFIELD_TILT_DEG  = 6.5;
 export const PLAYFIELD_SURFACE_Y = 1.0681; // top of playfield mesh = 1.0171 + 0.1019/2
 
-export const BUMPER_POSITIONS = [
-  { x: -0.020586, y: 1.0482, z: -0.1967 },
-  { x: -0.097406, y: 1.0621, z: -0.30509 },
-  { x:  0.059483, y: 1.0621, z: -0.30509 },
-] as const;
+// BUMPER_POSITIONS déplacé en littéral dans le layout de la map (collider
+// tuné, centre Box3 mesh non fiable). Plus de constante ici.
 export {
   DEMOGORGON_TARGET,
   DEMOGORGON_TARGET_HITS,
