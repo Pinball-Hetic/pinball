@@ -24,7 +24,7 @@ import {
   UPSIDE_DOWN_ATMOSPHERE_SURFACE_TINT,
   UPSIDE_DOWN_ATMOSPHERE_TINT,
   UPSIDE_DOWN_ATMOSPHERE_WALL_TINT,
-} from '@pinball/game-engine';
+} from './UpsideDownConstants';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
 import { PlayfieldShadeOverlay } from '@pinball/game-engine';

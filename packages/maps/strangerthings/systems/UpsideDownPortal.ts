@@ -16,7 +16,7 @@ import {
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
-} from '@pinball/game-engine';
+} from './UpsideDownConstants';
 import { findObjectByNormalizedName } from '@pinball/game-engine';
 import { GlowSprite } from '@pinball/game-engine';
 

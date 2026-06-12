@@ -3,7 +3,6 @@ import {
   INITIAL_LIVES,
   bossThresholdMet,
   type BossId,
-  UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
 import { BOSS_IDS, getBossDefinition } from "@/map/activeMapBosses";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
@@ -102,11 +101,14 @@ export interface GameStateOptions {
   portalAnchor?: { x: number; z: number };
   /** Ancres écran des pop de score bumper (depuis layout.bumpers). */
   bumperAnchors?: { x: number; z: number }[];
+  /** Délai avant le hint d'atmosphère (depuis layout.atmosphere.hintMs). */
+  atmosphereHintMs?: number;
 }
 
 export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptions) {
   const portalAnchor = opts?.portalAnchor ?? { x: 0, z: 0 };
   const bumperAnchors = opts?.bumperAnchors ?? [];
+  const atmosphereHintMs = opts?.atmosphereHintMs ?? 45_000;
   // `callbacks` est un objet littéral recréé à chaque render → on le lit via
   // un ref pour ne PAS remettre l'interval 250ms (decay combo + expiration
   // fever) à zéro à chaque render (sinon il pourrait ne jamais se déclencher).
@@ -505,7 +507,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         upsideDownHintTimerRef.current = window.setTimeout(() => {
           upsideDownHintTimerRef.current = null;
           setUpsideDownHint(false);
-        }, UPSIDE_DOWN_HINT_MS);
+        }, atmosphereHintMs);
         callbacks?.onAtmosphereChange?.(true);
       }
       if (event.type === "RETURN_PORTAL_TRANSITION_END") {

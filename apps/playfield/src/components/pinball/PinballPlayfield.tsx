@@ -576,7 +576,11 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
     },
-  }, { portalAnchor: mapLayout.sensors.portal, bumperAnchors: mapLayout.bumpers });
+  }, {
+    portalAnchor: mapLayout.sensors.portal,
+    bumperAnchors: mapLayout.bumpers,
+    atmosphereHintMs: mapLayout.atmosphere.hintMs,
+  });
 
   // Patches de mapState poussés par le module de map (ctx.setMapState). Fusionnés
   // dans chaque snapshot. hetic/fever restent fournis par useGameState pour

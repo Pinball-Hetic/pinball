@@ -92,7 +92,7 @@ export interface GeometryLayout {
   };
 }
 
-// Tous les réglages d'ambiance monde alternatif (UpsideDownConstants.ts).
+// Tous les réglages d'ambiance monde alternatif (ambiance fournie par la map).
 export interface AtmosphereLayout {
   transition: {
     durationS: number;

@@ -31,6 +31,8 @@ import {
   PLAYFIELD_SHADE_Y,
   PLAYFIELD_SHADE_Z,
   PLAYFIELD_SHADE_MAX_OPACITY,
+} from '@pinball/game-engine'
+import {
   UPSIDE_DOWN_TRANSITION_DURATION,
   UPSIDE_DOWN_TRANSITION_BLACKOUT,
   UPSIDE_DOWN_TRANSITION_REVEAL,
@@ -65,7 +67,7 @@ import {
   UPSIDE_DOWN_ATMOSPHERE_BLEND_STROBE_HZ,
   UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT,
   UPSIDE_DOWN_HINT_MS,
-} from '@pinball/game-engine'
+} from './systems/UpsideDownConstants'
 
 // Layout ST. Étape transitoire : on assemble le MapLayout à partir des
 // constantes game-engine existantes (référence, pas de copie → pas de drift).

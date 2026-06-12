@@ -8,7 +8,7 @@ import {
   UPSIDE_DOWN_TRANSITION_REVEAL,
   UPSIDE_DOWN_TRANSITION_STROBE_HZ,
   UPSIDE_DOWN_TRANSITION_TREMOR,
-} from '@pinball/game-engine';
+} from './UpsideDownConstants';
 import { easeIn, easeOut, strobeOn } from '@pinball/game-engine';
 import { CameraBillboardSprite } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
