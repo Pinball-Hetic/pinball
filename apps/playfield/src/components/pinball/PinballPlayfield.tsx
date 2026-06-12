@@ -1304,13 +1304,15 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             shooterLaneGate?.open();
           }
           if (event.type === 'DROP_TARGET_HIT') {
-            const meshName = event.targetId.replace('drop_', 'drop_target_');
+            // Meshes GLB conventionnés en target_<id> (ex. target_left_1) ;
+            // l'id de drop est drop_<id> → on retrouve le mesh visuel.
+            const meshName = event.targetId.replace('drop_', 'target_');
             const mesh = playfieldRootRef?.getObjectByName(meshName);
             if (mesh) mesh.visible = false;
           }
           if (event.type === 'DROP_TARGET_COMPLETE' || event.type === 'DROP_TARGET_RESET') {
             for (const dt of mapLayout.dropTargets) {
-              const mesh = playfieldRootRef?.getObjectByName(dt.id.replace('drop_', 'drop_target_'));
+              const mesh = playfieldRootRef?.getObjectByName(dt.id.replace('drop_', 'target_'));
               if (mesh) mesh.visible = true;
             }
           }
