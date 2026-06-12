@@ -286,7 +286,7 @@ export class BallDiagnostics {
    * uniquement quand la bille est dans la bande, zéro sinon. Chaque franchissement
    * → `console.warn('[WALL CROSS]', …)` + incrément du compteur exposé au HUD.
    * `side` indique si le passage se fait au-dessus du sommet du mur
-   * (Z < SHOOTER_LANE_LEFT_WALL_TOP_Z, trou légitime de sortie) ou en dessous
+   * (Z < lane.leftWallTopZ, trou légitime de sortie) ou en dessous
    * (traversée parasite du mur plein).
    */
   private traceWallCross(p: Vec3, v: Vec3): void {

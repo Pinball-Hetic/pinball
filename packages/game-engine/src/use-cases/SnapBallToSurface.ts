@@ -1,6 +1,4 @@
 import {
-  SHOOTER_LANE_LEFT_WALL_TOP_Z,
-  SHOOTER_LANE_LOCK_X,
   SURFACE_SNAP_THRESHOLD,
   WALL_BOTTOM_Z,
   WALL_LEFT_X,
@@ -30,8 +28,12 @@ export interface SurfaceSnapResult {
  *   gravité qui ramène la balle, on ne l'empêche pas. XZ jamais touché →
  *   vitesse de jeu conservée.
  */
-export function computeSurfaceSnap(pos: Vec3, vel: Vec3): SurfaceSnapResult | null {
-  const inLaneStraight = pos.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && pos.x > SHOOTER_LANE_LOCK_X;
+export function computeSurfaceSnap(
+  pos: Vec3,
+  vel: Vec3,
+  lane: { leftWallTopZ: number; lockX: number },
+): SurfaceSnapResult | null {
+  const inLaneStraight = pos.z > lane.leftWallTopZ && pos.x > lane.lockX;
   if (inLaneStraight) return null;
 
   const inPlayfield =

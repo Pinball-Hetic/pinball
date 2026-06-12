@@ -16,9 +16,6 @@ import {
   BALL_RADIUS,
   BALL_MAX_SPEED,
   bottomOutLaneSepX,
-  SHOOTER_LANE_LEFT_WALL_TOP_Z,
-  SHOOTER_LANE_LOCK_X,
-  SHOOTER_LANE_EXIT_X,
   WALL_LEFT_X,
   WALL_RIGHT_X,
   WALL_BOTTOM_Z,
@@ -916,12 +913,12 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         rightFlipper?.updateMatrixWorld(true);
 
         if (leftFlipper && (leftFlipper as THREE.Mesh).isMesh) {
-          leftFlipperPivot = attachFlipperAtHinge(leftFlipper, "left", pinballmap);
+          leftFlipperPivot = attachFlipperAtHinge(leftFlipper, "left", mapLayout.flipperPivots, pinballmap);
           leftFlipperObj = leftFlipper;
           leftFlashMats = collectFlashMats(leftFlipper);
         }
         if (rightFlipper && (rightFlipper as THREE.Mesh).isMesh) {
-          rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", pinballmap);
+          rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", mapLayout.flipperPivots, pinballmap);
           rightFlipperObj = rightFlipper;
           rightFlashMats = collectFlashMats(rightFlipper);
         }
@@ -1028,7 +1025,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         await mapModule?.preload?.();
 
         shooterLaneGate = new ShooterLaneGate();
-        shooterLaneGate.bind(world);
+        shooterLaneGate.bind(world, mapLayout.shooterLane);
         shooterLaneGateRef.current = shooterLaneGate;
 
         modelRoot.updateMatrixWorld(true);
@@ -1704,12 +1701,12 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         // couloir, avant l'ouverture de sortie), on fige X sur la ligne de spawn
         // et on annule la vitesse latérale → lancement parfaitement droit, sans
         // dépendre de la géométrie GLB. La balle est libérée dès qu'elle atteint
-        // la zone de sortie (Z <= SHOOTER_LANE_LEFT_WALL_TOP_Z) pour partir
+        // la zone de sortie (Z <= mapLayout.shooterLane.leftWallTopZ) pour partir
         // naturellement dans le terrain.
         if (gameStateRef.current === "playing" && !ballMoveMode && !shooterLaneGate?.isClosed()) {
           const lp = ballPhysicsInst.body.translation();
           const inLaneStraight =
-            lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > SHOOTER_LANE_LOCK_X;
+            lp.z > mapLayout.shooterLane.leftWallTopZ && lp.x > mapLayout.shooterLane.lockX;
           if (inLaneStraight) {
             ballPhysicsInst.body.setTranslation(
               { x: mapLayout.spawns.ball.x, y: lp.y, z: lp.z },
@@ -1719,7 +1716,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             ballPhysicsInst.body.setLinvel({ x: 0, y: lv.y, z: lv.z }, true);
             const av = ballPhysicsInst.body.angvel();
             ballPhysicsInst.body.setAngvel({ x: av.x, y: 0, z: 0 }, true);
-          } else if (lp.x < SHOOTER_LANE_EXIT_X) {
+          } else if (lp.x < mapLayout.shooterLane.exitX) {
             shooterLaneGate?.close();
           }
         }
@@ -1730,6 +1727,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           const snap = computeSurfaceSnap(
             ballPhysicsInst.body.translation(),
             ballPhysicsInst.body.linvel(),
+            mapLayout.shooterLane,
           );
           if (snap) {
             ballPhysicsInst.body.setTranslation(snap.translation, true);

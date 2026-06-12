@@ -59,10 +59,10 @@ export interface ShooterLaneLayout {
 }
 
 export interface FlipperPivots {
-  leftX: number; // FLIPPER_LEFT_PIVOT_X
-  rightX: number; // FLIPPER_RIGHT_PIVOT_X
-  y: number; // FLIPPER_PIVOT_Y
-  z: number; // FLIPPER_PIVOT_Z
+  leftX: number;
+  rightX: number;
+  y: number;
+  z: number;
 }
 
 // surfaceYAtZ(z) = base - ((z + zOffset) / zSpan) * yDrop

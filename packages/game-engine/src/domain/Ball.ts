@@ -25,42 +25,9 @@ export const BALL_MAX_SPEED = 7.0;
 // (plunge full réaliste, sous le clamp BALL_MAX_SPEED).
 export const PLUNGER_IMPULSE_Z = -0.26;
 
-// ── Couloir plongeur (shooter lane) — vrai lancement physique ────────────────
-// X min = 0.206 : mur gauche analytique HORS du chemin de la balle (canal large
-// pour que la balle, diamètre ~0.0295, ne soit jamais coincée). La balle est
-// maintenue à droite par le spawn ; les arcs GLB bordent le côté gauche.
-export const SHOOTER_LANE_X_MIN = 0.206;
-export const SHOOTER_LANE_X_MAX = 0.265;
-// Z : bas = côté joueur, haut = début de la courbe de sortie (Z négatif).
-export const SHOOTER_LANE_BOTTOM_Z = 0.42;
-export const SHOOTER_LANE_TOP_Z = -0.49;
-export const SHOOTER_LANE_WALL_HEIGHT = 0.05;
-// Épais pour empêcher le tunneling de la balle rapide (clamp BALL_MAX_SPEED, 7 m/s) au lancement.
-export const SHOOTER_LANE_WALL_THICKNESS = 0.02;
-export const SHOOTER_LANE_RESTITUTION = 0.2;
-export const SHOOTER_LANE_FRICTION = 0.08;
-// Le mur gauche (séparateur) s'arrête ici : ouverture en haut-gauche par
-// laquelle la balle déviée sort dans le terrain.
-export const SHOOTER_LANE_LEFT_WALL_TOP_Z = -0.28;
-
-// Verrou latéral : tant que la balle monte la partie droite du couloir
-// (X au-dessus de ce seuil), on la fige sur la ligne de spawn → lancement droit.
-export const SHOOTER_LANE_LOCK_X = 0.19;
-// Diagnostic LaneFlight : la balle est considérée sortie dans le terrain sous ce X.
-export const SHOOTER_LANE_EXIT_X = 0.18;
-// Diagnostic LaneFlight : retombée en bas du couloir (échec de lancement) au-delà de ce Z.
-export const SHOOTER_LANE_FAIL_Z = 0.30;
-
-// Guide courbe de sortie = mur EXTÉRIEUR (droite + haut) qui s'incurve.
-// Centre au coin haut-gauche du couloir : la balle montante (-Z) longe la face
-// concave et est renvoyée vers la gauche (-X) en redescendant (+Z) → arc
-// classique de flipper. Quart de cercle balayé de 270° (haut-gauche) à 360°
-// (sommet du mur droit).
-export const SHOOTER_GUIDE_CENTER = { x: SHOOTER_LANE_X_MIN, z: -0.40 } as const;
-export const SHOOTER_GUIDE_RADIUS = SHOOTER_LANE_X_MAX - SHOOTER_LANE_X_MIN;
-export const SHOOTER_GUIDE_SEGMENTS = 10;
-export const SHOOTER_GUIDE_ANGLE_START = Math.PI * 1.5;
-export const SHOOTER_GUIDE_ANGLE_END = Math.PI * 2;
+// Couloir plongeur (shooter lane) + guide : géométrie déplacée en littéraux
+// dans le layout de la map (layout.shooterLane). Le moteur lit la config
+// injectée (ShooterLaneGate, computeSurfaceSnap, PlayfieldColliderFactory).
 
 // Playfield — GLB: center=[0,1.0171,-0.0671] size=[0.53,0.1019,0.9697]
 // Surface is already tilted in GLB geometry → gravity stays straight down
