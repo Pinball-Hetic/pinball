@@ -1,4 +1,6 @@
-export type BossId = 'demogorgon' | 'vecna';
+// Identifiant de boss générique (les ids concrets — demogorgon/vecna — sont
+// fournis par les définitions de boss de la map, pas codés dans le moteur).
+export type BossId = string;
 
 export type BossTargetPosition = {
   x: number;
