@@ -1,0 +1,16 @@
+{
+  "name": "@pinball/map-strangerthings",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "lint": "eslint . --ext .ts",
+    "build": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@pinball/shared-types": "workspace:*",
+    "@pinball/game-engine": "workspace:*"
+  }
+}

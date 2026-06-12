@@ -10,6 +10,8 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
+      "@pinball/maps": ["../../packages/maps/index.ts"],
+      "@pinball/map-strangerthings": ["../../packages/maps/strangerthings/index.ts"],
       "@pinball/*": ["../../packages/*/src"]
     }
   }

@@ -1,0 +1,5 @@
+{
+  "extends": "../config/tsconfig.json",
+  "include": ["index.ts"],
+  "exclude": ["node_modules", "strangerthings"]
+}

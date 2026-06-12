@@ -1,0 +1,16 @@
+{
+  "name": "@pinball/maps",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "lint": "eslint . --ext .ts --ignore-pattern strangerthings",
+    "build": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@pinball/shared-types": "workspace:*",
+    "@pinball/map-strangerthings": "workspace:*"
+  }
+}
