@@ -780,12 +780,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     // Hoisté : le MapContext (construit tôt) le référence via closures, mais il
     // n'est assigné qu'une fois le pipeline d'events prêt (plus bas).
     let emit: GameEventListener;
-    let bumperVisuals: BumperVisuals | null = null;
     let garlandLights: GarlandLights | null = null;
     let bossReveals: BossRevealOrchestrator | null = null;
     let nestMarker: BossNestMarker | null = null;
     let ballTrail: BallTrail | null = null;
-    let demogorgonReveal: DemogorgonReveal | null = null;
     let vecnaReveal: VecnaReveal | null = null;
     let upsideDownPortal: UpsideDownPortal | null = null;
     let upsideDownTransition: UpsideDownTransition | null = null;
@@ -929,37 +927,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         // garlands + bumperVisuals créés par le module de map (cluster visuals),
         // récupérés après mapModule.setup (plus bas, après le monde physique).
-        nestMarker = new BossNestMarker();
-        nestMarker.setup({ root: playfieldRoot });
-        nestMarkerRef.current = nestMarker;
+        // nestMarker + demogorgon/vecna reveals + bossReveals : créés/possédés
+        // par le module de map (récupérés via le bridge, preload fait là-haut).
         ballTrail = new BallTrail();
         ballTrail.mount(scene);
-        demogorgonReveal = new DemogorgonReveal();
-        demogorgonReveal.setup({
-          root: playfieldRoot,
-          scene,
-          camera,
-          garlandLights,
-          bumperVisuals,
-          onFightEnd: () => collisionProcessor?.setBossFightActive('demogorgon', false),
-          onTargetReady: () => collisionProcessor?.setBossTargetArmed('demogorgon', true),
-        });
-
-        vecnaReveal = new VecnaReveal();
-        vecnaReveal.setup({
-          root: playfieldRoot,
-          camera,
-          garlandLights,
-          bumperVisuals,
-          onFightEnd: () => collisionProcessor?.setBossFightActive('vecna', false),
-          onTargetReady: () => collisionProcessor?.setBossTargetArmed('vecna', true),
-        });
-
-        bossReveals = new BossRevealOrchestrator();
-        bossReveals.register(demogorgonReveal).register(vecnaReveal);
-        await bossReveals.preloadAll(renderer, scene, camera).catch((err) => {
-          console.warn("[BossReveals] preload failed:", err);
-        });
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
@@ -1072,13 +1043,25 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             atmosphere?: UpsideDownAtmosphere | null;
             portal?: UpsideDownPortal | null;
             transition?: UpsideDownTransition | null;
+            nestMarker?: BossNestMarker | null;
+            bossReveals?: BossRevealOrchestrator | null;
+            demogorgonReveal?: DemogorgonReveal | null;
+            vecnaReveal?: VecnaReveal | null;
           };
           garlandLights = stVisuals.garlands ?? null;
-          bumperVisuals = stVisuals.bumperVisuals ?? null;
           upsideDownAtmosphere = stVisuals.atmosphere ?? null;
           upsideDownPortal = stVisuals.portal ?? null;
           upsideDownTransition = stVisuals.transition ?? null;
+          nestMarker = stVisuals.nestMarker ?? null;
+          bossReveals = stVisuals.bossReveals ?? null;
+          vecnaReveal = stVisuals.vecnaReveal ?? null;
           garlandLightsRef.current = garlandLights;
+          nestMarkerRef.current = nestMarker;
+          // Préchargement des reveals boss (async) — gardé ici (module.setup
+          // est synchrone). Bloque le chargement comme avant.
+          await bossReveals?.preloadAll(renderer, scene, camera).catch((err) => {
+            console.warn("[BossReveals] preload failed:", err);
+          });
         }
 
         shooterLaneGate = new ShooterLaneGate();
@@ -1314,9 +1297,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
           if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
           // bumperVisuals + garlands : onGameEvent géré par le module de map.
-          bossReveals?.onGameEvent(event);
-          // upsideDownPortal + upsideDownAtmosphere : onGameEvent géré par le
-          // module de map.
+          // bossReveals + upsideDownPortal + upsideDownAtmosphere : onGameEvent
+          // géré par le module de map.
           mapModule?.onGameEvent(event);
 
           // ── Screen shake par event (juice) ───────────────────────────────────
@@ -1511,7 +1493,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           drainBallUC.execute();
         };
 
-        demogorgonReveal?.setEmit(emit);
+        // demogorgonReveal.setEmit fait par le module (ctx.emitGameEvent).
 
         // ── Input handling ────────────────────────────────────────────────────
         console.log("[PinballPlayfield] KEYBOARD_MODE =", KEYBOARD_MODE);
@@ -1738,10 +1720,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       // bumperVisuals + garlands : update(dt) géré par mapModule.update.
       // setFever reste piloté ici (l'état fever vit dans useGameState).
       garlandLights?.setFever(isFeverActive());
-      bossReveals?.update(dt);
-      nestMarker?.update(dt);
-      // upsideDownAtmosphere + upsideDownPortal : update(dt) géré par
-      // mapModule.update.
+      // bossReveals + nestMarker + upsideDownAtmosphere + upsideDownPortal :
+      // update(dt) géré par mapModule.update.
 
       // Hint tardif : nid armé > 45 s sans reveal → pulse amplifié + bandeau DMD
       // unique par partie (« LE DEMOGORGON SOMMEILLE… »).
@@ -2121,9 +2101,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
       if (pw?._onKeyUp) document.removeEventListener("keyup", pw._onKeyUp);
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
-      // bumperVisuals + garlands : dispose géré par mapModule.dispose.
-      bossReveals?.dispose();
-      nestMarker?.dispose();
+      // bumperVisuals + garlands + bossReveals + nestMarker : dispose géré par
+      // mapModule.dispose.
       nestMarkerRef.current = null;
       ballTrail?.dispose();
       shooterLaneGate?.dispose();

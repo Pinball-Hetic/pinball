@@ -4,6 +4,10 @@ import {
   UpsideDownAtmosphere,
   UpsideDownPortal,
   UpsideDownTransition,
+  BossNestMarker,
+  DemogorgonReveal,
+  VecnaReveal,
+  BossRevealOrchestrator,
 } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 
@@ -20,6 +24,10 @@ export interface StModule extends MapModule {
   atmosphere: UpsideDownAtmosphere | null
   portal: UpsideDownPortal | null
   transition: UpsideDownTransition | null
+  nestMarker: BossNestMarker | null
+  bossReveals: BossRevealOrchestrator | null
+  demogorgonReveal: DemogorgonReveal | null
+  vecnaReveal: VecnaReveal | null
 }
 
 export function createModule(): StModule {
@@ -28,6 +36,10 @@ export function createModule(): StModule {
   let atmosphere: UpsideDownAtmosphere | null = null
   let portal: UpsideDownPortal | null = null
   let transition: UpsideDownTransition | null = null
+  let nestMarker: BossNestMarker | null = null
+  let bossReveals: BossRevealOrchestrator | null = null
+  let demogorgonReveal: DemogorgonReveal | null = null
+  let vecnaReveal: VecnaReveal | null = null
   return {
     get garlands() {
       return garlands
@@ -43,6 +55,18 @@ export function createModule(): StModule {
     },
     get transition() {
       return transition
+    },
+    get nestMarker() {
+      return nestMarker
+    },
+    get bossReveals() {
+      return bossReveals
+    },
+    get demogorgonReveal() {
+      return demogorgonReveal
+    },
+    get vecnaReveal() {
+      return vecnaReveal
     },
     setup(ctx: MapContext): void {
       bumperVisuals = new BumperVisuals()
@@ -78,18 +102,46 @@ export function createModule(): StModule {
         garlandLights: garlands,
         bumperVisuals,
       })
+
+      nestMarker = new BossNestMarker()
+      nestMarker.setup({ root: ctx.root })
+      demogorgonReveal = new DemogorgonReveal()
+      demogorgonReveal.setup({
+        root: ctx.root,
+        scene: ctx.scene,
+        camera: ctx.camera,
+        garlandLights: garlands,
+        bumperVisuals,
+        onFightEnd: () => ctx.setBossFightActive('demogorgon', false),
+        onTargetReady: () => ctx.setBossTargetArmed('demogorgon', true),
+      })
+      demogorgonReveal.setEmit(ctx.emitGameEvent)
+      vecnaReveal = new VecnaReveal()
+      vecnaReveal.setup({
+        root: ctx.root,
+        camera: ctx.camera,
+        garlandLights: garlands,
+        bumperVisuals,
+        onFightEnd: () => ctx.setBossFightActive('vecna', false),
+        onTargetReady: () => ctx.setBossTargetArmed('vecna', true),
+      })
+      bossReveals = new BossRevealOrchestrator()
+      bossReveals.register(demogorgonReveal).register(vecnaReveal)
     },
     onGameEvent(e: GameEvent): void {
       bumperVisuals?.onGameEvent(e)
       garlands?.onGameEvent(e)
       atmosphere?.onGameEvent(e)
       portal?.onGameEvent(e)
+      bossReveals?.onGameEvent(e)
     },
     update(dt: number): void {
       bumperVisuals?.update(dt)
       garlands?.update(dt)
       atmosphere?.update(dt)
       portal?.update(dt)
+      bossReveals?.update(dt)
+      nestMarker?.update(dt)
       // transition.update reste piloté par PinballPlayfield (post-lecture
       // isActive, pour préserver l'ordre de décision du gel à 1 frame près).
     },
@@ -103,11 +155,17 @@ export function createModule(): StModule {
       atmosphere?.dispose()
       portal?.dispose()
       transition?.dispose()
+      bossReveals?.dispose()
+      nestMarker?.dispose()
       bumperVisuals = null
       garlands = null
       atmosphere = null
       portal = null
       transition = null
+      nestMarker = null
+      bossReveals = null
+      demogorgonReveal = null
+      vecnaReveal = null
     },
   }
 }
