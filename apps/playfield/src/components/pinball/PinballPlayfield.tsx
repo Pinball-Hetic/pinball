@@ -927,11 +927,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         hidePinballmapDecorNodes(playfieldRoot);
         prepareGltfMaterialsForDisplay(playfieldRoot);
 
-        bumperVisuals = new BumperVisuals();
-        bumperVisuals.setup(playfieldRoot);
-        garlandLights = new GarlandLights();
-        garlandLights.setup(playfieldRoot);
-        garlandLightsRef.current = garlandLights;
+        // garlands + bumperVisuals créés par le module de map (cluster visuals),
+        // récupérés après mapModule.setup (plus bas, après le monde physique).
         nestMarker = new BossNestMarker();
         nestMarker.setup({ root: playfieldRoot });
         nestMarkerRef.current = nestMarker;
@@ -1051,6 +1048,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             emitGameEvent: (e) => emit(e),
           };
           mapModule.setup(mapCtx);
+          // Bridge transitoire : récupère les systèmes visuels créés par le
+          // module pour les systèmes Upside Down (encore ici) + le ref qui
+          // pilote celebrate/setFever. Disparaît au cluster Upside Down.
+          const stVisuals = mapModule as MapModule & {
+            garlands?: GarlandLights | null;
+            bumperVisuals?: BumperVisuals | null;
+          };
+          garlandLights = stVisuals.garlands ?? null;
+          bumperVisuals = stVisuals.bumperVisuals ?? null;
+          garlandLightsRef.current = garlandLights;
         }
 
         shooterLaneGate = new ShooterLaneGate();
@@ -1292,8 +1299,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           if (event.type === "DRAIN") diag.noteReset("drain");
           if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
           if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
-          bumperVisuals?.onGameEvent(event);
-          garlandLights?.onGameEvent(event);
+          // bumperVisuals + garlands : onGameEvent géré par le module de map.
           bossReveals?.onGameEvent(event);
           upsideDownPortal?.onGameEvent(event);
           upsideDownAtmosphere?.onGameEvent(event);
@@ -1731,9 +1737,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const dt = prevFrameTime > 0 ? Math.min((time - prevFrameTime) / 1000, 0.05) : 0.016;
       prevFrameTime = time;
 
-      bumperVisuals?.update(dt);
+      // bumperVisuals + garlands : update(dt) géré par mapModule.update.
+      // setFever reste piloté ici (l'état fever vit dans useGameState).
       garlandLights?.setFever(isFeverActive());
-      garlandLights?.update(dt);
       bossReveals?.update(dt);
       nestMarker?.update(dt);
       upsideDownAtmosphere?.update(dt);
@@ -2117,8 +2123,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
       if (pw?._onKeyUp) document.removeEventListener("keyup", pw._onKeyUp);
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
-      bumperVisuals?.dispose();
-      garlandLights?.dispose();
+      // bumperVisuals + garlands : dispose géré par mapModule.dispose.
       bossReveals?.dispose();
       nestMarker?.dispose();
       nestMarkerRef.current = null;
