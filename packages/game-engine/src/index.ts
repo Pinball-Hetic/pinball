@@ -27,6 +27,7 @@ export * from './infrastructure/PhysicsWorld';
 export * from './infrastructure/BallPhysics';
 export * from './infrastructure/PlayfieldTrimeshBuilder';
 export * from './infrastructure/MeshRoleResolver';
+export * from './infrastructure/LayoutResolver';
 export * from './infrastructure/PlayfieldColliderFactory';
 export * from './infrastructure/LauncherLaneBounds';
 export * from './infrastructure/FlipperSplitter';

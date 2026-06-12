@@ -74,7 +74,7 @@ import {
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import { NoSignal } from "@pinball/ui";
-import { MeshRoleResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
+import { MeshRoleResolver, LayoutResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
 import type {
   ButtonAction,
   ButtonId,
@@ -1037,6 +1037,9 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           meshResolver,
           mapManifest.elements ?? {},
         );
+        // Phase 3.4 — COMPARAISON : dérive bumpers/targets du GLB + logge le
+        // delta vs constantes (rien branché tant que validation pas faite).
+        LayoutResolver.deriveAndCompare(playfieldRoot, meshResolver, mapLayout);
         PlayfieldColliderFactory.createForMap(world, mapLayout, colliderMap);
 
         // upsideDownTransition créé/possédé par le module (récupéré via le
