@@ -37,6 +37,18 @@ export interface MapContext {
   colliderMap: Map<number, string>;
   /** Physique de la bille (null tant qu'elle n'est pas créée — dispo en jeu). */
   readonly ball: BallPhysics | null;
+  /** Mesh visuel de la bille (visibilité/scale pendant les transitions). */
+  readonly ballMesh: THREE.Object3D | null;
+
+  // ── Coordination du cycle de monde (glue map ↔ core) ──────────────────────
+  /** Réarme le déclencheur de portail (autorise un nouveau passage). */
+  resetPortalTrigger(): void;
+  /** Termine le cycle de monde : reset des baselines de score core. */
+  completeWorldCycle(score: number): void;
+  /** Réinitialise le détecteur de bille bloquée. */
+  resetStuck(): void;
+  /** Joue un son par identifiant (mappé côté app). */
+  playSound(id: string): void;
 
   /** Résout un objet de la scène par nom (applique meshAliases). */
   resolve(name: string): THREE.Object3D | null;

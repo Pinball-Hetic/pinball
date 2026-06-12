@@ -998,6 +998,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             get ball() {
               return ballPhysicsInst;
             },
+            get ballMesh() {
+              return ballMesh;
+            },
+            resetPortalTrigger: () => collisionProcessor?.resetPortalTrigger(),
+            completeWorldCycle: (score) => collisionProcessor?.completeWorldCycle(score),
+            resetStuck: () => stuckDetector.reset(),
+            playSound: (id) => {
+              if (id === "upside_down_appear") playUpsideDownAppearSound();
+            },
             lighting: {
               renderer,
               ambient: ambientLight,
