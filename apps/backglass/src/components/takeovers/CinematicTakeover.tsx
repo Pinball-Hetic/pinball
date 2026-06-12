@@ -119,6 +119,14 @@ export default function CinematicTakeover({ clip, payload }: Props) {
       )
 
     default:
-      return null
+      // Clip inconnu (map sans takeover dédié) : libellé neutre, style
+      // attract existant. Jamais d'écran vide ni de crash.
+      return (
+        <VhsGlitch className="tk-attract">
+          <div className="tk-center">
+            <div className="tk-kicker">{clip.replace(/_/g, ' ').toUpperCase()}</div>
+          </div>
+        </VhsGlitch>
+      )
   }
 }

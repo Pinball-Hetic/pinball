@@ -395,7 +395,20 @@ function layoutCinematic(grid: Uint8Array, display: DmdDisplay, clockMs: number)
   }
 
   const clip = clipFor(d.clip)
-  if (!clip) return
+  if (!clip) {
+    // Clip inconnu (map sans frame ASCII dédiée, ou event hors ST) : rendu
+    // générique — nom du clip lisible + valeur éventuelle, léger glitch.
+    // Jamais d'écran noir, jamais de crash.
+    if (flickerSkip(clockMs, 140, -0.6)) return
+    const label = d.clip.replace(/_/g, ' ').toUpperCase()
+    if (d.value) {
+      drawCentered(grid, label, 2, FONT_5X7, DOT.marquee)
+      drawCentered(grid, String(d.value), 11, FONT_12X22, DOT.score)
+    } else {
+      drawCentered(grid, label, 13, FONT_5X7, DOT.marquee)
+    }
+    return
+  }
 
   if (d.clip === 'hall_of_fame') {
     // 3.5s de cadre étoilé, puis le compteur roule de 0 au score en 1.5s.
