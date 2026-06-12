@@ -7,7 +7,7 @@ import {
 } from '../domain/Ball';
 import type { MapLayout } from '../domain/MapLayout';
 import { BOSS_IDS, getBossDefinition } from '../domain/BossRegistry';
-import { surfaceYAtZ, BOTTOM_OUT_LANE_SEP_X, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
+import { surfaceYAtZ, bottomOutLaneSepX, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
 import { hasPinballmapRoot } from './GltfNodeNames';
 
@@ -473,8 +473,9 @@ export class PlayfieldColliderFactory {
     colliderMap: Map<number, string>,
   ): void {
     const leftX = layout.geometry.bounds.leftX;
-    const centerX = (leftX + BOTTOM_OUT_LANE_SEP_X) / 2;
-    const halfX = (BOTTOM_OUT_LANE_SEP_X - leftX) / 2;
+    const laneSepX = bottomOutLaneSepX(layout.spawns.ball.x);
+    const centerX = (leftX + laneSepX) / 2;
+    const halfX = (laneSepX - leftX) / 2;
     const body = world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed().setTranslation(centerX, surfaceYAtZ(BOTTOM_OUT_Z), BOTTOM_OUT_Z),
     );

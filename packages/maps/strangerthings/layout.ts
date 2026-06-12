@@ -2,7 +2,6 @@ import type { MapLayout } from '@pinball/game-engine'
 import {
   BUMPER_POSITIONS,
   DROP_TARGETS,
-  BALL_SPAWN_POSITION,
   SHOOTER_LANE_X_MIN,
   SHOOTER_LANE_X_MAX,
   SHOOTER_LANE_BOTTOM_Z,
@@ -93,7 +92,7 @@ export const layout: MapLayout = {
   },
   // Spawns : analytiques (pas de mesh attendu — hors couloir/hinge).
   spawns: {
-    ball: { ...BALL_SPAWN_POSITION },
+    ball: { x: 0.2355, y: 1.01, z: 0.161 },
     upsideDown: { x: -0.0225, z: -0.48 },
     upsideDownImpulse: { x: 0, y: 0, z: 0.055 },
     normalReturn: { x: -0.0225, z: -0.12 },

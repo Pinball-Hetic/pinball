@@ -17,7 +17,9 @@ export const BALL_MAX_SPEED = 7.0;
 // Spawn — centre géométrique du couloir : (X_MIN 0.206 + X_MAX 0.265) / 2 =
 // 0.2355. La balle est tenue sur cette ligne par le verrou latéral (charge +
 // montée), donc parfaitement centrée entre les deux murs du couloir.
-export const BALL_SPAWN_POSITION = { x: 0.2355, y: 1.010, z: 0.1610 } as const;
+// BALL_SPAWN_POSITION déplacé en littéral dans le layout de la map
+// (layout.spawns.ball). Le moteur lit le spawn via le layout injecté ;
+// bottomOutLaneSepX(spawnX) paramètre la zone bottom-out (PlayfieldGeometry).
 
 // Plunger — impulsion = masse * Δv. À pleine charge : 0.26/0.08 = 3.25 m/s
 // (plunge full réaliste, sous le clamp BALL_MAX_SPEED).

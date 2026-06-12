@@ -3,6 +3,7 @@ import {
   BALL_LOST_Y_THRESHOLD,
   isBallOutOfBounds,
   isInBottomOutZone,
+  bottomOutLaneSepX,
 } from '../domain/PlayfieldGeometry';
 
 export type BallLostReason = 'escaped_below_floor' | 'escaped_out_of_bounds';
@@ -93,11 +94,13 @@ export class BallDiagnostics {
   private readonly lane: MapLayout['shooterLane'];
   private readonly wallFaceInner: number;
   private readonly wallFaceOuter: number;
+  private readonly laneSepX: number;
 
   constructor(layout: MapLayout) {
     this.lane = layout.shooterLane;
     this.wallFaceInner = this.lane.xMin - this.lane.wallThickness / 2; // ≈ 0.196
     this.wallFaceOuter = this.lane.xMin + this.lane.wallThickness / 2; // ≈ 0.216
+    this.laneSepX = bottomOutLaneSepX(layout.spawns.ball.x);
   }
 
   private snapshot: BallDiagnosticsSnapshot = {
@@ -375,7 +378,7 @@ export class BallDiagnostics {
     ) {
       return 'lane';
     }
-    if (isInBottomOutZone(p.x, p.z)) return 'drain_zone';
+    if (isInBottomOutZone(p.x, p.z, this.laneSepX)) return 'drain_zone';
     return 'playfield';
   }
 

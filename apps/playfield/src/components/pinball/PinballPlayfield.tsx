@@ -15,7 +15,7 @@ import {
   DetectBottomOut,
   BALL_RADIUS,
   BALL_MAX_SPEED,
-  BALL_SPAWN_POSITION,
+  bottomOutLaneSepX,
   SHOOTER_LANE_LEFT_WALL_TOP_Z,
   SHOOTER_LANE_LOCK_X,
   SHOOTER_LANE_EXIT_X,
@@ -781,7 +781,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     let debugCollidersOn = false;
 
     const stuckDetector = new StuckBallDetector();
-    const bottomOutDetector = new DetectBottomOut();
+    const bottomOutDetector = new DetectBottomOut(bottomOutLaneSepX(mapLayout.spawns.ball.x));
     const diag = new BallDiagnostics(mapLayout);
     let lastDebugPush = 0;
 
@@ -1151,7 +1151,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           }
         }
 
-        ballPhysicsInst.setSpawnPosition(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, BALL_SPAWN_POSITION.z);
+        ballPhysicsInst.setSpawnPosition(mapLayout.spawns.ball.x, mapLayout.spawns.ball.y, mapLayout.spawns.ball.z);
         ballPhysicsInst.body.wakeUp();
 
         // ── Plunger visual + kinematic body ──────────────────────────────────
@@ -1162,15 +1162,15 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         const pmat = new THREE.MeshStandardMaterial({ color: 0xddaa00, metalness: 0.9, roughness: 0.15 });
         const pmesh = new THREE.Mesh(pgeo, pmat);
         pmesh.rotation.x = Math.PI / 2;
-        pmesh.position.set(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, plungerRestZ);
+        pmesh.position.set(mapLayout.spawns.ball.x, mapLayout.spawns.ball.y, plungerRestZ);
         scene.add(pmesh);
         plungerMesh = pmesh;
         disposableGeos.push(pgeo);
         disposableMats.push(pmat);
 
         plungerBody = PlungerPhysics.createBody(world, {
-          x: BALL_SPAWN_POSITION.x,
-          y: BALL_SPAWN_POSITION.y,
+          x: mapLayout.spawns.ball.x,
+          y: mapLayout.spawns.ball.y,
           z: plungerRestZ,
         });
 
@@ -1683,9 +1683,9 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
         // mur droit (frottement → ralentissement au lancement).
         if (gameStateRef.current === "idle" && physicsReady && !ballMoveMode) {
-          const z = BALL_SPAWN_POSITION.z;
+          const z = mapLayout.spawns.ball.z;
           ballPhysicsInst.body.setTranslation(
-            { x: BALL_SPAWN_POSITION.x, y: ballCenterOnSurface(z), z },
+            { x: mapLayout.spawns.ball.x, y: ballCenterOnSurface(z), z },
             true,
           );
           ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -1704,7 +1704,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > SHOOTER_LANE_LOCK_X;
           if (inLaneStraight) {
             ballPhysicsInst.body.setTranslation(
-              { x: BALL_SPAWN_POSITION.x, y: lp.y, z: lp.z },
+              { x: mapLayout.spawns.ball.x, y: lp.y, z: lp.z },
               true,
             );
             const lv = ballPhysicsInst.body.linvel();
@@ -1807,8 +1807,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         plungerMesh.position.z = plungerZ;
         if (plungerBody) {
           plungerBody.setNextKinematicTranslation({
-            x: BALL_SPAWN_POSITION.x,
-            y: BALL_SPAWN_POSITION.y,
+            x: mapLayout.spawns.ball.x,
+            y: mapLayout.spawns.ball.y,
             z: plungerZ,
           });
         }
