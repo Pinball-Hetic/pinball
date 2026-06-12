@@ -44,7 +44,7 @@ export interface MapContext {
   /** Réarme le déclencheur de portail (autorise un nouveau passage). */
   resetPortalTrigger(): void;
   /** Termine le cycle de monde : reset des baselines de score core. */
-  completeWorldCycle(score: number): void;
+  completeWorldCycle(): void;
   /** Réinitialise le détecteur de bille bloquée. */
   resetStuck(): void;
   /** Joue un son par identifiant (mappé côté app). */

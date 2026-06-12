@@ -1002,7 +1002,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               return ballMesh;
             },
             resetPortalTrigger: () => collisionProcessor?.resetPortalTrigger(),
-            completeWorldCycle: (score) => collisionProcessor?.completeWorldCycle(score),
+            completeWorldCycle: () => collisionProcessor?.completeWorldCycle(scoreRef.current),
             resetStuck: () => stuckDetector.reset(),
             playSound: (id) => {
               if (id === "upside_down_appear") playUpsideDownAppearSound();
@@ -1256,8 +1256,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         // ── Use-cases ─────────────────────────────────────────────────────────
         const plunger = new Plunger();
-        let onPortalEnter: (() => void) | null = null;
-        let onReturnPortalEnter: (() => void) | null = null;
 
         const baseEmit = buildEmit(() => {
           if (ballMesh) ballMesh.visible = false;
@@ -1352,11 +1350,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             }
           }
           if (event.type === "PORTAL_ENTER") {
-            onPortalEnter?.();
+            // Bascule de monde gérée par le module (mapModule.onGameEvent).
             dmd.pushCinematic("portal_swallow");
           }
           if (event.type === "RETURN_PORTAL_ENTER") {
-            onReturnPortalEnter?.();
             dmd.pushCinematic("portal_swallow");
           }
           if (event.type === "PORTAL_TRANSITION_END") {
@@ -1412,62 +1409,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // plus haut via le bridge). On garde ici le binding vecna + les resets.
         vecnaReveal?.bindUpsideDownAtmosphere(upsideDownAtmosphere);
 
-        onPortalEnter = () => {
-          if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
-          if (upsideDownTransition.isActive()) return;
-          ballPhysicsInst.holdAtUpsideDownSpawn();
-          ballPhysicsInst.syncToMesh(ballMesh);
-          upsideDownTransition.start(
-            {
-              ballMesh,
-              ballBody: ballPhysicsInst.body,
-              onRevealStart: () => playUpsideDownAppearSound(),
-              onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
-            },
-            () => {
-              ballPhysicsInst?.spawnFromUpsideDown();
-              collisionProcessor?.resetPortalTrigger();
-              stuckDetector.reset();
-              if (ballMesh && ballPhysicsInst) {
-                ballPhysicsInst.syncToMesh(ballMesh);
-                ballMesh.visible = true;
-                ballMesh.scale.setScalar(1);
-              }
-              emit({ type: "PORTAL_TRANSITION_END" });
-            },
-          );
-        };
-
-        onReturnPortalEnter = () => {
-          if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
-          if (upsideDownTransition.isActive()) return;
-          ballPhysicsInst.holdAtNormalReturnSpawn();
-          ballPhysicsInst.syncToMesh(ballMesh);
-          upsideDownTransition.start(
-            {
-              ballMesh,
-              ballBody: ballPhysicsInst.body,
-              onRevealStart: () => playUpsideDownAppearSound(),
-              onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
-            },
-            () => {
-              ballPhysicsInst?.spawnFromNormalReturn();
-              upsideDownPortal?.reset();
-              upsideDownPortal?.setUpsideDownActive(false);
-              upsideDownAtmosphere?.reset();
-              collisionProcessor?.completeWorldCycle(scoreRef.current);
-              bossReveals?.endAllFights();
-              stuckDetector.reset();
-              if (ballMesh && ballPhysicsInst) {
-                ballPhysicsInst.syncToMesh(ballMesh);
-                ballMesh.visible = true;
-                ballMesh.scale.setScalar(1);
-              }
-              emit({ type: "WORLD_CYCLE_COMPLETE" });
-              emit({ type: "RETURN_PORTAL_TRANSITION_END" });
-            },
-          );
-        };
+        // onPortalEnter / onReturnPortalEnter (bascule de monde) gérés par le
+        // module de map (mapModule.onGameEvent sur PORTAL_ENTER/RETURN_PORTAL_ENTER).
 
         resetBallRef.current = () => {
           if (!drainBallUC || !sessionStartedRef.current) return;

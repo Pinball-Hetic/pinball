@@ -158,6 +158,61 @@ export function createModule(): StModule {
           }, 400)
         }
       }
+
+      // ── Cycle de monde : entrée Upside Down / retour monde normal ──────────
+      if (e.type === 'PORTAL_ENTER') {
+        const ball = ctx.ball
+        const mesh = ctx.ballMesh
+        if (!ball || !mesh || !transition || transition.isActive()) return
+        ball.holdAtUpsideDownSpawn()
+        ball.syncToMesh(mesh)
+        transition.start(
+          {
+            ballMesh: mesh,
+            ballBody: ball.body,
+            onRevealStart: () => ctx.playSound('upside_down_appear'),
+            onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
+          },
+          () => {
+            ball.spawnFromUpsideDown()
+            ctx.resetPortalTrigger()
+            ctx.resetStuck()
+            ball.syncToMesh(mesh)
+            mesh.visible = true
+            mesh.scale.setScalar(1)
+            ctx.emitGameEvent({ type: 'PORTAL_TRANSITION_END' })
+          },
+        )
+      }
+      if (e.type === 'RETURN_PORTAL_ENTER') {
+        const ball = ctx.ball
+        const mesh = ctx.ballMesh
+        if (!ball || !mesh || !transition || transition.isActive()) return
+        ball.holdAtNormalReturnSpawn()
+        ball.syncToMesh(mesh)
+        transition.start(
+          {
+            ballMesh: mesh,
+            ballBody: ball.body,
+            onRevealStart: () => ctx.playSound('upside_down_appear'),
+            onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
+          },
+          () => {
+            ball.spawnFromNormalReturn()
+            portal?.reset()
+            portal?.setUpsideDownActive(false)
+            atmosphere?.reset()
+            ctx.completeWorldCycle()
+            bossReveals?.endAllFights()
+            ctx.resetStuck()
+            ball.syncToMesh(mesh)
+            mesh.visible = true
+            mesh.scale.setScalar(1)
+            ctx.emitGameEvent({ type: 'WORLD_CYCLE_COMPLETE' })
+            ctx.emitGameEvent({ type: 'RETURN_PORTAL_TRANSITION_END' })
+          },
+        )
+      }
     },
     update(dt: number): void {
       bumperVisuals?.update(dt)
