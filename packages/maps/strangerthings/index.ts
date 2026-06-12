@@ -1,6 +1,8 @@
 import type { MapPackage } from '@pinball/shared-types'
 import { manifest } from './manifest'
 
+export { layout } from './layout'
+
 // Paquet de la map Stranger Things. Les drapeaux restent false tant que le
 // comportement (phase 4) et les contenus DMD/backglass (phase 5) ne sont pas
 // extraits dans ce package.

@@ -1,12 +1,20 @@
+import type { MapLayout } from '@pinball/game-engine'
 import type { MapPackage } from '@pinball/shared-types'
-import { mapPackage as strangerthings } from '@pinball/map-strangerthings'
+import { mapPackage as stPackage, layout as stLayout } from '@pinball/map-strangerthings'
+
+// Le layout (type game-engine) ne peut pas vivre sur MapPackage (shared-types
+// ne dépend pas de game-engine). Le registry — qui, lui, dépend de game-engine
+// — l'assemble dans un type enrichi.
+export interface ResolvedMap extends MapPackage {
+  layout: MapLayout
+}
 
 // Composition root des maps : SEUL fichier du repo qui importe les packages
 // @pinball/map-*. Les apps résolvent une map par id via getMapPackage.
-export function getMapPackage(id: string): MapPackage | null {
+export function getMapPackage(id: string): ResolvedMap | null {
   switch (id) {
     case 'strangerthings':
-      return strangerthings
+      return { ...stPackage, layout: stLayout }
     default:
       return null
   }

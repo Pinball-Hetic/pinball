@@ -87,6 +87,7 @@ import {
   UpsideDownAtmosphere,
   ShooterLaneGate,
 } from "@pinball/game-engine";
+import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import type {
   ButtonAction,
   ButtonId,
@@ -94,6 +95,8 @@ import type {
   DevGameEventTrigger,
 } from "@pinball/shared-types";
 import { clipFreezeMs } from "@pinball/shared-types";
+
+const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? "strangerthings";
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -408,6 +411,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   const cinematicsRef = useRef<CinematicDirector | null>(null);
   if (!cinematicsRef.current) cinematicsRef.current = new CinematicDirector();
   const cinematics = cinematicsRef.current;
+
+  // Résolution de la map (une fois). null → throw explicite pour l'instant ;
+  // le fallback NO SIGNAL plein écran arrivera en phase 5.
+  const mapPackageRef = useRef<ResolvedMap | null>(null);
+  if (!mapPackageRef.current) {
+    const resolved = getMapPackage(MAP_ID);
+    if (!resolved) throw new Error(`Map introuvable: ${MAP_ID}`);
+    mapPackageRef.current = resolved;
+  }
+  const mapLayout = mapPackageRef.current.layout;
 
   const playCinematic = useCallback(
     (
@@ -1007,6 +1020,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
         PlayfieldColliderFactory.createAll(
           world,
+          mapLayout,
           colliderMap,
           playfieldRoot,
           collOnly

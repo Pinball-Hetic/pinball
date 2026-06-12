@@ -1,30 +1,11 @@
 import type * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
-  BUMPER_POSITIONS,
-  WALL_LEFT_X,
   BALL_RADIUS,
-  BALL_SPAWN_POSITION,
   SLINGSHOT_LEFT_CENTER,
   SLINGSHOT_RIGHT_CENTER,
-  POP_ZONE_SENSORS,
-  ROCKET_SENSOR,
-  DROP_TARGETS,
-  SHOOTER_LANE_X_MIN,
-  SHOOTER_LANE_X_MAX,
-  SHOOTER_LANE_BOTTOM_Z,
-  SHOOTER_LANE_TOP_Z,
-  SHOOTER_LANE_WALL_HEIGHT,
-  SHOOTER_LANE_WALL_THICKNESS,
-  SHOOTER_LANE_RESTITUTION,
-  SHOOTER_LANE_FRICTION,
-  SHOOTER_LANE_LEFT_WALL_TOP_Z,
-  SHOOTER_GUIDE_CENTER,
-  SHOOTER_GUIDE_RADIUS,
-  SHOOTER_GUIDE_SEGMENTS,
-  SHOOTER_GUIDE_ANGLE_START,
-  SHOOTER_GUIDE_ANGLE_END,
 } from '../domain/Ball';
+import type { MapLayout } from '../domain/MapLayout';
 import { BOSS_IDS, getBossDefinition } from '../domain/BossRegistry';
 import { surfaceYAtZ, BOTTOM_OUT_LANE_SEP_X, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
@@ -39,12 +20,13 @@ export type AnalyticalColliderOptions = {
 export class PlayfieldColliderFactory {
   static createAll(
     world: RAPIER.World,
+    layout: MapLayout,
     colliderMap: Map<number, string>,
     playfieldRoot?: THREE.Object3D,
     analytical?: AnalyticalColliderOptions,
   ): void {
     if (playfieldRoot && hasPinballmapRoot(playfieldRoot)) {
-      PlayfieldColliderFactory.createPinballmap(world, colliderMap);
+      PlayfieldColliderFactory.createPinballmap(world, layout, colliderMap);
       return;
     }
 
@@ -62,13 +44,14 @@ export class PlayfieldColliderFactory {
         PlayfieldColliderFactory.createLaneFloor(world);
       }
     }
-    if (a.walls) PlayfieldColliderFactory.createWalls(world);
-    if (a.bumpers) PlayfieldColliderFactory.createBumpers(world, colliderMap);
-    PlayfieldColliderFactory.createSensors(world, colliderMap);
+    if (a.walls) PlayfieldColliderFactory.createWalls(world, layout);
+    if (a.bumpers) PlayfieldColliderFactory.createBumpers(world, layout, colliderMap);
+    PlayfieldColliderFactory.createSensors(world, layout, colliderMap);
   }
 
   private static createPinballmap(
     world: RAPIER.World,
+    layout: MapLayout,
     colliderMap: Map<number, string>,
   ): void {
     // Sol analytique lisse (cuboïde incliné) qui remplace le trimesh bosselé du
@@ -76,12 +59,12 @@ export class PlayfieldColliderFactory {
     // aucune facette → la balle glisse sans accrocher les arêtes internes du
     // trimesh (« ghost collisions » Rapier) qui la ralentissaient.
     PlayfieldColliderFactory.createPlayfieldFloor(world);
-    PlayfieldColliderFactory.createBumpers(world, colliderMap);
-    PlayfieldColliderFactory.createSensors(world, colliderMap);
+    PlayfieldColliderFactory.createBumpers(world, layout, colliderMap);
+    PlayfieldColliderFactory.createSensors(world, layout, colliderMap);
     // Sol analytique ACTIVÉ : le tapis Strangerthings est splitté en 2
     // trimeshes avec une couture à Z≈-0.286 en plein couloir (+ lèvre ~3mm
     // sur Circle.001). Le strip lisse shadow la couture → launch fiable.
-    PlayfieldColliderFactory.createShooterLane(world, { includeFloor: true });
+    PlayfieldColliderFactory.createShooterLane(world, layout, { includeFloor: true });
   }
 
   /**
@@ -93,17 +76,20 @@ export class PlayfieldColliderFactory {
    */
   static createShooterLane(
     world: RAPIER.World,
+    layout: MapLayout,
     options: { includeFloor?: boolean } = {},
   ): void {
+    const lane = layout.shooterLane;
     if (options.includeFloor !== false) {
-      PlayfieldColliderFactory.createShooterLaneFloor(world);
+      PlayfieldColliderFactory.createShooterLaneFloor(world, layout);
     }
     // Mur droit : pleine hauteur, contient la balle côté +X jusqu'au sommet.
     PlayfieldColliderFactory.createTiltedLaneWall(
       world,
-      SHOOTER_LANE_X_MAX,
-      SHOOTER_LANE_TOP_Z,
-      SHOOTER_LANE_BOTTOM_Z,
+      layout,
+      lane.xMax,
+      lane.topZ,
+      lane.bottomZ,
     );
     // Mur gauche : s'arrête avant le sommet → ouverture de sortie en haut-gauche.
     // Aminci à 1cm, centre décalé à 0.211 → face extérieure 0.206 (au lieu de
@@ -111,44 +97,47 @@ export class PlayfieldColliderFactory {
     // canal 36mm pour bille 29.5mm). Face intérieure couloir inchangée (0.216).
     PlayfieldColliderFactory.createTiltedLaneWall(
       world,
-      SHOOTER_LANE_X_MIN + 0.005,
-      SHOOTER_LANE_LEFT_WALL_TOP_Z,
-      SHOOTER_LANE_BOTTOM_Z,
+      layout,
+      lane.xMin + 0.005,
+      lane.leftWallTopZ,
+      lane.bottomZ,
       0.01,
     );
-    PlayfieldColliderFactory.createShooterGuide(world);
-    PlayfieldColliderFactory.createShooterBackWall(world);
+    PlayfieldColliderFactory.createShooterGuide(world, layout);
+    PlayfieldColliderFactory.createShooterBackWall(world, layout);
   }
 
   /** Filet de sécurité : mur de fond en haut du couloir → la balle ne peut
    *  jamais s'échapper de la table, même si le guide la rate. */
-  private static createShooterBackWall(world: RAPIER.World): void {
-    const z = SHOOTER_LANE_TOP_Z;
-    const midX = (SHOOTER_LANE_X_MIN + SHOOTER_LANE_X_MAX) / 2;
-    const halfX = (SHOOTER_LANE_X_MAX - SHOOTER_LANE_X_MIN) / 2;
-    const y = surfaceYAtZ(z) + SHOOTER_LANE_WALL_HEIGHT / 2;
+  private static createShooterBackWall(world: RAPIER.World, layout: MapLayout): void {
+    const lane = layout.shooterLane;
+    const z = lane.topZ;
+    const midX = (lane.xMin + lane.xMax) / 2;
+    const halfX = (lane.xMax - lane.xMin) / 2;
+    const y = surfaceYAtZ(z) + lane.wallHeight / 2;
     const body = world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed().setTranslation(midX, y, z),
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(
         halfX,
-        SHOOTER_LANE_WALL_HEIGHT / 2,
-        SHOOTER_LANE_WALL_THICKNESS / 2,
+        lane.wallHeight / 2,
+        lane.wallThickness / 2,
       )
-        .setRestitution(SHOOTER_LANE_RESTITUTION)
-        .setFriction(SHOOTER_LANE_FRICTION),
+        .setRestitution(lane.restitution)
+        .setFriction(lane.friction),
       body,
     );
   }
 
-  private static createShooterLaneFloor(world: RAPIER.World): void {
-    const zTop = SHOOTER_LANE_TOP_Z;
-    const zBot = SHOOTER_LANE_BOTTOM_Z;
+  private static createShooterLaneFloor(world: RAPIER.World, layout: MapLayout): void {
+    const lane = layout.shooterLane;
+    const zTop = lane.topZ;
+    const zBot = lane.bottomZ;
     const midZ = (zTop + zBot) / 2;
     const halfZ = (zBot - zTop) / 2;
-    const midX = (SHOOTER_LANE_X_MIN + SHOOTER_LANE_X_MAX) / 2;
-    const halfX = (SHOOTER_LANE_X_MAX - SHOOTER_LANE_X_MIN) / 2;
+    const midX = (lane.xMin + lane.xMax) / 2;
+    const halfX = (lane.xMax - lane.xMin) / 2;
     const yTop = surfaceYAtZ(zTop);
     const yBot = surfaceYAtZ(zBot);
     const midY = (yTop + yBot) / 2;
@@ -170,16 +159,19 @@ export class PlayfieldColliderFactory {
   /** Mur droit le long de Z (suit l'inclinaison du tapis), épaisseur sur X. */
   private static createTiltedLaneWall(
     world: RAPIER.World,
+    layout: MapLayout,
     x: number,
     zTop: number,
     zBot: number,
-    thickness: number = SHOOTER_LANE_WALL_THICKNESS,
+    thickness?: number,
   ): void {
+    const lane = layout.shooterLane;
+    const t = thickness ?? lane.wallThickness;
     const midZ = (zTop + zBot) / 2;
     const halfZ = (zBot - zTop) / 2;
     const yTop = surfaceYAtZ(zTop);
     const yBot = surfaceYAtZ(zBot);
-    const midY = (yTop + yBot) / 2 + SHOOTER_LANE_WALL_HEIGHT / 2;
+    const midY = (yTop + yBot) / 2 + lane.wallHeight / 2;
     const tilt = Math.atan2(yTop - yBot, zBot - zTop);
 
     const body = world.createRigidBody(
@@ -189,12 +181,12 @@ export class PlayfieldColliderFactory {
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(
-        thickness / 2,
-        SHOOTER_LANE_WALL_HEIGHT / 2,
+        t / 2,
+        lane.wallHeight / 2,
         halfZ,
       )
-        .setRestitution(SHOOTER_LANE_RESTITUTION)
-        .setFriction(SHOOTER_LANE_FRICTION),
+        .setRestitution(lane.restitution)
+        .setFriction(lane.friction),
       body,
     );
   }
@@ -203,18 +195,19 @@ export class PlayfieldColliderFactory {
    * Guide courbe : quart de cercle approximé par N cuboïdes tangents.
    * La normale concave pousse la balle montante (-Z) vers le terrain (-X).
    */
-  private static createShooterGuide(world: RAPIER.World): void {
-    const C = SHOOTER_GUIDE_CENTER;
-    const R = SHOOTER_GUIDE_RADIUS;
-    const N = SHOOTER_GUIDE_SEGMENTS;
-    const dA = (SHOOTER_GUIDE_ANGLE_END - SHOOTER_GUIDE_ANGLE_START) / N;
-    const halfLen = (R * Math.abs(dA)) / 2 + SHOOTER_LANE_WALL_THICKNESS;
+  private static createShooterGuide(world: RAPIER.World, layout: MapLayout): void {
+    const lane = layout.shooterLane;
+    const C = lane.guideCenter;
+    const R = lane.guideRadius;
+    const N = lane.guideSegments;
+    const dA = (lane.guideAngleEnd - lane.guideAngleStart) / N;
+    const halfLen = (R * Math.abs(dA)) / 2 + lane.wallThickness;
 
     for (let i = 0; i < N; i++) {
-      const aMid = SHOOTER_GUIDE_ANGLE_START + dA * (i + 0.5);
+      const aMid = lane.guideAngleStart + dA * (i + 0.5);
       const x = C.x + R * Math.cos(aMid);
       const z = C.z + R * Math.sin(aMid);
-      const y = surfaceYAtZ(z) + SHOOTER_LANE_WALL_HEIGHT / 2;
+      const y = surfaceYAtZ(z) + lane.wallHeight / 2;
 
       // Tangente à l'arc dans le plan XZ → axe local +X du cuboïde.
       const tx = -Math.sin(aMid);
@@ -231,23 +224,27 @@ export class PlayfieldColliderFactory {
       world.createCollider(
         RAPIER.ColliderDesc.cuboid(
           halfLen,
-          SHOOTER_LANE_WALL_HEIGHT / 2,
-          SHOOTER_LANE_WALL_THICKNESS / 2,
+          lane.wallHeight / 2,
+          lane.wallThickness / 2,
         )
-          .setRestitution(SHOOTER_LANE_RESTITUTION)
-          .setFriction(SHOOTER_LANE_FRICTION),
+          .setRestitution(lane.restitution)
+          .setFriction(lane.friction),
         body,
       );
     }
   }
 
-  private static createSensors(world: RAPIER.World, colliderMap: Map<number, string>): void {
+  private static createSensors(
+    world: RAPIER.World,
+    layout: MapLayout,
+    colliderMap: Map<number, string>,
+  ): void {
     PlayfieldColliderFactory.createSlingshotSensors(world, colliderMap);
-    PlayfieldColliderFactory.createPopZoneSensors(world, colliderMap);
-    PlayfieldColliderFactory.createRocketSensor(world, colliderMap);
+    PlayfieldColliderFactory.createPopZoneSensors(world, layout, colliderMap);
+    PlayfieldColliderFactory.createRocketSensor(world, layout, colliderMap);
     PlayfieldColliderFactory.createBossTargets(world, colliderMap);
-    PlayfieldColliderFactory.createDropTargets(world, colliderMap);
-    PlayfieldColliderFactory.createBottomOutSensor(world, colliderMap);
+    PlayfieldColliderFactory.createDropTargets(world, layout, colliderMap);
+    PlayfieldColliderFactory.createBottomOutSensor(world, layout, colliderMap);
     // Les bumps (Bump-left / Bump-right) sont détectés via leur trimesh GLB,
     // taggé dans colliderMap par PlayfieldTrimeshBuilder. Aucun sensor cylindrique
     // supplémentaire : la surface réelle du mèche est la zone de rebond.
@@ -313,12 +310,12 @@ export class PlayfieldColliderFactory {
     );
   }
 
-  private static createWalls(world: RAPIER.World): void {
+  private static createWalls(world: RAPIER.World, layout: MapLayout): void {
     const WALL_H = 0.06;
     const WALL_T = 0.015;
     const HH = WALL_H / 2;
     const HT = WALL_T / 2;
-    const laneSepX = BALL_SPAWN_POSITION.x - BALL_RADIUS * 2;
+    const laneSepX = layout.spawns.ball.x - BALL_RADIUS * 2;
 
     const walls = [
       { hx: HT, hy: HH, hz: 0.485, px: -0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
@@ -338,9 +335,13 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createBumpers(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    for (let i = 0; i < BUMPER_POSITIONS.length; i++) {
-      const pos = BUMPER_POSITIONS[i];
+  private static createBumpers(
+    world: RAPIER.World,
+    layout: MapLayout,
+    colliderMap: Map<number, string>,
+  ): void {
+    for (let i = 0; i < layout.bumpers.length; i++) {
+      const pos = layout.bumpers[i];
       const bumperBody = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(pos.x, pos.y, pos.z),
       );
@@ -374,9 +375,14 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createPopZoneSensors(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    for (let i = 0; i < POP_ZONE_SENSORS.length; i++) {
-      const p = POP_ZONE_SENSORS[i];
+  private static createPopZoneSensors(
+    world: RAPIER.World,
+    layout: MapLayout,
+    colliderMap: Map<number, string>,
+  ): void {
+    const zones = layout.sensors.popZones;
+    for (let i = 0; i < zones.length; i++) {
+      const p = zones[i];
       const b = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, p.y, p.z),
       );
@@ -407,9 +413,14 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createRocketSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {
+  private static createRocketSensor(
+    world: RAPIER.World,
+    layout: MapLayout,
+    colliderMap: Map<number, string>,
+  ): void {
+    const rocket = layout.sensors.rocket;
     const b = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(ROCKET_SENSOR.x, ROCKET_SENSOR.y, ROCKET_SENSOR.z),
+      RAPIER.RigidBodyDesc.fixed().setTranslation(rocket.x, rocket.y, rocket.z),
     );
     const col = world.createCollider(
       RAPIER.ColliderDesc.cuboid(0.015, 0.010, 0.020)
@@ -420,8 +431,12 @@ export class PlayfieldColliderFactory {
     colliderMap.set(col.handle, 'rocket_ramp');
   }
 
-  private static createDropTargets(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    for (const dt of DROP_TARGETS) {
+  private static createDropTargets(
+    world: RAPIER.World,
+    layout: MapLayout,
+    colliderMap: Map<number, string>,
+  ): void {
+    for (const dt of layout.dropTargets) {
       const b = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(dt.x, dt.y, dt.z),
       );
@@ -436,9 +451,14 @@ export class PlayfieldColliderFactory {
     }
   }
 
-  private static createBottomOutSensor(world: RAPIER.World, colliderMap: Map<number, string>): void {
-    const centerX = (WALL_LEFT_X + BOTTOM_OUT_LANE_SEP_X) / 2;
-    const halfX = (BOTTOM_OUT_LANE_SEP_X - WALL_LEFT_X) / 2;
+  private static createBottomOutSensor(
+    world: RAPIER.World,
+    layout: MapLayout,
+    colliderMap: Map<number, string>,
+  ): void {
+    const leftX = layout.geometry.bounds.leftX;
+    const centerX = (leftX + BOTTOM_OUT_LANE_SEP_X) / 2;
+    const halfX = (BOTTOM_OUT_LANE_SEP_X - leftX) / 2;
     const body = world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed().setTranslation(centerX, surfaceYAtZ(BOTTOM_OUT_Z), BOTTOM_OUT_Z),
     );
