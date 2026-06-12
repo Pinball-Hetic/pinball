@@ -128,7 +128,7 @@ export function handlePinballSoundEvent(event: GameEvent): void {
       }
       break;
     }
-    case "ELEVEN_ASSIST":
+    case "ASSIST":
       sfx.playElevenAssist();
       break;
     case "PORTAL_ENTER":

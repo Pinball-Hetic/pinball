@@ -389,7 +389,7 @@ export class DemogorgonReveal implements BossRevealController {
     if (this.elevenAssistLight && this.root && !this.elevenAssistLight.parent) {
       this.root.add(this.elevenAssistLight);
     }
-    this.emit?.({ type: 'ELEVEN_ASSIST', scoreIncrement: ELEVEN_ASSIST_SCORE });
+    this.emit?.({ type: 'ASSIST', assistId: 'eleven', scoreIncrement: ELEVEN_ASSIST_SCORE });
   }
 
   private hideElevenAssist(): void {

@@ -86,7 +86,8 @@ function eventLabel(event: GameEvent): string | null {
     case 'WORLD_CYCLE_COMPLETE': return 'CYCLE COMPLET';
     case 'RAMP_HIT': return 'RAMP';
     case 'DROP_TARGET_COMPLETE': return `DROP ${event.side.toUpperCase()}`;
-    case 'ELEVEN_ASSIST': return 'ELEVEN +' + 100;
+    // TODO phase 5 : libellé fourni par le contenu DMD de la map (eventLabels).
+    case 'ASSIST': return 'ELEVEN +' + 100;
     default: return null; // bumpers/slingshots/zones → pas de highlight, juste score
   }
 }

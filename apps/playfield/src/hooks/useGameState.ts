@@ -434,7 +434,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           },
         }));
       }
-      if (event.type === "ELEVEN_ASSIST") {
+      if (event.type === "ASSIST") {
         setBossHud((prev) => ({
           ...prev,
           demogorgon: {
