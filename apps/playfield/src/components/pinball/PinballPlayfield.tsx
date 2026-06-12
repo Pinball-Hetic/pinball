@@ -1150,6 +1150,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // ── Use-cases ─────────────────────────────────────────────────────────
         const plunger = new Plunger();
         let onPortalEnter: (() => void) | null = null;
+        let onReturnPortalEnter: (() => void) | null = null;
 
         const baseEmit = buildEmit(() => {
           if (ballMesh) ballMesh.visible = false;
@@ -1231,8 +1232,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           }
           if (event.type === "PORTAL_ENTER") {
             onPortalEnter?.();
-            // Synchro DMD/backglass : la transition existante gère déjà la
-            // pause physique 4s, donc pas de director ici.
+            dmd.pushCinematic("portal_swallow");
+          }
+          if (event.type === "RETURN_PORTAL_ENTER") {
+            onReturnPortalEnter?.();
             dmd.pushCinematic("portal_swallow");
           }
           if (event.type === "PORTAL_TRANSITION_END") {
@@ -1321,6 +1324,38 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 ballMesh.scale.setScalar(1);
               }
               emit({ type: "PORTAL_TRANSITION_END" });
+            },
+          );
+        };
+
+        onReturnPortalEnter = () => {
+          if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
+          if (upsideDownTransition.isActive()) return;
+          ballPhysicsInst.holdAtNormalReturnSpawn();
+          ballPhysicsInst.syncToMesh(ballMesh);
+          upsideDownTransition.start(
+            {
+              ballMesh,
+              ballBody: ballPhysicsInst.body,
+              onRevealStart: () => playUpsideDownAppearSound(),
+              onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
+            },
+            () => {
+              ballPhysicsInst?.spawnFromNormalReturn();
+              upsideDownPortal?.reset();
+              upsideDownPortal?.setUpsideDownActive(false);
+              upsideDownAtmosphere?.reset();
+              collisionProcessor?.resetPortalTrigger();
+              collisionProcessor?.resetUpsideDownSession();
+              vecnaReveal?.endFight();
+              clearUpsideDownSession();
+              stuckDetector.reset();
+              if (ballMesh && ballPhysicsInst) {
+                ballPhysicsInst.syncToMesh(ballMesh);
+                ballMesh.visible = true;
+                ballMesh.scale.setScalar(1);
+              }
+              emit({ type: "RETURN_PORTAL_TRANSITION_END" });
             },
           );
         };

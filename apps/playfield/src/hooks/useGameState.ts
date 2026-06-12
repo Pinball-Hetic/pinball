@@ -464,6 +464,18 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           tone: "target",
         });
       }
+      if (event.type === "RETURN_PORTAL_ENTER") {
+        const point = jitterScreenPoint(
+          playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
+          3,
+        );
+        pushScorePop({
+          amount: event.scoreIncrement * multiplierRef.current,
+          x: point.x,
+          y: point.y,
+          tone: "target",
+        });
+      }
       if (event.type === "PORTAL_TRANSITION_END") {
         setUpsideDownActive(true);
         setUpsideDownHint(true);
@@ -475,6 +487,15 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           setUpsideDownHint(false);
         }, UPSIDE_DOWN_HINT_MS);
         callbacks?.onAtmosphereChange?.(true);
+      }
+      if (event.type === "RETURN_PORTAL_TRANSITION_END") {
+        setUpsideDownActive(false);
+        setUpsideDownHint(false);
+        if (upsideDownHintTimerRef.current !== null) {
+          window.clearTimeout(upsideDownHintTimerRef.current);
+          upsideDownHintTimerRef.current = null;
+        }
+        callbacks?.onAtmosphereChange?.(false);
       }
     };
 
