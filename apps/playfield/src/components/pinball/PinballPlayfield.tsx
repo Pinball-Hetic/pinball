@@ -1304,18 +1304,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             screenShake.add(0.5);
           }
 
-          if (event.type === "BOSS_LOCKED_HIT") {
-            // Cible verrouillée frappée : flash gris + « ENCORE X PTS » au DMD.
-            nestMarker?.flashLocked(event.bossId);
-            dmd.pushEvent(`ENCORE ${event.remaining} PTS`, 0, {
-              player: playerRef.current,
-              score: scoreRef.current,
-              combo: comboRef.current,
-              multiplier: multiplierRef.current,
-              lives: livesRef.current,
-              mapState: buildMapState(),
-            });
-          }
+          // BOSS_LOCKED_HIT (flash nid + « ENCORE X PTS ») : géré par le module.
 
           // Cinématiques boss Demogorgon (reveal + victoire) : gérées par le
           // module de map (mapModule.onGameEvent).

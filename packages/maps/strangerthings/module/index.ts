@@ -140,6 +140,11 @@ export function createModule(): StModule {
 
       const ctx = ctxRef
       if (!ctx) return
+      // Cible verrouillée frappée : flash gris + « ENCORE X PTS » au DMD.
+      if (e.type === 'BOSS_LOCKED_HIT') {
+        nestMarker?.flashLocked(e.bossId)
+        ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
+      }
       // Cinématiques boss Demogorgon (reveal + victoire).
       if (e.type === 'BOSS_REVEAL' && e.bossId === 'demogorgon') {
         ctx.playCinematic('demogorgon_rises', { once: true })
