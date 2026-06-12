@@ -1,4 +1,4 @@
-import type { BossId } from '../domain/BossRegistry';
+import type { BossId, BossGateContext } from '../domain/BossRegistry';
 import {
   BOSS_IDS,
   bossThresholdMet,
@@ -13,11 +13,8 @@ type BossFightState = {
   sensor: BossTargetSensor;
 };
 
-export type BossRevealContext = {
-  totalScore: number;
+export type BossRevealContext = BossGateContext & {
   gameState: string;
-  upsideDownActive: boolean;
-  upsideDownScoreBaseline: number;
 };
 
 export class BossFightManager {

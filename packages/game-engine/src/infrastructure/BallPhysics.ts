@@ -10,6 +10,8 @@ import {
   BUMPER_EJECT_IMPULSE,
   UPSIDE_DOWN_SPAWN,
   UPSIDE_DOWN_SPAWN_IMPULSE,
+  NORMAL_WORLD_RETURN_SPAWN,
+  NORMAL_WORLD_RETURN_IMPULSE,
   PLUNGER_IMPULSE_Z,
 } from '../domain/Ball';
 import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
@@ -87,6 +89,29 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
         x: UPSIDE_DOWN_SPAWN_IMPULSE.x,
         y: UPSIDE_DOWN_SPAWN_IMPULSE.y,
         z: UPSIDE_DOWN_SPAWN_IMPULSE.z,
+      },
+      true,
+    );
+  }
+
+  holdAtNormalReturnSpawn(): void {
+    const y = ballCenterOnSurface(NORMAL_WORLD_RETURN_SPAWN.z) + 0.004;
+    this.body.setTranslation(
+      { x: NORMAL_WORLD_RETURN_SPAWN.x, y, z: NORMAL_WORLD_RETURN_SPAWN.z },
+      true,
+    );
+    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.body.wakeUp();
+  }
+
+  spawnFromNormalReturn(): void {
+    this.holdAtNormalReturnSpawn();
+    this.body.applyImpulse(
+      {
+        x: NORMAL_WORLD_RETURN_IMPULSE.x,
+        y: NORMAL_WORLD_RETURN_IMPULSE.y,
+        z: NORMAL_WORLD_RETURN_IMPULSE.z,
       },
       true,
     );

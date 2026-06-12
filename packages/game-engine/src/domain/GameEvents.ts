@@ -15,6 +15,9 @@ export type GameEvent =
   | { type: 'PORTAL_ENTER'; scoreIncrement: number }
   | { type: 'PORTAL_TREMOR' }
   | { type: 'PORTAL_TRANSITION_END' }
+  | { type: 'RETURN_PORTAL_ENTER'; scoreIncrement: number }
+  | { type: 'RETURN_PORTAL_TRANSITION_END' }
+  | { type: 'WORLD_CYCLE_COMPLETE' }
   | { type: 'DRAIN' }
   | { type: 'BOTTOM_OUT' }
   | { type: 'BUMP_HIT'; side: 'left' | 'right'; scoreIncrement: number }

@@ -123,6 +123,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const heticRef = useRef(0);
   const milestonesPassedRef = useRef<Set<number>>(new Set());
   const upsideDownActiveRef = useRef(false);
+  const normalWorldBaselineRef = useRef(0);
   const upsideDownBaselineRef = useRef(0);
   const bossArmedFiredRef = useRef<Set<BossId>>(new Set());
   const feverUntilRef = useRef(0);
@@ -292,6 +293,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     milestonesPassedRef.current.clear();
     bossArmedFiredRef.current.clear();
     upsideDownActiveRef.current = false;
+    normalWorldBaselineRef.current = 0;
     upsideDownBaselineRef.current = 0;
     feverUntilRef.current = 0;
     setFever(false);
@@ -354,6 +356,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           const met = bossThresholdMet(def, {
             totalScore: scoreRef.current,
             upsideDownActive: upsideDownActiveRef.current,
+            normalWorldScoreBaseline: normalWorldBaselineRef.current,
             upsideDownScoreBaseline: upsideDownBaselineRef.current,
           });
           if (met) {
@@ -493,6 +496,18 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           tone: "target",
         });
       }
+      if (event.type === "RETURN_PORTAL_ENTER") {
+        const point = jitterScreenPoint(
+          playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
+          3,
+        );
+        pushScorePop({
+          amount: event.scoreIncrement * multiplierRef.current,
+          x: point.x,
+          y: point.y,
+          tone: "target",
+        });
+      }
       if (event.type === "PORTAL_TRANSITION_END") {
         setUpsideDownActive(true);
         upsideDownActiveRef.current = true;
@@ -506,6 +521,22 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           setUpsideDownHint(false);
         }, UPSIDE_DOWN_HINT_MS);
         callbacks?.onAtmosphereChange?.(true);
+      }
+      if (event.type === "RETURN_PORTAL_TRANSITION_END") {
+        setUpsideDownActive(false);
+        setUpsideDownHint(false);
+        if (upsideDownHintTimerRef.current !== null) {
+          window.clearTimeout(upsideDownHintTimerRef.current);
+          upsideDownHintTimerRef.current = null;
+        }
+        callbacks?.onAtmosphereChange?.(false);
+      }
+      if (event.type === "WORLD_CYCLE_COMPLETE") {
+        clearAllBossHud();
+        normalWorldBaselineRef.current = scoreRef.current;
+        upsideDownActiveRef.current = false;
+        upsideDownBaselineRef.current = 0;
+        bossArmedFiredRef.current.clear();
       }
     };
 

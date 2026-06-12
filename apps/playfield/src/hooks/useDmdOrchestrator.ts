@@ -82,6 +82,8 @@ function eventLabel(event: GameEvent): string | null {
         : `${def.hud.dmdLabel} HIT ${event.hitCount}/${def.targetHits}`;
     }
     case 'PORTAL_ENTER': return 'PORTAL';
+    case 'RETURN_PORTAL_ENTER': return 'RETOUR';
+    case 'WORLD_CYCLE_COMPLETE': return 'CYCLE COMPLET';
     case 'RAMP_HIT': return 'RAMP';
     case 'DROP_TARGET_COMPLETE': return `DROP ${event.side.toUpperCase()}`;
     case 'ELEVEN_ASSIST': return 'ELEVEN +' + 100;

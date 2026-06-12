@@ -66,7 +66,6 @@ export type BossRevealConfig = {
   scoreThreshold: number;
   scoreIncrement: number;
   requiresUpsideDown: boolean;
-  useUpsideDownScoreBaseline: boolean;
 };
 
 export type BossDefinition = {
@@ -78,6 +77,7 @@ export type BossDefinition = {
   reveal: BossRevealConfig;
   hud: BossHudConfig;
   unlocksPortal: boolean;
+  unlocksReturnPortal: boolean;
   targetMeshTheme: BossTargetMeshTheme;
   targetPulse: BossTargetPulseConfig;
 };
@@ -95,7 +95,6 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       scoreThreshold: 3000,
       scoreIncrement: 150,
       requiresUpsideDown: false,
-      useUpsideDownScoreBaseline: false,
     },
     hud: {
       label: 'Cible Demogorgon',
@@ -112,6 +111,7 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       nestHintLabel: 'LE DEMOGORGON SOMMEILLE PRES DES BUMPERS',
     },
     unlocksPortal: true,
+    unlocksReturnPortal: false,
     targetMeshTheme: {
       ring: {
         color: 0xff2244,
@@ -155,7 +155,6 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       scoreThreshold: 3000,
       scoreIncrement: 200,
       requiresUpsideDown: true,
-      useUpsideDownScoreBaseline: true,
     },
     hud: {
       label: 'Cible Vecna',
@@ -170,6 +169,7 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       victoryClearMs: 1600,
     },
     unlocksPortal: false,
+    unlocksReturnPortal: true,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,
@@ -204,19 +204,22 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
 export type BossGateContext = {
   totalScore: number;
   upsideDownActive: boolean;
+  normalWorldScoreBaseline: number;
   upsideDownScoreBaseline: number;
 };
 
-/** Score effectif d'un boss (ajusté de la baseline Upside Down si applicable). */
+/** Score effectif d'un boss depuis l'entrée dans son monde. */
 export function bossEffectiveScore(def: BossDefinition, ctx: BossGateContext): number {
-  return def.reveal.useUpsideDownScoreBaseline
-    ? ctx.totalScore - ctx.upsideDownScoreBaseline
-    : ctx.totalScore;
+  const baseline = def.reveal.requiresUpsideDown
+    ? ctx.upsideDownScoreBaseline
+    : ctx.normalWorldScoreBaseline;
+  return ctx.totalScore - baseline;
 }
 
 /** True si le palier de score du boss est franchi ET son gate Upside Down satisfait. */
 export function bossThresholdMet(def: BossDefinition, ctx: BossGateContext): boolean {
   if (def.reveal.requiresUpsideDown && !ctx.upsideDownActive) return false;
+  if (!def.reveal.requiresUpsideDown && ctx.upsideDownActive) return false;
   return bossEffectiveScore(def, ctx) >= def.reveal.scoreThreshold;
 }
 

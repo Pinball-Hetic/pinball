@@ -95,12 +95,19 @@ export const PORTAL_SENSOR_RADIUS = 0.017;
 export const PORTAL_MAGNET_RADIUS = 0.058;
 export const PORTAL_MAGNET_STRENGTH = 0.0055;
 export const PORTAL_ENTER_SCORE = 500;
+export const RETURN_PORTAL_ENTER_SCORE = 500;
 
 export const UPSIDE_DOWN_SPAWN = {
   x: -0.0225,
   z: -0.48,
 } as const;
 export const UPSIDE_DOWN_SPAWN_IMPULSE = { x: 0, y: 0, z: 0.055 } as const;
+
+export const NORMAL_WORLD_RETURN_SPAWN = {
+  x: -0.0225,
+  z: -0.12,
+} as const;
+export const NORMAL_WORLD_RETURN_IMPULSE = { x: 0, y: 0, z: 0.05 } as const;
 
 export const ELEVEN_ASSIST_SCORE = 100;
 export const ELEVEN_ASSIST_INTERVAL = 3.2;

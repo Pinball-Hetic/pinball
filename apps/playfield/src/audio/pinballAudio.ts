@@ -140,6 +140,9 @@ export function handlePinballSoundEvent(event: GameEvent): void {
     case "PORTAL_TRANSITION_END":
       sfx.playPortalTransitionEnd();
       break;
+    case "RETURN_PORTAL_TRANSITION_END":
+      sfx.playPortalTransitionEnd();
+      break;
     case "BOTTOM_OUT":
       sfx.playBottomOut();
       break;

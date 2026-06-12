@@ -1184,12 +1184,14 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // ── Use-cases ─────────────────────────────────────────────────────────
         const plunger = new Plunger();
         let onPortalEnter: (() => void) | null = null;
+        let onReturnPortalEnter: (() => void) | null = null;
 
         const baseEmit = buildEmit(() => {
           if (ballMesh) ballMesh.visible = false;
           diag.noteReset("game_over_hide");
         });
         const releaseUpsideDownWorld = () => {
+          upsideDownPortal?.setUpsideDownActive(false);
           upsideDownAtmosphere?.reset();
           collisionProcessor?.resetUpsideDownSession();
           vecnaReveal?.endFight();
@@ -1203,6 +1205,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           const ctx = {
             totalScore: scoreRef.current,
             upsideDownActive: collisionProcessor.isUpsideDownActive(),
+            normalWorldScoreBaseline: collisionProcessor.getNormalWorldScoreBaseline(),
             upsideDownScoreBaseline: collisionProcessor.getUpsideDownScoreBaseline(),
           };
           nestMarker.setUpsideDown(ctx.upsideDownActive);
@@ -1288,6 +1291,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             && gameStateRef.current === "game_over"
           ) {
             collisionProcessor?.resetAllBossFights();
+            collisionProcessor?.resetScoreBaselines();
             bossReveals?.endAllFights();
           }
           if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
@@ -1300,12 +1304,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           }
           if (event.type === "PORTAL_ENTER") {
             onPortalEnter?.();
-            // Synchro DMD/backglass : la transition existante gère déjà la
-            // pause physique 4s, donc pas de director ici.
+            dmd.pushCinematic("portal_swallow");
+          }
+          if (event.type === "RETURN_PORTAL_ENTER") {
+            onReturnPortalEnter?.();
             dmd.pushCinematic("portal_swallow");
           }
           if (event.type === "PORTAL_TRANSITION_END") {
             upsideDownPortal?.reset();
+            upsideDownPortal?.setUpsideDownActive(true);
             collisionProcessor?.resetPortalTrigger();
             collisionProcessor?.onUpsideDownEntered(scoreRef.current);
           }
@@ -1397,6 +1404,37 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           );
         };
 
+        onReturnPortalEnter = () => {
+          if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
+          if (upsideDownTransition.isActive()) return;
+          ballPhysicsInst.holdAtNormalReturnSpawn();
+          ballPhysicsInst.syncToMesh(ballMesh);
+          upsideDownTransition.start(
+            {
+              ballMesh,
+              ballBody: ballPhysicsInst.body,
+              onRevealStart: () => playUpsideDownAppearSound(),
+              onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
+            },
+            () => {
+              ballPhysicsInst?.spawnFromNormalReturn();
+              upsideDownPortal?.reset();
+              upsideDownPortal?.setUpsideDownActive(false);
+              upsideDownAtmosphere?.reset();
+              collisionProcessor?.completeWorldCycle(scoreRef.current);
+              bossReveals?.endAllFights();
+              stuckDetector.reset();
+              if (ballMesh && ballPhysicsInst) {
+                ballPhysicsInst.syncToMesh(ballMesh);
+                ballMesh.visible = true;
+                ballMesh.scale.setScalar(1);
+              }
+              emit({ type: "WORLD_CYCLE_COMPLETE" });
+              emit({ type: "RETURN_PORTAL_TRANSITION_END" });
+            },
+          );
+        };
+
         resetBallRef.current = () => {
           if (!drainBallUC || !sessionStartedRef.current) return;
           if (gameStateRef.current === "game_over") return;
@@ -1453,6 +1491,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 if (gameStateRef.current === "game_over") {
                   resetGame();
                   collisionProcessor?.resetAllBossFights();
+                  collisionProcessor?.resetScoreBaselines();
                   bossReveals?.endAllFights();
                   upsideDownPortal?.reset();
                   upsideDownAtmosphere?.reset();
@@ -1489,6 +1528,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               if (data.action === "DOWN" && gameStateRef.current === "game_over") {
                 resetGame();
                 collisionProcessor?.resetAllBossFights();
+                collisionProcessor?.resetScoreBaselines();
                 bossReveals?.endAllFights();
                 upsideDownPortal?.reset();
                 upsideDownAtmosphere?.reset();

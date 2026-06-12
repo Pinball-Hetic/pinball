@@ -11,6 +11,7 @@ import {
   BUMP_EJECT_SCALE,
   BUMP_HIT_COOLDOWN_MS,
   DROP_TARGETS,
+  RETURN_PORTAL_ENTER_SCORE,
   PORTAL_ENTER_SCORE,
 } from '../domain/Ball';
 import {
@@ -33,6 +34,7 @@ export class CollisionEventProcessor {
   private portalOpen = false;
   private portalTriggered = false;
   private upsideDownActive = false;
+  private normalWorldScoreBaseline = 0;
   private upsideDownScoreBaseline = 0;
   private lastTotalScore = 0;
   // Throttle des events « nid verrouillé » par boss (anti-spam, 2 s).
@@ -42,8 +44,13 @@ export class CollisionEventProcessor {
     return {
       totalScore: this.lastTotalScore,
       upsideDownActive: this.upsideDownActive,
+      normalWorldScoreBaseline: this.normalWorldScoreBaseline,
       upsideDownScoreBaseline: this.upsideDownScoreBaseline,
     };
+  }
+
+  getNormalWorldScoreBaseline(): number {
+    return this.normalWorldScoreBaseline;
   }
 
   /** Baseline de score Upside Down (pour recalculer l'état des marqueurs de nid). */
@@ -95,12 +102,26 @@ export class CollisionEventProcessor {
     this.resetBossFight('vecna');
   }
 
+  resetScoreBaselines(): void {
+    this.normalWorldScoreBaseline = 0;
+    this.upsideDownScoreBaseline = 0;
+  }
+
+  completeWorldCycle(score: number): void {
+    this.upsideDownActive = false;
+    this.upsideDownScoreBaseline = 0;
+    this.normalWorldScoreBaseline = score;
+    this.portalTriggered = false;
+    this.resetAllBossFights();
+  }
+
   tryAllBossReveals(totalScore: number, gameState: string): void {
     this.lastTotalScore = totalScore;
     this.bossFights.tryAllReveals({
       totalScore,
       gameState,
       upsideDownActive: this.upsideDownActive,
+      normalWorldScoreBaseline: this.normalWorldScoreBaseline,
       upsideDownScoreBaseline: this.upsideDownScoreBaseline,
     });
   }
@@ -124,8 +145,17 @@ export class CollisionEventProcessor {
 
       // Contact avec une cible de boss encore verrouillée (palier non atteint) :
       // pédagogie « ENCORE X PTS » plutôt qu'un hit silencieux. Throttle 2 s.
+      // Uniquement pour le boss du monde courant : sinon on afficherait un
+      // décompte de points trompeur (le vrai blocage est le mauvais monde, pas
+      // le score) — ex. cible Demogorgon touchée dans l'Upside Down.
       const boss = getBossByColliderRole(role);
-      if (boss && started && gameState === 'playing' && !this.bossFights.isTriggered(boss.id)) {
+      if (
+        boss
+        && boss.reveal.requiresUpsideDown === this.upsideDownActive
+        && started
+        && gameState === 'playing'
+        && !this.bossFights.isTriggered(boss.id)
+      ) {
         const ctx = this.gateContext();
         if (!bossThresholdMet(boss, ctx)) {
           const now = performance.now();
@@ -147,7 +177,11 @@ export class CollisionEventProcessor {
       if (role === 'portal_enter') {
         if (started && gameState === 'playing' && this.portalOpen && !this.portalTriggered) {
           this.portalTriggered = true;
-          this.emit({ type: 'PORTAL_ENTER', scoreIncrement: PORTAL_ENTER_SCORE });
+          if (this.upsideDownActive) {
+            this.emit({ type: 'RETURN_PORTAL_ENTER', scoreIncrement: RETURN_PORTAL_ENTER_SCORE });
+          } else {
+            this.emit({ type: 'PORTAL_ENTER', scoreIncrement: PORTAL_ENTER_SCORE });
+          }
         }
         return;
       }
