@@ -54,7 +54,6 @@ import {
   configureGltfRenderer,
   createGltfLoader,
   ballCenterOnSurface,
-  DROP_TARGETS,
   PlungerPhysics,
   type BossId,
   CinematicDirector,
@@ -1037,10 +1036,12 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           meshResolver,
           mapManifest.elements ?? {},
         );
-        // Phase 3.4 — COMPARAISON : dérive bumpers/targets du GLB + logge le
-        // delta vs constantes (rien branché tant que validation pas faite).
-        LayoutResolver.deriveAndCompare(playfieldRoot, meshResolver, mapLayout);
-        PlayfieldColliderFactory.createForMap(world, mapLayout, colliderMap);
+        // Phase 3.4 — drop targets dérivés du GLB (deltas ≤ 0.7 mm validés en
+        // jeu) ; bumpers gardés au littéral (centre Box3 ≠ collider tuné). Le
+        // log de comparaison reste actif pour surveiller la dérive au réexport.
+        const derivedLayout = LayoutResolver.deriveAndCompare(playfieldRoot, meshResolver, mapLayout);
+        const resolvedLayout = LayoutResolver.withDerivedDropTargets(mapLayout, derivedLayout);
+        PlayfieldColliderFactory.createForMap(world, resolvedLayout, colliderMap);
 
         // upsideDownTransition créé/possédé par le module (récupéré via le
         // bridge). L'orchestration (isActive/start, cycle de monde) reste ici
@@ -1287,7 +1288,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             if (mesh) mesh.visible = false;
           }
           if (event.type === 'DROP_TARGET_COMPLETE' || event.type === 'DROP_TARGET_RESET') {
-            for (const dt of DROP_TARGETS) {
+            for (const dt of mapLayout.dropTargets) {
               const mesh = playfieldRootRef?.getObjectByName(dt.id.replace('drop_', 'drop_target_'));
               if (mesh) mesh.visible = true;
             }

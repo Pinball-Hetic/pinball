@@ -95,4 +95,20 @@ export class LayoutResolver {
     }
     return derived;
   }
+
+  /**
+   * Renvoie une copie du layout avec les positions des drop targets remplacées
+   * par celles dérivées du GLB (source de vérité). Les bumpers ne sont PAS
+   * dérivés (centre Box3 ≠ point collider tuné, deltas hors tolérance) → ils
+   * restent au littéral. Un drop target sans mesh garde son littéral (fallback).
+   */
+  static withDerivedDropTargets(layout: MapLayout, derived: DerivedLayout): MapLayout {
+    return {
+      ...layout,
+      dropTargets: layout.dropTargets.map((dt) => {
+        const d = derived.dropTargets[dt.id];
+        return d ? { ...dt, x: d.x, y: d.y, z: d.z } : dt;
+      }),
+    };
+  }
 }

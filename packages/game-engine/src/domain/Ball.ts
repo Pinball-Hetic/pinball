@@ -131,11 +131,6 @@ export const SLINGSHOT_RESTITUTION  = 0.8;
 // Pop-zone + rocket sensors : déplacés en littéraux dans le layout de la map
 // (pas de mesh sensor_ dans le GLB → TODO blender). Plus de constante ici.
 
-// Drop targets — from GLB
-export const DROP_TARGETS = [
-  { id: 'drop_left_1',  x: -0.209, y: 1.022, z: -0.019, side: 'left' as const },
-  { id: 'drop_left_2',  x: -0.205, y: 1.026, z: -0.049, side: 'left' as const },
-  { id: 'drop_right_1', x:  0.157, y: 1.024, z: -0.041, side: 'right' as const },
-  { id: 'drop_right_2', x:  0.148, y: 1.028, z: -0.077, side: 'right' as const },
-  { id: 'drop_right_3', x:  0.137, y: 1.032, z: -0.114, side: 'right' as const },
-] as const;
+// Drop targets : définitions (id/side) + positions déplacées dans le layout de
+// la map ; positions dérivées du GLB au runtime (LayoutResolver). Plus de
+// constante ici.

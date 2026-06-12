@@ -1,7 +1,6 @@
 import type { MapLayout } from '@pinball/game-engine'
 import {
   BUMPER_POSITIONS,
-  DROP_TARGETS,
   SHOOTER_LANE_X_MIN,
   SHOOTER_LANE_X_MAX,
   SHOOTER_LANE_BOTTOM_Z,
@@ -75,7 +74,15 @@ import {
 // game-engine) se fera consommateur par consommateur en phase 4.
 export const layout: MapLayout = {
   bumpers: BUMPER_POSITIONS.map((b) => ({ ...b })),
-  dropTargets: DROP_TARGETS.map((d) => ({ ...d })),
+  // Drop targets : positions dérivées du GLB au runtime (LayoutResolver, meshes
+  // target_*). Les littéraux ci-dessous = fallback (≤ 0.7 mm du dérivé).
+  dropTargets: [
+    { id: 'drop_left_1', x: -0.209, y: 1.022, z: -0.019, side: 'left' },
+    { id: 'drop_left_2', x: -0.205, y: 1.026, z: -0.049, side: 'left' },
+    { id: 'drop_right_1', x: 0.157, y: 1.024, z: -0.041, side: 'right' },
+    { id: 'drop_right_2', x: 0.148, y: 1.028, z: -0.077, side: 'right' },
+    { id: 'drop_right_3', x: 0.137, y: 1.032, z: -0.114, side: 'right' },
+  ],
   // TODO(blender): dériver du GLB quand les meshes sensor_* existeront
   // (sensor_pop_1/2/3, sensor_rocket, sensor_demogorgon). Littéraux explicites
   // en attendant — pas de mesh dans le GLB actuel.
