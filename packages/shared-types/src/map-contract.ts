@@ -1,0 +1,42 @@
+import type { ClipId } from './socket-events'
+
+// Timings d'un clip cinématique (équivalent des tables CLIP_*_MS, mais
+// par map). Migration des tables ST vers manifest.clips en phase 5.
+export interface ClipTimings {
+  showMs: number
+  freezeMs: number
+  takeoverMs?: number
+}
+
+// Contrat de données SÉRIALISABLE d'une map. Aucune dépendance Three/React/
+// game-engine : shared-types reste neutre. Les interfaces runtime (MapModule,
+// MapContext, contenus DMD/backglass) vivent dans game-engine et les apps
+// (phases 2-5).
+export interface MapManifest {
+  id: string
+  name: string
+  version: number
+  glb: string // relatif au dossier assets/ du package
+  scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
+  rules: {
+    lives: number
+    multiplierThresholds: number[]
+    milestones: number[]
+    milestoneRepeatEvery: number
+    comboDecayMs: number
+  }
+  elements?: Record<string, Record<string, number | string>> // tuning par id d'élément
+  meshAliases?: Record<string, string> // nom GLB legacy → nom conventionnel
+  clips?: Record<ClipId, ClipTimings> // timings des clips de la map
+  forbiddenInCore?: string[] // termes pour le grep-guard anti-fuite
+}
+
+// Paquet de map résolu par la composition root (packages/maps/index.ts).
+// Les modules runtime sont chargés plus tard (phases 4-5) ; ici on n'expose
+// que des drapeaux de capacité.
+export interface MapPackage {
+  manifest: MapManifest
+  hasModule: boolean // comportement playfield custom (chargé en phase 4)
+  hasDmd: boolean // contenu DMD fourni (phase 5) — sinon NO SIGNAL
+  hasBackglass: boolean // idem backglass
+}
