@@ -14,6 +14,14 @@ export interface ClipTimings {
 // (phases 2-5).
 export type CinematicFamily = 'boss' | 'collect' | 'milestone' | 'other'
 
+// URL publique d'un asset de map. Les assets vivent dans le package de map
+// (packages/maps/<id>/assets/) et sont synchronisés vers
+// apps/<app>/public/maps/<id>/ au build (scripts/sync-map-assets.sh). Le
+// préfixe est dérivé de l'id de map — aucun chemin littéral côté consommateur.
+export function mapAssetUrl(mapId: string, relPath: string): string {
+  return `/maps/${mapId}/${relPath.replace(/^\/+/, '')}`
+}
+
 export interface MapManifest {
   id: string
   name: string

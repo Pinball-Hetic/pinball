@@ -25,7 +25,7 @@ export default function PinballPage() {
       <Head>
         <link rel="preload" href="/audio/early-sound.mp3" as="audio" type="audio/mpeg" />
         {PRELOAD.map((p) => (
-          <link key={p} rel="preload" href={`/${p}`} as={preloadAs(p)} />
+          <link key={p} rel="preload" href={p} as={preloadAs(p)} />
         ))}
       </Head>
       <PinballPlayfield />

@@ -1,4 +1,6 @@
-export const VECNA_MODEL_URL = '/playfield/vecna.glb';
+import { mapAsset } from '../manifest';
+
+export const VECNA_MODEL_URL = mapAsset('playfield/vecna.glb');
 export const VECNA_MODEL_HEIGHT = 0.2;
 export const VECNA_MODEL_YAW = 0;
 export const VECNA_MODEL_FOOT_LIFT = 0.026;

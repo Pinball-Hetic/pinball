@@ -428,7 +428,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const emitRef = useRef<GameEventListener | null>(null);
   const mapLayout = mapPackageRef.current.layout;
   const mapManifest = mapPackageRef.current.manifest;
-  const playfieldUrl = `/${mapManifest.glb}`;
+  // manifest.glb est déjà une URL publique absolue (/maps/<id>/…).
+  const playfieldUrl = mapManifest.glb;
 
   const playCinematic = useCallback(
     (

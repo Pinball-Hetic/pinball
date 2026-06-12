@@ -14,8 +14,9 @@ import { CameraBillboardSprite } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
+import { mapAsset } from '../manifest';
 
-const TEXTURE_URL = '/playfield/upsidedown.jpg';
+const TEXTURE_URL = mapAsset('playfield/upsidedown.jpg');
 
 type Phase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore' | 'tremor';
 

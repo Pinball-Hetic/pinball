@@ -1,4 +1,5 @@
 import type { BossDefinition, BossId } from '@pinball/game-engine'
+import { mapAsset } from './manifest'
 
 // Définitions de boss Stranger Things (déplacées de game-engine/BossRegistry).
 // Le moteur ne contient plus de contenu boss : il reçoit ces définitions
@@ -31,7 +32,7 @@ export const bossDefinitions: BossDefinition[] = [
     },
     unlocksPortal: true,
     unlocksReturnPortal: false,
-    revealSoundUrl: '/audio/spawnDG.mp3',
+    revealSoundUrl: mapAsset('audio/spawnDG.mp3'),
     revealSoundVolume: 100,
     // Eleven aide pendant le fight (cf. DemogorgonReveal émet ASSIST id 'eleven').
     assist: { id: 'eleven' },

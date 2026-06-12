@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { GameEvent, GameEventListener } from '@pinball/game-engine';
 import { getBossDefinition, DEMOGORGON_TARGET } from '../bosses';
+import { mapAsset } from '../manifest';
 import {
   ASSIST_SCORE,
   ASSIST_INTERVAL,
@@ -17,7 +18,7 @@ import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { DemogorgonTargetVisual } from './DemogorgonTargetVisual';
 import type { BossRevealController } from './BossRevealController';
 
-const TEXTURE_URL = '/playfield/demogorgon.png';
+const TEXTURE_URL = mapAsset('playfield/demogorgon.png');
 
 const BLACKOUT = 0.12;
 const REVEAL = 0.5;

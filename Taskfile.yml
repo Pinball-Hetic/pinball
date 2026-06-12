@@ -58,6 +58,11 @@ tasks:
     cmds:
       - bun scripts/validate-map.ts {{.CLI_ARGS}}
 
+  "maps:sync-assets":
+    desc: "Synchronise les assets d'une map vers public/ : task maps:sync-assets -- <mapId>"
+    cmds:
+      - bash scripts/sync-map-assets.sh {{.CLI_ARGS}}
+
   clean:
     desc: Supprimer artefacts de build et node_modules
     cmds:

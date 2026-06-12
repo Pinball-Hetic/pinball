@@ -1,4 +1,6 @@
-export const DEMOGORGON_MODEL_URL = '/playfield/demogorgon.glb';
+import { mapAsset } from '../manifest';
+
+export const DEMOGORGON_MODEL_URL = mapAsset('playfield/demogorgon.glb');
 export const DEMOGORGON_MODEL_HEIGHT = 0.2;
 export const DEMOGORGON_MODEL_YAW = 0;
 export const DEMOGORGON_MODEL_FOOT_LIFT = 0.026;

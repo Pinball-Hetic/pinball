@@ -2,8 +2,9 @@
   "name": "@pinball/playfield",
   "version": "1.0.0",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "sync-assets": "sh ../../scripts/sync-map-assets.sh",
+    "dev": "bun run sync-assets && next dev",
+    "build": "bun run sync-assets && next build",
     "start": "next start",
     "lint": "eslint src --ext .ts,.tsx"
   },

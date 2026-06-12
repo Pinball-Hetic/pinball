@@ -1,11 +1,17 @@
-import type { MapManifest } from '@pinball/shared-types'
+import { mapAssetUrl, type MapManifest } from '@pinball/shared-types'
+
+// Id de la map + helper de résolution d'asset (URL publique /maps/<id>/…).
+// SEULE source du littéral d'id dans le package (assets synchronisés depuis
+// packages/maps/strangerthings/assets/).
+export const MAP_ID = 'strangerthings'
+export const mapAsset = (rel: string) => mapAssetUrl(MAP_ID, rel)
 
 // Manifest de la map Stranger Things. Les valeurs sont issues des
 // constantes game-engine (ScoringConstants, BossRegistry, FlipperConstants)
 // et de useGameState. Phases ultérieures : le moteur lira ces valeurs depuis
 // le manifest (injection) au lieu des constantes hardcodées.
 export const manifest: MapManifest = {
-  id: 'strangerthings',
+  id: MAP_ID,
   name: 'Stranger Things',
   version: 1,
   attractTagline: 'Hawkins National Laboratory',
@@ -22,17 +28,17 @@ export const manifest: MapManifest = {
     milestone_30k: 'milestone',
     milestone_big: 'milestone',
   },
-  // Assets préchargés par la page playfield (chemins relatifs à public/).
-  preload: ['playfield/demogorgon.glb', 'playfield/demogorgon.png'],
+  // Assets préchargés par la page playfield (URL publique /maps/<id>/…).
+  preload: [mapAsset('playfield/demogorgon.glb'), mapAsset('playfield/demogorgon.png')],
   // Sons d'event de la map (joués via ctx.playSound(id)).
   sounds: {
-    upside_down_appear: { url: '/audio/apparitionUpsideDown.mp3', volume: 280 },
+    upside_down_appear: { url: mapAsset('audio/apparitionUpsideDown.mp3'), volume: 280 },
   },
   // Libellés des compteurs (recap backglass).
   counterLabels: { demogorgons: 'DEMOGORGONS', portals: 'PORTAILS', hetic: 'HETIC' },
   // Clés de mapState éditables par l'outil de debug (dev).
   debugMapState: { numbers: ['hetic'], flags: ['fever'] },
-  glb: 'playfield/newStrangerthings.glb',
+  glb: mapAsset('playfield/newStrangerthings.glb'),
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {
     bumper: 100, // SCORE_BUMPER
