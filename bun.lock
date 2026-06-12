@@ -114,6 +114,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@dimforge/rapier3d-compat": "^0.14.0",
+        "@pinball/shared-types": "workspace:*",
         "three": "^0.183.2",
       },
       "devDependencies": {
