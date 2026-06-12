@@ -3,6 +3,7 @@ import {
   BumperVisuals,
   UpsideDownAtmosphere,
   UpsideDownPortal,
+  UpsideDownTransition,
 } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 
@@ -18,6 +19,7 @@ export interface StModule extends MapModule {
   bumperVisuals: BumperVisuals | null
   atmosphere: UpsideDownAtmosphere | null
   portal: UpsideDownPortal | null
+  transition: UpsideDownTransition | null
 }
 
 export function createModule(): StModule {
@@ -25,6 +27,7 @@ export function createModule(): StModule {
   let bumperVisuals: BumperVisuals | null = null
   let atmosphere: UpsideDownAtmosphere | null = null
   let portal: UpsideDownPortal | null = null
+  let transition: UpsideDownTransition | null = null
   return {
     get garlands() {
       return garlands
@@ -37,6 +40,9 @@ export function createModule(): StModule {
     },
     get portal() {
       return portal
+    },
+    get transition() {
+      return transition
     },
     setup(ctx: MapContext): void {
       bumperVisuals = new BumperVisuals()
@@ -64,6 +70,14 @@ export function createModule(): StModule {
         colliderMap: ctx.colliderMap,
         onOpenChange: (open) => ctx.setPortalGateOpen(open),
       })
+      transition = new UpsideDownTransition()
+      transition.setup({
+        root: ctx.root,
+        scene: ctx.scene,
+        camera: ctx.camera,
+        garlandLights: garlands,
+        bumperVisuals,
+      })
     },
     onGameEvent(e: GameEvent): void {
       bumperVisuals?.onGameEvent(e)
@@ -76,6 +90,11 @@ export function createModule(): StModule {
       garlands?.update(dt)
       atmosphere?.update(dt)
       portal?.update(dt)
+      // transition.update reste piloté par PinballPlayfield (post-lecture
+      // isActive, pour préserver l'ordre de décision du gel à 1 frame près).
+    },
+    shouldFreezePhysics(): boolean {
+      return transition?.isActive() ?? false
     },
     onGameReset(): void {},
     dispose(): void {
@@ -83,10 +102,12 @@ export function createModule(): StModule {
       garlands?.dispose()
       atmosphere?.dispose()
       portal?.dispose()
+      transition?.dispose()
       bumperVisuals = null
       garlands = null
       atmosphere = null
       portal = null
+      transition = null
     },
   }
 }

@@ -1067,11 +1067,13 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             bumperVisuals?: BumperVisuals | null;
             atmosphere?: UpsideDownAtmosphere | null;
             portal?: UpsideDownPortal | null;
+            transition?: UpsideDownTransition | null;
           };
           garlandLights = stVisuals.garlands ?? null;
           bumperVisuals = stVisuals.bumperVisuals ?? null;
           upsideDownAtmosphere = stVisuals.atmosphere ?? null;
           upsideDownPortal = stVisuals.portal ?? null;
+          upsideDownTransition = stVisuals.transition ?? null;
           garlandLightsRef.current = garlandLights;
         }
 
@@ -1093,14 +1095,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         );
         PlayfieldColliderFactory.createForMap(world, mapLayout, colliderMap);
 
-        upsideDownTransition = new UpsideDownTransition();
-        upsideDownTransition.setup({
-          root: playfieldRoot,
-          scene,
-          camera,
-          garlandLights,
-          bumperVisuals,
-        });
+        // upsideDownTransition créé/possédé par le module (récupéré via le
+        // bridge). L'orchestration (isActive/start, cycle de monde) reste ici
+        // car elle pilote la bille (spawns).
 
         ballPhysicsInst = new BallPhysics(world, mapLayout);
 
@@ -2127,9 +2124,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       ballTrail?.dispose();
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;
-      // upsideDownPortal : dispose géré par mapModule.dispose.
-      upsideDownTransition?.dispose();
-      // upsideDownAtmosphere : dispose géré par mapModule.dispose.
+      // upsideDownPortal + transition + atmosphere : dispose géré par
+      // mapModule.dispose.
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();
