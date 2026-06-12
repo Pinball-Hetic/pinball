@@ -9,10 +9,16 @@ function make() {
   return { mgr, events };
 }
 
-const PLAYING = (over: Partial<{ totalScore: number; upsideDownActive: boolean; upsideDownScoreBaseline: number }> = {}) => ({
+const PLAYING = (over: Partial<{
+  totalScore: number;
+  upsideDownActive: boolean;
+  normalWorldScoreBaseline: number;
+  upsideDownScoreBaseline: number;
+}> = {}) => ({
   totalScore: 0,
   gameState: 'playing',
   upsideDownActive: false,
+  normalWorldScoreBaseline: 0,
   upsideDownScoreBaseline: 0,
   ...over,
 });
@@ -21,6 +27,20 @@ test('reveals demogorgon at its score threshold with the right payload', () => {
   const { mgr, events } = make();
   mgr.tryReveal('demogorgon', PLAYING({ totalScore: 3000 }));
   expect(events).toEqual([{ type: 'BOSS_REVEAL', bossId: 'demogorgon', scoreIncrement: 150 }]);
+});
+
+test('demogorgon requires score since normal world entry', () => {
+  const { mgr, events } = make();
+  mgr.tryReveal('demogorgon', PLAYING({ totalScore: 15000, normalWorldScoreBaseline: 15000 }));
+  expect(events).toHaveLength(0);
+  mgr.tryReveal('demogorgon', PLAYING({ totalScore: 18000, normalWorldScoreBaseline: 15000 }));
+  expect(events).toEqual([{ type: 'BOSS_REVEAL', bossId: 'demogorgon', scoreIncrement: 150 }]);
+});
+
+test('demogorgon does not reveal in the Upside Down', () => {
+  const { mgr, events } = make();
+  mgr.tryReveal('demogorgon', PLAYING({ totalScore: 9000, upsideDownActive: true }));
+  expect(events).toHaveLength(0);
 });
 
 test('does not reveal below threshold or outside playing', () => {
@@ -39,14 +59,19 @@ test('reveal is once-only', () => {
 
 test('vecna requires the Upside Down and a baseline-adjusted score', () => {
   const { mgr, events } = make();
-  // High raw score but not in the Upside Down → no reveal.
   mgr.tryReveal('vecna', PLAYING({ totalScore: 9999, upsideDownActive: false }));
   expect(events).toHaveLength(0);
-  // In Upside Down but score-since-entry < threshold → no reveal.
   mgr.tryReveal('vecna', PLAYING({ totalScore: 5000, upsideDownActive: true, upsideDownScoreBaseline: 4000 }));
   expect(events).toHaveLength(0);
-  // score - baseline >= 3000 → reveal.
   mgr.tryReveal('vecna', PLAYING({ totalScore: 7000, upsideDownActive: true, upsideDownScoreBaseline: 4000 }));
+  expect(events).toEqual([{ type: 'BOSS_REVEAL', bossId: 'vecna', scoreIncrement: 200 }]);
+});
+
+test('vecna requires score since Upside Down entry on each cycle', () => {
+  const { mgr, events } = make();
+  mgr.tryReveal('vecna', PLAYING({ totalScore: 20000, upsideDownActive: true, upsideDownScoreBaseline: 20000 }));
+  expect(events).toHaveLength(0);
+  mgr.tryReveal('vecna', PLAYING({ totalScore: 23000, upsideDownActive: true, upsideDownScoreBaseline: 20000 }));
   expect(events).toEqual([{ type: 'BOSS_REVEAL', bossId: 'vecna', scoreIncrement: 200 }]);
 });
 

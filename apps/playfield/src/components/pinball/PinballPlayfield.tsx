@@ -1220,6 +1220,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             && gameStateRef.current === "game_over"
           ) {
             collisionProcessor?.resetAllBossFights();
+            collisionProcessor?.resetScoreBaselines();
             bossReveals?.endAllFights();
           }
           if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
@@ -1345,7 +1346,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               upsideDownPortal?.reset();
               upsideDownPortal?.setUpsideDownActive(false);
               upsideDownAtmosphere?.reset();
-              collisionProcessor?.completeWorldCycle();
+              collisionProcessor?.completeWorldCycle(scoreRef.current);
               bossReveals?.endAllFights();
               stuckDetector.reset();
               if (ballMesh && ballPhysicsInst) {
@@ -1415,6 +1416,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 if (gameStateRef.current === "game_over") {
                   resetGame();
                   collisionProcessor?.resetAllBossFights();
+                  collisionProcessor?.resetScoreBaselines();
                   bossReveals?.endAllFights();
                   upsideDownPortal?.reset();
                   upsideDownAtmosphere?.reset();
@@ -1451,6 +1453,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               if (data.action === "DOWN" && gameStateRef.current === "game_over") {
                 resetGame();
                 collisionProcessor?.resetAllBossFights();
+                collisionProcessor?.resetScoreBaselines();
                 bossReveals?.endAllFights();
                 upsideDownPortal?.reset();
                 upsideDownAtmosphere?.reset();

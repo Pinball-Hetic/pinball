@@ -29,6 +29,7 @@ export class CollisionEventProcessor {
   private portalOpen = false;
   private portalTriggered = false;
   private upsideDownActive = false;
+  private normalWorldScoreBaseline = 0;
   private upsideDownScoreBaseline = 0;
 
   setPortalOpen(open: boolean): void {
@@ -67,9 +68,15 @@ export class CollisionEventProcessor {
     this.resetBossFight('vecna');
   }
 
-  completeWorldCycle(): void {
+  resetScoreBaselines(): void {
+    this.normalWorldScoreBaseline = 0;
+    this.upsideDownScoreBaseline = 0;
+  }
+
+  completeWorldCycle(score: number): void {
     this.upsideDownActive = false;
     this.upsideDownScoreBaseline = 0;
+    this.normalWorldScoreBaseline = score;
     this.portalTriggered = false;
     this.resetAllBossFights();
   }
@@ -79,6 +86,7 @@ export class CollisionEventProcessor {
       totalScore,
       gameState,
       upsideDownActive: this.upsideDownActive,
+      normalWorldScoreBaseline: this.normalWorldScoreBaseline,
       upsideDownScoreBaseline: this.upsideDownScoreBaseline,
     });
   }

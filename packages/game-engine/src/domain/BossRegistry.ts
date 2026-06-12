@@ -64,7 +64,6 @@ export type BossRevealConfig = {
   scoreThreshold: number;
   scoreIncrement: number;
   requiresUpsideDown: boolean;
-  useUpsideDownScoreBaseline: boolean;
 };
 
 export type BossDefinition = {
@@ -94,7 +93,6 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       scoreThreshold: 3000,
       scoreIncrement: 150,
       requiresUpsideDown: false,
-      useUpsideDownScoreBaseline: false,
     },
     hud: {
       label: 'Cible Demogorgon',
@@ -154,7 +152,6 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
       scoreThreshold: 3000,
       scoreIncrement: 200,
       requiresUpsideDown: true,
-      useUpsideDownScoreBaseline: true,
     },
     hud: {
       label: 'Cible Vecna',

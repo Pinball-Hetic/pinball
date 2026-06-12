@@ -12,6 +12,7 @@ export type BossRevealContext = {
   totalScore: number;
   gameState: string;
   upsideDownActive: boolean;
+  normalWorldScoreBaseline: number;
   upsideDownScoreBaseline: number;
 };
 
@@ -72,10 +73,12 @@ export class BossFightManager {
     // One boss fight at a time — don't reveal while another is still active.
     if (this.anyOtherFightActive(id)) return;
     if (def.reveal.requiresUpsideDown && !context.upsideDownActive) return;
+    if (!def.reveal.requiresUpsideDown && context.upsideDownActive) return;
 
-    const score = def.reveal.useUpsideDownScoreBaseline
-      ? context.totalScore - context.upsideDownScoreBaseline
-      : context.totalScore;
+    const baseline = def.reveal.requiresUpsideDown
+      ? context.upsideDownScoreBaseline
+      : context.normalWorldScoreBaseline;
+    const score = context.totalScore - baseline;
     if (score < def.reveal.scoreThreshold) return;
 
     this.beginFight(id, false);
