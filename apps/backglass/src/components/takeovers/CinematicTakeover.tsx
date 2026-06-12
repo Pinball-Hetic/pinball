@@ -1,9 +1,8 @@
 import type { CinematicClip, GameOver, LeaderboardEntry } from '@pinball/shared-types'
 import VhsGlitch from '../VhsGlitch'
-import SideArt from '../SideArt'
+import { SideArt, DemogorgonTakeover } from '@pinball/map-strangerthings/backglass'
 import HighScoreTakeover from './HighScoreTakeover'
 import RecapTakeover from './RecapTakeover'
-import DemogorgonTakeover from './DemogorgonTakeover'
 
 interface Props {
   clip: CinematicClip

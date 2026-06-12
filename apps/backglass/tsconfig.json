@@ -17,6 +17,8 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
+      "@pinball/map-strangerthings/backglass": ["../../packages/maps/strangerthings/backglass"],
+      "@pinball/map-strangerthings": ["../../packages/maps/strangerthings/index.ts"],
       "@pinball/*": ["../../packages/*/src"]
     }
   },

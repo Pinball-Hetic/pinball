@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { Reactor } from '@/hooks/useIngameReactor'
+import type { Reactor } from './reactor'
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 const ROW1 = ALPHABET.slice(0, 13)

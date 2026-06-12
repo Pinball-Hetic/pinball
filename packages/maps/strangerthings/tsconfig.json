@@ -1,5 +1,9 @@
 {
   "extends": "../../config/tsconfig.json",
-  "include": ["**/*.ts"],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["dom", "dom.iterable", "esnext"]
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules", "**/*.test.ts"]
 }

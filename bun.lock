@@ -16,6 +16,7 @@
       "name": "@pinball/backglass",
       "version": "1.0.0",
       "dependencies": {
+        "@pinball/map-strangerthings": "workspace:*",
         "@pinball/shared-types": "workspace:*",
         "next": "^16.2.1",
         "react": "^19.2.4",
@@ -150,6 +151,13 @@
         "@pinball/dmd-core": "workspace:*",
         "@pinball/game-engine": "workspace:*",
         "@pinball/shared-types": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/react": "^19.0.10",
+        "react": "^19.2.4",
+      },
+      "peerDependencies": {
+        "react": "^19.2.4",
       },
     },
     "packages/shared-types": {
