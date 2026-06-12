@@ -55,6 +55,20 @@ describe('MeshRoleResolver.resolveFromAncestry', () => {
     });
   });
 
+  test('vis_ sur un enfant exclut un détail dans un groupe physique', () => {
+    const r = new MeshRoleResolver();
+    // Vis décorative dans un groupe bumper_1 → non-physique (vis gagne).
+    expect(r.resolveFromAncestry(['vis_screw', 'bumper_1'])).toEqual({
+      role: 'vis',
+      id: 'screw',
+    });
+    // Le reste du groupe (sans nom propre) hérite bien de bumper_1.
+    expect(r.resolveFromAncestry(['Mesh_3', 'bumper_1'])).toEqual({
+      role: 'bumper',
+      id: '1',
+    });
+  });
+
   test('aucun ancêtre résolu → null + mesh enregistré', () => {
     const r = new MeshRoleResolver();
     expect(r.resolveFromAncestry(['Mesh_8', 'Circle.018', 'Pinballmap'])).toBeNull();

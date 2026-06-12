@@ -46,6 +46,15 @@ hiérarchie : le préfixe le plus **spécifique** gagne. Donc :
 Exemple : objet `wall_rail_left` contenant `Mesh_8/9/10` → les 3 primitives
 sont des murs. Pas besoin de toucher aux `Mesh_N`.
 
+**Exclure un détail dans un groupe physique** : à l'inverse, pour rendre un
+sous-objet **non-physique** alors que son groupe est physique, nommer ce
+sous-objet `vis_…`. Comme le plus spécifique gagne, il surcharge le rôle du
+groupe. Exemple : groupe `bumper_1` contenant une vis décorative `vis_screw`
+→ la vis est ignorée côté physique, le reste du groupe reste bumper. (Le
+sous-objet doit être un **objet Blender distinct** pour porter son propre
+nom ; une simple primitive issue d'un split par matériau ne peut pas être
+renommée séparément.)
+
 ### Tuning par élément (`manifest.elements`)
 
 Certains rôles ont des variantes physiques. Les exprimer dans
