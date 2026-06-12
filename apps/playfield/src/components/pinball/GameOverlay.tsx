@@ -18,6 +18,7 @@ interface GameOverlayProps {
   upsideDownHint: boolean;
   atmosphereBannerLabel: string;
   atmosphereHintLabel: string;
+  attractTagline: string;
   cabinetMode?: boolean;
   onAttractInteract?: () => void;
 }
@@ -35,6 +36,7 @@ export default function GameOverlay({
   upsideDownHint,
   atmosphereBannerLabel,
   atmosphereHintLabel,
+  attractTagline,
   cabinetMode = false,
   onAttractInteract,
 }: GameOverlayProps) {
@@ -185,7 +187,7 @@ export default function GameOverlay({
         >
           <div className="text-center">
             <p className="font-mono text-[10px] uppercase tracking-[0.55em] text-red-400/80">
-              Hawkins National Laboratory
+              {attractTagline}
             </p>
             <h1 className="mt-3 font-mono text-4xl font-bold uppercase tracking-[0.18em] text-zinc-100 drop-shadow-[0_0_24px_rgba(255,180,0,0.35)] sm:text-5xl">
               Pinball

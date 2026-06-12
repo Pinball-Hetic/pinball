@@ -16,6 +16,8 @@ export interface MapManifest {
   id: string
   name: string
   version: number
+  /** Sous-titre d'écran d'attract (branding de la map, ex. lab fictif). */
+  attractTagline?: string
   glb: string // relatif au dossier assets/ du package
   scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
   rules: {

@@ -8,6 +8,7 @@ export const manifest: MapManifest = {
   id: 'strangerthings',
   name: 'Stranger Things',
   version: 1,
+  attractTagline: 'Hawkins National Laboratory',
   glb: 'playfield/newStrangerthings.glb',
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {
