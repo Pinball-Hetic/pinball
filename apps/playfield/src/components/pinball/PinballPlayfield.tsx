@@ -1011,6 +1011,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // ── Physics ──────────────────────────────────────────────────────────
         physicsWorld = await PhysicsWorld.create();
         const world = physicsWorld.world;
+        // colliderMap créé ici (avant le ctx) pour être injecté dans le module.
+        const colliderMap = new Map<number, string>();
 
         // ── MapContext : construit TÔT (avant UpsideDownTransition L~1034) pour
         // que module.setup puisse créer ses systèmes avant qu'ils soient
@@ -1023,7 +1025,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             physics: physicsWorld,
             layout: mapLayout,
             manifest: mapManifest,
+            colliderMap,
+            lighting: {
+              renderer,
+              ambient: ambientLight,
+              hemi: hemiLight,
+              dir: dirLight,
+              fill: fillLight,
+            },
             resolve: (name) => findObjectByNormalizedName(playfieldRoot, name) ?? null,
+            setPortalGateOpen: (open) => collisionProcessor?.setPortalOpen(open),
             addScore: (points, label) =>
               emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
             setMapState: (patch) => {
@@ -1065,8 +1076,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         shooterLaneGateRef.current = shooterLaneGate;
 
         modelRoot.updateMatrixWorld(true);
-
-        const colliderMap = new Map<number, string>();
 
         // GLB conventionné role-driven : les murs (wall_/lane_) sont des
         // trimeshes classés par rôle ; le sol/bumpers/sensors/couloir sont
