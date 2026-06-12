@@ -78,6 +78,10 @@ elements: {
 - Noms en underscores selon les conventions ci-dessus.
 - Trianguler les surfaces de collision (`floor_`, `wall_`).
 
+> **Dette Blender en cours (Stranger Things)** : meshes `sensor_*` à ajouter +
+> origines des bumpers à corriger pour dériver les positions du GLB. Détail
+> chiffré, par mesh, en langage Blender → **[docs/BLENDER_GLB_TODO.md](./BLENDER_GLB_TODO.md)**.
+
 ## Cycle de création
 
 1. Créer `packages/maps/<id>/` (`package.json`, `tsconfig.json`,
