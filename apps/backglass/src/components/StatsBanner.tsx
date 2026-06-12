@@ -11,8 +11,10 @@ interface StatsBannerProps {
 
 const ROTATE_MS = 5000
 
-function fmt(n: number): string {
-  return n.toLocaleString('fr-FR')
+// Défense en profondeur : le bandeau d'un kiosk ne crash JAMAIS pour une
+// stat manquante (undefined/null → 0).
+function fmt(n: number | undefined | null): string {
+  return (n ?? 0).toLocaleString('fr-FR')
 }
 
 function buildSlides(stats: GlobalStats, entries: LeaderboardEntry[]): string[] {
