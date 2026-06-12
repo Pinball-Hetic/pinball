@@ -13,7 +13,7 @@ import CinematicTakeover from '@/components/takeovers/CinematicTakeover'
 
 export default function BackglassPage() {
   const { entries, stats, connected } = useBackglassData()
-  const { takeover, upsideDown, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
+  const { takeover, alternateWorld, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
     useBackglassTakeover(entries)
   const stageRef = useRef<HTMLDivElement>(null)
   const goldWaveRef = useRef<HTMLDivElement>(null)
@@ -52,10 +52,10 @@ export default function BackglassPage() {
     return () => window.removeEventListener('resize', fit)
   }, [])
 
-  const sideAgitation = upsideDown ? 1 : Math.max(0.15, agitation)
+  const sideAgitation = alternateWorld ? 1 : Math.max(0.15, agitation)
 
   return (
-    <div className={`stage-fit ${upsideDown ? 'upside-down' : ''} ${fever ? 'fever' : ''}`}>
+    <div className={`stage-fit ${alternateWorld ? 'upside-down' : ''} ${fever ? 'fever' : ''}`}>
       <main className="stage" ref={stageRef}>
         <div className="vignette" style={{ opacity: 1 + agitation * 0.8 }} />
         <div className="vignette-heat" />
@@ -67,7 +67,7 @@ export default function BackglassPage() {
 
         <section className="zone-side">
           <SideArt
-            mood={upsideDown ? 'upsideDown' : 'normal'}
+            mood={alternateWorld ? 'upsideDown' : 'normal'}
             agitation={sideAgitation}
             reactor={reactor}
           />
@@ -77,7 +77,7 @@ export default function BackglassPage() {
           <HallOfFame
             entries={entries}
             highlightRank={highlightRank}
-            inverted={upsideDown && !holdHallFlip}
+            inverted={alternateWorld && !holdHallFlip}
             reactor={reactor}
           />
         </section>

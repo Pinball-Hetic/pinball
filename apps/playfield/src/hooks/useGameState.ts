@@ -127,14 +127,14 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
   const [player, setPlayer] = useState<string>(() => generatePlayerName());
   const [bossHud, setBossHud] = useState<BossHudState>(() => initialBossHud(bosses));
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
-  const [alternateWorldActive, setUpsideDownActive] = useState(false);
-  const [upsideDownHint, setUpsideDownHint] = useState(false);
+  const [alternateWorldActive, setAlternateWorldActive] = useState(false);
+  const [alternateWorldHint, setAlternateWorldHint] = useState(false);
   const [fever, setFever] = useState(false);
 
   const milestonesPassedRef = useRef<Set<number>>(new Set());
   const alternateWorldActiveRef = useRef(false);
   const normalWorldBaselineRef = useRef(0);
-  const upsideDownBaselineRef = useRef(0);
+  const alternateWorldBaselineRef = useRef(0);
   const bossArmedFiredRef = useRef<Set<BossId>>(new Set());
   const feverUntilRef = useRef(0);
   const scoreRef = useRef(0);
@@ -148,7 +148,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
   const elevenTimerRef = useRef<number | null>(null);
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
-  const upsideDownHintTimerRef = useRef<number | null>(null);
+  const alternateWorldHintTimerRef = useRef<number | null>(null);
 
   const maxComboRef = useRef(0);
   const maxMultiplierRef = useRef(1);
@@ -205,12 +205,12 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     scorePopTimersRef.current.set(id, timer);
   }, []);
 
-  const clearUpsideDownHint = useCallback(() => {
-    if (upsideDownHintTimerRef.current !== null) {
-      window.clearTimeout(upsideDownHintTimerRef.current);
-      upsideDownHintTimerRef.current = null;
+  const clearAlternateWorldHint = useCallback(() => {
+    if (alternateWorldHintTimerRef.current !== null) {
+      window.clearTimeout(alternateWorldHintTimerRef.current);
+      alternateWorldHintTimerRef.current = null;
     }
-    setUpsideDownHint(false);
+    setAlternateWorldHint(false);
   }, []);
 
   const clearBossHud = useCallback((id: BossId) => {
@@ -232,16 +232,16 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     }
   }, [clearBossHud]);
 
-  const clearUpsideDownSession = useCallback(() => {
-    clearUpsideDownHint();
+  const clearAlternateWorldSession = useCallback(() => {
+    clearAlternateWorldHint();
     clearBossHud("vecna");
     callbacks?.onAtmosphereChange?.(false);
-    setUpsideDownActive(false);
+    setAlternateWorldActive(false);
     alternateWorldActiveRef.current = false;
-    upsideDownBaselineRef.current = 0;
-    // Le nid de vecna pourra se ré-annoncer à la prochaine entrée Upside Down.
+    alternateWorldBaselineRef.current = 0;
+    // Le nid de vecna pourra se ré-annoncer à la prochaine entrée monde alternatif.
     bossArmedFiredRef.current.delete("vecna");
-  }, [clearUpsideDownHint, clearBossHud, callbacks]);
+  }, [clearAlternateWorldHint, clearBossHud, callbacks]);
 
   const updateGameState = (state: GameState) => {
     gameStateRef.current = state;
@@ -300,7 +300,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     bossArmedFiredRef.current.clear();
     alternateWorldActiveRef.current = false;
     normalWorldBaselineRef.current = 0;
-    upsideDownBaselineRef.current = 0;
+    alternateWorldBaselineRef.current = 0;
     feverUntilRef.current = 0;
     setFever(false);
     lastEventTimeRef.current = 0;
@@ -312,7 +312,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     playerRef.current = newName;
     clearAllBossHud();
     clearScorePops();
-    clearUpsideDownSession();
+    clearAlternateWorldSession();
     updateGameState("idle");
     callbacks?.onIdleReset?.();
   };
@@ -352,7 +352,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         if (crossed) callbacks?.onMilestone?.(crossed);
 
         // Éveil du nid : palier de boss franchi → onBossArmed une fois par partie.
-        // Le set garde l'unicité ; le gate Upside Down/baseline est porté par
+        // Le set garde l'unicité ; le gate monde alternatif/baseline est porté par
         // bossThresholdMet (généricité demogorgon + vecna).
         for (const id of bossIds) {
           if (bossArmedFiredRef.current.has(id)) continue;
@@ -361,7 +361,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
             totalScore: scoreRef.current,
             alternateWorldActive: alternateWorldActiveRef.current,
             normalWorldScoreBaseline: normalWorldBaselineRef.current,
-            alternateWorldScoreBaseline: upsideDownBaselineRef.current,
+            alternateWorldScoreBaseline: alternateWorldBaselineRef.current,
           });
           if (met) {
             bossArmedFiredRef.current.add(id);
@@ -501,25 +501,25 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         });
       }
       if (event.type === "PORTAL_TRANSITION_END") {
-        setUpsideDownActive(true);
+        setAlternateWorldActive(true);
         alternateWorldActiveRef.current = true;
-        upsideDownBaselineRef.current = scoreRef.current;
-        setUpsideDownHint(true);
-        if (upsideDownHintTimerRef.current !== null) {
-          window.clearTimeout(upsideDownHintTimerRef.current);
+        alternateWorldBaselineRef.current = scoreRef.current;
+        setAlternateWorldHint(true);
+        if (alternateWorldHintTimerRef.current !== null) {
+          window.clearTimeout(alternateWorldHintTimerRef.current);
         }
-        upsideDownHintTimerRef.current = window.setTimeout(() => {
-          upsideDownHintTimerRef.current = null;
-          setUpsideDownHint(false);
+        alternateWorldHintTimerRef.current = window.setTimeout(() => {
+          alternateWorldHintTimerRef.current = null;
+          setAlternateWorldHint(false);
         }, atmosphereHintMs);
         callbacks?.onAtmosphereChange?.(true);
       }
       if (event.type === "RETURN_PORTAL_TRANSITION_END") {
-        setUpsideDownActive(false);
-        setUpsideDownHint(false);
-        if (upsideDownHintTimerRef.current !== null) {
-          window.clearTimeout(upsideDownHintTimerRef.current);
-          upsideDownHintTimerRef.current = null;
+        setAlternateWorldActive(false);
+        setAlternateWorldHint(false);
+        if (alternateWorldHintTimerRef.current !== null) {
+          window.clearTimeout(alternateWorldHintTimerRef.current);
+          alternateWorldHintTimerRef.current = null;
         }
         callbacks?.onAtmosphereChange?.(false);
       }
@@ -527,7 +527,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         clearAllBossHud();
         normalWorldBaselineRef.current = scoreRef.current;
         alternateWorldActiveRef.current = false;
-        upsideDownBaselineRef.current = 0;
+        alternateWorldBaselineRef.current = 0;
         bossArmedFiredRef.current.clear();
       }
     };
@@ -548,11 +548,11 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     bossHud,
     scorePops,
     alternateWorldActive,
-    upsideDownHint,
+    alternateWorldHint,
     fever,
     isFeverActive,
     startFever,
-    clearUpsideDownSession,
+    clearAlternateWorldSession,
     resetGame,
     buildEmit,
   };

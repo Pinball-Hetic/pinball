@@ -15,7 +15,7 @@ interface GameOverlayProps {
   bossHud: BossHudState;
   scorePops: ScorePop[];
   alternateWorldActive: boolean;
-  upsideDownHint: boolean;
+  alternateWorldHint: boolean;
   atmosphereBannerLabel: string;
   atmosphereHintLabel: string;
   attractTagline: string;
@@ -34,7 +34,7 @@ export default function GameOverlay({
   bossHud,
   scorePops,
   alternateWorldActive,
-  upsideDownHint,
+  alternateWorldHint,
   atmosphereBannerLabel,
   atmosphereHintLabel,
   attractTagline,
@@ -54,11 +54,11 @@ export default function GameOverlay({
   const showResetBall =
     bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
 
-  const showUpsideDownBanner =
+  const showAlternateWorldBanner =
     bootPhase === "in_game" && gameState === "playing" && alternateWorldActive;
 
-  const showUpsideDownHint =
-    bootPhase === "in_game" && gameState === "playing" && upsideDownHint;
+  const showAlternateWorldHint =
+    bootPhase === "in_game" && gameState === "playing" && alternateWorldHint;
 
   return (
     <>
@@ -98,7 +98,7 @@ export default function GameOverlay({
         </header>
       )}
 
-      {showUpsideDownBanner && (
+      {showAlternateWorldBanner && (
         <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-10 flex justify-center">
           <div className="rounded border border-violet-500/25 bg-black/45 px-3 py-1 font-mono backdrop-blur-sm">
             <p className="text-[10px] uppercase tracking-[0.45em] text-violet-300/80 drop-shadow-[0_0_10px_rgba(140,80,200,0.45)]">
@@ -108,7 +108,7 @@ export default function GameOverlay({
         </div>
       )}
 
-      {showUpsideDownHint && (
+      {showAlternateWorldHint && (
         <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center px-6">
           <p className="animate-pulse text-center font-mono text-xs uppercase tracking-[0.22em] text-violet-200/75 drop-shadow-[0_0_12px_rgba(150,90,220,0.55)] sm:text-sm">
             {atmosphereHintLabel}

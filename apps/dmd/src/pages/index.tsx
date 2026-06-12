@@ -112,7 +112,7 @@ const disconnectedStyle: CSSProperties = {
 
 export default function ScoreboardPage() {
   const router = useRouter()
-  const { display, upsideDown, connected } = useDmdState()
+  const { display, alternateWorld, connected } = useDmdState()
 
   // ?flat : ancien rendu JSX plat (debug). Attendre router.isReady pour
   // éviter de monter le canvas puis de basculer en flat.
@@ -144,7 +144,7 @@ export default function ScoreboardPage() {
       }}
     >
       <NeonBand text="STRANGER THINGS" position="top" />
-      <DmdCanvas display={display} upsideDown={upsideDown} />
+      <DmdCanvas display={display} alternateWorld={alternateWorld} />
       <NeonBand text="PINBALL HETIC" position="bottom" />
       {!connected && <div style={disconnectedStyle}>Disconnected</div>}
     </main>

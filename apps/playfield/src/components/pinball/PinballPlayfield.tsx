@@ -141,8 +141,8 @@ import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 
 
-type UpsideDownPersistence = "until_game_over" | "until_drain";
-const UPSIDE_DOWN_PERSISTENCE: UpsideDownPersistence = "until_game_over";
+type AlternateWorldPersistence = "until_game_over" | "until_drain";
+const ALTERNATE_WORLD_PERSISTENCE: AlternateWorldPersistence = "until_game_over";
 
 /**
  * Mode du clavier — `NEXT_PUBLIC_KEYBOARD_MODE` :
@@ -459,7 +459,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     bossHud,
     scorePops,
     alternateWorldActive,
-    upsideDownHint,
+    alternateWorldHint,
     scoreRef,
     livesRef,
     comboRef,
@@ -467,7 +467,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     playerRef,
     isFeverActive,
     startFever,
-    clearUpsideDownSession,
+    clearAlternateWorldSession,
     resetGame,
     buildEmit,
   } = useGameState({
@@ -554,8 +554,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     },
     onAtmosphereChange: (alternateWorldActive) => {
       dmd.setAtmosphere(alternateWorldActive);
-      atmosphereUpsideRef.current = alternateWorldActive;
-      // nestMarker.setUpsideDown géré par le module (réconciliation onGameEvent).
+      atmosphereAlternateRef.current = alternateWorldActive;
+      // nestMarker géré par le module (réconciliation onGameEvent).
     },
     // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
     // module de map (events MILESTONE / BOSS_ARMED).
@@ -598,7 +598,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const shooterLaneGateRef = useRef<ShooterLaneGate | null>(null);
   const screenShakeRef = useRef<ScreenShake | null>(null);
   if (!screenShakeRef.current) screenShakeRef.current = new ScreenShake();
-  const atmosphereUpsideRef = useRef(false);
+  const atmosphereAlternateRef = useRef(false);
 
   useEffect(() => {
     dmd.pushIntro(playerRef.current);
@@ -1016,8 +1016,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             playCinematic: (clipId, opts) => playCinematic(clipId, opts),
             setAtmosphere: (active) => {
               dmd.setAtmosphere(active);
-              atmosphereUpsideRef.current = active;
-              // nestMarker.setUpsideDown géré par le module (réconciliation).
+              atmosphereAlternateRef.current = active;
+              // nestMarker géré par le module (réconciliation).
             },
             emitGameEvent: (e) => emit(e),
           };
@@ -1219,10 +1219,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           if (ballMesh) ballMesh.visible = false;
           diag.noteReset("game_over_hide");
         });
-        const releaseUpsideDownWorld = () => {
+        const releaseAlternateWorld = () => {
           mapModule?.releaseWorld?.();
           collisionProcessor?.resetAlternateWorldSession();
-          clearUpsideDownSession();
+          clearAlternateWorldSession();
         };
         // Réconciliation des marqueurs de nid : gérée par le module de map
         // (fin de mapModule.onGameEvent, après chaque event).
@@ -1267,10 +1267,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           }
           if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
             if (
-              UPSIDE_DOWN_PERSISTENCE === "until_drain" ||
+              ALTERNATE_WORLD_PERSISTENCE === "until_drain" ||
               gameStateRef.current === "game_over"
             ) {
-              releaseUpsideDownWorld();
+              releaseAlternateWorld();
             }
           }
           if (event.type === "PORTAL_ENTER") {
@@ -1321,7 +1321,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         );
 
         // upsideDownPortal créé/possédé par le module de map (récupéré plus
-        // haut via le bridge). Ses resets / setUpsideDownActive / aimant
+        // haut via le bridge). Ses resets / setAlternateWorldActive / aimant
         // restent pilotés ici (flow transition + cycle de monde).
 
         // upsideDownAtmosphere créé/possédé par le module de map (récupéré
@@ -1564,7 +1564,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       prevFrameTime = time;
 
       // visuals + garlands (incl. setFever via ctx.isFeverActive) + bosses +
-      // upside-down : update(dt) géré par mapModule.update.
+      // monde alternatif : update(dt) géré par mapModule.update.
 
       // Hint tardif du nid : géré par le module de map (mapModule.update).
 
@@ -1860,7 +1860,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           dt,
           ballMesh ? ballMesh.position : { x: 0, y: 0, z: 0 },
           intensity,
-          { alternateWorld: atmosphereUpsideRef.current, fever: feverNow },
+          { alternateWorld: atmosphereAlternateRef.current, fever: feverNow },
           camera.quaternion,
         );
       }
@@ -1958,7 +1958,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           bossHud={bossHud}
           scorePops={scorePops}
           alternateWorldActive={alternateWorldActive}
-          upsideDownHint={upsideDownHint}
+          alternateWorldHint={alternateWorldHint}
           atmosphereBannerLabel={mapLayout.atmosphere.bannerLabel}
           atmosphereHintLabel={mapLayout.atmosphere.hintLabel}
           attractTagline={mapManifest.attractTagline ?? mapManifest.name}

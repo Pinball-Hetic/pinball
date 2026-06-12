@@ -31,7 +31,7 @@ export function useDmdState() {
   }, []);
 
   // Dérivé du dernier display reçu — state-driven, pas d'event séparé.
-  const upsideDown = display.alternateWorld;
+  const alternateWorld = display.alternateWorld;
 
-  return { display, upsideDown, connected };
+  return { display, alternateWorld, connected };
 }

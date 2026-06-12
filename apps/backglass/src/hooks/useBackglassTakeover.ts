@@ -51,7 +51,7 @@ interface JoyceSignal {
 
 interface TakeoverState {
   takeover: Takeover | null
-  upsideDown: boolean
+  alternateWorld: boolean
   highlightRank: number | undefined
   agitation: number
   joyce: JoyceSignal
@@ -93,7 +93,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
   const stackRef = useRef<StackEntry[]>([])
   const lastActivityRef = useRef(0)
   const lastJoyceIdleRef = useRef(0)
-  const upsideDownRef = useRef(false)
+  const alternateWorldRef = useRef(false)
   const highlightUntilRef = useRef(0)
   const highlightRankRef = useRef<number | undefined>(undefined)
   const agitationStartRef = useRef(-AGITATION_MS)
@@ -107,7 +107,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
 
   const [state, setState] = useState<TakeoverState>({
     takeover: null,
-    upsideDown: false,
+    alternateWorld: false,
     highlightRank: undefined,
     agitation: 0,
     joyce: { text: null, id: 0 },
@@ -169,7 +169,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
     })
 
     socket.on('dmd:display', (d) => {
-      upsideDownRef.current = d.alternateWorld ?? false
+      alternateWorldRef.current = d.alternateWorld ?? false
       if ('mapState' in d) feverRef.current = mapStateFlag(d.mapState, 'fever')
       if (d.mode === 'CINEMATIC') {
         // Garde kiosk : event serveur malformé sans clip. Un clip inconnu
@@ -304,7 +304,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         takeover: top
           ? { scene: top.scene, payload: top.payload, clip: top.clip }
           : null,
-        upsideDown: upsideDownRef.current,
+        alternateWorld: alternateWorldRef.current,
         highlightRank: highlightRankRef.current,
         agitation: agitationAt(now - agitationStartRef.current),
         joyce: joyceRef.current,
