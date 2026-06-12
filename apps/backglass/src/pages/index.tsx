@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { NoSignal } from '@pinball/ui'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
@@ -110,7 +111,11 @@ export default function BackglassPage() {
           </div>
         )}
 
-        {!connected && <div className="disconnected">Disconnected</div>}
+        {!connected && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 50 }}>
+            <NoSignal reason="BACKGLASS — PAS DE SIGNAL SERVEUR" />
+          </div>
+        )}
       </main>
     </div>
   )

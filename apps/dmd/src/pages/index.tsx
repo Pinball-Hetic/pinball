@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { useDmdState } from '@/hooks/useDmdState'
 import DmdCanvas from '@/components/DmdCanvas'
 import NeonBand from '@/components/NeonBand'
+import { NoSignal } from '@pinball/ui'
 import type { DmdDisplay } from '@pinball/shared-types'
 
 const TOTAL_LIVES = 3
@@ -101,13 +102,10 @@ function renderDisplay(d: DmdDisplay): ReactElement {
   }
 }
 
-const disconnectedStyle: CSSProperties = {
+const NO_SIGNAL_OVERLAY: CSSProperties = {
   position: 'absolute',
-  top: 16,
-  right: 16,
-  color: '#ef4444',
-  fontSize: 14,
-  fontFamily: 'monospace',
+  inset: 0,
+  zIndex: 10,
 }
 
 export default function ScoreboardPage() {
@@ -146,7 +144,11 @@ export default function ScoreboardPage() {
       <NeonBand text="STRANGER THINGS" position="top" />
       <DmdCanvas display={display} alternateWorld={alternateWorld} />
       <NeonBand text="PINBALL HETIC" position="bottom" />
-      {!connected && <div style={disconnectedStyle}>Disconnected</div>}
+      {!connected && (
+        <div style={NO_SIGNAL_OVERLAY}>
+          <NoSignal reason="DMD — PAS DE SIGNAL SERVEUR" />
+        </div>
+      )}
     </main>
   )
 }
