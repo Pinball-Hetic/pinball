@@ -7,7 +7,7 @@ import type {
   GameOver,
   CinematicClip,
 } from '@pinball/shared-types'
-import { clipShowMs } from '@pinball/shared-types'
+import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
@@ -170,7 +170,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
 
     socket.on('dmd:display', (d) => {
       upsideDownRef.current = d.upsideDown ?? false
-      if ('fever' in d) feverRef.current = d.fever
+      if ('mapState' in d) feverRef.current = mapStateFlag(d.mapState, 'fever')
       if (d.mode === 'CINEMATIC') {
         // Garde kiosk : event serveur malformé sans clip. Un clip inconnu
         // ne crashe plus (clipShowMs garantit un nombre → jamais de NaN sur

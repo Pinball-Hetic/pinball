@@ -1,4 +1,5 @@
 import type { DmdDisplay } from '@pinball/shared-types'
+import { mapStateNumber, mapStateFlag } from '@pinball/shared-types'
 import { FONT_5X7, FONT_12X22, drawText, measureText } from './fonts'
 import { GRID_W, GRID_H } from './DmdRenderer'
 import { DOT } from './palette'
@@ -136,14 +137,15 @@ function drawFeverBanner(grid: Uint8Array, score: number, clockMs: number): void
 
 function layoutScore(grid: Uint8Array, display: DmdDisplay, clockMs: number): void {
   const d = display as Variant<'SCORE'>
-  if (d.fever) {
+  // TODO phase 5 — rendu HETIC/FEVER fourni par le contenu DMD de la map.
+  if (mapStateFlag(d.mapState, 'fever')) {
     drawFeverBanner(grid, d.score, clockMs)
     return
   }
   // Le score remplit la bande (rows 1-22). Combo/multiplier ne s'affichent
   // que via les overlays COMBO_FLASH / MULTI_FLASH (pas de ligne permanente).
   drawCentered(grid, String(d.score), 1, FONT_12X22, DOT.score)
-  drawStatusRow(grid, d.lives, d.hetic, 24)
+  drawStatusRow(grid, d.lives, mapStateNumber(d.mapState, 'hetic'), 24)
 }
 
 // ── Clips paliers (procéduraux) ───────────────────────────────────────────
