@@ -29,3 +29,9 @@ jobs:
 
       - name: Test all packages
         run: bun run test
+
+      - name: Validate maps
+        run: bun scripts/validate-map.ts strangerthings
+
+      - name: Map leak guard (warning)
+        run: bash scripts/check-map-leaks.sh
