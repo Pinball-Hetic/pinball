@@ -88,6 +88,11 @@ export default function BallDebugOverlay({ snapshot, visible }: BallDebugOverlay
             {snapshot.lastReset ? RESET_LABELS[snapshot.lastReset] : "—"}
           </Row>
           <div className="my-1 border-t border-zinc-700" />
+          <Row label="WallCross">
+            <span style={{ color: snapshot.wallCrossCount > 0 ? "#f87171" : undefined }}>
+              {snapshot.wallCrossCount}
+            </span>
+          </Row>
           <Row label="Pertes">{snapshot.lostCount}</Row>
           <div className="flex flex-col gap-0.5">
             <span className="text-zinc-400">Dernière perte</span>

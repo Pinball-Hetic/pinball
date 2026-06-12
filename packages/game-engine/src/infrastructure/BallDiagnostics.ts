@@ -5,6 +5,8 @@ import {
   SHOOTER_LANE_BOTTOM_Z,
   SHOOTER_LANE_EXIT_X,
   SHOOTER_LANE_FAIL_Z,
+  SHOOTER_LANE_WALL_THICKNESS,
+  SHOOTER_LANE_LEFT_WALL_TOP_Z,
 } from '../domain/Ball';
 import {
   BALL_LOST_Y_THRESHOLD,
@@ -47,6 +49,8 @@ export interface BallDiagnosticsSnapshot {
   apexX: number;
   /** Vitesse maximale atteinte depuis le dernier lancement. */
   peakSpeed: number;
+  /** Nb total de franchissements détectés du mur gauche du couloir (sentinelle). */
+  wallCrossCount: number;
 }
 
 export interface BallLostEvent {
@@ -77,6 +81,16 @@ export const LOST_LABELS: Record<BallLostReason, string> = {
   escaped_out_of_bounds: 'Sortie hors des limites du terrain (X/Z)',
 };
 
+// ── Traceur de traversée du mur gauche du couloir ──────────────────────────────
+// Le mur gauche du couloir est centré sur SHOOTER_LANE_X_MIN, épaisseur
+// SHOOTER_LANE_WALL_THICKNESS → faces internes/externes à ±épaisseur/2. On trace
+// la bille dès qu'elle entre dans une bande X large autour du mur, et on signale
+// tout franchissement frame-à-frame (interne→externe ou inverse).
+const WALL_FACE_INNER = SHOOTER_LANE_X_MIN - SHOOTER_LANE_WALL_THICKNESS / 2; // ≈ 0.196
+const WALL_FACE_OUTER = SHOOTER_LANE_X_MIN + SHOOTER_LANE_WALL_THICKNESS / 2; // ≈ 0.216
+const WALL_BAND_X_MIN = 0.17;
+const WALL_BAND_X_MAX = 0.23;
+
 /**
  * Suit la balle chaque frame et explique pourquoi elle disparaît ou sort du
  * terrain : classification de zone, détection de fuite physique (sous le sol /
@@ -100,6 +114,7 @@ export class BallDiagnostics {
     apexZ: 0,
     apexX: 0,
     peakSpeed: 0,
+    wallCrossCount: 0,
   };
 
   private lostLatched = false;
@@ -120,6 +135,11 @@ export class BallDiagnostics {
   private traceEverStep = 6; // 1 échantillon toutes les ~6 frames (~100 ms)
   private prevTraceVz = 0;
 
+  // ── Traceur de traversée du mur gauche ───────────────────────────────────────
+  // X de la frame précédente (NaN = pas encore dans la bande). Sert à détecter le
+  // passage d'une face du mur à l'autre entre 2 frames.
+  private prevWallX = Number.NaN;
+
   /** Met à jour le snapshot et signale une perte (une seule fois par épisode). */
   update(body: DiagBody, gameState: string): BallLostEvent | null {
     const p = body.translation();
@@ -128,6 +148,9 @@ export class BallDiagnostics {
 
     // Traceur de vol de lancement (avant tout le reste pour capter la montée).
     this.traceLaneFlight(p, v, speed, gameState);
+
+    // Traceur de traversée du mur gauche du couloir.
+    this.traceWallCross(p, v);
 
     // Suivi de la vitesse de pointe depuis le dernier lancement.
     if (gameState === 'playing' && speed > this.peakSpeed) {
@@ -252,6 +275,57 @@ export class BallDiagnostics {
         `Z=${p.z.toFixed(3)} X=${p.x.toFixed(3)} Y=${p.y.toFixed(3)} | ` +
         `v=${speed.toFixed(2)} (vx=${v.x.toFixed(2)} vy=${v.y.toFixed(2)} vz=${v.z.toFixed(2)})${tag}`,
     );
+  }
+
+  /**
+   * Sentinelle PERMANENTE (indépendante de `verbose`) : trace la balle dans la
+   * bande X autour du mur gauche du couloir et signale tout franchissement
+   * frame-à-frame (face interne ↔ face externe). Coût : 2 comparaisons/frame
+   * uniquement quand la bille est dans la bande, zéro sinon. Chaque franchissement
+   * → `console.warn('[WALL CROSS]', …)` + incrément du compteur exposé au HUD.
+   * `side` indique si le passage se fait au-dessus du sommet du mur
+   * (Z < SHOOTER_LANE_LEFT_WALL_TOP_Z, trou légitime de sortie) ou en dessous
+   * (traversée parasite du mur plein).
+   */
+  private traceWallCross(p: Vec3, v: Vec3): void {
+    const inBand = p.x >= WALL_BAND_X_MIN && p.x <= WALL_BAND_X_MAX;
+    if (!inBand) {
+      this.prevWallX = Number.NaN;
+      return;
+    }
+
+    const prev = this.prevWallX;
+    this.prevWallX = p.x;
+
+    // Trace par-frame détaillée : verbose uniquement (spam console).
+    if (this.verbose) {
+      // eslint-disable-next-line no-console
+      console.info(
+        `[WallTrace] x=${p.x.toFixed(4)} z=${p.z.toFixed(3)} | vx=${v.x.toFixed(2)} vz=${v.z.toFixed(2)}`,
+      );
+    }
+
+    if (Number.isNaN(prev)) return;
+
+    const crossedOutward = prev < WALL_FACE_INNER && p.x > WALL_FACE_OUTER;
+    const crossedInward = prev > WALL_FACE_OUTER && p.x < WALL_FACE_INNER;
+    if (!crossedOutward && !crossedInward) return;
+
+    // Franchissement détecté : warn TOUJOURS + compteur snapshot (sentinelle).
+    const side = p.z < SHOOTER_LANE_LEFT_WALL_TOP_Z ? 'above_top' : 'below_top';
+    this.snapshot = {
+      ...this.snapshot,
+      wallCrossCount: this.snapshot.wallCrossCount + 1,
+    };
+    // eslint-disable-next-line no-console
+    console.warn('[WALL CROSS]', {
+      x: p.x,
+      z: p.z,
+      vx: v.x,
+      vz: v.z,
+      side,
+      dir: crossedOutward ? 'inner_to_outer' : 'outer_to_inner',
+    });
   }
 
   /** Mémorise le dernier évènement de jeu (BUMPER_HIT, DRAIN, ...) pour le HUD. */
