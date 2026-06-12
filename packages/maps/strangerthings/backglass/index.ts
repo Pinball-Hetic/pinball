@@ -5,3 +5,6 @@ export { default as JoyceWall } from './JoyceWall'
 export { default as SideArt } from './SideArt'
 export { default as DemogorgonTakeover } from './DemogorgonTakeover'
 export type { Reactor, Reaction } from './reactor'
+import { manifest } from '../manifest'
+// Libellés des compteurs ST (recap) — depuis le manifest (data légère).
+export const counterLabels: Record<string, string> = manifest.counterLabels ?? {}

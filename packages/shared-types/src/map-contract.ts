@@ -30,6 +30,8 @@ export interface MapManifest {
   overlayFiles?: Record<string, string>
   /** Sons d'event de la map par id (joués via ctx.playSound(id)). */
   sounds?: Record<string, { url: string; volume?: number }>
+  /** Libellés des compteurs (GameStats.counters) par id, pour le recap backglass. */
+  counterLabels?: Record<string, string>
   glb: string // relatif au dossier assets/ du package
   scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
   rules: {

@@ -28,6 +28,8 @@ export const manifest: MapManifest = {
   sounds: {
     upside_down_appear: { url: '/audio/apparitionUpsideDown.mp3', volume: 280 },
   },
+  // Libellés des compteurs (recap backglass).
+  counterLabels: { demogorgons: 'DEMOGORGONS', portals: 'PORTAILS', hetic: 'HETIC' },
   glb: 'playfield/newStrangerthings.glb',
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {
