@@ -10,7 +10,7 @@ export type EarlySoundPhase = "off" | "armed" | "playing" | "released";
 
 export class EarlySoundController {
   private phase: EarlySoundPhase = "off";
-  private demogorgonConsumed = false;
+  private revealConsumed = false;
 
   constructor(private readonly samples: SamplePlayer) {}
 
@@ -19,7 +19,7 @@ export class EarlySoundController {
   }
 
   arm(): Promise<void> {
-    if (this.demogorgonConsumed) return Promise.resolve();
+    if (this.revealConsumed) return Promise.resolve();
     this.phase = "armed";
     return this.samples
       .prepareGaplessLoop(EARLY_SOUND_URL, EARLY_SOUND_LOOP_SILENCE_THRESHOLD)
@@ -27,7 +27,7 @@ export class EarlySoundController {
   }
 
   async engage(): Promise<void> {
-    if (this.demogorgonConsumed) return;
+    if (this.revealConsumed) return;
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
       this.phase = "playing";
       return;
@@ -42,7 +42,7 @@ export class EarlySoundController {
   }
 
   engageSync(): void {
-    if (this.demogorgonConsumed) return;
+    if (this.revealConsumed) return;
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
       this.phase = "playing";
       return;
@@ -67,15 +67,15 @@ export class EarlySoundController {
     this.phase = "released";
   }
 
-  consumeForDemogorgon(): void {
-    this.demogorgonConsumed = true;
+  consumeOnBossReveal(): void {
+    this.revealConsumed = true;
     // Stop immédiat (pas de fade) pour que spawnDG ne soit pas masqué par la musique.
     this.samples.stopGaplessLoop(EARLY_SOUND_URL);
     this.phase = "released";
   }
 
   resetForNewGame(): void {
-    this.demogorgonConsumed = false;
+    this.revealConsumed = false;
     this.samples.stopGaplessLoop(EARLY_SOUND_URL);
     this.phase = "off";
   }

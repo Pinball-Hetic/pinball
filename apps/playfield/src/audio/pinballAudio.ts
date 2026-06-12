@@ -3,12 +3,10 @@ import { getBossById, type BossDefinition } from "@pinball/game-engine";
 import { installAudioBootstrap } from "./AudioBootstrap";
 import { EarlySoundController } from "./EarlySoundController";
 import {
-  APPARITION_UPSIDE_DOWN_URL,
   EARLY_SOUND_URL,
   GAME_OVER_URL,
-  SPAWN_DG_URL,
 } from "./pinballAudioConfig";
-import { soundLevel } from "./pinballAudioVolumes";
+import { soundLevel, percentToGain } from "./pinballAudioVolumes";
 import { SamplePlayer } from "./SamplePlayer";
 import { SfxEngine } from "./SfxEngine";
 
@@ -26,18 +24,25 @@ function warmAssets(): void {
   assetsWarmed = true;
   void samples.prepareGaplessLoop(EARLY_SOUND_URL);
   void samples.preloadBuffer(GAME_OVER_URL);
-  void samples.preloadBuffer(SPAWN_DG_URL);
-  void samples.preloadBuffer(APPARITION_UPSIDE_DOWN_URL);
+  // Sons spécifiques à la map (reveal boss, ambiance) : préchargés via
+  // warmMapSounds(urls) depuis le playfield (URLs fournies par la map).
 }
 
-export function playUpsideDownAppearSound(): void {
-  const gain = soundLevel("apparitionUpsideDown");
+// Préchargement des sons de la map (boss revealSoundUrl + ambiances).
+export function warmMapSounds(urls: string[]): void {
+  for (const url of urls) void samples.preloadBuffer(url);
+}
+
+// Son cinématique d'event de la map (ducking + impact). URL+volume fournis
+// par le contenu de la map (manifest.sounds).
+export function playMapCinematicSound(url: string, volumePercent = 100): void {
+  const gain = percentToGain(volumePercent);
   void samples.resumeContext();
   sfx.markContextUnlocked();
   samples.duckBackground(2.5);
   sfx.playCinematicImpact();
-  if (samples.playOneShotCached(APPARITION_UPSIDE_DOWN_URL, gain)) return;
-  void samples.playOneShotBuffer(APPARITION_UPSIDE_DOWN_URL, gain);
+  if (samples.playOneShotCached(url, gain)) return;
+  void samples.playOneShotBuffer(url, gain);
 }
 
 function tryStartEarlySound(sync: boolean): void {
@@ -78,7 +83,7 @@ export function notifyBootPhase(phase: PinballBootPhase): void {
     }
     return;
   }
-  // in_game: keep ambient loop playing (background music until Demogorgon / game over).
+  // in_game: keep ambient loop playing (background music until boss reveal / game over).
   wantsEarlySound = false;
   earlySound.disarm();
 }
@@ -114,12 +119,14 @@ export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition
     case "BUMPER_HIT":
       sfx.playBumper(event.bumperIndex);
       break;
-    case "BOSS_REVEAL":
-      if (event.bossId === "demogorgon") {
-        earlySound.consumeForDemogorgon();
-        void samples.playOneShotBuffer(SPAWN_DG_URL, soundLevel("spawnDemogorgon"));
+    case "BOSS_REVEAL": {
+      const def = getBossById(bosses, event.bossId);
+      if (def?.revealSoundUrl) {
+        earlySound.consumeOnBossReveal();
+        void samples.playOneShotBuffer(def.revealSoundUrl, percentToGain(def.revealSoundVolume ?? 100));
       }
       break;
+    }
     case "BOSS_TARGET_HIT": {
       const def = getBossById(bosses, event.bossId);
       sfx.playTargetHit(event.hitCount);
@@ -129,10 +136,10 @@ export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition
       break;
     }
     case "ASSIST":
-      sfx.playElevenAssist();
+      sfx.playAssist();
       break;
     case "PORTAL_ENTER":
-      // Son MP3 géré par playUpsideDownAppearSound() à l'apparition de l'image.
+      // Son d.event de la map joué via ctx.playSound (manifest.sounds).
       break;
     case "PORTAL_TREMOR":
       sfx.playPortalTremor();

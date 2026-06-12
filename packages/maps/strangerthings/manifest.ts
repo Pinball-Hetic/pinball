@@ -24,6 +24,10 @@ export const manifest: MapManifest = {
   },
   // Assets préchargés par la page playfield (chemins relatifs à public/).
   preload: ['playfield/demogorgon.glb', 'playfield/demogorgon.png'],
+  // Sons d'event de la map (joués via ctx.playSound(id)).
+  sounds: {
+    upside_down_appear: { url: '/audio/apparitionUpsideDown.mp3', volume: 280 },
+  },
   glb: 'playfield/newStrangerthings.glb',
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {

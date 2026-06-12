@@ -82,6 +82,10 @@ export type BossDefinition = {
   unlocksReturnPortal: boolean;
   targetMeshTheme: BossTargetMeshTheme;
   targetPulse: BossTargetPulseConfig;
+  /** Son joué au reveal du boss (URL asset map). Absent → pas de son dédié. */
+  revealSoundUrl?: string;
+  /** Volume du son de reveal (0–100+, relatif au bus). Défaut 100. */
+  revealSoundVolume?: number;
 };
 
 /** Contexte minimal pour évaluer le gate de reveal d'un boss (score + monde alternatif). */

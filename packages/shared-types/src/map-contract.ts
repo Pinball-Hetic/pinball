@@ -28,6 +28,8 @@ export interface MapManifest {
   preload?: string[]
   /** Vidéos/images d'overlay cinématique par clipId (sinon fallback CSS). */
   overlayFiles?: Record<string, string>
+  /** Sons d'event de la map par id (joués via ctx.playSound(id)). */
+  sounds?: Record<string, { url: string; volume?: number }>
   glb: string // relatif au dossier assets/ du package
   scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
   rules: {

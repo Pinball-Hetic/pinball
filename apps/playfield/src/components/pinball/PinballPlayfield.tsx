@@ -84,6 +84,11 @@ const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? "strangerthings";
 const RESOLVED_MAP = getMapPackage(MAP_ID);
 // Définitions de boss de la map active (point de composition unique).
 const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
+// URLs de sons spécifiques à la map (reveal boss + sons d'event) à précharger.
+const MAP_SOUND_URLS: string[] = [
+  ...MAP_BOSSES.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
+  ...Object.values(RESOLVED_MAP?.manifest.sounds ?? {}).map((s) => s.url),
+];
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -136,7 +141,8 @@ import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import {
   notifyBootPhase,
   onPlayfieldReady,
-  playUpsideDownAppearSound,
+  playMapCinematicSound,
+  warmMapSounds,
   resetPinballAudioForNewGame,
   unlockPinballAudio,
 } from "@/audio/pinballAudio";
@@ -964,7 +970,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             resetStuck: () => stuckDetector.reset(),
             enterAlternateWorld: () => collisionProcessor?.onAlternateWorldEntered(scoreRef.current),
             playSound: (id) => {
-              if (id === "upside_down_appear") playUpsideDownAppearSound();
+              const s = mapManifest.sounds?.[id];
+              if (s) playMapCinematicSound(s.url, s.volume);
             },
             refreshScoreSnapshot: () => {
               const snap = {
@@ -1534,6 +1541,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         physicsReadyRef.current = true;
         setPhysicsReady(true);
         onPlayfieldReady();
+        warmMapSounds(MAP_SOUND_URLS);
         debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);

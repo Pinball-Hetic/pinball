@@ -31,6 +31,8 @@ export const bossDefinitions: BossDefinition[] = [
     },
     unlocksPortal: true,
     unlocksReturnPortal: false,
+    revealSoundUrl: '/audio/spawnDG.mp3',
+    revealSoundVolume: 100,
     targetMeshTheme: {
       ring: {
         color: 0xff2244,
