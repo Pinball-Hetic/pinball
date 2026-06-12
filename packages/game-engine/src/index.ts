@@ -8,6 +8,7 @@ export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
 export * from './domain/ScoringConstants';
 export * from './domain/BossRegistry';
+export * from './domain/MapLayout';
 export * from './domain/VecnaConstants';
 export * from './domain/LiveGameSnapshot';
 

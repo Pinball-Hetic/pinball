@@ -1,0 +1,147 @@
+import type { BossDefinition } from './BossRegistry';
+
+// Données de placement/géométrie d'une map. Le moteur reçoit ce bloc par
+// injection (phase 4) au lieu d'importer des constantes ST. Les TYPES vivent
+// dans game-engine ; les VALEURS dans le package de la map (layout.ts).
+
+export interface MapPoint3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface MapPoint2 {
+  x: number;
+  z: number;
+}
+
+export interface DropTargetDef {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  side: 'left' | 'right';
+}
+
+export interface SensorLayout {
+  popZones: MapPoint3[]; // POP_ZONE_SENSORS
+  rocket: MapPoint3; // ROCKET_SENSOR
+  demogorgon: MapPoint3; // DEMOGORGON_SENSOR
+  portal: MapPoint3; // PORTAL_UPSIDE_DOWN
+}
+
+export interface SpawnLayout {
+  ball: MapPoint3; // BALL_SPAWN_POSITION
+  upsideDown: MapPoint2; // UPSIDE_DOWN_SPAWN
+  upsideDownImpulse: MapPoint3; // UPSIDE_DOWN_SPAWN_IMPULSE
+  normalReturn: MapPoint2; // NORMAL_WORLD_RETURN_SPAWN
+  normalReturnImpulse: MapPoint3; // NORMAL_WORLD_RETURN_IMPULSE
+}
+
+export interface ShooterLaneLayout {
+  xMin: number;
+  xMax: number;
+  bottomZ: number;
+  topZ: number;
+  wallHeight: number;
+  wallThickness: number;
+  restitution: number;
+  friction: number;
+  leftWallTopZ: number;
+  lockX: number;
+  exitX: number;
+  failZ: number;
+  guideCenter: MapPoint2;
+  guideRadius: number;
+  guideSegments: number;
+  guideAngleStart: number;
+  guideAngleEnd: number;
+}
+
+export interface FlipperPivots {
+  leftX: number; // FLIPPER_LEFT_PIVOT_X
+  rightX: number; // FLIPPER_RIGHT_PIVOT_X
+  y: number; // FLIPPER_PIVOT_Y
+  z: number; // FLIPPER_PIVOT_Z
+}
+
+// surfaceYAtZ(z) = base - ((z + zOffset) / zSpan) * yDrop
+export interface SurfaceCoefficients {
+  base: number;
+  zOffset: number;
+  zSpan: number;
+  yDrop: number;
+}
+
+export interface PlayfieldBounds {
+  leftX: number; // WALL_LEFT_X
+  rightX: number; // WALL_RIGHT_X
+  topZ: number; // WALL_TOP_Z
+  bottomZ: number; // WALL_BOTTOM_Z
+}
+
+export interface GeometryLayout {
+  coefficients: SurfaceCoefficients;
+  bounds: PlayfieldBounds;
+  shade: {
+    width: number; // PLAYFIELD_SHADE_W
+    depth: number; // PLAYFIELD_SHADE_D
+    y: number; // PLAYFIELD_SHADE_Y
+    z: number; // PLAYFIELD_SHADE_Z
+    maxOpacity: number; // PLAYFIELD_SHADE_MAX_OPACITY
+  };
+}
+
+// Tous les réglages d'ambiance Upside Down (UpsideDownConstants.ts).
+export interface AtmosphereLayout {
+  transition: {
+    durationS: number;
+    blackout: number;
+    reveal: number;
+    restore: number;
+    tremor: number;
+    strobeHz: number;
+  };
+  portalVisual: {
+    openPolish: number;
+    pulseSpeed: number;
+    accentPulseSpeed: number;
+    vineCount: number;
+  };
+  blend: number;
+  bg: number;
+  tint: number;
+  surfaceTint: number;
+  wallTint: number;
+  decorTint: number;
+  emissive: number;
+  decorEmissive: number;
+  exposure: number;
+  ambientIntensity: number;
+  hemiIntensity: number;
+  dirIntensity: number;
+  fillIntensity: number;
+  shadeOpacity: number;
+  shadeColor: number;
+  fogColor: number;
+  fogDensity: number;
+  pulseExposureMin: number;
+  pulseExposureMax: number;
+  pulseExposureSpeed: number;
+  strobeHz: number;
+  blendStrobeHz: number;
+  sporeCount: number;
+  hintMs: number;
+}
+
+export interface MapLayout {
+  bumpers: MapPoint3[]; // BUMPER_POSITIONS
+  dropTargets: DropTargetDef[]; // DROP_TARGETS
+  sensors: SensorLayout;
+  spawns: SpawnLayout;
+  shooterLane: ShooterLaneLayout;
+  flipperPivots: FlipperPivots;
+  bosses: BossDefinition[]; // BOSS_REGISTRY (données ; types restent dans game-engine)
+  geometry: GeometryLayout;
+  atmosphere: AtmosphereLayout;
+}
