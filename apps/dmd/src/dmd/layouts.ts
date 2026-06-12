@@ -211,24 +211,25 @@ function clipHeticLetter(grid: Uint8Array, n: number, ms: number): void {
   const idx = Math.max(0, Math.min(4, n - 1))
   const letter = HETIC_LETTERS[idx]
   const landMs = 900
+  const landY = 2 // atterrit au-dessus de la rangée (rows 2-22)
   let y: number
   let shake = 0
   if (ms < landMs) {
     const p = ms / landMs
-    y = -16 + p * (12 + 16) // tombe vers y=12
+    y = -21 + p * (landY + 21) // chute hors écran (y=-21) → y=2
   } else {
-    y = 12
+    y = landY
     if (ms < landMs + 80) shake = 1 // clunk
   }
   const sx = shake ? (Math.floor(ms) % 2 ? 1 : -1) : 0
-  drawCentered(grid, letter, y + 0, FONT_5X7, DOT.heticOn, 1, 3)
-  // rangée H E T I C en bas, acquises allumées
+  // rangée H E T I C en bas dessinée AVANT la grande lettre
   const step = 8
   const startX = Math.round((GRID_W - 5 * step) / 2)
   for (let i = 0; i < 5; i++) {
     const lit = i <= idx
     drawText(grid, GRID_W, startX + i * step + sx, 25, HETIC_LETTERS[i], FONT_5X7, lit ? DOT.heticOn : DOT.heticOff)
   }
+  drawCentered(grid, letter, y, FONT_5X7, DOT.heticOn, 1, 3)
 }
 
 function clipHeticComplete(grid: Uint8Array, _score: number, ms: number): void {
