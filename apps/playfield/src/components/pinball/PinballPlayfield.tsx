@@ -565,7 +565,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     // module de map (events MILESTONE / BOSS_ARMED).
     onMilestone: (threshold) => emitRef.current?.({ type: "MILESTONE", threshold }),
     onBossArmed: (bossId) => emitRef.current?.({ type: "BOSS_ARMED", bossId }),
-    // hetic (lettres + complete + fever) géré par le module de map.
+    // le bonus map (lettres + complete + fever) géré par le module de map.
     onFeverEnd: () => {
       // Re-émet un snapshot fever:false pour que DMD/backglass retombent.
       const snap = {
@@ -587,12 +587,12 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   });
 
   // Patches de mapState poussés par le module de map (ctx.setMapState). Fusionnés
-  // dans chaque snapshot. hetic/fever restent fournis par useGameState pour
+  // dans chaque snapshot. les compteurs map restent fournis par useGameState pour
   // l'instant (migreront dans le module en phase 4.3d).
   const mapStateExtraRef = useRef<Record<string, number | boolean>>({});
 
   // Construction unique du mapState injecté dans chaque snapshot DMD/score.
-  // hetic/demogorgons/portals viennent du module de map (mapStateExtraRef) ;
+  // les compteurs map viennent du module de map (mapStateExtraRef) ;
   // fever reste piloté par useGameState (mécanisme multiplicateur).
   const buildMapState = (fever: boolean = isFeverActive()) => ({
     ...mapStateExtraRef.current,
@@ -641,7 +641,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     // selon le frame time (1.5 → 1.25 → 1.0 → 1.0 + trail réduit/spores off).
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(clientWidth, clientHeight);
-    // Shadows désactivées : avec 13+ PointLights (guirlandes + bumpers) dans
+    // Shadows désactivées : avec 13+ PointLights (lumières décor + bumpers) dans
     // le shader, chaque pixel paie déjà lourd. La shadow map (cast + receive
     // sur tous les meshes GLB) ajoutait un pass de rendu entier + lookups PCF.
     renderer.shadowMap.enabled = false;
@@ -768,8 +768,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     let prevFrameTime = 0;
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
-    let vecnaIntroHolding = false;
-    const vecnaIntroBallPos = { x: 0, y: 0, z: 0 };
+    let bossIntroHolding = false;
+    const bossIntroBallPos = { x: 0, y: 0, z: 0 };
 
 
     // ── Flipper collider debug wireframes ────────────────────────────────────
@@ -883,7 +883,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
         // garlands + bumperVisuals créés par le module de map (cluster visuals),
         // récupérés après mapModule.setup (plus bas, après le monde physique).
-        // nestMarker + demogorgon/vecna reveals + bossReveals : créés/possédés
+        // nestMarker + reveals boss + bossReveals : créés/possédés
         // par le module de map (récupérés via le bridge, preload fait là-haut).
         ballTrail = new BallTrail();
         ballTrail.mount(scene);
@@ -1253,13 +1253,14 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           else if (event.type === "SLINGSHOT_HIT") screenShake.add(0.2);
           else if (event.type === "DROP_TARGET_HIT") screenShake.add(0.35);
           else if (event.type === "DROP_TARGET_COMPLETE") screenShake.add(0.6);
-          else if (event.type === "BOSS_TARGET_HIT" && event.bossId === "demogorgon") {
+          else if (event.type === "BOSS_TARGET_HIT") {
+            // Juice générique : tout hit de cible boss secoue l'écran.
             screenShake.add(0.5);
           }
 
           // BOSS_LOCKED_HIT (flash nid + « ENCORE X PTS ») : géré par le module.
 
-          // Cinématiques boss Demogorgon (reveal + victoire) : gérées par le
+          // Cinématiques boss (reveal + victoire) : gérées par le
           // module de map (mapModule.onGameEvent).
           if (
             (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
@@ -1329,8 +1330,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         // restent pilotés ici (flow transition + cycle de monde).
 
         // upsideDownAtmosphere créé/possédé par le module de map (récupéré
-        // plus haut via le bridge). On garde ici le binding vecna + les resets.
-        // vecnaReveal.bindUpsideDownAtmosphere fait par le module (setup).
+        // plus haut via le bridge). On garde ici le binding boss + les resets.
+        // Le binding atmosphère du boss fait par le module (setup).
 
         // onPortalEnter / onReturnPortalEnter (bascule de monde) gérés par le
         // module de map (mapModule.onGameEvent sur PORTAL_ENTER/RETURN_PORTAL_ENTER).
@@ -1347,7 +1348,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           drainBallUC.execute();
         };
 
-        // demogorgonReveal.setEmit fait par le module (ctx.emitGameEvent).
+        // le reveal boss setEmit fait par le module (ctx.emitGameEvent).
 
         // ── Input handling ────────────────────────────────────────────────────
         console.log("[PinballPlayfield] KEYBOARD_MODE =", KEYBOARD_MODE);
@@ -1575,23 +1576,23 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       cinematics.update(time);
       mapModule?.update(dt);
       // Gel + intro boss pilotés par le module (shouldFreezePhysics inclut
-      // transition + intro vecna). transition.update est dans mapModule.update.
-      const vecnaIntroActive = mapModule?.isIntroHolding?.() ?? false;
+      // transition + intro boss). transition.update est dans mapModule.update.
+      const bossIntroActive = mapModule?.isIntroHolding?.() ?? false;
       const freezeFrame = (mapModule?.shouldFreezePhysics?.() ?? false) || cinematics.shouldFreeze();
 
-      if (vecnaIntroActive && !vecnaIntroHolding && ballPhysicsInst) {
+      if (bossIntroActive && !bossIntroHolding && ballPhysicsInst) {
         const p = ballPhysicsInst.body.translation();
-        vecnaIntroBallPos.x = p.x;
-        vecnaIntroBallPos.y = p.y;
-        vecnaIntroBallPos.z = p.z;
-        vecnaIntroHolding = true;
+        bossIntroBallPos.x = p.x;
+        bossIntroBallPos.y = p.y;
+        bossIntroBallPos.z = p.z;
+        bossIntroHolding = true;
         leftTarget = 0;
         rightTarget = 0;
         ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       }
-      if (!vecnaIntroActive) {
-        vecnaIntroHolding = false;
+      if (!bossIntroActive) {
+        bossIntroHolding = false;
       }
 
       if (!freezeFrame) {
@@ -1682,9 +1683,9 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
       // Ball sync
       if (ballMesh?.visible && ballPhysicsInst) {
-        if (vecnaIntroActive && gameStateRef.current === "playing") {
+        if (bossIntroActive && gameStateRef.current === "playing") {
           ballPhysicsInst.body.setTranslation(
-            { x: vecnaIntroBallPos.x, y: vecnaIntroBallPos.y, z: vecnaIntroBallPos.z },
+            { x: bossIntroBallPos.x, y: bossIntroBallPos.y, z: bossIntroBallPos.z },
             true,
           );
           ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
