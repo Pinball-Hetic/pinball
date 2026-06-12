@@ -84,6 +84,7 @@ import {
   ShooterLaneGate,
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
+import { NoSignal } from "@pinball/ui";
 import { MeshRoleResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
 import type {
   ButtonAction,
@@ -94,6 +95,9 @@ import type {
 import { clipFreezeMs } from "@pinball/shared-types";
 
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? "strangerthings";
+// Résolu au niveau module (MAP_ID = constante build-time) → permet un garde
+// NO SIGNAL en 1ère ligne du composant, avant tout hook.
+const RESOLVED_MAP = getMapPackage(MAP_ID);
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -352,7 +356,15 @@ type PinballPlayfieldProps = {
   cabinetMode?: boolean;
 };
 
-export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfieldProps) {
+// Garde NO SIGNAL : map introuvable → écran de veille plein écran (pas de
+// crash). Wrapper sans hook → l'Inner (tous les hooks) n'est monté que si la
+// map existe.
+export default function PinballPlayfield(props: PinballPlayfieldProps) {
+  if (!RESOLVED_MAP) return <NoSignal reason={`MAP "${MAP_ID}" INTROUVABLE`} />;
+  return <PinballPlayfieldInner {...props} />;
+}
+
+function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   const [debugSnapshot, setDebugSnapshot] = useState<BallDiagnosticsSnapshot | null>(null);
@@ -408,16 +420,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   if (!cinematicsRef.current) cinematicsRef.current = new CinematicDirector();
   const cinematics = cinematicsRef.current;
 
-  // Résolution de la map (une fois). null → throw explicite pour l'instant ;
-  // le fallback NO SIGNAL plein écran arrivera en phase 5.
-  const mapPackageRef = useRef<ResolvedMap | null>(null);
+  // Map résolue (garantie non-null par le garde NO SIGNAL du wrapper).
+  const mapPackageRef = useRef<ResolvedMap>(RESOLVED_MAP!);
   // Ref vers le module (accessible depuis les callbacks render-scope, ex. reset).
   const mapModuleRef = useRef<MapModule | null>(null);
-  if (!mapPackageRef.current) {
-    const resolved = getMapPackage(MAP_ID);
-    if (!resolved) throw new Error(`Map introuvable: ${MAP_ID}`);
-    mapPackageRef.current = resolved;
-  }
   const mapLayout = mapPackageRef.current.layout;
   const mapManifest = mapPackageRef.current.manifest;
   const playfieldUrl = `/${mapManifest.glb}`;

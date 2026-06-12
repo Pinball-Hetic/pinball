@@ -74,6 +74,7 @@
         "@pinball/game-engine": "workspace:*",
         "@pinball/maps": "workspace:*",
         "@pinball/shared-types": "workspace:*",
+        "@pinball/ui": "workspace:*",
         "next": "^16.2.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
@@ -141,6 +142,16 @@
     "packages/shared-types": {
       "name": "@pinball/shared-types",
       "version": "1.0.0",
+    },
+    "packages/ui": {
+      "name": "@pinball/ui",
+      "version": "1.0.0",
+      "devDependencies": {
+        "@types/react": "^19.0.10",
+      },
+      "peerDependencies": {
+        "react": "^19.0.0",
+      },
     },
   },
   "packages": {
@@ -319,6 +330,8 @@
     "@pinball/server": ["@pinball/server@workspace:apps/server"],
 
     "@pinball/shared-types": ["@pinball/shared-types@workspace:packages/shared-types"],
+
+    "@pinball/ui": ["@pinball/ui@workspace:packages/ui"],
 
     "@prisma/client": ["@prisma/client@6.19.2", "", { "peerDependencies": { "prisma": "*", "typescript": ">=5.1.0" } }, "sha512-gR2EMvfK/aTxsuooaDA32D8v+us/8AAet+C3J1cc04SW35FPdZYgLF+iN4NDLUgAaUGTKdAB0CYenu1TAgGdMg=="],
 
