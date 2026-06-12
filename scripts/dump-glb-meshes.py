@@ -87,7 +87,42 @@ def node_name(i):
     return nodes[i].get("name", f"node_{i}")
 
 
+# Conventions de préfixe — miroir de MeshRoleResolver (TS).
+PREFIXES = ["vis_", "floor_", "wall_", "flipper_", "bumper_",
+            "slingshot_", "target_", "sensor_", "lane_"]
+
+
+def normalize(name):
+    out = name.lower()
+    for ch in (" ", ".", "-"):
+        out = out.replace(ch, "_")
+    return out
+
+
+def resolve_ancestry(i):
+    """Remonte la hiérarchie (mesh → racine), 1er préfixe gagne. Comme
+    MeshRoleResolver.resolveFromAncestry."""
+    cur = i
+    while cur is not None:
+        norm = normalize(node_name(cur))
+        for p in PREFIXES:
+            if norm.startswith(p):
+                return p.rstrip("_"), norm[len(p):]
+        cur = parent.get(cur)
+    return None, None
+
+
+def chain(i):
+    out = []
+    cur = i
+    while cur is not None:
+        out.append(node_name(cur))
+        cur = parent.get(cur)
+    return " < ".join(out)
+
+
 rows = []
+unresolved = []
 for i, n in enumerate(nodes):
     if "mesh" not in n:
         continue
@@ -114,23 +149,21 @@ for i, n in enumerate(nodes):
     if not found:
         continue
     size = [maxs[k] - mins[k] for k in range(3)]
-    center = [(maxs[k] + mins[k]) / 2 for k in range(3)]
-    dims = sorted(size)
-    pid = parent.get(i)
-    pname = node_name(pid) if pid is not None else "-"
-    if dims[0] < RAIL_MIN_PHYS_DIM and dims[1] < RAIL_MIN_PHYS_DIM:
-        role = "vis_   (décor < 25mm)"
-    else:
-        role = "wall_  (structurel)"
-    rows.append((node_name(i), pname, size, center, role))
+    role, rid = resolve_ancestry(i)
+    rows.append((node_name(i), size, role, rid))
+    if role is None:
+        unresolved.append((node_name(i), chain(i)))
 
 print(f"GLB: {path}")
-print(f"{'mesh':<16}{'parent':<16}{'taille (mm)':<20}{'centre (m)':<26}rôle suggéré")
-print("-" * 100)
-for name, pname, size, center, role in rows:
+print(f"{'mesh':<18}{'taille (mm)':<20}rôle résolu (via hiérarchie)")
+print("-" * 80)
+for name, size, role, rid in rows:
     sz = f"{size[0]*1000:.0f}x{size[1]*1000:.0f}x{size[2]*1000:.0f}"
-    ct = f"{center[0]:+.3f},{center[1]:+.3f},{center[2]:+.3f}"
-    print(f"{name:<16}{pname:<16}{sz:<20}{ct:<26}{role}")
+    label = f"{role}_{rid}" if role else "⚠ NON RÉSOLU (aucune physique + warn)"
+    print(f"{name:<18}{sz:<20}{label}")
 
-print(f"\n{len(rows)} meshes. Seuil rail/décor = {RAIL_MIN_PHYS_DIM*1000:.0f}mm.")
-print("Note: Mesh_0 = sol (physique analytique, pas trimesh), Mesh_1 = mur single-sided.")
+print(f"\n{len(rows)} meshes — {len(unresolved)} non résolus.")
+if unresolved:
+    print("Meshes sans rôle (ni préfixe ni vis_) → ignorés côté physique :")
+    for name, ch in unresolved:
+        print(f"  • {ch}")
