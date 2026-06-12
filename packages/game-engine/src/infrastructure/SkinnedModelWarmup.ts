@@ -36,11 +36,3 @@ export async function warmupObject3D(
   await renderer.compileAsync(root, camera, scene);
   root.visible = wasVisible;
 }
-
-export async function fitWithRetry(apply: () => boolean, maxFrames = 8): Promise<boolean> {
-  for (let i = 0; i < maxFrames; i += 1) {
-    if (apply()) return true;
-    await new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
-  }
-  return apply();
-}

@@ -12,7 +12,7 @@ export default function PinballPage() {
     <>
       <Head>
         <link rel="preload" href="/audio/early-sound.mp3" as="audio" type="audio/mpeg" />
-        <link rel="preload" href="/playfield/demogorgon.glb" as="fetch" crossOrigin="anonymous" />
+        <link rel="preload" href="/playfield/demogorgon.glb" as="fetch" />
         <link rel="preload" href="/playfield/demogorgon.png" as="image" />
       </Head>
       <PinballPlayfield />
