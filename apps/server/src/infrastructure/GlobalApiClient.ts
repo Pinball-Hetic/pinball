@@ -52,3 +52,32 @@ export async function postScore(p: ScorePayload): Promise<ScoreRegistered> {
   }
   throw new Error('global /v1/scores: inatteignable');
 }
+
+// Cache ETag en mémoire (process server) : évite de re-télécharger un board
+// inchangé. Clé = `${mapId}:${limit}`.
+const lbCache = new Map<string, { etag: string; body: unknown }>();
+
+export async function getWorldLeaderboard(mapId: string, limit = 10): Promise<unknown> {
+  const base = process.env.GLOBAL_API_URL;
+  if (!base) throw new Error('GLOBAL_API_URL manquant');
+  const key = `${mapId}:${limit}`;
+  const prev = lbCache.get(key);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8_000);
+  try {
+    const res = await fetch(
+      `${base}/v1/leaderboard?mapId=${encodeURIComponent(mapId)}&scope=world&limit=${limit}`,
+      { headers: prev ? { 'If-None-Match': prev.etag } : {}, signal: ctrl.signal },
+    );
+    clearTimeout(t);
+    if (res.status === 304 && prev) return prev.body;
+    if (!res.ok) throw new Error(`global /v1/leaderboard ${res.status}`);
+    const body = await res.json();
+    const etag = res.headers.get('ETag');
+    if (etag) lbCache.set(key, { etag, body });
+    return body;
+  } catch (err) {
+    clearTimeout(t);
+    throw err;
+  }
+}

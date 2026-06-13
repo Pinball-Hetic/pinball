@@ -1,5 +1,6 @@
 import { type LeaderboardEntry, type GlobalStats, DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { prisma } from '../infrastructure/prisma';
+import { getWorldLeaderboard } from '../infrastructure/GlobalApiClient';
 
 export async function topTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEntry[]> {
   const games = await prisma.game.findMany({
@@ -14,6 +15,26 @@ export async function topTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEntry[]
     score: g.score,
     date: g.createdAt.toISOString(),
   }));
+}
+
+// Leaderboard mondial : proxy l'API globale, mappe vers LeaderboardEntry.
+// pseudo null = score pas encore réclamé (affiché '—'). Fallback board local
+// si le global est KO (offline-safe).
+export async function worldTopTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEntry[]> {
+  try {
+    const data = (await getWorldLeaderboard(mapId, 10)) as {
+      entries: { rank: number; pseudo: string | null; score: number; playedAt: string }[];
+    };
+    return data.entries.map((e) => ({
+      rank: e.rank,
+      name: e.pseudo ?? '—', // null = pas encore réclamé
+      score: e.score,
+      date: e.playedAt,
+    }));
+  } catch (err) {
+    console.error('[server] world leaderboard KO, fallback local:', (err as Error).message);
+    return topTen(mapId); // offline → board local
+  }
 }
 
 function startOfToday(): Date {
