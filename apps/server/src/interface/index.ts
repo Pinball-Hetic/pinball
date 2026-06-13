@@ -6,7 +6,7 @@ import type {
   ServerToClientEvents,
 } from '@pinball/shared-types';
 import { topTen, globalStats } from '../use-cases/Leaderboard';
-import { recordGame } from '../use-cases/RecordGame';
+import { registerScore } from '../use-cases/RegisterScore';
 
 const app = express();
 const httpServer = createServer(app);
@@ -91,8 +91,9 @@ io.on('connection', (socket) => {
       return;
     }
     try {
-      await recordGame(data);
-      io.emit('leaderboard:refresh', await topTen());
+      const registered = await registerScore(data);
+      socket.emit('game:registered', registered); // au seul émetteur → QR
+      io.emit('leaderboard:refresh', await topTen()); // backglass (anon)
     } catch (err) {
       // le jeu continue — la persistence ne doit JAMAIS bloquer le relay
       console.error('[server] game:over persist failed:', err);
