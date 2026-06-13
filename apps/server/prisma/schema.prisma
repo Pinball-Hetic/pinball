@@ -11,6 +11,7 @@ model Game {
   id            String   @id @default(cuid())
   player        String // pseudo affiché — aléatoire aujourd'hui
   playerId      String? // réservé : future feature compte/pseudo (site web)
+  code          String?  @unique // token de claim (QR) — null si pas encore généré
   mapId         String   @default("strangerthings") // map jouée
   score         Int
   maxCombo      Int      @default(0)
