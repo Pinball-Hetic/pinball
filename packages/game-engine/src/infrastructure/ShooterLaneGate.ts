@@ -1,13 +1,8 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import {
-  SHOOTER_LANE_X_MIN,
-  SHOOTER_LANE_TOP_Z,
-  SHOOTER_LANE_LEFT_WALL_TOP_Z,
-  SHOOTER_LANE_WALL_HEIGHT,
-  SHOOTER_LANE_RESTITUTION,
-  SHOOTER_LANE_FRICTION,
-} from '../domain/Ball';
+import type { MapLayout } from '../domain/MapLayout';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
+
+type LaneConfig = MapLayout['shooterLane'];
 
 // Mur de fermeture du couloir : posé un poil à droite du bord gauche du couloir,
 // fin (le but est de boucher l'ouverture, pas de rebondir).
@@ -18,9 +13,11 @@ export class ShooterLaneGate {
   private world: RAPIER.World | null = null;
   private body: RAPIER.RigidBody | null = null;
   private collider: RAPIER.Collider | null = null;
+  private lane: LaneConfig | null = null;
 
-  bind(world: RAPIER.World): void {
+  bind(world: RAPIER.World, lane: LaneConfig): void {
     this.world = world;
+    this.lane = lane;
   }
 
   isClosed(): boolean {
@@ -40,17 +37,18 @@ export class ShooterLaneGate {
   }
 
   close(): void {
-    if (!this.world || this.collider) return;
+    if (!this.world || this.collider || !this.lane) return;
+    const lane = this.lane;
 
-    const x = SHOOTER_LANE_X_MIN + GATE_X_INSET;
-    const zTop = SHOOTER_LANE_TOP_Z;
-    const zBot = SHOOTER_LANE_LEFT_WALL_TOP_Z;
+    const x = lane.xMin + GATE_X_INSET;
+    const zTop = lane.topZ;
+    const zBot = lane.leftWallTopZ;
     const thickness = GATE_THICKNESS;
     const midZ = (zTop + zBot) / 2;
     const halfZ = (zBot - zTop) / 2;
     const yTop = surfaceYAtZ(zTop);
     const yBot = surfaceYAtZ(zBot);
-    const midY = (yTop + yBot) / 2 + SHOOTER_LANE_WALL_HEIGHT / 2;
+    const midY = (yTop + yBot) / 2 + lane.wallHeight / 2;
     const tilt = Math.atan2(yTop - yBot, zBot - zTop);
 
     this.body = this.world.createRigidBody(
@@ -61,11 +59,11 @@ export class ShooterLaneGate {
     this.collider = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(
         thickness / 2,
-        SHOOTER_LANE_WALL_HEIGHT / 2,
+        lane.wallHeight / 2,
         halfZ,
       )
-        .setRestitution(SHOOTER_LANE_RESTITUTION)
-        .setFriction(SHOOTER_LANE_FRICTION),
+        .setRestitution(lane.restitution)
+        .setFriction(lane.friction),
       this.body,
     );
   }

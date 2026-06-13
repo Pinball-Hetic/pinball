@@ -1,11 +1,5 @@
-export {
-  DEMOGORGON_REVEAL_SCORE,
-  SCORE_DEMOGORGON_REVEAL,
-  SCORE_DEMOGORGON_TARGET,
-  VECNA_REVEAL_SCORE,
-  SCORE_VECNA_REVEAL,
-  SCORE_VECNA_TARGET,
-} from './BossRegistry';
+// Scores de boss (reveal/target) fournis par les définitions de boss de la map
+// (manifest.scoring + layout.bosses) — plus de valeur ST ici.
 
 export const SCORE_BUMPER = 100;
 export const SCORE_BUMP   = 30;

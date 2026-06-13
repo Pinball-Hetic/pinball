@@ -1,14 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
   INITIAL_LIVES,
-  BOSS_IDS,
-  getBossDefinition,
   bossThresholdMet,
   type BossId,
-  BUMPER_POSITIONS,
-  PORTAL_UPSIDE_DOWN,
-  UPSIDE_DOWN_HINT_MS,
 } from "@pinball/game-engine";
+import { getBossById, type BossDefinition } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
 import type { GameStats } from "@pinball/shared-types";
 import { handlePinballSoundEvent, playGameOverSound } from "../audio/pinballAudio";
@@ -46,11 +42,9 @@ export interface ScoringCallbacks {
   onGameOver?: (finalScore: number, stats: GameStats) => void;
   onGameStart?: () => void;
   onIdleReset?: () => void;
-  onAtmosphereChange?: (upsideDownActive: boolean) => void;
+  onAtmosphereChange?: (alternateWorldActive: boolean) => void;
   onMilestone?: (threshold: number) => void;
   onBossArmed?: (bossId: BossId) => void; // palier franchi → le nid s'éveille (1×/partie)
-  onHeticLetter?: (letterIndex: number) => void; // 1-4
-  onHeticComplete?: () => void;
   onFeverEnd?: () => void;
 }
 
@@ -97,10 +91,26 @@ const initialBossHudEntry = (): BossHudEntry => ({
   assistFlash: false,
 });
 
-const initialBossHud = (): BossHudState =>
-  Object.fromEntries(BOSS_IDS.map((id) => [id, initialBossHudEntry()])) as BossHudState;
+const initialBossHud = (bosses: BossDefinition[]): BossHudState =>
+  Object.fromEntries(bosses.map((b) => [b.id, initialBossHudEntry()])) as BossHudState;
 
-export function useGameState(callbacks?: ScoringCallbacks) {
+export interface GameStateOptions {
+  /** Ancre écran des pop de score portail (depuis layout.sensors.portal). */
+  portalAnchor?: { x: number; z: number };
+  /** Ancres écran des pop de score bumper (depuis layout.bumpers). */
+  bumperAnchors?: { x: number; z: number }[];
+  /** Délai avant le hint d'atmosphère (depuis layout.atmosphere.hintMs). */
+  atmosphereHintMs?: number;
+  /** Définitions de boss de la map active (layout.bosses). */
+  bosses?: BossDefinition[];
+}
+
+export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptions) {
+  const portalAnchor = opts?.portalAnchor ?? { x: 0, z: 0 };
+  const bumperAnchors = opts?.bumperAnchors ?? [];
+  const atmosphereHintMs = opts?.atmosphereHintMs ?? 45_000;
+  const bosses = opts?.bosses ?? [];
+  const bossIds = bosses.map((b) => b.id);
   // `callbacks` est un objet littéral recréé à chaque render → on le lit via
   // un ref pour ne PAS remettre l'interval 250ms (decay combo + expiration
   // fever) à zéro à chaque render (sinon il pourrait ne jamais se déclencher).
@@ -113,18 +123,16 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const [combo, setCombo] = useState(0);
   const [multiplier, setMultiplier] = useState(1);
   const [player, setPlayer] = useState<string>(() => generatePlayerName());
-  const [bossHud, setBossHud] = useState<BossHudState>(initialBossHud);
+  const [bossHud, setBossHud] = useState<BossHudState>(() => initialBossHud(bosses));
   const [scorePops, setScorePops] = useState<ScorePop[]>([]);
-  const [upsideDownActive, setUpsideDownActive] = useState(false);
-  const [upsideDownHint, setUpsideDownHint] = useState(false);
-  const [hetic, setHetic] = useState(0);
+  const [alternateWorldActive, setAlternateWorldActive] = useState(false);
+  const [alternateWorldHint, setAlternateWorldHint] = useState(false);
   const [fever, setFever] = useState(false);
 
-  const heticRef = useRef(0);
   const milestonesPassedRef = useRef<Set<number>>(new Set());
-  const upsideDownActiveRef = useRef(false);
+  const alternateWorldActiveRef = useRef(false);
   const normalWorldBaselineRef = useRef(0);
-  const upsideDownBaselineRef = useRef(0);
+  const alternateWorldBaselineRef = useRef(0);
   const bossArmedFiredRef = useRef<Set<BossId>>(new Set());
   const feverUntilRef = useRef(0);
   const scoreRef = useRef(0);
@@ -135,15 +143,15 @@ export function useGameState(callbacks?: ScoringCallbacks) {
   const lastEventTimeRef = useRef(0);
   const playerRef = useRef(player);
   const victoryTimersRef = useRef<Partial<Record<BossId, number>>>({});
-  const elevenTimerRef = useRef<number | null>(null);
+  // Timer du flash d'assist (générique : le boss propriétaire est déduit de
+  // sa def via `assist`). Un seul assist actif à la fois.
+  const assistTimerRef = useRef<number | null>(null);
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
-  const upsideDownHintTimerRef = useRef<number | null>(null);
+  const alternateWorldHintTimerRef = useRef<number | null>(null);
 
   const maxComboRef = useRef(0);
   const maxMultiplierRef = useRef(1);
-  const demogorgonsRef = useRef(0);
-  const portalsRef = useRef(0);
   const gameStartRef = useRef(0);
 
   useEffect(() => {
@@ -197,12 +205,12 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     scorePopTimersRef.current.set(id, timer);
   }, []);
 
-  const clearUpsideDownHint = useCallback(() => {
-    if (upsideDownHintTimerRef.current !== null) {
-      window.clearTimeout(upsideDownHintTimerRef.current);
-      upsideDownHintTimerRef.current = null;
+  const clearAlternateWorldHint = useCallback(() => {
+    if (alternateWorldHintTimerRef.current !== null) {
+      window.clearTimeout(alternateWorldHintTimerRef.current);
+      alternateWorldHintTimerRef.current = null;
     }
-    setUpsideDownHint(false);
+    setAlternateWorldHint(false);
   }, []);
 
   const clearBossHud = useCallback((id: BossId) => {
@@ -211,29 +219,36 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       window.clearTimeout(timer);
       delete victoryTimersRef.current[id];
     }
-    if (id === "demogorgon" && elevenTimerRef.current !== null) {
-      window.clearTimeout(elevenTimerRef.current);
-      elevenTimerRef.current = null;
+    // Annule le flash d'assist si CE boss en possède un (plus de nom en dur).
+    const def = getBossById(bosses, id);
+    if (def?.assist && assistTimerRef.current !== null) {
+      window.clearTimeout(assistTimerRef.current);
+      assistTimerRef.current = null;
     }
     setBossHud((prev) => ({ ...prev, [id]: initialBossHudEntry() }));
-  }, []);
+  }, [bosses]);
 
   const clearAllBossHud = useCallback(() => {
-    for (const id of BOSS_IDS) {
+    for (const id of bossIds) {
       clearBossHud(id);
     }
   }, [clearBossHud]);
 
-  const clearUpsideDownSession = useCallback(() => {
-    clearUpsideDownHint();
-    clearBossHud("vecna");
+  const clearAlternateWorldSession = useCallback(() => {
+    clearAlternateWorldHint();
+    // Boss liés au monde alternatif (reveal gaté requiresAlternateWorld) : reset
+    // HUD + ré-armement, sans nom en dur. Ils se ré-annoncent à la prochaine
+    // entrée dans le monde alternatif.
+    for (const def of bosses) {
+      if (!def.reveal.requiresAlternateWorld) continue;
+      clearBossHud(def.id);
+      bossArmedFiredRef.current.delete(def.id);
+    }
     callbacks?.onAtmosphereChange?.(false);
-    setUpsideDownActive(false);
-    upsideDownActiveRef.current = false;
-    upsideDownBaselineRef.current = 0;
-    // Le nid de vecna pourra se ré-annoncer à la prochaine entrée Upside Down.
-    bossArmedFiredRef.current.delete("vecna");
-  }, [clearUpsideDownHint, clearBossHud, callbacks]);
+    setAlternateWorldActive(false);
+    alternateWorldActiveRef.current = false;
+    alternateWorldBaselineRef.current = 0;
+  }, [clearAlternateWorldHint, clearBossHud, callbacks, bosses]);
 
   const updateGameState = (state: GameState) => {
     gameStateRef.current = state;
@@ -265,9 +280,9 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       const stats: GameStats = {
         maxCombo: maxComboRef.current,
         maxMultiplier: maxMultiplierRef.current,
-        demogorgons: demogorgonsRef.current,
-        portals: portalsRef.current,
-        hetic: heticRef.current,
+        // Counters remplis par PinballPlayfield depuis le mapState (alimenté par
+        // le module de map). useGameState ne compte plus rien de ST.
+        counters: {},
         durationS: gameStartRef.current
           ? Math.round((performance.now() - gameStartRef.current) / 1000)
           : 0,
@@ -288,34 +303,30 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     multiplierRef.current = 1;
     setCombo(0);
     setMultiplier(1);
-    heticRef.current = 0;
-    setHetic(0);
     milestonesPassedRef.current.clear();
     bossArmedFiredRef.current.clear();
-    upsideDownActiveRef.current = false;
+    alternateWorldActiveRef.current = false;
     normalWorldBaselineRef.current = 0;
-    upsideDownBaselineRef.current = 0;
+    alternateWorldBaselineRef.current = 0;
     feverUntilRef.current = 0;
     setFever(false);
     lastEventTimeRef.current = 0;
     maxComboRef.current = 0;
     maxMultiplierRef.current = 1;
-    demogorgonsRef.current = 0;
-    portalsRef.current = 0;
     gameStartRef.current = 0;
     const newName = generatePlayerName();
     setPlayer(newName);
     playerRef.current = newName;
     clearAllBossHud();
     clearScorePops();
-    clearUpsideDownSession();
+    clearAlternateWorldSession();
     updateGameState("idle");
     callbacks?.onIdleReset?.();
   };
 
   const buildEmit = (hideBall: () => void): GameEventListener =>
     (event) => {
-      handlePinballSoundEvent(event);
+      handlePinballSoundEvent(event, bosses);
 
       const now = performance.now();
 
@@ -348,16 +359,16 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         if (crossed) callbacks?.onMilestone?.(crossed);
 
         // Éveil du nid : palier de boss franchi → onBossArmed une fois par partie.
-        // Le set garde l'unicité ; le gate Upside Down/baseline est porté par
-        // bossThresholdMet (généricité demogorgon + vecna).
-        for (const id of BOSS_IDS) {
+        // Le set garde l'unicité ; le gate monde alternatif/baseline est porté par
+        // bossThresholdMet (générique pour tout boss, gate monde alternatif inclus).
+        for (const id of bossIds) {
           if (bossArmedFiredRef.current.has(id)) continue;
-          const def = getBossDefinition(id);
+          const def = getBossById(bosses, id); if (!def) continue;
           const met = bossThresholdMet(def, {
             totalScore: scoreRef.current,
-            upsideDownActive: upsideDownActiveRef.current,
+            alternateWorldActive: alternateWorldActiveRef.current,
             normalWorldScoreBaseline: normalWorldBaselineRef.current,
-            upsideDownScoreBaseline: upsideDownBaselineRef.current,
+            alternateWorldScoreBaseline: alternateWorldBaselineRef.current,
           });
           if (met) {
             bossArmedFiredRef.current.add(id);
@@ -366,7 +377,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         }
       }
       if (event.type === "BUMPER_HIT") {
-        const bumper = BUMPER_POSITIONS[event.bumperIndex];
+        const bumper = bumperAnchors[event.bumperIndex];
         if (bumper) {
           const point = jitterScreenPoint(
             playfieldToScreenPercent(bumper.x, bumper.z),
@@ -380,7 +391,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         }
       }
       if (event.type === "BOSS_TARGET_HIT") {
-        const def = getBossDefinition(event.bossId);
+        const def = getBossById(bosses, event.bossId); if (!def) return;
         const point = jitterScreenPoint(
           playfieldToScreenPercent(def.target.x, def.target.z),
           4,
@@ -392,8 +403,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           tone: "target",
         });
         const victory = event.hitCount >= def.targetHits;
-        // Counts ANY boss defeated (field GameStats.demogorgons = "boss vaincus").
-        if (victory) demogorgonsRef.current += 1;
+        // Compteur "boss vaincus" : tenu par le module de map (mapState).
         setBossHud((prev) => ({
           ...prev,
           [event.bossId]: {
@@ -434,25 +444,26 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           },
         }));
       }
-      if (event.type === "ELEVEN_ASSIST") {
-        setBossHud((prev) => ({
-          ...prev,
-          demogorgon: {
-            ...prev.demogorgon,
-            active: true,
-            assistFlash: true,
-          },
-        }));
-        if (elevenTimerRef.current !== null) {
-          window.clearTimeout(elevenTimerRef.current);
-        }
-        elevenTimerRef.current = window.setTimeout(() => {
-          elevenTimerRef.current = null;
+      if (event.type === "ASSIST") {
+        // Boss propriétaire de l'assist déduit de sa def (assist.id), pas en dur.
+        const assistBoss = bosses.find((b) => b.assist?.id === event.assistId);
+        if (assistBoss) {
+          const bossId = assistBoss.id;
           setBossHud((prev) => ({
             ...prev,
-            demogorgon: { ...prev.demogorgon, assistFlash: false },
+            [bossId]: { ...prev[bossId], active: true, assistFlash: true },
           }));
-        }, 900);
+          if (assistTimerRef.current !== null) {
+            window.clearTimeout(assistTimerRef.current);
+          }
+          assistTimerRef.current = window.setTimeout(() => {
+            assistTimerRef.current = null;
+            setBossHud((prev) => ({
+              ...prev,
+              [bossId]: { ...prev[bossId], assistFlash: false },
+            }));
+          }, 900);
+        }
       }
       if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
         comboRef.current = 0;
@@ -465,28 +476,17 @@ export function useGameState(callbacks?: ScoringCallbacks) {
           clearAllBossHud();
         }
       }
-      if (event.type === "DROP_TARGET_COMPLETE") {
-        heticRef.current += 1;
-        setHetic(heticRef.current);
-        if (heticRef.current < 5) {
-          callbacks?.onHeticLetter?.(heticRef.current); // 1..4
-        } else {
-          // complete émis AVANT le reset (snapshot montre encore 5/5), puis
-          // la boucle redevient collectable (re-jouable).
-          callbacks?.onHeticComplete?.();
-          heticRef.current = 0;
-          setHetic(0);
-        }
-      }
+      // DROP_TARGET_COMPLETE (compteur de collecte + cinématiques) : géré par
+      // le module de map.
       if (event.type === "BALL_LAUNCHED") {
         if (gameStartRef.current === 0) gameStartRef.current = now;
         if (gameStateRef.current === "idle") callbacks?.onGameStart?.();
         updateGameState("playing");
       }
       if (event.type === "PORTAL_ENTER") {
-        portalsRef.current += 1;
+        // Compteur "portals" : tenu par le module de map (mapState).
         const point = jitterScreenPoint(
-          playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
+          playfieldToScreenPercent(portalAnchor.x, portalAnchor.z),
           3,
         );
         pushScorePop({
@@ -498,7 +498,7 @@ export function useGameState(callbacks?: ScoringCallbacks) {
       }
       if (event.type === "RETURN_PORTAL_ENTER") {
         const point = jitterScreenPoint(
-          playfieldToScreenPercent(PORTAL_UPSIDE_DOWN.x, PORTAL_UPSIDE_DOWN.z),
+          playfieldToScreenPercent(portalAnchor.x, portalAnchor.z),
           3,
         );
         pushScorePop({
@@ -509,33 +509,33 @@ export function useGameState(callbacks?: ScoringCallbacks) {
         });
       }
       if (event.type === "PORTAL_TRANSITION_END") {
-        setUpsideDownActive(true);
-        upsideDownActiveRef.current = true;
-        upsideDownBaselineRef.current = scoreRef.current;
-        setUpsideDownHint(true);
-        if (upsideDownHintTimerRef.current !== null) {
-          window.clearTimeout(upsideDownHintTimerRef.current);
+        setAlternateWorldActive(true);
+        alternateWorldActiveRef.current = true;
+        alternateWorldBaselineRef.current = scoreRef.current;
+        setAlternateWorldHint(true);
+        if (alternateWorldHintTimerRef.current !== null) {
+          window.clearTimeout(alternateWorldHintTimerRef.current);
         }
-        upsideDownHintTimerRef.current = window.setTimeout(() => {
-          upsideDownHintTimerRef.current = null;
-          setUpsideDownHint(false);
-        }, UPSIDE_DOWN_HINT_MS);
+        alternateWorldHintTimerRef.current = window.setTimeout(() => {
+          alternateWorldHintTimerRef.current = null;
+          setAlternateWorldHint(false);
+        }, atmosphereHintMs);
         callbacks?.onAtmosphereChange?.(true);
       }
       if (event.type === "RETURN_PORTAL_TRANSITION_END") {
-        setUpsideDownActive(false);
-        setUpsideDownHint(false);
-        if (upsideDownHintTimerRef.current !== null) {
-          window.clearTimeout(upsideDownHintTimerRef.current);
-          upsideDownHintTimerRef.current = null;
+        setAlternateWorldActive(false);
+        setAlternateWorldHint(false);
+        if (alternateWorldHintTimerRef.current !== null) {
+          window.clearTimeout(alternateWorldHintTimerRef.current);
+          alternateWorldHintTimerRef.current = null;
         }
         callbacks?.onAtmosphereChange?.(false);
       }
       if (event.type === "WORLD_CYCLE_COMPLETE") {
         clearAllBossHud();
         normalWorldBaselineRef.current = scoreRef.current;
-        upsideDownActiveRef.current = false;
-        upsideDownBaselineRef.current = 0;
+        alternateWorldActiveRef.current = false;
+        alternateWorldBaselineRef.current = 0;
         bossArmedFiredRef.current.clear();
       }
     };
@@ -555,14 +555,12 @@ export function useGameState(callbacks?: ScoringCallbacks) {
     playerRef,
     bossHud,
     scorePops,
-    upsideDownActive,
-    upsideDownHint,
-    hetic,
-    heticRef,
+    alternateWorldActive,
+    alternateWorldHint,
     fever,
     isFeverActive,
     startFever,
-    clearUpsideDownSession,
+    clearAlternateWorldSession,
     resetGame,
     buildEmit,
   };

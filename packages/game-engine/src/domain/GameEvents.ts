@@ -11,13 +11,15 @@ export type GameEvent =
   | { type: 'BOSS_REVEAL'; bossId: BossId; scoreIncrement: number }
   | { type: 'BOSS_TARGET_HIT'; bossId: BossId; hitCount: number; scoreIncrement: number }
   | { type: 'BOSS_LOCKED_HIT'; bossId: BossId; remaining: number }
-  | { type: 'ELEVEN_ASSIST'; scoreIncrement: number }
+  | { type: 'ASSIST'; assistId: string; scoreIncrement: number }
   | { type: 'PORTAL_ENTER'; scoreIncrement: number }
   | { type: 'PORTAL_TREMOR' }
   | { type: 'PORTAL_TRANSITION_END' }
   | { type: 'RETURN_PORTAL_ENTER'; scoreIncrement: number }
   | { type: 'RETURN_PORTAL_TRANSITION_END' }
   | { type: 'WORLD_CYCLE_COMPLETE' }
+  | { type: 'MILESTONE'; threshold: number }
+  | { type: 'BOSS_ARMED'; bossId: BossId }
   | { type: 'DRAIN' }
   | { type: 'BOTTOM_OUT' }
   | { type: 'BUMP_HIT'; side: 'left' | 'right'; scoreIncrement: number }

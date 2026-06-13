@@ -1,21 +1,20 @@
 import { useEffect, useRef } from 'react'
+import { NoSignal } from '@pinball/ui'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
-import JoyceWall from '@/components/JoyceWall'
-import SideArt from '@/components/SideArt'
+import { JoyceWall, SideArt, backglassTheme, backglassThemeAlternate } from '@/map/content'
 import HallOfFame from '@/components/HallOfFame'
 import StatsBanner from '@/components/StatsBanner'
 import ReactorFx from '@/components/ReactorFx'
 import HighScoreTakeover from '@/components/takeovers/HighScoreTakeover'
 import RecapTakeover from '@/components/takeovers/RecapTakeover'
-import DemogorgonTakeover from '@/components/takeovers/DemogorgonTakeover'
 import AttractScene from '@/components/takeovers/AttractScene'
 import CinematicTakeover from '@/components/takeovers/CinematicTakeover'
 
 export default function BackglassPage() {
   const { entries, stats, connected } = useBackglassData()
-  const { takeover, upsideDown, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
+  const { takeover, alternateWorld, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
     useBackglassTakeover(entries)
   const stageRef = useRef<HTMLDivElement>(null)
   const goldWaveRef = useRef<HTMLDivElement>(null)
@@ -54,10 +53,17 @@ export default function BackglassPage() {
     return () => window.removeEventListener('resize', fit)
   }, [])
 
-  const sideAgitation = upsideDown ? 1 : Math.max(0.15, agitation)
+  const sideAgitation = alternateWorld ? 1 : Math.max(0.15, agitation)
+
+  // Tokens de thème de la map posés en custom properties (base + surcharges
+  // monde alternatif). Le backglass se re-render librement (pas de scène 3D).
+  const themeStyle = {
+    ...backglassTheme,
+    ...(alternateWorld ? backglassThemeAlternate : {}),
+  } as React.CSSProperties
 
   return (
-    <div className={`stage-fit ${upsideDown ? 'upside-down' : ''} ${fever ? 'fever' : ''}`}>
+    <div className={`stage-fit ${fever ? 'fever' : ''}`} style={themeStyle}>
       <main className="stage" ref={stageRef}>
         <div className="vignette" style={{ opacity: 1 + agitation * 0.8 }} />
         <div className="vignette-heat" />
@@ -69,7 +75,7 @@ export default function BackglassPage() {
 
         <section className="zone-side">
           <SideArt
-            mood={upsideDown ? 'upsideDown' : 'normal'}
+            mood={alternateWorld ? 'alternate' : 'normal'}
             agitation={sideAgitation}
             reactor={reactor}
           />
@@ -79,7 +85,7 @@ export default function BackglassPage() {
           <HallOfFame
             entries={entries}
             highlightRank={highlightRank}
-            inverted={upsideDown && !holdHallFlip}
+            inverted={alternateWorld && !holdHallFlip}
             reactor={reactor}
           />
         </section>
@@ -98,7 +104,13 @@ export default function BackglassPage() {
             {takeover.scene === 'RECAP' && takeover.payload && (
               <RecapTakeover payload={takeover.payload} />
             )}
-            {takeover.scene === 'DEMOGORGON' && <DemogorgonTakeover />}
+            {takeover.scene === 'MAP_EVENT' && takeover.clip && (
+              <CinematicTakeover
+                clip={takeover.clip}
+                payload={takeover.payload}
+                entries={entries}
+              />
+            )}
             {takeover.scene === 'ATTRACT' && (
               <AttractScene entries={entries} />
             )}
@@ -112,7 +124,11 @@ export default function BackglassPage() {
           </div>
         )}
 
-        {!connected && <div className="disconnected">Disconnected</div>}
+        {!connected && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 50 }}>
+            <NoSignal reason="BACKGLASS — PAS DE SIGNAL SERVEUR" />
+          </div>
+        )}
       </main>
     </div>
   )

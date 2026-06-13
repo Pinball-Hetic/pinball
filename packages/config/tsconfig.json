@@ -10,6 +10,12 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
+      "@pinball/maps/backglass": ["../../packages/maps/backglass.ts"],
+      "@pinball/maps/dmd": ["../../packages/maps/dmd.ts"],
+      "@pinball/maps": ["../../packages/maps/index.ts"],
+      "@pinball/map-strangerthings/backglass": ["../../packages/maps/strangerthings/backglass"],
+      "@pinball/map-strangerthings/dmd": ["../../packages/maps/strangerthings/dmd"],
+      "@pinball/map-strangerthings": ["../../packages/maps/strangerthings/index.ts"],
       "@pinball/*": ["../../packages/*/src"]
     }
   }

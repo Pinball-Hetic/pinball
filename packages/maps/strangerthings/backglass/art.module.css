@@ -1,0 +1,274 @@
+/* Styles des composants backglass Stranger Things (déplacés du globals de
+   l'app — dette CSS du refacto multi-maps résorbée). CSS Module SCOPÉ :
+   les composants accèdent aux classes via styles['nom']. Les classes
+   structurelles/génériques de l'app (tk-center, glitch-text, vhs*, tk-confetti,
+   confetti-dot, tk-kicker/score, tabular-nums) restent globales → référencées
+   par chaîne globale côté composant, ou via :global() ici. Tokens de thème
+   (--glow, --st-font, --heat, --sway-dur…) posés par l'app sur le conteneur.
+   slide-in / pulse-soft : copies locales (les originales globales servent au
+   structurel de l'app ; ici scopées avec les classes ST qui les utilisent). */
+
+/* ---------- Joyce wall ---------- */
+.joyce-wall {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 18px 60px;
+  box-sizing: border-box;
+  background: var(--header-bg);
+  border-bottom: 3px solid #000;
+  box-shadow: inset 0 -30px 60px #000;
+}
+.joyce-row {
+  display: flex;
+  justify-content: space-between;
+}
+.joyce-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 64px;
+}
+.joyce-bulb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  margin-bottom: 6px;
+  transition: opacity 0.12s ease, box-shadow 0.12s ease;
+}
+.joyce-letter {
+  font-family: var(--st-font);
+  font-size: 34px;
+  font-weight: 700;
+  transition: color 0.15s ease, text-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+/* ---------- Side art (demogorgon + vines) ---------- */
+.side-art {
+  width: 100%;
+  height: 100%;
+}
+.side-art-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--art-glow) 40%, transparent));
+}
+.demo-body {
+  transform-origin: 160px 400px;
+  animation: demo-breathe calc(var(--sway-dur) * 1.4) ease-in-out infinite;
+}
+.demo-petal {
+  fill: #0a0202;
+  transform-origin: 160px 215px;
+  animation: petal-flex var(--sway-dur) ease-in-out infinite;
+}
+.vine {
+  transform-origin: bottom center;
+  animation: vine-sway var(--sway-dur) ease-in-out infinite;
+  /* heat module la vitesse des vignes (plus chaud = plus rapide) */
+  animation-duration: calc(var(--sway-dur, 5s) * (1 - var(--heat, 0) * 0.6));
+}
+@keyframes vine-sway {
+  0%, 100% { transform: rotate(calc(-1 * var(--vine-amp))); }
+  50% { transform: rotate(var(--vine-amp)); }
+}
+@keyframes petal-flex {
+  0%, 100% { transform: rotate(-3deg) scale(1); }
+  50% { transform: rotate(3deg) scale(1.04); }
+}
+@keyframes demo-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.03); }
+}
+
+/* RAMP : trait lumineux vertical sur le latéral (SideArt) */
+.ramp-beam {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 6px;
+  transform: translateX(-50%) scaleY(0);
+  background: linear-gradient(180deg, transparent, #fff, #ffd95e, transparent);
+  filter: blur(1px) drop-shadow(0 0 12px #ffd95e);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.ramp-beam-on {
+  animation: ramp-beam 0.5s ease-out;
+}
+@keyframes ramp-beam {
+  0% { opacity: 0; transform: translateX(-50%) scaleY(0); }
+  30% { opacity: 1; transform: translateX(-50%) scaleY(1); }
+  100% { opacity: 0; transform: translateX(-50%) scaleY(1); }
+}
+
+/* DEMOGORGON takeover */
+.tk-demogorgon { background: #1a0202; }
+.demo-flash { position: absolute; inset: 0; background: #ff0000; animation: demo-flash 0.5s ease-out forwards; }
+@keyframes demo-flash {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+.demo-giant { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.85; filter: drop-shadow(0 0 40px #ff2d2d); animation: demo-loom 3s ease-out; }
+@keyframes demo-loom { 0% { transform: scale(1.4); opacity: 0.2; } 30% { opacity: 0.9; } 100% { transform: scale(1); opacity: 0.85; } }
+.demo-text { gap: 10px; }
+.demo-text :global(.glitch-text) { font-family: var(--st-font); font-size: 96px; font-weight: 900; color: #ff2d2d; }
+.demo-points { font-size: 80px; font-weight: 900; color: #ffd95e; text-shadow: 0 0 30px #ffae00; }
+
+/* ===================== Cinematic takeovers ===================== */
+.cine-blackout {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  animation: cine-blackout 2.5s ease-out;
+}
+@keyframes cine-blackout {
+  0% { opacity: 1; }
+  12% { opacity: 1; }
+  30% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.tk-cine-rises { background: radial-gradient(ellipse at 50% 45%, #2a0606 0%, #050202 70%, #000 100%); }
+.cine-giant-side {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 60px #ff2d2d);
+  animation: cine-loom 2.5s ease-out;
+}
+.cine-giant-side > * { width: 70%; height: 100%; }
+@keyframes cine-loom {
+  0% { transform: scale(1.5); opacity: 0; }
+  35% { opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+.cine-run {
+  font-family: var(--st-font);
+  font-size: 240px;
+  font-weight: 900;
+  color: #ff2d2d;
+  letter-spacing: 0.1em;
+  animation: cine-panic 0.18s steps(2) infinite;
+}
+@keyframes cine-panic {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(3px, -2px); }
+}
+
+.tk-cine-portal { background: #060010; }
+.cine-portal-wave {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(177, 77, 255, 0.9) 0%, rgba(120, 40, 220, 0.4) 30%, transparent 70%);
+  animation: cine-portal 4s ease-in;
+}
+@keyframes cine-portal {
+  0% { transform: scale(0); opacity: 0.2; }
+  60% { opacity: 1; }
+  100% { transform: scale(3.2); opacity: 0.85; }
+}
+
+.cine-demo-count {
+  position: absolute;
+  bottom: 80px;
+  left: 0;
+  right: 0;
+  z-index: 55;
+  text-align: center;
+  font-family: var(--st-font);
+  font-size: 64px;
+  font-weight: 900;
+  color: #ffd95e;
+  text-shadow: 0 0 30px #ffae00;
+  animation: slide-in 0.6s ease;
+}
+
+.tk-cine-last { background: #000; }
+.cine-last-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 25%, rgba(255, 20, 20, 0.75) 120%);
+  animation: cine-last 1.2s ease-in-out;
+}
+@keyframes cine-last {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 1; }
+}
+.cine-last-text {
+  color: #ff2d2d;
+  text-shadow: 0 0 30px #ff2d2d;
+  animation: pulse-soft 0.6s ease-in-out infinite;
+}
+
+/* milestone_30k : fusée qui traverse de bas en haut. */
+.tk-cine-rocket { background: radial-gradient(ellipse at 50% 60%, #1a1206, #050308 70%, #000); }
+.cine-rocket {
+  position: absolute;
+  left: 50%;
+  bottom: -80px;
+  width: 18px;
+  height: 60px;
+  border-radius: 50% 50% 40% 40%;
+  background: linear-gradient(180deg, #fff, #ffd95e 40%, #ff7700);
+  box-shadow: 0 0 30px #ffae00, 0 40px 60px 10px rgba(255, 120, 0, 0.5);
+  transform: translateX(-50%);
+  animation: rocket-fly 4s ease-in forwards;
+}
+@keyframes rocket-fly {
+  0% { bottom: -80px; opacity: 1; }
+  70% { bottom: 70%; opacity: 1; }
+  100% { bottom: 120%; opacity: 0; }
+}
+
+/* milestone_big : réutilise .tk-confetti / .confetti-dot (globales app). */
+.tk-cine-fireworks { background: radial-gradient(ellipse at 50% 45%, #1a1206, #050308 70%, #000); }
+
+/* hetic_complete : 5 lettres géantes + explosion + FEVER. */
+.tk-cine-hetic { background: radial-gradient(ellipse at 50% 45%, #2a1a06, #060406 70%, #000); }
+.cine-hetic-letters {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+}
+.cine-hetic-letters span {
+  font-family: var(--st-font);
+  font-size: 200px;
+  font-weight: 900;
+  color: #ffd95e;
+  text-shadow: 0 0 40px #ffae00;
+  animation: hetic-pop 0.5s ease-out both;
+}
+@keyframes hetic-pop {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.cine-fever-text {
+  color: #ff7700 !important;
+  text-shadow: 0 0 40px #ffae00, 0 0 80px #ff3b00;
+  animation: pulse-soft 0.4s ease-in-out infinite;
+}
+
+/* Copies locales des keyframes génériques utilisées par les classes ST
+   ci-dessus (les originales restent globales dans le globals de l'app). */
+@keyframes slide-in {
+  0% { opacity: 0; transform: translateX(40px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}

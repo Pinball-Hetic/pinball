@@ -5,12 +5,11 @@ export async function recordGame(data: GameOver): Promise<void> {
   await prisma.game.create({
     data: {
       player: data.player,
+      mapId: data.mapId,
       score: data.finalScore,
       maxCombo: data.stats.maxCombo,
       maxMultiplier: data.stats.maxMultiplier,
-      demogorgons: data.stats.demogorgons,
-      portals: data.stats.portals,
-      hetic: data.stats.hetic,
+      counters: data.stats.counters,
       durationS: data.stats.durationS,
     },
   });

@@ -1,11 +1,6 @@
 import * as THREE from 'three';
-import {
-  HINGE_INSET_FROM_EDGE,
-  FLIPPER_LEFT_PIVOT_X,
-  FLIPPER_RIGHT_PIVOT_X,
-  FLIPPER_PIVOT_Y,
-  FLIPPER_PIVOT_Z,
-} from '../domain/FlipperConstants';
+import { HINGE_INSET_FROM_EDGE } from '../domain/FlipperConstants';
+import type { FlipperPivots } from '../domain/MapLayout';
 import { findObjectByNormalizedName, normalizeGltfName } from './GltfNodeNames';
 
 export type PlayfieldFlipperPair = {
@@ -84,7 +79,7 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
   }
   if (meshes.length === 0) return null;
 
-  // Cas Strangerthings.glb : 2+ meshes qui couvrent CHACUN toute la largeur
+  // Cas GLB multi-mesh sol : 2+ meshes qui couvrent CHACUN toute la largeur
   // du playfield (base + plastique du même couple de flippers). On découpe
   // géométriquement le plus dense au X=0 pour obtenir 2 demi-meshes
   // gauche/droit, et on masque les autres.
@@ -241,6 +236,7 @@ function hingeLocalPosition(
   flipper: THREE.Object3D,
   side: 'left' | 'right',
   parent: THREE.Object3D,
+  pivots: FlipperPivots,
 ): THREE.Vector3 {
   flipper.updateMatrixWorld(true);
   parent.updateMatrixWorld(true);
@@ -249,13 +245,13 @@ function hingeLocalPosition(
   const inset = (max.x - min.x) * HINGE_INSET_FROM_EDGE;
   // Convention pinball : hinge au far-X (côté bord playfield), tip au center.
   // LEFT → hinge à min.x (far left). RIGHT → hinge à max.x (far right).
-  // Les constantes FLIPPER_*_PIVOT_* permettent un réglage fin sans recompute.
+  // Le réglage fin du pivot vient du layout de la map (pivots).
   const baseX  = side === 'left' ? min.x + inset : max.x - inset;
-  const extraX = side === 'left' ? FLIPPER_LEFT_PIVOT_X : FLIPPER_RIGHT_PIVOT_X;
+  const extraX = side === 'left' ? pivots.leftX : pivots.rightX;
   const hingeWorld = new THREE.Vector3(
     baseX  + extraX,
-    (min.y + max.y) / 2 + FLIPPER_PIVOT_Y,
-    (min.z + max.z) / 2 + FLIPPER_PIVOT_Z,
+    (min.y + max.y) / 2 + pivots.y,
+    (min.z + max.z) / 2 + pivots.z,
   );
   const hingeLocal = hingeWorld.clone();
   parent.worldToLocal(hingeLocal);
@@ -265,6 +261,7 @@ function hingeLocalPosition(
 export function attachFlipperAtHinge(
   flipper: THREE.Object3D,
   side: 'left' | 'right',
+  pivots: FlipperPivots,
   mountParent?: THREE.Object3D,
 ): FlipperPivot {
   const parent = mountParent ?? flipper.parent;
@@ -274,7 +271,7 @@ export function attachFlipperAtHinge(
 
   const pivot = new THREE.Group();
   pivot.name = `${flipper.name}_pivot`;
-  pivot.position.copy(hingeLocalPosition(flipper, side, parent));
+  pivot.position.copy(hingeLocalPosition(flipper, side, parent, pivots));
   parent.add(pivot);
   pivot.attach(flipper);
 

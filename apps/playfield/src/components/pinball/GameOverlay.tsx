@@ -1,4 +1,4 @@
-import { BOSS_IDS, getBossDefinition } from "@pinball/game-engine";
+import type { BossDefinition } from "@pinball/game-engine";
 import type { BossHudState, ScorePop } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
 import PlungerPowerBar from "./PlungerPowerBar";
@@ -14,8 +14,12 @@ interface GameOverlayProps {
   initialLives: number;
   bossHud: BossHudState;
   scorePops: ScorePop[];
-  upsideDownActive: boolean;
-  upsideDownHint: boolean;
+  alternateWorldActive: boolean;
+  alternateWorldHint: boolean;
+  atmosphereBannerLabel: string;
+  atmosphereHintLabel: string;
+  attractTagline: string;
+  bosses: BossDefinition[];
   cabinetMode?: boolean;
   onAttractInteract?: () => void;
 }
@@ -29,8 +33,12 @@ export default function GameOverlay({
   initialLives,
   bossHud,
   scorePops,
-  upsideDownActive,
-  upsideDownHint,
+  alternateWorldActive,
+  alternateWorldHint,
+  atmosphereBannerLabel,
+  atmosphereHintLabel,
+  attractTagline,
+  bosses,
   cabinetMode = false,
   onAttractInteract,
 }: GameOverlayProps) {
@@ -46,11 +54,11 @@ export default function GameOverlay({
   const showResetBall =
     bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
 
-  const showUpsideDownBanner =
-    bootPhase === "in_game" && gameState === "playing" && upsideDownActive;
+  const showAlternateWorldBanner =
+    bootPhase === "in_game" && gameState === "playing" && alternateWorldActive;
 
-  const showUpsideDownHint =
-    bootPhase === "in_game" && gameState === "playing" && upsideDownHint;
+  const showAlternateWorldHint =
+    bootPhase === "in_game" && gameState === "playing" && alternateWorldHint;
 
   return (
     <>
@@ -90,32 +98,32 @@ export default function GameOverlay({
         </header>
       )}
 
-      {showUpsideDownBanner && (
+      {showAlternateWorldBanner && (
         <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-10 flex justify-center">
           <div className="rounded border border-violet-500/25 bg-black/45 px-3 py-1 font-mono backdrop-blur-sm">
             <p className="text-[10px] uppercase tracking-[0.45em] text-violet-300/80 drop-shadow-[0_0_10px_rgba(140,80,200,0.45)]">
-              Upside Down
+              {atmosphereBannerLabel}
             </p>
           </div>
         </div>
       )}
 
-      {showUpsideDownHint && (
+      {showAlternateWorldHint && (
         <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center px-6">
           <p className="animate-pulse text-center font-mono text-xs uppercase tracking-[0.22em] text-violet-200/75 drop-shadow-[0_0_12px_rgba(150,90,220,0.55)] sm:text-sm">
-            Le monde s&apos;est inversé…
+            {atmosphereHintLabel}
           </p>
         </div>
       )}
 
-      {BOSS_IDS.map((bossId) => {
-        const def = getBossDefinition(bossId);
+      {bosses.map((def) => {
+        const bossId = def.id;
         const hud = bossHud[bossId];
         const showBossHud =
           bootPhase === "in_game" &&
           gameState === "playing" &&
           hud.active &&
-          (!def.hud.requiresUpsideDown || upsideDownActive);
+          (!def.hud.requiresAlternateWorld || alternateWorldActive);
 
         if (!showBossHud) return null;
 
@@ -181,7 +189,7 @@ export default function GameOverlay({
         >
           <div className="text-center">
             <p className="font-mono text-[10px] uppercase tracking-[0.55em] text-red-400/80">
-              Hawkins National Laboratory
+              {attractTagline}
             </p>
             <h1 className="mt-3 font-mono text-4xl font-bold uppercase tracking-[0.18em] text-zinc-100 drop-shadow-[0_0_24px_rgba(255,180,0,0.35)] sm:text-5xl">
               Pinball

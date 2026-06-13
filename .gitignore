@@ -56,3 +56,5 @@ backups/
 
 .agents/
 skills-lock.json
+# Assets de map synchronisés au build (cf. scripts/sync-map-assets.sh)
+apps/*/public/maps/

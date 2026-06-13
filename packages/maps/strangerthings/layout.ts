@@ -1,0 +1,177 @@
+import type { MapLayout } from '@pinball/game-engine'
+import { bossDefinitions } from './bosses'
+import {
+  WALL_LEFT_X,
+  WALL_RIGHT_X,
+  WALL_TOP_Z,
+  WALL_BOTTOM_Z,
+  PLAYFIELD_SHADE_W,
+  PLAYFIELD_SHADE_D,
+  PLAYFIELD_SHADE_Y,
+  PLAYFIELD_SHADE_Z,
+  PLAYFIELD_SHADE_MAX_OPACITY,
+} from '@pinball/game-engine'
+import {
+  UPSIDE_DOWN_TRANSITION_DURATION,
+  UPSIDE_DOWN_TRANSITION_BLACKOUT,
+  UPSIDE_DOWN_TRANSITION_REVEAL,
+  UPSIDE_DOWN_TRANSITION_RESTORE,
+  UPSIDE_DOWN_TRANSITION_TREMOR,
+  UPSIDE_DOWN_TRANSITION_STROBE_HZ,
+  UPSIDE_DOWN_PORTAL_OPEN_POLISH,
+  UPSIDE_DOWN_PORTAL_PULSE_SPEED,
+  UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
+  UPSIDE_DOWN_PORTAL_VINE_COUNT,
+  UPSIDE_DOWN_ATMOSPHERE_BLEND,
+  UPSIDE_DOWN_ATMOSPHERE_BG,
+  UPSIDE_DOWN_ATMOSPHERE_TINT,
+  UPSIDE_DOWN_ATMOSPHERE_SURFACE_TINT,
+  UPSIDE_DOWN_ATMOSPHERE_WALL_TINT,
+  UPSIDE_DOWN_ATMOSPHERE_DECOR_TINT,
+  UPSIDE_DOWN_ATMOSPHERE_EMISSIVE,
+  UPSIDE_DOWN_ATMOSPHERE_DECOR_EMISSIVE,
+  UPSIDE_DOWN_ATMOSPHERE_EXPOSURE,
+  UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_SHADE_OPACITY,
+  UPSIDE_DOWN_ATMOSPHERE_SHADE_COLOR,
+  UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR,
+  UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY,
+  UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MIN,
+  UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MAX,
+  UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED,
+  UPSIDE_DOWN_ATMOSPHERE_STROBE_HZ,
+  UPSIDE_DOWN_ATMOSPHERE_BLEND_STROBE_HZ,
+  UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT,
+  UPSIDE_DOWN_HINT_MS,
+} from './systems/UpsideDownConstants'
+
+// Layout ST. Étape transitoire : on assemble le MapLayout à partir des
+// constantes game-engine existantes (référence, pas de copie → pas de drift).
+// La bascule de propriété (literaux ici, suppression des constantes côté
+// game-engine) se fera consommateur par consommateur en phase 4.
+export const layout: MapLayout = {
+  // Bumpers : littéraux (collider tuné). Le centre Box3 des meshes bumper_*
+  // dévie de 11-15 mm (cap mushroom) → non dérivable. TODO(blender): ajouter
+  // bumper_anchor_1/2/3 (empty au point collider) pour dériver à terme.
+  bumpers: [
+    { x: -0.020586, y: 1.0482, z: -0.1967 },
+    { x: -0.097406, y: 1.0621, z: -0.30509 },
+    { x: 0.059483, y: 1.0621, z: -0.30509 },
+  ],
+  // Drop targets : positions dérivées du GLB au runtime (LayoutResolver, meshes
+  // target_*). Les littéraux ci-dessous = fallback (≤ 0.7 mm du dérivé).
+  dropTargets: [
+    { id: 'drop_left_1', x: -0.209, y: 1.022, z: -0.019, side: 'left' },
+    { id: 'drop_left_2', x: -0.205, y: 1.026, z: -0.049, side: 'left' },
+    { id: 'drop_right_1', x: 0.157, y: 1.024, z: -0.041, side: 'right' },
+    { id: 'drop_right_2', x: 0.148, y: 1.028, z: -0.077, side: 'right' },
+    { id: 'drop_right_3', x: 0.137, y: 1.032, z: -0.114, side: 'right' },
+  ],
+  // TODO(blender): dériver du GLB quand les meshes sensor_* existeront
+  // (sensor_pop_1/2/3, sensor_rocket, sensor_demogorgon). Littéraux explicites
+  // en attendant — pas de mesh dans le GLB actuel.
+  sensors: {
+    popZones: [
+      { x: -0.0225, y: 1.057, z: -0.448 },
+      { x: -0.087, y: 1.056, z: -0.438 },
+      { x: 0.042, y: 1.056, z: -0.438 },
+    ],
+    rocket: { x: 0.193, y: 1.021, z: -0.13 },
+    bossReveal: { x: -0.0195, y: 1.0575, z: -0.269 },
+    // sensor_portal (Ø sensor 1.7 cm) — littéral en attendant le mesh.
+    portal: { x: -0.000751, y: 1.015191, z: -0.064818 },
+  },
+  // Spawns : analytiques (pas de mesh attendu — hors couloir/hinge).
+  spawns: {
+    ball: { x: 0.2355, y: 1.01, z: 0.161 },
+    alternateWorld: { x: -0.0225, z: -0.48 },
+    alternateWorldImpulse: { x: 0, y: 0, z: 0.055 },
+    normalReturn: { x: -0.0225, z: -0.12 },
+    normalReturnImpulse: { x: 0, y: 0, z: 0.05 },
+  },
+  // Couloir plongeur : géométrie analytique (pas de mesh). Littéraux map.
+  shooterLane: {
+    xMin: 0.206,
+    xMax: 0.265,
+    bottomZ: 0.42,
+    topZ: -0.49,
+    wallHeight: 0.05,
+    wallThickness: 0.02,
+    restitution: 0.2,
+    friction: 0.08,
+    leftWallTopZ: -0.28,
+    lockX: 0.19,
+    exitX: 0.18,
+    failZ: 0.3,
+    guideCenter: { x: 0.206, z: -0.4 },
+    guideRadius: 0.059,
+    guideSegments: 10,
+    guideAngleStart: Math.PI * 1.5,
+    guideAngleEnd: Math.PI * 2,
+  },
+  // Réglage fin du pivot des flippers (offset depuis le bord de la bbox).
+  flipperPivots: {
+    leftX: 0.02,
+    rightX: -0.02,
+    y: 0.0,
+    z: -0.018,
+  },
+  bosses: bossDefinitions,
+  geometry: {
+    // surfaceYAtZ(z) = 1.068 - ((z + 0.552) / 0.970) * 0.110
+    coefficients: { base: 1.068, zOffset: 0.552, zSpan: 0.97, yDrop: 0.11 },
+    bounds: { leftX: WALL_LEFT_X, rightX: WALL_RIGHT_X, topZ: WALL_TOP_Z, bottomZ: WALL_BOTTOM_Z },
+    shade: {
+      width: PLAYFIELD_SHADE_W,
+      depth: PLAYFIELD_SHADE_D,
+      y: PLAYFIELD_SHADE_Y,
+      z: PLAYFIELD_SHADE_Z,
+      maxOpacity: PLAYFIELD_SHADE_MAX_OPACITY,
+    },
+  },
+  atmosphere: {
+    transition: {
+      durationS: UPSIDE_DOWN_TRANSITION_DURATION,
+      blackout: UPSIDE_DOWN_TRANSITION_BLACKOUT,
+      reveal: UPSIDE_DOWN_TRANSITION_REVEAL,
+      restore: UPSIDE_DOWN_TRANSITION_RESTORE,
+      tremor: UPSIDE_DOWN_TRANSITION_TREMOR,
+      strobeHz: UPSIDE_DOWN_TRANSITION_STROBE_HZ,
+    },
+    portalVisual: {
+      openPolish: UPSIDE_DOWN_PORTAL_OPEN_POLISH,
+      pulseSpeed: UPSIDE_DOWN_PORTAL_PULSE_SPEED,
+      accentPulseSpeed: UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
+      vineCount: UPSIDE_DOWN_PORTAL_VINE_COUNT,
+    },
+    blend: UPSIDE_DOWN_ATMOSPHERE_BLEND,
+    bg: UPSIDE_DOWN_ATMOSPHERE_BG,
+    tint: UPSIDE_DOWN_ATMOSPHERE_TINT,
+    surfaceTint: UPSIDE_DOWN_ATMOSPHERE_SURFACE_TINT,
+    wallTint: UPSIDE_DOWN_ATMOSPHERE_WALL_TINT,
+    decorTint: UPSIDE_DOWN_ATMOSPHERE_DECOR_TINT,
+    emissive: UPSIDE_DOWN_ATMOSPHERE_EMISSIVE,
+    decorEmissive: UPSIDE_DOWN_ATMOSPHERE_DECOR_EMISSIVE,
+    exposure: UPSIDE_DOWN_ATMOSPHERE_EXPOSURE,
+    ambientIntensity: UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY,
+    hemiIntensity: UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY,
+    dirIntensity: UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY,
+    fillIntensity: UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY,
+    shadeOpacity: UPSIDE_DOWN_ATMOSPHERE_SHADE_OPACITY,
+    shadeColor: UPSIDE_DOWN_ATMOSPHERE_SHADE_COLOR,
+    fogColor: UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR,
+    fogDensity: UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY,
+    pulseExposureMin: UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MIN,
+    pulseExposureMax: UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MAX,
+    pulseExposureSpeed: UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED,
+    strobeHz: UPSIDE_DOWN_ATMOSPHERE_STROBE_HZ,
+    blendStrobeHz: UPSIDE_DOWN_ATMOSPHERE_BLEND_STROBE_HZ,
+    sporeCount: UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT,
+    hintMs: UPSIDE_DOWN_HINT_MS,
+    bannerLabel: 'Upside Down',
+    hintLabel: 'Le monde s\'est inversé…',
+  },
+}

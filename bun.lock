@@ -16,7 +16,9 @@
       "name": "@pinball/backglass",
       "version": "1.0.0",
       "dependencies": {
+        "@pinball/maps": "workspace:*",
         "@pinball/shared-types": "workspace:*",
+        "@pinball/ui": "workspace:*",
         "next": "^16.2.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
@@ -35,7 +37,10 @@
       "name": "@pinball/dmd",
       "version": "1.0.0",
       "dependencies": {
+        "@pinball/dmd-core": "workspace:*",
+        "@pinball/maps": "workspace:*",
         "@pinball/shared-types": "workspace:*",
+        "@pinball/ui": "workspace:*",
         "next": "^16.2.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
@@ -72,7 +77,9 @@
       "version": "1.0.0",
       "dependencies": {
         "@pinball/game-engine": "workspace:*",
+        "@pinball/maps": "workspace:*",
         "@pinball/shared-types": "workspace:*",
+        "@pinball/ui": "workspace:*",
         "next": "^16.2.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
@@ -108,20 +115,74 @@
       "name": "@pinball/config",
       "version": "1.0.0",
     },
+    "packages/dmd-core": {
+      "name": "@pinball/dmd-core",
+      "version": "1.0.0",
+      "dependencies": {
+        "@pinball/shared-types": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/game-engine": {
       "name": "@pinball/game-engine",
       "version": "1.0.0",
       "dependencies": {
         "@dimforge/rapier3d-compat": "^0.14.0",
+        "@pinball/shared-types": "workspace:*",
         "three": "^0.183.2",
       },
       "devDependencies": {
         "@types/three": "^0.183.1",
       },
     },
+    "packages/maps": {
+      "name": "@pinball/maps",
+      "version": "1.0.0",
+      "dependencies": {
+        "@pinball/dmd-core": "workspace:*",
+        "@pinball/game-engine": "workspace:*",
+        "@pinball/map-strangerthings": "workspace:*",
+        "@pinball/shared-types": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/react": "^19.0.10",
+        "react": "^19.2.4",
+      },
+      "peerDependencies": {
+        "react": "^19.2.4",
+      },
+    },
+    "packages/maps/strangerthings": {
+      "name": "@pinball/map-strangerthings",
+      "version": "1.0.0",
+      "dependencies": {
+        "@pinball/dmd-core": "workspace:*",
+        "@pinball/game-engine": "workspace:*",
+        "@pinball/shared-types": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/react": "^19.0.10",
+        "react": "^19.2.4",
+      },
+      "peerDependencies": {
+        "react": "^19.2.4",
+      },
+    },
     "packages/shared-types": {
       "name": "@pinball/shared-types",
       "version": "1.0.0",
+    },
+    "packages/ui": {
+      "name": "@pinball/ui",
+      "version": "1.0.0",
+      "devDependencies": {
+        "@types/react": "^19.0.10",
+      },
+      "peerDependencies": {
+        "react": "^19.0.0",
+      },
     },
   },
   "packages": {
@@ -287,15 +348,23 @@
 
     "@pinball/dmd": ["@pinball/dmd@workspace:apps/dmd"],
 
+    "@pinball/dmd-core": ["@pinball/dmd-core@workspace:packages/dmd-core"],
+
     "@pinball/game-engine": ["@pinball/game-engine@workspace:packages/game-engine"],
 
     "@pinball/input-bridge": ["@pinball/input-bridge@workspace:apps/input-bridge"],
+
+    "@pinball/map-strangerthings": ["@pinball/map-strangerthings@workspace:packages/maps/strangerthings"],
+
+    "@pinball/maps": ["@pinball/maps@workspace:packages/maps"],
 
     "@pinball/playfield": ["@pinball/playfield@workspace:apps/playfield"],
 
     "@pinball/server": ["@pinball/server@workspace:apps/server"],
 
     "@pinball/shared-types": ["@pinball/shared-types@workspace:packages/shared-types"],
+
+    "@pinball/ui": ["@pinball/ui@workspace:packages/ui"],
 
     "@prisma/client": ["@prisma/client@6.19.2", "", { "peerDependencies": { "prisma": "*", "typescript": ">=5.1.0" } }, "sha512-gR2EMvfK/aTxsuooaDA32D8v+us/8AAet+C3J1cc04SW35FPdZYgLF+iN4NDLUgAaUGTKdAB0CYenu1TAgGdMg=="],
 

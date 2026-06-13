@@ -1,12 +1,19 @@
 @import 'tailwindcss';
 
+/* Défauts NEUTRES (aucune identité de map). La map active surcharge ces tokens
+   en custom properties via le style inline du conteneur racine (cf. pages/index
+   + map.backglassTheme). Une map sans thème reste générique. */
 :root {
   --background: #060406;
-  --foreground: #ede4d3;
-  /* teinte d'ambiance (vire violet en Upside Down — piloté en P6) */
-  --glow: #ff2d2d;
-  --vignette: #2a0606;
-  --st-font: 'Times New Roman', Georgia, serif;
+  --foreground: #e6e6e6;
+  --glow: #8aa0b8;
+  --vignette: #0a0e14;
+  --st-font: Georgia, 'Times New Roman', serif;
+  --stage-bg: radial-gradient(ellipse at 50% 38%, #14181c 0%, #06080a 60%, #000 100%);
+  --stage-filter: none;
+  --header-bg: linear-gradient(180deg, #1a1d20 0%, #0e1012 100%);
+  --fever-a: #ffa000;
+  --fever-b: #00a0d0;
 }
 
 body {
@@ -32,7 +39,9 @@ body {
   width: 1920px;
   height: 1080px;
   transform-origin: center center;
-  background: radial-gradient(ellipse at 50% 38%, #160a10 0%, #060406 60%, #000 100%);
+  background: var(--stage-bg);
+  filter: var(--stage-filter, none);
+  transition: background 0.6s ease, filter 0.6s ease;
   display: grid;
   grid-template-rows: 240px 660px 180px;
   grid-template-columns: 640px 1280px;
@@ -71,81 +80,8 @@ body {
   letter-spacing: 0.1em;
 }
 
-/* ---------- Joyce wall ---------- */
-.joyce-wall {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 14px;
-  padding: 18px 60px;
-  box-sizing: border-box;
-  background: linear-gradient(180deg, #1c1209 0%, #120b06 100%);
-  border-bottom: 3px solid #000;
-  box-shadow: inset 0 -30px 60px #000;
-}
-.joyce-row {
-  display: flex;
-  justify-content: space-between;
-}
-.joyce-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 64px;
-}
-.joyce-bulb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  margin-bottom: 6px;
-  transition: opacity 0.12s ease, box-shadow 0.12s ease;
-}
-.joyce-letter {
-  font-family: var(--st-font);
-  font-size: 34px;
-  font-weight: 700;
-  transition: color 0.15s ease, text-shadow 0.15s ease, opacity 0.15s ease;
-}
-
-/* ---------- Side art (demogorgon + vines) ---------- */
-.side-art {
-  width: 100%;
-  height: 100%;
-}
-.side-art-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--art-glow) 40%, transparent));
-}
-.demo-body {
-  transform-origin: 160px 400px;
-  animation: demo-breathe calc(var(--sway-dur) * 1.4) ease-in-out infinite;
-}
-.demo-petal {
-  fill: #0a0202;
-  transform-origin: 160px 215px;
-  animation: petal-flex var(--sway-dur) ease-in-out infinite;
-}
-.vine {
-  transform-origin: bottom center;
-  animation: vine-sway var(--sway-dur) ease-in-out infinite;
-}
-
-@keyframes vine-sway {
-  0%, 100% { transform: rotate(calc(-1 * var(--vine-amp))); }
-  50% { transform: rotate(var(--vine-amp)); }
-}
-@keyframes petal-flex {
-  0%, 100% { transform: rotate(-3deg) scale(1); }
-  50% { transform: rotate(3deg) scale(1.04); }
-}
-@keyframes demo-breathe {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(1.03); }
-}
+/* Joyce wall + Side art (demogorgon/vines) : styles ST déplacés dans
+   packages/maps/strangerthings/backglass/art.module.css. */
 
 /* ---------- Hall of Fame ---------- */
 .hof {
@@ -326,20 +262,6 @@ body {
   color: rgba(237, 228, 211, 0.7);
 }
 
-/* ===================== Upside Down ===================== */
-.upside-down {
-  --glow: #b14dff;
-  --vignette: #1a0640;
-}
-.upside-down .stage {
-  background: radial-gradient(ellipse at 50% 38%, #1a0a2a 0%, #06040c 60%, #000 100%);
-  filter: hue-rotate(8deg) saturate(1.1);
-  transition: background 0.6s ease, filter 0.6s ease;
-}
-.upside-down .joyce-wall {
-  background: linear-gradient(180deg, #150a22 0%, #0b0614 100%);
-}
-
 /* ===================== Takeover layer ===================== */
 .takeover-layer {
   position: absolute;
@@ -419,22 +341,8 @@ body {
 }
 .recap-value { font-size: 56px; font-weight: 800; color: #fff; }
 .recap-label { margin-top: 8px; font-size: 22px; letter-spacing: 0.12em; opacity: 0.6; }
-.hetic-slots { display: inline-flex; gap: 8px; font-family: var(--st-font); }
-.hetic-on { color: #ffd95e; text-shadow: 0 0 16px #ffae00; }
-.hetic-off { color: rgba(255, 255, 255, 0.2); }
-
-/* DEMOGORGON */
-.tk-demogorgon { background: #1a0202; }
-.demo-flash { position: absolute; inset: 0; background: #ff0000; animation: demo-flash 0.5s ease-out forwards; }
-@keyframes demo-flash {
-  0% { opacity: 0.85; }
-  100% { opacity: 0; }
-}
-.demo-giant { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.85; filter: drop-shadow(0 0 40px #ff2d2d); animation: demo-loom 3s ease-out; }
-@keyframes demo-loom { 0% { transform: scale(1.4); opacity: 0.2; } 30% { opacity: 0.9; } 100% { transform: scale(1); opacity: 0.85; } }
-.demo-text { gap: 10px; }
-.demo-text .glitch-text { font-family: var(--st-font); font-size: 96px; font-weight: 900; color: #ff2d2d; }
-.demo-points { font-size: 80px; font-weight: 900; color: #ffd95e; text-shadow: 0 0 30px #ffae00; }
+/* (hetic-slots : mortes, supprimées. DEMOGORGON takeover : déplacé dans
+   art.module.css de la map.) */
 
 /* ATTRACT */
 .tk-attract { background: radial-gradient(ellipse at 50% 45%, #120810 0%, #050308 70%, #000 100%); }
@@ -494,37 +402,13 @@ body {
   transition: opacity 0.12s linear;
 }
 
-/* heat module la vitesse des vignes (plus chaud = plus rapide) */
-.vine {
-  animation-duration: calc(var(--sway-dur, 5s) * (1 - var(--heat, 0) * 0.6));
-}
+/* (.vine + heat : déplacé dans art.module.css de la map — lit var(--heat).) */
 /* heat accélère le shimmer du tableau */
 .hof-shimmer {
   animation-duration: calc(6s * (1 - var(--heat, 0) * 0.55));
 }
 
-/* RAMP : trait lumineux vertical sur le latéral */
-.ramp-beam {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 6px;
-  transform: translateX(-50%) scaleY(0);
-  background: linear-gradient(180deg, transparent, #fff, #ffd95e, transparent);
-  filter: blur(1px) drop-shadow(0 0 12px #ffd95e);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 5;
-}
-.ramp-beam-on {
-  animation: ramp-beam 0.5s ease-out;
-}
-@keyframes ramp-beam {
-  0% { opacity: 0; transform: translateX(-50%) scaleY(0); }
-  30% { opacity: 1; transform: translateX(-50%) scaleY(1); }
-  100% { opacity: 0; transform: translateX(-50%) scaleY(1); }
-}
+/* (RAMP ramp-beam : déplacé dans art.module.css de la map — SideArt.) */
 
 /* DROP : secousse du tableau */
 .hof-shake {
@@ -593,96 +477,10 @@ body {
   100% { filter: brightness(1); }
 }
 
-/* ===================== Cinematic takeovers ===================== */
-.cine-blackout {
-  position: absolute;
-  inset: 0;
-  background: #000;
-  animation: cine-blackout 2.5s ease-out;
-}
-@keyframes cine-blackout {
-  0% { opacity: 1; }
-  12% { opacity: 1; }
-  30% { opacity: 0; }
-  100% { opacity: 0; }
-}
+/* Cinématiques de takeover propres à la map : styles déplacés dans son
+   art.module.css (co-localisé avec les composants). */
 
-.tk-cine-rises { background: radial-gradient(ellipse at 50% 45%, #2a0606 0%, #050202 70%, #000 100%); }
-.cine-giant-side {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  opacity: 0.9;
-  filter: drop-shadow(0 0 60px #ff2d2d);
-  animation: cine-loom 2.5s ease-out;
-}
-.cine-giant-side > * { width: 70%; height: 100%; }
-@keyframes cine-loom {
-  0% { transform: scale(1.5); opacity: 0; }
-  35% { opacity: 0.9; }
-  100% { transform: scale(1); opacity: 0.9; }
-}
-.cine-run {
-  font-family: var(--st-font);
-  font-size: 240px;
-  font-weight: 900;
-  color: #ff2d2d;
-  letter-spacing: 0.1em;
-  animation: cine-panic 0.18s steps(2) infinite;
-}
-@keyframes cine-panic {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(3px, -2px); }
-}
-
-.tk-cine-portal { background: #060010; }
-.cine-portal-wave {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(177, 77, 255, 0.9) 0%, rgba(120, 40, 220, 0.4) 30%, transparent 70%);
-  animation: cine-portal 4s ease-in;
-}
-@keyframes cine-portal {
-  0% { transform: scale(0); opacity: 0.2; }
-  60% { opacity: 1; }
-  100% { transform: scale(3.2); opacity: 0.85; }
-}
-
-.cine-demo-count {
-  position: absolute;
-  bottom: 80px;
-  left: 0;
-  right: 0;
-  z-index: 55;
-  text-align: center;
-  font-family: var(--st-font);
-  font-size: 64px;
-  font-weight: 900;
-  color: #ffd95e;
-  text-shadow: 0 0 30px #ffae00;
-  animation: slide-in 0.6s ease;
-}
-
-.tk-cine-last { background: #000; }
-.cine-last-vignette {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, transparent 25%, rgba(255, 20, 20, 0.75) 120%);
-  animation: cine-last 1.2s ease-in-out;
-}
-@keyframes cine-last {
-  0% { opacity: 0; }
-  30% { opacity: 1; }
-  100% { opacity: 1; }
-}
-.cine-last-text {
-  color: #ff2d2d;
-  text-shadow: 0 0 30px #ff2d2d;
-  animation: pulse-soft 0.6s ease-in-out infinite;
-}
-
-/* ===================== Paliers / HETIC / FEVER ===================== */
+/* ===================== Paliers / FEVER (structurel app) ===================== */
 /* Onde dorée (milestones 5k/15k) — même mécanique que portal-wave. */
 .gold-wave {
   position: absolute;
@@ -708,57 +506,9 @@ body {
   100% { opacity: 0; background-position: -150% 0; }
 }
 
-/* milestone_30k : fusée qui traverse de bas en haut. */
-.tk-cine-rocket { background: radial-gradient(ellipse at 50% 60%, #1a1206, #050308 70%, #000); }
-.cine-rocket {
-  position: absolute;
-  left: 50%;
-  bottom: -80px;
-  width: 18px;
-  height: 60px;
-  border-radius: 50% 50% 40% 40%;
-  background: linear-gradient(180deg, #fff, #ffd95e 40%, #ff7700);
-  box-shadow: 0 0 30px #ffae00, 0 40px 60px 10px rgba(255, 120, 0, 0.5);
-  transform: translateX(-50%);
-  animation: rocket-fly 4s ease-in forwards;
-}
-@keyframes rocket-fly {
-  0% { bottom: -80px; opacity: 1; }
-  70% { bottom: 70%; opacity: 1; }
-  100% { bottom: 120%; opacity: 0; }
-}
-
-/* milestone_big : réutilise .tk-confetti / .confetti-dot (couleurs surchargées inline). */
-.tk-cine-fireworks { background: radial-gradient(ellipse at 50% 45%, #1a1206, #050308 70%, #000); }
-
-/* hetic_complete : 5 lettres géantes + explosion + FEVER. */
-.tk-cine-hetic { background: radial-gradient(ellipse at 50% 45%, #2a1a06, #060406 70%, #000); }
-.cine-hetic-letters {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 30px;
-}
-.cine-hetic-letters span {
-  font-family: var(--st-font);
-  font-size: 200px;
-  font-weight: 900;
-  color: #ffd95e;
-  text-shadow: 0 0 40px #ffae00;
-  animation: hetic-pop 0.5s ease-out both;
-}
-@keyframes hetic-pop {
-  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
-  60% { transform: scale(1.3); opacity: 1; }
-  100% { transform: scale(1); }
-}
-.cine-fever-text {
-  color: #ff7700 !important;
-  text-shadow: 0 0 40px #ffae00, 0 0 80px #ff3b00;
-  animation: pulse-soft 0.4s ease-in-out infinite;
-}
+/* Takeovers de palier propres à la map : styles déplacés dans son
+   art.module.css. gold-wave (onde milestone) + l'état FEVER ci-dessous
+   restent app (structurels). */
 
 /* ── État FEVER continu (display.fever) : bordure chenillard + vignettage chaud. */
 .fever .stage::before {
@@ -769,7 +519,7 @@ body {
   pointer-events: none;
   border: 10px solid transparent;
   background:
-    repeating-linear-gradient(90deg, #ff7700 0 24px, #00c7ff 24px 48px) border-box;
+    repeating-linear-gradient(90deg, var(--fever-a) 0 24px, var(--fever-b) 24px 48px) border-box;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);

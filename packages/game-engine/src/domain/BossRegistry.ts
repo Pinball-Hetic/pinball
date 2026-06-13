@@ -1,4 +1,6 @@
-export type BossId = 'demogorgon' | 'vecna';
+// Identifiant de boss générique (les ids concrets sont fournis par les
+// définitions de boss de la map, pas codés dans le moteur).
+export type BossId = string;
 
 export type BossTargetPosition = {
   x: number;
@@ -50,7 +52,7 @@ export type BossHudConfig = {
   label: string;
   victoryLabel: string;
   dmdLabel: string;
-  requiresUpsideDown: boolean;
+  requiresAlternateWorld: boolean;
   bottomClass: string;
   borderClass: string;
   subtitleClass: string;
@@ -65,7 +67,7 @@ export type BossHudConfig = {
 export type BossRevealConfig = {
   scoreThreshold: number;
   scoreIncrement: number;
-  requiresUpsideDown: boolean;
+  requiresAlternateWorld: boolean;
 };
 
 export type BossDefinition = {
@@ -80,146 +82,35 @@ export type BossDefinition = {
   unlocksReturnPortal: boolean;
   targetMeshTheme: BossTargetMeshTheme;
   targetPulse: BossTargetPulseConfig;
+  /** Son joué au reveal du boss (URL asset map). Absent → pas de son dédié. */
+  revealSoundUrl?: string;
+  /** Volume du son de reveal (0–100+, relatif au bus). Défaut 100. */
+  revealSoundVolume?: number;
+  /** Assist périodique associé à ce boss (allié qui aide pendant le fight).
+   *  `id` est matché contre ASSIST.assistId. Absent → ce boss n'a pas d'assist. */
+  assist?: { id: string };
 };
 
-export const BOSS_IDS: readonly BossId[] = ['demogorgon', 'vecna'];
-
-export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
-  demogorgon: {
-    id: 'demogorgon',
-    colliderRole: 'demogorgon_target',
-    target: { x: 0, y: 1.012, z: -0.02 },
-    targetHits: 5,
-    scoreTargetHit: 250,
-    reveal: {
-      scoreThreshold: 3000,
-      scoreIncrement: 150,
-      requiresUpsideDown: false,
-    },
-    hud: {
-      label: 'Cible Demogorgon',
-      victoryLabel: 'Demogorgon vaincu !',
-      dmdLabel: 'DEMOGORGON',
-      requiresUpsideDown: false,
-      bottomClass: 'bottom-8',
-      borderClass: 'border-red-500/40',
-      subtitleClass: 'text-red-300/90',
-      hitsClass: 'text-red-400 drop-shadow-[0_0_10px_rgba(255,60,60,0.7)]',
-      victoryClass: 'text-amber-300 drop-shadow-[0_0_20px_rgba(255,200,80,0.9)]',
-      assistLabel: 'Eleven +100',
-      victoryClearMs: 1400,
-      nestHintLabel: 'LE DEMOGORGON SOMMEILLE PRES DES BUMPERS',
-    },
-    unlocksPortal: true,
-    unlocksReturnPortal: false,
-    targetMeshTheme: {
-      ring: {
-        color: 0xff2244,
-        emissive: 0xff1133,
-        emissiveIntensity: 1.6,
-        radius: 0.032,
-        metalness: 0.4,
-        roughness: 0.35,
-      },
-      core: {
-        color: 0xffeedd,
-        emissive: 0xff4422,
-        emissiveIntensity: 1.2,
-        radius: 0.014,
-        metalness: 0.2,
-        roughness: 0.4,
-      },
-      light: { color: 0xff2244, intensity: 0.45 },
-      victoryBurst: { color: 0xffee55 },
-    },
-    targetPulse: {
-      hitFlashDuration: 0.18,
-      pulseSpeed: 2.5,
-      pulseAmp: 0.18,
-      hitBoost: 1.4,
-      ringEmissiveBase: 1.6,
-      coreEmissiveBase: 1.2,
-      lightIntensityBase: 0.45,
-      wobbleSpeed: 3,
-      wobbleAmp: 0.08,
-      hitScaleBoost: 0.25,
-    },
-  },
-  vecna: {
-    id: 'vecna',
-    colliderRole: 'vecna_target',
-    target: { x: 0, y: 1.012, z: -0.067 },
-    targetHits: 10,
-    scoreTargetHit: 300,
-    reveal: {
-      scoreThreshold: 3000,
-      scoreIncrement: 200,
-      requiresUpsideDown: true,
-    },
-    hud: {
-      label: 'Cible Vecna',
-      victoryLabel: 'Vecna vaincu !',
-      dmdLabel: 'VECNA',
-      requiresUpsideDown: true,
-      bottomClass: 'bottom-24',
-      borderClass: 'border-violet-500/45',
-      subtitleClass: 'text-violet-300/90',
-      hitsClass: 'text-violet-400 drop-shadow-[0_0_10px_rgba(160,80,255,0.7)]',
-      victoryClass: 'text-violet-200 drop-shadow-[0_0_20px_rgba(160,80,255,0.9)]',
-      victoryClearMs: 1600,
-    },
-    unlocksPortal: false,
-    unlocksReturnPortal: true,
-    targetMeshTheme: {
-      ring: {
-        color: 0x6622aa,
-        emissive: 0x9933ff,
-        emissiveIntensity: 1.5,
-        radius: 0.034,
-      },
-      core: {
-        color: 0xeeddff,
-        emissive: 0xaa55ff,
-        emissiveIntensity: 1.1,
-        radius: 0.015,
-      },
-      light: { color: 0x9933ff, intensity: 0.42 },
-    },
-    targetPulse: {
-      hitFlashDuration: 0.18,
-      pulseSpeed: 2.2,
-      pulseAmp: 0.16,
-      hitBoost: 1.35,
-      ringEmissiveBase: 1.5,
-      coreEmissiveBase: 1.1,
-      lightIntensityBase: 0.42,
-      wobbleSpeed: 2.8,
-      wobbleAmp: 0.06,
-      hitScaleBoost: 0.22,
-    },
-  },
-};
-
-/** Contexte minimal pour évaluer le gate de reveal d'un boss (score + Upside Down). */
+/** Contexte minimal pour évaluer le gate de reveal d'un boss (score + monde alternatif). */
 export type BossGateContext = {
   totalScore: number;
-  upsideDownActive: boolean;
+  alternateWorldActive: boolean;
   normalWorldScoreBaseline: number;
-  upsideDownScoreBaseline: number;
+  alternateWorldScoreBaseline: number;
 };
 
 /** Score effectif d'un boss depuis l'entrée dans son monde. */
 export function bossEffectiveScore(def: BossDefinition, ctx: BossGateContext): number {
-  const baseline = def.reveal.requiresUpsideDown
-    ? ctx.upsideDownScoreBaseline
+  const baseline = def.reveal.requiresAlternateWorld
+    ? ctx.alternateWorldScoreBaseline
     : ctx.normalWorldScoreBaseline;
   return ctx.totalScore - baseline;
 }
 
-/** True si le palier de score du boss est franchi ET son gate Upside Down satisfait. */
+/** True si le palier de score du boss est franchi ET son gate monde alternatif satisfait. */
 export function bossThresholdMet(def: BossDefinition, ctx: BossGateContext): boolean {
-  if (def.reveal.requiresUpsideDown && !ctx.upsideDownActive) return false;
-  if (!def.reveal.requiresUpsideDown && ctx.upsideDownActive) return false;
+  if (def.reveal.requiresAlternateWorld && !ctx.alternateWorldActive) return false;
+  if (!def.reveal.requiresAlternateWorld && ctx.alternateWorldActive) return false;
   return bossEffectiveScore(def, ctx) >= def.reveal.scoreThreshold;
 }
 
@@ -229,22 +120,15 @@ export function bossPointsRemaining(def: BossDefinition, ctx: BossGateContext): 
   return Math.max(0, Math.ceil(gap / 100) * 100);
 }
 
-export function getBossDefinition(id: BossId): BossDefinition {
-  return BOSS_REGISTRY[id];
+// Helpers génériques de lookup sur un jeu de définitions injecté (le moteur ne
+// possède plus de registry boss — les apps passent layout.bosses).
+export function findBossByColliderRole(
+  bosses: BossDefinition[],
+  role: string,
+): BossDefinition | undefined {
+  return bosses.find((boss) => boss.colliderRole === role);
 }
 
-export function getBossByColliderRole(role: string): BossDefinition | undefined {
-  return BOSS_IDS.map((id) => BOSS_REGISTRY[id]).find((boss) => boss.colliderRole === role);
+export function getBossById(bosses: BossDefinition[], id: BossId): BossDefinition | undefined {
+  return bosses.find((boss) => boss.id === id);
 }
-
-export const DEMOGORGON_TARGET = BOSS_REGISTRY.demogorgon.target;
-export const DEMOGORGON_TARGET_HITS = BOSS_REGISTRY.demogorgon.targetHits;
-export const VECNA_TARGET = BOSS_REGISTRY.vecna.target;
-export const VECNA_TARGET_HITS = BOSS_REGISTRY.vecna.targetHits;
-
-export const DEMOGORGON_REVEAL_SCORE = BOSS_REGISTRY.demogorgon.reveal.scoreThreshold;
-export const SCORE_DEMOGORGON_REVEAL = BOSS_REGISTRY.demogorgon.reveal.scoreIncrement;
-export const SCORE_DEMOGORGON_TARGET = BOSS_REGISTRY.demogorgon.scoreTargetHit;
-export const VECNA_REVEAL_SCORE = BOSS_REGISTRY.vecna.reveal.scoreThreshold;
-export const SCORE_VECNA_REVEAL = BOSS_REGISTRY.vecna.reveal.scoreIncrement;
-export const SCORE_VECNA_TARGET = BOSS_REGISTRY.vecna.scoreTargetHit;
