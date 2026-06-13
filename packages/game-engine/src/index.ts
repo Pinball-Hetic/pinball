@@ -52,6 +52,7 @@ export * from './infrastructure/GlowSprite';
 export * from './infrastructure/QualityGovernor';
 export * from './infrastructure/CinematicEasing';
 export * from './infrastructure/CameraBillboardSprite';
+export * from './infrastructure/PlayfieldCameraDirector';
 export * from './infrastructure/PlayfieldCinematicStrobe';
 export * from './infrastructure/PlayfieldShadeOverlay';
 export * from './infrastructure/UpsideDownPortal';
