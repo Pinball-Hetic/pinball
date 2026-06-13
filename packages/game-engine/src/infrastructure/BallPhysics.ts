@@ -105,9 +105,11 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
   }
 
   applyEjectionForce(bumperPos: { x: number; z: number }): void {
-    const p = this.body.translation();
-    const dx = p.x - bumperPos.x;
-    const dz = p.z - bumperPos.z;
+    const t = this.body.translation();
+    const px = t.x;
+    const pz = t.z;
+    const dx = px - bumperPos.x;
+    const dz = pz - bumperPos.z;
     const len = Math.sqrt(dx * dx + dz * dz) || 1;
     this.body.applyImpulse(
       { x: (dx / len) * BUMPER_EJECT_IMPULSE, y: 0, z: (dz / len) * BUMPER_EJECT_IMPULSE },

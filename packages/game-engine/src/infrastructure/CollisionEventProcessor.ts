@@ -36,8 +36,8 @@ export class CollisionEventProcessor {
   private normalWorldScoreBaseline = 0;
   private alternateWorldScoreBaseline = 0;
   private lastTotalScore = 0;
-  // Throttle des events « nid verrouillé » par boss (anti-spam, 2 s).
   private lockedHitLastMs: Partial<Record<BossId, number>> = {};
+  private pendingPhysics: Array<() => void> = [];
 
   private gateContext() {
     return {
@@ -197,7 +197,7 @@ export class CollisionEventProcessor {
         const idx = parseInt(role.split('_')[1], 10);
         const pos = this.layout.bumpers[idx];
         if (pos) {
-          this.bumperHitUC.execute(idx, pos);
+          this.pendingPhysics.push(() => this.bumperHitUC.execute(idx, pos));
         }
       }
 
@@ -206,18 +206,22 @@ export class CollisionEventProcessor {
         const now = performance.now();
         if (now - this.bumpLastHitMs[side] >= BUMP_HIT_COOLDOWN_MS) {
           this.bumpLastHitMs[side] = now;
-          this.bumpHitUC.execute(side, BUMP_EJECT_SCALE);
+          this.pendingPhysics.push(() => this.bumpHitUC.execute(side, BUMP_EJECT_SCALE));
         }
       }
 
       if (role === 'bottom_out' && gameState === 'playing') {
-        this.bottomOutBallUC.execute();
-        this.resetDropTargets();
+        this.pendingPhysics.push(() => {
+          this.bottomOutBallUC.execute();
+          this.resetDropTargets();
+        });
       }
 
       if (role === 'drain' && gameState === 'playing') {
-        this.drainBallUC.execute();
-        this.resetDropTargets();
+        this.pendingPhysics.push(() => {
+          this.drainBallUC.execute();
+          this.resetDropTargets();
+        });
       }
 
       if ((role === 'slingshot_left' || role === 'slingshot_right') && gameState === 'playing') {
@@ -237,6 +241,13 @@ export class CollisionEventProcessor {
         this.handleDropTarget(role);
       }
     });
+  }
+
+  flushPendingPhysics(): void {
+    if (this.pendingPhysics.length === 0) return;
+    const pending = this.pendingPhysics;
+    this.pendingPhysics = [];
+    for (const run of pending) run();
   }
 
   resetDropTargets(): void {
