@@ -795,6 +795,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
     let vecnaIntroHolding = false;
+    let vecnaIntroWasActive = false;
     const vecnaIntroBallPos = { x: 0, y: 0, z: 0 };
 
 
@@ -1279,6 +1280,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             playCinematic("demogorgon_rises", { once: true });
             cameraDirector?.play("demogorgon");
           }
+          if (event.type === "BOSS_REVEAL" && event.bossId === "vecna") {
+            cameraDirector?.play("vecna");
+          }
           if (
             event.type === "BOSS_TARGET_HIT"
             && event.bossId === "demogorgon"
@@ -1744,6 +1748,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (!vecnaIntroActive) {
         vecnaIntroHolding = false;
       }
+      if (vecnaIntroWasActive && !vecnaIntroActive) {
+        cameraDirector?.restore();
+      }
+      vecnaIntroWasActive = vecnaIntroActive;
 
       if (transitionActive) {
         upsideDownTransition?.update(dt);
