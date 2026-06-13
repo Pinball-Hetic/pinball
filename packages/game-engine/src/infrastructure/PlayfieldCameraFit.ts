@@ -31,8 +31,29 @@ export type PlayfieldCamFit = {
   corners: THREE.Vector3[];
 };
 
+export type PlayfieldCameraDebugTuning = {
+  dirY: number;
+  dirZ: number;
+  lookYBias: number;
+  lookZBias: number;
+  portraitNdcX: number;
+  portraitNdcY: number;
+  distanceScale: number;
+};
+
+export const DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING: PlayfieldCameraDebugTuning = {
+  dirY: 0.65,
+  dirZ: 0.75,
+  lookYBias: PLAYFIELD_PORTRAIT_LOOK_Y_BIAS,
+  lookZBias: PLAYFIELD_PORTRAIT_LOOK_Z_BIAS,
+  portraitNdcX: PLAYFIELD_PORTRAIT_NDC_X,
+  portraitNdcY: PLAYFIELD_PORTRAIT_NDC_Y,
+  distanceScale: 1,
+};
+
 export type PlayfieldCameraFitOptions = {
   viewMode?: PlayfieldViewMode;
+  debugTuning?: PlayfieldCameraDebugTuning | null;
 };
 
 export function playfieldViewDirForMode(viewMode: PlayfieldViewMode): THREE.Vector3 {
@@ -48,13 +69,23 @@ export function playfieldCameraTargetForMode(
   viewMode: PlayfieldViewMode,
   frameBox: THREE.Box3,
   out: THREE.Vector3,
+  debugTuning?: PlayfieldCameraDebugTuning | null,
 ): THREE.Vector3 {
   frameBox.getCenter(out);
   if (viewMode !== 'portrait-fill') return out;
 
-  out.y = THREE.MathUtils.lerp(out.y, PLAYFIELD_SURFACE_Y, PLAYFIELD_PORTRAIT_LOOK_Y_BIAS);
-  out.z = THREE.MathUtils.lerp(out.z, frameBox.max.z, PLAYFIELD_PORTRAIT_LOOK_Z_BIAS);
+  const lookY = debugTuning?.lookYBias ?? PLAYFIELD_PORTRAIT_LOOK_Y_BIAS;
+  const lookZ = debugTuning?.lookZBias ?? PLAYFIELD_PORTRAIT_LOOK_Z_BIAS;
+  out.y = THREE.MathUtils.lerp(out.y, PLAYFIELD_SURFACE_Y, lookY);
+  out.z = THREE.MathUtils.lerp(out.z, frameBox.max.z, lookZ);
   return out;
+}
+
+function portraitViewDirFromTuning(debugTuning?: PlayfieldCameraDebugTuning | null): THREE.Vector3 {
+  if (!debugTuning) return PLAYFIELD_PORTRAIT_VIEW_DIR.clone();
+  const dir = new THREE.Vector3(0, debugTuning.dirY, debugTuning.dirZ);
+  if (dir.lengthSq() < 1e-8) return PLAYFIELD_PORTRAIT_VIEW_DIR.clone();
+  return dir.normalize();
 }
 
 export function fillPlayfieldBoxCorners(box: THREE.Box3, reuse: THREE.Vector3[]): THREE.Vector3[] {
@@ -326,6 +357,7 @@ export function fitPlayfieldCamera(
     camera,
     fit,
     target,
+    options,
   );
 }
 
@@ -341,16 +373,21 @@ export function refitPlayfieldCamera(
   viewMode: PlayfieldViewMode,
   target: THREE.Vector3,
   corners: THREE.Vector3[],
+  debugTuning?: PlayfieldCameraDebugTuning | null,
 ): PlayfieldCameraRefit {
   const frameBox = boundingBoxPlayableArea(playfieldRoot);
-  playfieldCameraTargetForMode(viewMode, frameBox, target);
+  playfieldCameraTargetForMode(viewMode, frameBox, target, debugTuning);
   fillPlayfieldBoxCorners(frameBox, corners);
+  const dirToCamera =
+    viewMode === 'portrait-fill'
+      ? portraitViewDirFromTuning(debugTuning)
+      : playfieldViewDirForMode(viewMode).clone();
   const fit: PlayfieldCamFit = {
     target,
-    dirToCamera: playfieldViewDirForMode(viewMode).clone(),
+    dirToCamera,
     corners,
   };
-  const distance = fitPlayfieldCamera(camera, fit, target, { viewMode });
+  const distance = fitPlayfieldCamera(camera, fit, target, { viewMode, debugTuning });
   return { fit, distance, frameBox };
 }
 
@@ -359,10 +396,11 @@ function fitPlayfieldCameraForMode(
   camera: THREE.PerspectiveCamera,
   fit: PlayfieldCamFit,
   target: THREE.Vector3,
+  options?: PlayfieldCameraFitOptions,
 ): number {
   switch (viewMode) {
     case 'portrait-fill':
-      return fitPlayfieldCameraPortraitFill(camera, fit, target);
+      return fitPlayfieldCameraPortraitFill(camera, fit, target, options?.debugTuning);
     case 'legacy':
       return fitPlayfieldCameraLegacy(camera, fit, target);
   }
@@ -372,14 +410,14 @@ function fitPlayfieldCameraPortraitFill(
   camera: THREE.PerspectiveCamera,
   fit: PlayfieldCamFit,
   target: THREE.Vector3,
+  debugTuning?: PlayfieldCameraDebugTuning | null,
 ): number {
-  const dWidth = distanceForPortraitWidthFirstView(camera, fit, PLAYFIELD_PORTRAIT_NDC_X);
-  const dist = distanceForPortraitHeightCoverView(
-    camera,
-    fit,
-    PLAYFIELD_PORTRAIT_NDC_Y,
-    dWidth,
-  );
+  const ndcX = debugTuning?.portraitNdcX ?? PLAYFIELD_PORTRAIT_NDC_X;
+  const ndcY = debugTuning?.portraitNdcY ?? PLAYFIELD_PORTRAIT_NDC_Y;
+  const scale = debugTuning?.distanceScale ?? 1;
+  const dWidth = distanceForPortraitWidthFirstView(camera, fit, ndcX);
+  const dist =
+    distanceForPortraitHeightCoverView(camera, fit, ndcY, dWidth) * scale;
   applyPlayfieldCamera(camera, target, fit.dirToCamera, dist);
   return dist;
 }

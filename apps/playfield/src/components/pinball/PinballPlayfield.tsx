@@ -55,6 +55,8 @@ import {
   parsePlayfieldViewMode,
   refitPlayfieldCamera,
   type PlayfieldCamFit,
+  DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING,
+  type PlayfieldCameraDebugTuning,
   BallTrail,
   QualityGovernor,
   PORTAL_ENTER_SCORE,
@@ -151,6 +153,7 @@ import {
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
+import DebugPanel from "./DebugPanel";
 
 
 type AlternateWorldPersistence = "until_game_over" | "until_drain";
@@ -200,6 +203,13 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
   const [debugSnapshot, setDebugSnapshot] = useState<BallDiagnosticsSnapshot | null>(null);
   const [debugVisible, setDebugVisible] = useState(false);
+  const [cameraDebugTuning, setCameraDebugTuning] = useState<PlayfieldCameraDebugTuning>(
+    () => DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING,
+  );
+  const cameraDebugTuningRef = useRef(cameraDebugTuning);
+  cameraDebugTuningRef.current = cameraDebugTuning;
+  const playfieldRootHandleRef = useRef<THREE.Object3D | null>(null);
+  const refitCameraRef = useRef<((root: THREE.Object3D) => void) | null>(null);
   // Overlay cinématique DOM (un re-render par cinématique, pas par frame).
   const [cinematicClip, setCinematicClip] = useState<CinematicClip | null>(null);
   const debugVisibleRef = useRef(false);
@@ -216,6 +226,12 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const sessionStartedRef = useRef(false);
   /** Appelé depuis le game loop quand la session démarre (affiche la balle). */
   const onSessionStartRef = useRef<(() => void) | null>(null);
+
+  const handleCameraTuningChange = useCallback((next: PlayfieldCameraDebugTuning) => {
+    setCameraDebugTuning(next);
+    const root = playfieldRootHandleRef.current;
+    if (root) refitCameraRef.current?.(root);
+  }, []);
 
   const handleAttractInteract = useCallback(() => {
     unlockPinballAudio();
@@ -540,12 +556,14 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         PLAYFIELD_VIEW_MODE,
         cameraTarget,
         camCorners,
+        cameraDebugTuningRef.current,
       );
       playfieldCamFit = { fit, camera, cameraTarget, distance };
       orbitControls?.target.copy(cameraTarget);
       captureDirectorBase(fit, distance);
       return frameBox;
     };
+    refitCameraRef.current = syncPlayfieldCamera;
 
     // ── Flipper visual state ─────────────────────────────────────────────────
     let leftFlipperPivot: FlipperPivot | null = null;
@@ -742,6 +760,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         if (cancelled) return; // StrictMode : démontage du 1er mount en vol
         const playfieldRoot = gltf.scene;
         playfieldRootRef = playfieldRoot;
+        playfieldRootHandleRef.current = playfieldRoot;
         collectDisposables(playfieldRoot);
         modelRoot.add(playfieldRoot);
         removePinballmapUnusedMeshes(playfieldRoot);
@@ -1814,6 +1833,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;
       cameraDirector?.dispose();
+      playfieldRootHandleRef.current = null;
+      refitCameraRef.current = null;
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();
@@ -1879,6 +1900,13 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         />
 
         <BallDebugOverlay snapshot={debugSnapshot} visible={debugVisible} />
+
+        {debugVisible && IS_PORTRAIT_FILL && (
+          <DebugPanel
+            cameraTuning={cameraDebugTuning}
+            onCameraTuningChange={handleCameraTuningChange}
+          />
+        )}
 
         {flipperPivotCoords && (
           <div className="pointer-events-none absolute right-2 top-2 z-[100] rounded-md bg-black/80 px-3.5 py-2 font-mono text-[11px] leading-[1.7] text-white">
