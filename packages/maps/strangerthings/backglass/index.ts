@@ -7,6 +7,8 @@ export { default as DemogorgonTakeover } from './DemogorgonTakeover'
 export type { Reactor, Reaction } from './reactor'
 export { renderMapTakeover, clipBehavior, eventTakeovers } from './takeover'
 export type { MapTakeoverContext, ClipBehavior, EventTakeover } from './takeover'
+export { backglassTheme, backglassThemeAlternate } from './theme'
+export type { ThemeTokens } from './theme'
 import { manifest } from '../manifest'
 import type { ClipTimings } from '@pinball/shared-types'
 // Data légère du manifest exposée au backglass (pas de getMapPackage lourd).

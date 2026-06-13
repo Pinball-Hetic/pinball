@@ -3,7 +3,7 @@ import { NoSignal } from '@pinball/ui'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
-import { JoyceWall, SideArt } from '@/map/content'
+import { JoyceWall, SideArt, backglassTheme, backglassThemeAlternate } from '@/map/content'
 import HallOfFame from '@/components/HallOfFame'
 import StatsBanner from '@/components/StatsBanner'
 import ReactorFx from '@/components/ReactorFx'
@@ -55,8 +55,15 @@ export default function BackglassPage() {
 
   const sideAgitation = alternateWorld ? 1 : Math.max(0.15, agitation)
 
+  // Tokens de thème de la map posés en custom properties (base + surcharges
+  // monde alternatif). Le backglass se re-render librement (pas de scène 3D).
+  const themeStyle = {
+    ...backglassTheme,
+    ...(alternateWorld ? backglassThemeAlternate : {}),
+  } as React.CSSProperties
+
   return (
-    <div className={`stage-fit ${alternateWorld ? 'alternate-world' : ''} ${fever ? 'fever' : ''}`}>
+    <div className={`stage-fit ${fever ? 'fever' : ''}`} style={themeStyle}>
       <main className="stage" ref={stageRef}>
         <div className="vignette" style={{ opacity: 1 + agitation * 0.8 }} />
         <div className="vignette-heat" />

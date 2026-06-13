@@ -22,4 +22,6 @@ export const {
   eventTakeovers,
   counterLabels,
   clips,
+  backglassTheme,
+  backglassThemeAlternate,
 } = content
