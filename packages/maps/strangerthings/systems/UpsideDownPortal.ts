@@ -3,23 +3,23 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEvent } from '@pinball/game-engine';
 import { getBossDefinition } from '../bosses';
 import {
-  PORTAL_COVER_RADIUS,
   PORTAL_HOLE_RADIUS,
   PORTAL_MAGNET_RADIUS,
   PORTAL_MAGNET_STRENGTH,
   PORTAL_SENSOR_RADIUS,
 } from '@pinball/game-engine';
 import { layout } from '../layout';
-import { PLAYFIELD_TILT } from '@pinball/game-engine';
+import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
-  UPSIDE_DOWN_PORTAL_OPEN_DURATION,
+  UPSIDE_DOWN_PORTAL_ANCHOR_NAMES,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
-  UPSIDE_DOWN_PORTAL_REVEAL_DELAY,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from './UpsideDownConstants';
-import { findObjectByNormalizedName } from '@pinball/game-engine';
+import { mapPortalRevealProgress, portalRevealTotalDuration } from './PortalRevealCurve';
+import { findObjectByNormalizedName, canonicalGltfName } from '@pinball/game-engine';
+import type { BossId } from '@pinball/game-engine';
 import { GlowSprite, easeInOut } from '@pinball/game-engine';
 
 type SetupConfig = {
@@ -28,20 +28,6 @@ type SetupConfig = {
   colliderMap: Map<number, string>;
   onOpenChange?: (open: boolean) => void;
 };
-
-function playfieldMaterialFromTable(root: THREE.Object3D): THREE.MeshStandardMaterial {
-  const table = findObjectByNormalizedName(root, 'table.005', 'table005');
-  if (table instanceof THREE.Mesh) {
-    const src = table.material;
-    const mat = (Array.isArray(src) ? src[0] : src) as THREE.Material;
-    if (mat instanceof THREE.MeshStandardMaterial) return mat.clone();
-  }
-  return new THREE.MeshStandardMaterial({
-    color: 0xff5010,
-    metalness: 0.19,
-    roughness: 0.45,
-  });
-}
 
 type PortalParticle = {
   mesh: THREE.Mesh;
@@ -57,12 +43,34 @@ type PortalVine = {
 };
 
 const _vinePoint = new THREE.Vector3();
+const _portalAnchor = new THREE.Vector3();
+
+function resolvePortalAnchor(root: THREE.Object3D): THREE.Vector3 {
+  for (const name of UPSIDE_DOWN_PORTAL_ANCHOR_NAMES) {
+    const node = findObjectByNormalizedName(root, name);
+    if (node) {
+      node.getWorldPosition(_portalAnchor);
+      return _portalAnchor.clone();
+    }
+  }
+  return _portalAnchor.set(
+    layout.sensors.portal.x,
+    layout.sensors.portal.y,
+    layout.sensors.portal.z,
+  );
+}
+
+function collectGlbPortalMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    if (canonicalGltfName(obj.name).includes('demogorgon_portal')) meshes.push(obj);
+  });
+  return meshes;
+}
 
 export class UpsideDownPortal {
-  private cover: THREE.Mesh | null = null;
-  private coverMat: THREE.MeshStandardMaterial | null = null;
-  private coverBody: RAPIER.RigidBody | null = null;
-  private coverCollider: RAPIER.Collider | null = null;
+  private glbPortalMeshes: THREE.Mesh[] = [];
   private sensorBody: RAPIER.RigidBody | null = null;
   private sensorCollider: RAPIER.Collider | null = null;
   private world: RAPIER.World | null = null;
@@ -74,7 +82,7 @@ export class UpsideDownPortal {
   private coreMat: THREE.MeshBasicMaterial | null = null;
   private vortexMat: THREE.MeshBasicMaterial | null = null;
   private rimGlow: GlowSprite | null = null;
-  private coreLight: THREE.PointLight | null = null; // seule PointLight conservée
+  private coreLight: THREE.PointLight | null = null;
   private accentGlow: GlowSprite | null = null;
   private vineMat: THREE.MeshStandardMaterial | null = null;
   private vines: PortalVine[] = [];
@@ -84,8 +92,6 @@ export class UpsideDownPortal {
   private anchorPos = new THREE.Vector3();
   private alternateWorldActive = false;
   private revealed = false;
-  private pendingReveal = false;
-  private pendingT = 0;
   private opening = false;
   private revealing = false;
   private revealT = 0;
@@ -101,38 +107,13 @@ export class UpsideDownPortal {
 
     config.root.updateMatrixWorld(true);
 
-    const anchor = findObjectByNormalizedName(config.root, 'portal_upsidedown');
-    if (anchor) {
-      anchor.getWorldPosition(this.anchorPos);
-    } else {
-      this.anchorPos.set(layout.sensors.portal.x, layout.sensors.portal.y, layout.sensors.portal.z);
-    }
-    this.baseY = this.anchorPos.y + 0.0015;
-
-    this.coverMat = playfieldMaterialFromTable(config.root);
-    const geo = new THREE.CylinderGeometry(PORTAL_COVER_RADIUS, PORTAL_COVER_RADIUS, 0.004, 32);
-    this.cover = new THREE.Mesh(geo, this.coverMat);
-    this.cover.position.copy(this.anchorPos);
-    this.cover.position.y = this.baseY;
-    this.cover.rotation.x = -PLAYFIELD_TILT;
-    this.cover.renderOrder = 2;
-    config.root.add(this.cover);
-
-    const qx = Math.sin(PLAYFIELD_TILT / 2);
-    const qw = Math.cos(PLAYFIELD_TILT / 2);
-    this.coverBody = config.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed()
-        .setTranslation(this.anchorPos.x, this.baseY, this.anchorPos.z)
-        .setRotation({ x: qx, y: 0, z: 0, w: qw }),
-    );
-    this.coverCollider = config.world.createCollider(
-      RAPIER.ColliderDesc.cylinder(0.002, PORTAL_COVER_RADIUS)
-        .setRestitution(0.35)
-        .setFriction(0.15),
-      this.coverBody,
-    );
+    this.anchorPos.copy(resolvePortalAnchor(config.root));
+    this.baseY = surfaceYAtZ(this.anchorPos.z);
+    this.glbPortalMeshes = collectGlbPortalMeshes(config.root);
+    this.setGlbPortalVisible(true);
 
     this.portalGroup = this.buildPortalVisuals();
+    this.portalGroup.renderOrder = 10;
     this.portalGroup.position.copy(this.anchorPos);
     this.portalGroup.position.y = this.baseY - 0.0005;
     this.portalGroup.rotation.x = -PLAYFIELD_TILT;
@@ -157,11 +138,20 @@ export class UpsideDownPortal {
   }
 
   onGameEvent(event: GameEvent): void {
-    if (this.revealed || this.revealing || this.opening || this.pendingReveal) return;
     if (event.type !== 'BOSS_TARGET_HIT') return;
     const def = getBossDefinition(event.bossId);
     if (event.hitCount < def.targetHits) return;
+    this.tryOpenForBoss(event.bossId);
+  }
 
+  notifyBossDefeated(bossId: BossId, alternateWorldActive: boolean): void {
+    this.alternateWorldActive = alternateWorldActive;
+    this.tryOpenForBoss(bossId);
+  }
+
+  private tryOpenForBoss(bossId: BossId): void {
+    if (this.revealed || this.revealing || this.opening) return;
+    const def = getBossDefinition(bossId);
     if (def.unlocksPortal && !this.alternateWorldActive) {
       this.scheduleReveal();
       return;
@@ -169,6 +159,23 @@ export class UpsideDownPortal {
     if (def.unlocksReturnPortal && this.alternateWorldActive) {
       this.beginReveal();
     }
+  }
+
+  private setGlbPortalOpacity(opacity: number): void {
+    const clamped = THREE.MathUtils.clamp(opacity, 0, 1);
+    for (const mesh of this.glbPortalMeshes) {
+      mesh.visible = clamped > 0.01;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const mat of mats) {
+        if (!(mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshBasicMaterial)) continue;
+        mat.transparent = clamped < 0.999;
+        mat.opacity = clamped;
+      }
+    }
+  }
+
+  private setGlbPortalVisible(visible: boolean): void {
+    this.setGlbPortalOpacity(visible ? 1 : 0);
   }
 
   applyMagnet(body: RAPIER.RigidBody): void {
@@ -195,26 +202,18 @@ export class UpsideDownPortal {
   update(dt: number): void {
     this.pulseT += dt;
 
-    if (this.pendingReveal) {
-      this.pendingT += dt;
-      if (this.pendingT >= UPSIDE_DOWN_PORTAL_REVEAL_DELAY) {
-        this.pendingReveal = false;
-        this.startOpening();
-      }
-    }
-
-    if (this.opening) {
+    if (this.opening && !this.revealed) {
       this.revealT += dt;
-      const rawT = Math.min(1, this.revealT / UPSIDE_DOWN_PORTAL_OPEN_DURATION);
-      this.applyOpenProgress(easeInOut(rawT));
-      if (rawT >= 1) this.finishOpening();
+      const u = Math.min(1, this.revealT / portalRevealTotalDuration());
+      this.applyOpenProgress(mapPortalRevealProgress(u));
+      if (u >= 1) this.finishOpening();
     }
 
     if (this.revealing && this.portalGroup) {
       this.revealT += dt;
       const t = Math.min(1, this.revealT / UPSIDE_DOWN_PORTAL_OPEN_POLISH);
       const ease = 1 - Math.pow(1 - t, 3);
-      this.portalGroup.scale.setScalar(0.35 + ease * 0.65);
+      this.applyOpenProgress(0.35 + ease * 0.65);
       if (t >= 1) this.revealing = false;
     }
 
@@ -275,17 +274,24 @@ export class UpsideDownPortal {
   }
 
   reset(): void {
-    if (!this.world || !this.cover || !this.coverMat) return;
-    if (!this.revealed && !this.revealing && !this.opening && !this.pendingReveal) return;
+    if (!this.world) return;
+    if (!this.revealed && !this.revealing && !this.opening) {
+      this.setGlbPortalVisible(true);
+      return;
+    }
+    this.closePortal(true);
+  }
 
+  hideForCinematic(): void {
+    this.closePortal(false);
+  }
+
+  private closePortal(glbVisible: boolean): void {
     this.revealed = false;
-    this.pendingReveal = false;
-    this.pendingT = 0;
     this.opening = false;
     this.revealing = false;
     this.revealT = 0;
     this.suckBoost = 0;
-
     if (this.portalGroup) {
       this.portalGroup.visible = false;
       this.portalGroup.scale.setScalar(1);
@@ -294,41 +300,13 @@ export class UpsideDownPortal {
       vine.mesh.position.y = 0;
       vine.mesh.rotation.z = 0;
     }
+    this.setGlbPortalVisible(glbVisible);
     this.removePortalSensor();
     this.onOpenChange?.(false);
-
-    this.cover.visible = true;
-    this.cover.scale.setScalar(1);
-    this.cover.position.copy(this.anchorPos);
-    this.cover.position.y = this.baseY;
-    this.coverMat.transparent = false;
-    this.coverMat.opacity = 1;
-
-    this.removePhysicsCover();
-
-    const qx = Math.sin(PLAYFIELD_TILT / 2);
-    const qw = Math.cos(PLAYFIELD_TILT / 2);
-    this.coverBody = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed()
-        .setTranslation(this.anchorPos.x, this.baseY, this.anchorPos.z)
-        .setRotation({ x: qx, y: 0, z: 0, w: qw }),
-    );
-    this.coverCollider = this.world.createCollider(
-      RAPIER.ColliderDesc.cylinder(0.002, PORTAL_COVER_RADIUS)
-        .setRestitution(0.35)
-        .setFriction(0.15),
-      this.coverBody,
-    );
   }
 
   dispose(): void {
     this.removePortalSensor();
-    this.removePhysicsCover();
-    if (this.cover) {
-      this.cover.geometry.dispose();
-      this.cover.parent?.remove(this.cover);
-    }
-    this.coverMat?.dispose();
     if (this.portalGroup) this.portalGroup.parent?.remove(this.portalGroup);
     this.rimGlow?.dispose();
     this.accentGlow?.dispose();
@@ -343,10 +321,6 @@ export class UpsideDownPortal {
     this.particles = [];
     this.vines = [];
 
-    this.cover = null;
-    this.coverMat = null;
-    this.coverBody = null;
-    this.coverCollider = null;
     this.world = null;
     this.colliderMap = null;
     this.onOpenChange = null;
@@ -360,12 +334,11 @@ export class UpsideDownPortal {
     this.accentGlow = null;
     this.vineMat = null;
     this.revealed = false;
-    this.pendingReveal = false;
-    this.pendingT = 0;
     this.opening = false;
     this.revealing = false;
     this.revealT = 0;
     this.suckBoost = 0;
+    this.glbPortalMeshes = [];
   }
 
   private buildPortalVisuals(): THREE.Group {
@@ -467,7 +440,6 @@ export class UpsideDownPortal {
     this.rimGlow.sprite.position.y = 0.012;
     group.add(this.rimGlow.sprite);
 
-    // Seule PointLight du portail (le groupe invisible la sort du rendu).
     this.coreLight = new THREE.PointLight(0x7722cc, 0.85, 0.1, 2);
     this.coreLight.position.y = 0.004;
     group.add(this.coreLight);
@@ -521,25 +493,15 @@ export class UpsideDownPortal {
   }
 
   private scheduleReveal(): void {
-    this.pendingReveal = true;
-    this.pendingT = 0;
-  }
-
-  private startOpening(): void {
     this.opening = true;
     this.revealT = 0;
-    this.removePhysicsCover();
-    if (this.portalGroup) {
-      this.portalGroup.visible = true;
-      this.portalGroup.scale.setScalar(0.001);
-    }
+    if (this.portalGroup) this.portalGroup.visible = true;
     this.applyOpenProgress(0);
   }
 
   private finishOpening(): void {
     this.opening = false;
     this.revealed = true;
-    if (this.cover) this.cover.visible = false;
     if (this.portalGroup) this.portalGroup.scale.setScalar(1);
     this.applyOpenProgress(1);
     this.createPortalSensor();
@@ -549,22 +511,14 @@ export class UpsideDownPortal {
   private applyOpenProgress(p: number): void {
     if (!this.portalGroup) return;
 
-    this.portalGroup.visible = p > 0.001;
-    this.portalGroup.scale.setScalar(Math.max(0.001, p));
+    const portalOn = easeInOut(p);
+    const glbOff = easeInOut(Math.min(1, p / 0.42));
+    const fx = Math.min(1, 0.22 + portalOn * 0.78);
+    this.setGlbPortalOpacity(1 - glbOff);
 
-    if (this.cover && this.coverMat) {
-      if (p < 0.5) {
-        this.cover.visible = true;
-        this.coverMat.transparent = true;
-        this.coverMat.opacity = 1 - p / 0.5;
-      } else {
-        this.cover.visible = false;
-        this.coverMat.transparent = false;
-        this.coverMat.opacity = 1;
-      }
-    }
+    this.portalGroup.visible = fx > 0.01;
+    this.portalGroup.scale.setScalar(0.14 + portalOn * 0.86);
 
-    const fx = Math.min(1, p * 1.15);
     if (this.coreMat) this.coreMat.opacity = 0.7 * fx;
     if (this.vortexMat) this.vortexMat.opacity = 0.35 * fx;
     if (this.outerRingMat) {
@@ -590,12 +544,8 @@ export class UpsideDownPortal {
     this.revealing = true;
     this.revealed = true;
     this.revealT = 0;
-    this.removePhysicsCover();
-    if (this.cover) this.cover.visible = false;
-    if (this.portalGroup) {
-      this.portalGroup.visible = true;
-      this.portalGroup.scale.setScalar(0.35);
-    }
+    if (this.portalGroup) this.portalGroup.visible = true;
+    this.applyOpenProgress(0.35);
     this.createPortalSensor();
     this.onOpenChange?.(true);
   }
@@ -628,16 +578,5 @@ export class UpsideDownPortal {
     }
     this.sensorCollider = null;
     this.sensorBody = null;
-  }
-
-  private removePhysicsCover(): void {
-    if (this.coverCollider && this.world) {
-      this.world.removeCollider(this.coverCollider, true);
-      this.coverCollider = null;
-    }
-    if (this.coverBody && this.world) {
-      this.world.removeRigidBody(this.coverBody);
-      this.coverBody = null;
-    }
   }
 }

@@ -82,7 +82,7 @@ export class PhysicsWorld {
    *           ne conserve pas les events d'un step à l'autre, drainer une seule
    *           fois par frame perdrait les collisions des steps intermédiaires.
    */
-  update(dt: number, onStep?: () => void): void {
+  update(dt: number, onStep?: () => void, onAfterSteps?: () => void): void {
     this.accumulator += dt * this.timeScale;
     const { steps, remainder } = PhysicsWorld.planSteps(this.accumulator);
     this.accumulator = remainder;
@@ -90,5 +90,6 @@ export class PhysicsWorld {
       this.world.step(this.eventQueue);
       onStep?.();
     }
+    onAfterSteps?.();
   }
 }

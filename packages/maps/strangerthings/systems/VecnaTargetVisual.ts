@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { VECNA_TARGET } from '../bosses';
 import {
+  VECNA_ANIM_HIT,
+  VECNA_ANIM_VICTORY,
   VECNA_ANIM_WALK,
   VECNA_MODEL_BIND_HEIGHT,
   VECNA_MODEL_FIT_FRAMES,
@@ -14,18 +16,20 @@ import {
   VECNA_WALK_FADE_OUT,
   VECNA_WALK_SETTLE_FACING,
 } from './VecnaConstants';
-import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
-import { easeOut } from '@pinball/game-engine';
-import { findGltfAnimationClip } from '@pinball/game-engine';
-import { createGltfLoader } from '@pinball/game-engine';
 import {
+  PLAYFIELD_TILT,
+  surfaceYAtZ,
+  easeOut,
+  findGltfAnimationClip,
+  createGltfLoader,
   applySkinnedModelFit,
   fitSkinnedModelWithRetry,
   updateSkinnedBindPose,
+  warmupObject3D,
 } from '@pinball/game-engine';
 
-// Scratch vector reused every frame in cameraFacingY() to avoid per-frame
-// allocation during the fight/settle phases (mirrors DemogorgonTargetVisual).
+type AnimState = 'walk' | 'fight' | 'hit' | 'victory';
+
 const _vecnaFacingPos = new THREE.Vector3();
 
 export class VecnaTargetVisual {
@@ -36,6 +40,10 @@ export class VecnaTargetVisual {
   private model: THREE.Object3D | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private walkAction: THREE.AnimationAction | null = null;
+  private fightIdleAction: THREE.AnimationAction | null = null;
+  private hitAction: THREE.AnimationAction | null = null;
+  private victoryAction: THREE.AnimationAction | null = null;
+  private animState: AnimState = 'walk';
   private glowLight: THREE.PointLight | null = null;
   private loadPromise: Promise<void> | null = null;
   private pathT = 1;
@@ -76,7 +84,19 @@ export class VecnaTargetVisual {
 
   async warmup(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
     if (!this.anchor) return;
-    await renderer.compileAsync(this.anchor, camera, scene);
+    await this.ensureReady();
+    await fitSkinnedModelWithRetry(
+      () => this.applyFit(),
+      VECNA_MODEL_FIT_FRAMES,
+      () => this.anchor !== null,
+    );
+    const primeActions = [this.walkAction, this.fightIdleAction, this.hitAction, this.victoryAction].filter(
+      (action): action is THREE.AnimationAction => action !== null,
+    );
+    await warmupObject3D(renderer, scene, camera, this.anchor, {
+      mixer: this.mixer,
+      primeActions,
+    });
   }
 
   beginReveal(): void {
@@ -84,7 +104,11 @@ export class VecnaTargetVisual {
     this.walkElapsed = 0;
     this.settling = false;
     this.settleElapsed = 0;
+    this.animState = 'walk';
     this.walkAction?.stop();
+    this.fightIdleAction?.stop();
+    this.hitAction?.stop();
+    this.victoryAction?.stop();
     this.setPathProgress(0);
   }
 
@@ -115,7 +139,11 @@ export class VecnaTargetVisual {
     this.walking = false;
     this.walkElapsed = 0;
     this.settling = false;
+    this.animState = 'walk';
     this.walkAction?.stop();
+    this.fightIdleAction?.stop();
+    this.hitAction?.stop();
+    this.victoryAction?.stop();
     this.pathT = 0;
     this.hitFlash = 0;
     this.setPathProgress(0);
@@ -126,10 +154,13 @@ export class VecnaTargetVisual {
     this.walking = true;
     this.walkElapsed = 0;
     this.settling = false;
+    this.animState = 'walk';
     if (!this.walkAction) return;
+    this.fightIdleAction?.stop();
     this.walkAction.reset();
     this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
     this.walkAction.clampWhenFinished = false;
+    this.walkAction.timeScale = 1;
     this.walkAction.play();
   }
 
@@ -183,14 +214,36 @@ export class VecnaTargetVisual {
       this.walkAction.time = 0;
     }
     this.syncFacing();
+    this.enterFightIdle();
   }
 
   playHit(): void {
+    if (!this.mixer || !this.hitAction || !this.fightIdleAction) return;
+    this.animState = 'hit';
     this.hitFlash = 0.18;
+    this.fightIdleAction.paused = false;
+    this.hitAction.reset();
+    this.hitAction.setLoop(THREE.LoopOnce, 1);
+    this.hitAction.clampWhenFinished = true;
+    this.hitAction.crossFadeFrom(this.fightIdleAction, 0.08, true).play();
   }
 
   playVictory(): void {
+    if (!this.mixer || !this.victoryAction) {
+      this.enterFightIdle();
+      return;
+    }
+    this.animState = 'victory';
     this.hitFlash = 0.28;
+    this.victoryAction.reset();
+    this.victoryAction.setLoop(THREE.LoopOnce, 1);
+    this.victoryAction.clampWhenFinished = true;
+    const from = this.hitAction?.isRunning() ? this.hitAction : this.fightIdleAction;
+    if (from) {
+      this.victoryAction.crossFadeFrom(from, 0.12, true).play();
+    } else {
+      this.victoryAction.play();
+    }
   }
 
   update(dt: number): void {
@@ -223,6 +276,9 @@ export class VecnaTargetVisual {
     this.camera = null;
     this.mixer = null;
     this.walkAction = null;
+    this.fightIdleAction = null;
+    this.hitAction = null;
+    this.victoryAction = null;
     this.glowLight = null;
     this.rig = null;
     this.offset = null;
@@ -233,6 +289,7 @@ export class VecnaTargetVisual {
     this.hitFlash = 0;
     this.pulseT = 0;
     this.pathT = 0;
+    this.animState = 'walk';
     this.loadPromise = null;
   }
 
@@ -283,13 +340,56 @@ export class VecnaTargetVisual {
 
     this.mixer = new THREE.AnimationMixer(model);
     const walkClip = findGltfAnimationClip(clips, VECNA_ANIM_WALK);
+    const hitClip = findGltfAnimationClip(clips, VECNA_ANIM_HIT);
+    const victoryClip = findGltfAnimationClip(clips, VECNA_ANIM_VICTORY);
+
     if (walkClip) {
       this.walkAction = this.mixer.clipAction(walkClip);
       this.walkAction.setLoop(THREE.LoopRepeat, Infinity);
       this.walkAction.clampWhenFinished = false;
+
+      this.fightIdleAction = this.mixer.clipAction(walkClip);
+      this.fightIdleAction.setLoop(THREE.LoopOnce, 1);
+      this.fightIdleAction.clampWhenFinished = true;
     } else {
       console.warn(`[Vecna] walk clip not found (token="${VECNA_ANIM_WALK}")`, clips.map((c) => c.name));
     }
+
+    if (hitClip) {
+      this.hitAction = this.mixer.clipAction(hitClip);
+      this.hitAction.setLoop(THREE.LoopOnce, 1);
+      this.hitAction.clampWhenFinished = true;
+    } else {
+      console.warn(`[Vecna] hit clip not found (token="${VECNA_ANIM_HIT}")`, clips.map((c) => c.name));
+    }
+
+    if (victoryClip) {
+      this.victoryAction = this.mixer.clipAction(victoryClip);
+      this.victoryAction.setLoop(THREE.LoopOnce, 1);
+      this.victoryAction.clampWhenFinished = true;
+    } else {
+      console.warn(`[Vecna] victory clip not found (token="${VECNA_ANIM_VICTORY}")`, clips.map((c) => c.name));
+    }
+
+    this.mixer.addEventListener('finished', (event) => {
+      if (event.action === this.hitAction && this.animState === 'hit') {
+        this.enterFightIdle();
+      }
+    });
+  }
+
+  private enterFightIdle(): void {
+    if (!this.fightIdleAction) return;
+    this.animState = 'fight';
+    this.hitAction?.stop();
+    this.walkAction?.stop();
+    this.fightIdleAction.reset();
+    this.fightIdleAction.setLoop(THREE.LoopOnce, 1);
+    this.fightIdleAction.clampWhenFinished = true;
+    this.fightIdleAction.time = 0;
+    this.fightIdleAction.timeScale = 1;
+    this.fightIdleAction.play();
+    this.fightIdleAction.paused = true;
   }
 
   private applyFit(): boolean {

@@ -1657,31 +1657,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftFlipperBodyOffset);
         syncFlipperBody(rightFlipperBody, rightFlipperObj, rightFlipperBodyOffset);
 
-        // ── Garantie de vitesse minimale ─────────────────────────────────────
-        // Le contact cinématique est quasi nul près de la charnière.
-        // Quand le flipper est en train de monter ET que la balle est dans la
-        // zone flipper, on garantit une vitesse -Z minimale sans override si la
-        // physique fait déjà mieux.
-        // Seuil normalisé en vitesse angulaire (rad/s) : 0.004 * 60 = 0.24 rad/s,
-        // indépendant du fps (évite que le seuil ne se déclenche jamais à 120+ Hz).
-        if (ballPhysicsInst && gameStateRef.current === 'playing' && flipperZones) {
-          const bp = ballPhysicsInst.body.translation();
-          const bv = ballPhysicsInst.body.linvel();
-          const { left: lz, right: rz } = flipperZones;
-          const angVelL = (leftSwing  - prevLeftSwing) / dt;
-          const angVelR = (rightSwing - prevRightSwing) / dt;
-          const inLeft  = bp.z > lz.zMin && bp.z < lz.zMax && bp.x > lz.xMin && bp.x < lz.xMax;
-          const inRight = bp.z > rz.zMin && bp.z < rz.zMax && bp.x > rz.xMin && bp.x < rz.xMax;
-          if (inLeft && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
-            ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
-            leftFlash = FLASH_DURATION; // hit-flash à la frappe
-          }
-          if (inRight && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL && bv.z > FLIPPER_MIN_LAUNCH_VZ) {
-            ballPhysicsInst.body.setLinvel({ x: bv.x, y: bv.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
-            rightFlash = FLASH_DURATION;
-          }
-        }
-
         // Décroissance + application du hit-flash flippers.
         if (leftFlash > 0) leftFlash = Math.max(0, leftFlash - dt);
         if (rightFlash > 0) rightFlash = Math.max(0, rightFlash - dt);
@@ -1705,9 +1680,45 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
       if (physicsWorld && !freezeFrame) {
         const world = physicsWorld;
-        world.update(dt, () => {
-          collisionProcessor?.process(world.eventQueue, gameStateRef.current);
-        });
+        world.update(
+          dt,
+          () => {
+            collisionProcessor?.process(world.eventQueue, gameStateRef.current);
+          },
+          () => {
+            collisionProcessor?.flushPendingPhysics();
+          },
+        );
+      }
+
+      if (
+        !freezeFrame
+        && ballPhysicsInst
+        && gameStateRef.current === 'playing'
+        && flipperZones
+      ) {
+        const pos = ballPhysicsInst.body.translation();
+        const bx = pos.x;
+        const bz = pos.z;
+        const { left: lz, right: rz } = flipperZones;
+        const angVelL = (leftSwing - prevLeftSwing) / dt;
+        const angVelR = (rightSwing - prevRightSwing) / dt;
+        const inLeft = bz > lz.zMin && bz < lz.zMax && bx > lz.xMin && bx < lz.xMax;
+        const inRight = bz > rz.zMin && bz < rz.zMax && bx > rz.xMin && bx < rz.xMax;
+        if (inLeft && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL) {
+          const vel = ballPhysicsInst.body.linvel();
+          if (vel.z > FLIPPER_MIN_LAUNCH_VZ) {
+            ballPhysicsInst.body.setLinvel({ x: vel.x, y: vel.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
+            leftFlash = FLASH_DURATION;
+          }
+        }
+        if (inRight && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL) {
+          const vel = ballPhysicsInst.body.linvel();
+          if (vel.z > FLIPPER_MIN_LAUNCH_VZ) {
+            ballPhysicsInst.body.setLinvel({ x: vel.x, y: vel.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
+            rightFlash = FLASH_DURATION;
+          }
+        }
       }
 
       if (ballPhysicsInst && !freezeFrame) {
