@@ -169,6 +169,7 @@ const KEYBOARD_MODE: KeyboardMode =
 
 const PLAYFIELD_VIEW_MODE = parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE);
 const PLAYFIELD_VIEW_DIR = playfieldViewDirForMode(PLAYFIELD_VIEW_MODE);
+const IS_PORTRAIT_FILL = PLAYFIELD_VIEW_MODE === 'portrait-fill';
 
 type PinballPlayfieldProps = {
   /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
@@ -185,6 +186,14 @@ export default function PinballPlayfield(props: PinballPlayfieldProps) {
 
 function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!IS_PORTRAIT_FILL) return;
+    document.documentElement.classList.add('playfield-portrait-fill');
+    return () => {
+      document.documentElement.classList.remove('playfield-portrait-fill');
+    };
+  }, []);
 
   const [debugSnapshot, setDebugSnapshot] = useState<BallDiagnosticsSnapshot | null>(null);
   const [debugVisible, setDebugVisible] = useState(false);
@@ -1814,23 +1823,26 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       }
     : {};
 
-  // ── JSX ───────────────────────────────────────────────────────────────────
+  const rootClassName = cabinetMode
+    ? "flex min-h-[100dvh] w-full items-center justify-center bg-black text-zinc-100"
+    : IS_PORTRAIT_FILL
+      ? "fixed inset-0 h-dvh w-dvw overflow-hidden bg-black text-zinc-100"
+      : "relative min-h-screen bg-black text-zinc-100";
+
+  const frameClassName = cabinetMode
+    ? "relative overflow-hidden rounded-sm shadow-[0_0_80px_rgba(0,0,0,0.85)] ring-1 ring-zinc-800/40"
+    : IS_PORTRAIT_FILL
+      ? "relative h-full w-full overflow-hidden"
+      : "relative min-h-screen w-full";
+
+  const canvasClassName =
+    cabinetMode || IS_PORTRAIT_FILL
+      ? "absolute inset-0 h-full w-full touch-none outline-none focus:outline-none"
+      : "h-screen w-full touch-none outline-none focus:outline-none";
+
   return (
-    <div
-      className={
-        cabinetMode
-          ? "flex min-h-[100dvh] w-full items-center justify-center bg-black text-zinc-100"
-          : "relative min-h-screen bg-black text-zinc-100"
-      }
-    >
-      <div
-        className={
-          cabinetMode
-            ? "relative overflow-hidden rounded-sm shadow-[0_0_80px_rgba(0,0,0,0.85)] ring-1 ring-zinc-800/40"
-            : "relative min-h-screen w-full"
-        }
-        style={cabinetFrameStyle}
-      >
+    <div className={rootClassName}>
+      <div className={frameClassName} style={cabinetFrameStyle}>
         <GameOverlay
           lives={lives}
           gameState={gameState}
@@ -1874,11 +1886,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           onPointerDown={() => {
             if (physicsReady && !sessionStarted) beginSession();
           }}
-          className={
-            cabinetMode
-              ? "absolute inset-0 h-full w-full touch-none outline-none focus:outline-none"
-              : "h-screen w-full touch-none outline-none focus:outline-none"
-          }
+          className={canvasClassName}
           tabIndex={0}
           aria-label="Terrain de flipper - Q/D ou fleches gauche/droite pour les flippers, maintenir ESPACE et relacher pour lancer"
         />
