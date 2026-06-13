@@ -1,7 +1,9 @@
 import type { BossCameraCinematicConfig } from './CameraCinematicConstants';
 import {
   DEMOGORGON_CAMERA_CINEMATIC,
+  DEMOGORGON_VICTORY_CAMERA_CINEMATIC,
   VECNA_CAMERA_CINEMATIC,
+  VECNA_VICTORY_CAMERA_CINEMATIC,
 } from './CameraCinematicConstants';
 
 export type BossId = 'demogorgon' | 'vecna';
@@ -85,6 +87,7 @@ export type BossDefinition = {
   unlocksPortal: boolean;
   unlocksReturnPortal: boolean;
   cameraCinematic: BossCameraCinematicConfig;
+  victoryCameraCinematic: BossCameraCinematicConfig;
   targetMeshTheme: BossTargetMeshTheme;
   targetPulse: BossTargetPulseConfig;
 };
@@ -120,6 +123,7 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
     unlocksPortal: true,
     unlocksReturnPortal: false,
     cameraCinematic: DEMOGORGON_CAMERA_CINEMATIC,
+    victoryCameraCinematic: DEMOGORGON_VICTORY_CAMERA_CINEMATIC,
     targetMeshTheme: {
       ring: {
         color: 0xff2244,
@@ -179,6 +183,7 @@ export const BOSS_REGISTRY: Record<BossId, BossDefinition> = {
     unlocksPortal: false,
     unlocksReturnPortal: true,
     cameraCinematic: VECNA_CAMERA_CINEMATIC,
+    victoryCameraCinematic: VECNA_VICTORY_CAMERA_CINEMATIC,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,

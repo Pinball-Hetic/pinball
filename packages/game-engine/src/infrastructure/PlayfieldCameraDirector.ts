@@ -48,30 +48,11 @@ export class PlayfieldCameraDirector {
   }
 
   play(bossId: BossId): void {
-    if (!this.camera || !this.base || this.phase !== 'idle') return;
+    this.begin(bossId, 'reveal');
+  }
 
-    const def = getBossDefinition(bossId);
-    this.config = def.cameraCinematic;
-    this.bossFocus.set(
-      def.target.x,
-      def.target.y + def.cameraCinematic.lookAtLift,
-      def.target.z,
-    );
-    if (def.cameraCinematic.panFrom) {
-      this.panFrom.set(
-        def.cameraCinematic.panFrom.x,
-        def.cameraCinematic.panFrom.y + def.cameraCinematic.lookAtLift,
-        def.cameraCinematic.panFrom.z,
-      );
-    } else {
-      this.panFrom.copy(this.base.target);
-    }
-    this.zoomedDistance = Math.max(
-      CAMERA_CINEMATIC_DISTANCE_MIN,
-      this.base.distance * def.cameraCinematic.distanceScale,
-    );
-    this.phase = 'zoomIn';
-    this.elapsed = 0;
+  playVictory(bossId: BossId): void {
+    this.begin(bossId, 'victory');
   }
 
   update(dt: number): void {
@@ -128,6 +109,35 @@ export class PlayfieldCameraDirector {
     this.restore();
     this.camera = null;
     this.base = null;
+  }
+
+  private begin(bossId: BossId, kind: 'reveal' | 'victory'): void {
+    if (!this.camera || !this.base || this.phase !== 'idle') return;
+
+    const def = getBossDefinition(bossId);
+    const cinematic =
+      kind === 'reveal' ? def.cameraCinematic : def.victoryCameraCinematic;
+    this.config = cinematic;
+    this.bossFocus.set(
+      def.target.x,
+      def.target.y + cinematic.lookAtLift,
+      def.target.z,
+    );
+    if (kind === 'reveal' && cinematic.panFrom) {
+      this.panFrom.set(
+        cinematic.panFrom.x,
+        cinematic.panFrom.y + cinematic.lookAtLift,
+        cinematic.panFrom.z,
+      );
+    } else {
+      this.panFrom.copy(this.base.target);
+    }
+    this.zoomedDistance = Math.max(
+      CAMERA_CINEMATIC_DISTANCE_MIN,
+      this.base.distance * cinematic.distanceScale,
+    );
+    this.phase = 'zoomIn';
+    this.elapsed = 0;
   }
 
   private finish(): void {

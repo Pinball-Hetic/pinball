@@ -1292,6 +1292,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           }
           if (
             event.type === "BOSS_TARGET_HIT"
+            && event.hitCount >= getBossDefinition(event.bossId).targetHits
+          ) {
+            cameraDirector?.playVictory(event.bossId);
+          }
+          if (
+            event.type === "BOSS_TARGET_HIT"
             && event.bossId === "demogorgon"
             && event.hitCount >= DEMOGORGON_TARGET_HITS
           ) {
