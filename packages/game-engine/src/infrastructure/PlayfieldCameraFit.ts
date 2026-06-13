@@ -329,6 +329,31 @@ export function fitPlayfieldCamera(
   );
 }
 
+export type PlayfieldCameraRefit = {
+  fit: PlayfieldCamFit;
+  distance: number;
+  frameBox: THREE.Box3;
+};
+
+export function refitPlayfieldCamera(
+  camera: THREE.PerspectiveCamera,
+  playfieldRoot: THREE.Object3D,
+  viewMode: PlayfieldViewMode,
+  target: THREE.Vector3,
+  corners: THREE.Vector3[],
+): PlayfieldCameraRefit {
+  const frameBox = boundingBoxPlayableArea(playfieldRoot);
+  playfieldCameraTargetForMode(viewMode, frameBox, target);
+  fillPlayfieldBoxCorners(frameBox, corners);
+  const fit: PlayfieldCamFit = {
+    target,
+    dirToCamera: playfieldViewDirForMode(viewMode).clone(),
+    corners,
+  };
+  const distance = fitPlayfieldCamera(camera, fit, target, { viewMode });
+  return { fit, distance, frameBox };
+}
+
 function fitPlayfieldCameraForMode(
   viewMode: PlayfieldViewMode,
   camera: THREE.PerspectiveCamera,

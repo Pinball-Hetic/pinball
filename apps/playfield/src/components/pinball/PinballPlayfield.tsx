@@ -52,11 +52,8 @@ import {
   ScreenShake,
   PlayfieldCameraDirector,
   playfieldViewDirForMode,
-  playfieldCameraTargetForMode,
   parsePlayfieldViewMode,
-  boundingBoxPlayableArea,
-  fillPlayfieldBoxCorners,
-  fitPlayfieldCamera,
+  refitPlayfieldCamera,
   type PlayfieldCamFit,
   BallTrail,
   QualityGovernor,
@@ -463,6 +460,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       cameraTarget: THREE.Vector3;
       distance: number;
     } | null = null;
+    const camCorners: THREE.Vector3[] = [];
     let orbitControls: OrbitControls | null = null;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -508,6 +506,33 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         child.castShadow = true;
         child.receiveShadow = true;
       });
+    };
+
+    let cameraDirector: PlayfieldCameraDirector | null = null;
+
+    const captureDirectorBase = (fit: PlayfieldCamFit, distance: number) => {
+      if (!cameraDirector) return;
+      if (cameraDirector.isActive()) cameraDirector.restore();
+      cameraDirector.captureBase({
+        camera,
+        target: cameraTarget,
+        dirToCamera: fit.dirToCamera,
+        distance,
+      });
+    };
+
+    const syncPlayfieldCamera = (root: THREE.Object3D) => {
+      const { fit, distance, frameBox } = refitPlayfieldCamera(
+        camera,
+        root,
+        PLAYFIELD_VIEW_MODE,
+        cameraTarget,
+        camCorners,
+      );
+      playfieldCamFit = { fit, camera, cameraTarget, distance };
+      orbitControls?.target.copy(cameraTarget);
+      captureDirectorBase(fit, distance);
+      return frameBox;
     };
 
     // ── Flipper visual state ─────────────────────────────────────────────────
@@ -574,7 +599,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     let emit: GameEventListener;
     let ballTrail: BallTrail | null = null;
     let shooterLaneGate: ShooterLaneGate | null = null;
-    let cameraDirector: PlayfieldCameraDirector | null = null;
 
     // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
     const quality = new QualityGovernor((tier) => {
@@ -1022,33 +1046,13 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
         // ── Caméra cabine fixe (non rotatable) — tapis jouable uniquement ───────
         modelRoot.updateMatrixWorld(true);
-        const camFrameBox = boundingBoxPlayableArea(playfieldRoot);
-        playfieldCameraTargetForMode(PLAYFIELD_VIEW_MODE, camFrameBox, cameraTarget);
-        const camCorners: THREE.Vector3[] = [];
-        fillPlayfieldBoxCorners(camFrameBox, camCorners);
-        const fit: PlayfieldCamFit = {
-          target: cameraTarget,
-          dirToCamera: PLAYFIELD_VIEW_DIR.clone(),
-          corners: camCorners,
-        };
-
+        cameraDirector = new PlayfieldCameraDirector();
+        cameraDirector.setBosses(MAP_BOSSES);
+        const camFrameBox = syncPlayfieldCamera(playfieldRoot);
         const msz = camFrameBox.getSize(new THREE.Vector3());
         camera.near = Math.max(0.001, Math.min(msz.length() * 0.004, 0.25));
         camera.far = Math.max(80, msz.length() * 120);
         camera.updateProjectionMatrix();
-
-        const camDistance = fitPlayfieldCamera(camera, fit, cameraTarget, {
-          viewMode: PLAYFIELD_VIEW_MODE,
-        });
-        playfieldCamFit = { fit, camera, cameraTarget, distance: camDistance };
-        cameraDirector = new PlayfieldCameraDirector();
-        cameraDirector.setBosses(MAP_BOSSES);
-        cameraDirector.captureBase({
-          camera,
-          target: cameraTarget,
-          dirToCamera: fit.dirToCamera,
-          distance: camDistance,
-        });
         const restoreBossCamera = () => {
           cameraDirector?.restore();
         };
@@ -1767,26 +1771,9 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       const { clientWidth: w, clientHeight: h } = mountEl;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      if (playfieldCamFit) {
-        const dist = fitPlayfieldCamera(
-          playfieldCamFit.camera,
-          playfieldCamFit.fit,
-          playfieldCamFit.cameraTarget,
-          { viewMode: PLAYFIELD_VIEW_MODE },
-        );
-        playfieldCamFit.distance = dist;
-        if (cameraDirector) {
-          if (cameraDirector.isActive()) {
-            cameraDirector.restore();
-          }
-          cameraDirector.captureBase({
-            camera: playfieldCamFit.camera,
-            target: playfieldCamFit.cameraTarget,
-            dirToCamera: playfieldCamFit.fit.dirToCamera,
-            distance: dist,
-          });
-        }
-      } else {
+      if (playfieldRootRef) {
+        syncPlayfieldCamera(playfieldRootRef);
+      } else if (playfieldCamFit) {
         camera.up.set(0, 1, 0);
         camera.lookAt(cameraTarget);
       }
