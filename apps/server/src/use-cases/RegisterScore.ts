@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import { randomBytes } from 'crypto';
 import type { GameOver, GameRegistered } from '@pinball/shared-types';
 import { prisma } from '../infrastructure/prisma';
@@ -31,6 +30,5 @@ export async function registerScore(data: GameOver): Promise<GameRegistered> {
     },
   });
   const claimUrl = buildClaimUrl(code);
-  const qrDataUrl = await QRCode.toDataURL(claimUrl);
-  return { code, claimUrl, qrDataUrl };
+  return { code, claimUrl };
 }
