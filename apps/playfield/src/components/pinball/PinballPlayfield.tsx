@@ -1299,21 +1299,17 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             && event.bossId === "demogorgon"
             && event.hitCount >= DEMOGORGON_TARGET_HITS
           ) {
-            // Slow-mo 400ms (physique ÷3) AVANT la cinématique de victoire.
-            // Timer local (plus simple que d'ajouter une phase au director ;
-            // le director enchaîne ensuite avec le gel).
             physicsWorld?.setTimeScale(1 / 3);
             window.setTimeout(() => {
               physicsWorld?.setTimeScale(1);
               playCinematic("demogorgon_slain", {
-                // Reprise "avec un bang" : impulse radial depuis le target.
                 onEnd: () =>
                   ballPhysicsInst?.applyEjectionForce({
                     x: DEMOGORGON_TARGET.x,
                     z: DEMOGORGON_TARGET.z,
                   }),
               });
-            }, 400);
+            }, 200);
           }
           if (
             (event.type === "DRAIN" || event.type === "BOTTOM_OUT")

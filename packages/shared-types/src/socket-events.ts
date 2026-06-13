@@ -140,7 +140,7 @@ export interface SensorInput {
 export const CLIP_SHOW_MS: Record<CinematicClip, number> = {
   demogorgon_rises: 10_000, // 6s gel + 4s célébration
   portal_swallow: 4_000,
-  demogorgon_slain: 15_000, // 8s gel + 7s célébration
+  demogorgon_slain: 15_000,
   last_chance: 2_000,
   hall_of_fame: 25_000,
   milestone_5k: 4_000,
@@ -163,7 +163,7 @@ export const CLIP_TAKEOVER_MS: Partial<Record<CinematicClip, number>> = {
 export const CLIP_FREEZE_MS: Record<CinematicClip, number> = {
   demogorgon_rises: 6_000,
   portal_swallow: 4_000,
-  demogorgon_slain: 8_000,
+  demogorgon_slain: 2_600,
   last_chance: 0,
   hall_of_fame: 0,
   milestone_5k: 0,
