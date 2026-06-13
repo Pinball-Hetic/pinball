@@ -5,7 +5,7 @@ import {
   CAMERA_CINEMATIC_DISTANCE_MIN,
   type BossCameraCinematicConfig,
 } from '../domain/CameraCinematicConstants';
-import { easeIn, easeOut } from './CinematicEasing';
+import { easeInOut, easeOut } from './CinematicEasing';
 
 type Phase = 'idle' | 'zoomIn' | 'hold' | 'zoomOut';
 
@@ -62,7 +62,7 @@ export class PlayfieldCameraDirector {
 
     if (this.phase === 'zoomIn') {
       const t = Math.min(1, this.elapsed / this.config.zoomInDuration);
-      const e = easeOut(t);
+      const e = easeInOut(t);
       this.lookAt.lerpVectors(this.panFrom, this.bossFocus, e);
       this.applyView(
         this.lookAt,
@@ -86,7 +86,7 @@ export class PlayfieldCameraDirector {
 
     if (this.phase === 'zoomOut') {
       const t = Math.min(1, this.elapsed / this.config.zoomOutDuration);
-      const e = easeIn(t);
+      const e = easeOut(t);
       this.lookAt.lerpVectors(this.bossFocus, this.base.target, e);
       this.applyView(
         this.lookAt,

@@ -25,10 +25,11 @@ export const CAMERA_CINEMATIC_FOV_MAX = 55;
 
 export const DEMOGORGON_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
   lookAtLift: 0.028,
-  zoomInDuration: 0.5,
-  holdDuration: 0.35,
-  zoomOutDuration: 0.4,
-  distanceScale: 0.74,
+  panFrom: { x: -0.0195, y: 1.012, z: -0.269 },
+  zoomInDuration: 1.75,
+  holdDuration: 1.1,
+  zoomOutDuration: 1.05,
+  distanceScale: 0.58,
 };
 
 export const DEMOGORGON_VICTORY_CAMERA_CINEMATIC: BossCameraCinematicConfig = {

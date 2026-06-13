@@ -928,7 +928,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           onFightEnd: () => collisionProcessor?.setBossFightActive('demogorgon', false),
           onTargetReady: () => {
             collisionProcessor?.setBossTargetArmed('demogorgon', true);
-            cameraDirector?.restore();
           },
         });
 
