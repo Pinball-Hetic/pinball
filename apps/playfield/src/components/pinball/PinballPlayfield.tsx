@@ -16,11 +16,6 @@ import {
   BALL_RADIUS,
   BALL_MAX_SPEED,
   bottomOutLaneSepX,
-  WALL_LEFT_X,
-  WALL_RIGHT_X,
-  WALL_BOTTOM_Z,
-  WALL_TOP_Z,
-  PLAYFIELD_SURFACE_Y,
   INITIAL_LIVES,
   PLUNGER_CHARGE_MS,
   plungerChargeProgress,
@@ -56,6 +51,11 @@ import {
   CinematicDirector,
   ScreenShake,
   PlayfieldCameraDirector,
+  PLAYFIELD_VIEW_DIR,
+  boundingBoxPlayableArea,
+  fillPlayfieldBoxCorners,
+  fitPlayfieldCamera,
+  type PlayfieldCamFit,
   BallTrail,
   QualityGovernor,
   PORTAL_ENTER_SCORE,
@@ -167,191 +167,6 @@ const ALTERNATE_WORLD_PERSISTENCE: AlternateWorldPersistence = "until_game_over"
 type KeyboardMode = "direct" | "simulate-esp32" | "disabled";
 const KEYBOARD_MODE: KeyboardMode =
   (process.env.NEXT_PUBLIC_KEYBOARD_MODE as KeyboardMode) || "direct";
-
-/**
- * Vue cabine fixe : joueur côté +Z (flippers), regarde vers le haut du tapis (-Z).
- * Direction depuis la cible vers la caméra (haut + avant).
- */
-const PLAYFIELD_VIEW_DIR = new THREE.Vector3(0, 0.48, 0.88).normalize();
-/** Marge NDC : plus bas = plus de bande autour du tapis. */
-const PLAYFIELD_VIEW_NDC_MARGIN = 0.78;
-const PLAYFIELD_CAM_DISTANCE_SCALE = 1.05;
-
-type PlayfieldCamFit = {
-  target: THREE.Vector3;
-  /** unitaire : depuis la cible vers la caméra */
-  dirToCamera: THREE.Vector3;
-  corners: THREE.Vector3[];
-};
-
-function fillPlayfieldBoxCorners(box: THREE.Box3, reuse: THREE.Vector3[]): THREE.Vector3[] {
-  reuse.length = 0;
-  const { min, max } = box;
-  for (const x of [min.x, max.x] as const) {
-    for (const y of [min.y, max.y] as const) {
-      for (const z of [min.z, max.z] as const) {
-        reuse.push(new THREE.Vector3(x, y, z));
-      }
-    }
-  }
-  return reuse;
-}
-
-function playfieldCornersInView(
-  camera: THREE.PerspectiveCamera,
-  target: THREE.Vector3,
-  camPos: THREE.Vector3,
-  corners: readonly THREE.Vector3[],
-  ndcMargin: number,
-): boolean {
-  camera.up.set(0, 1, 0);
-  camera.position.copy(camPos);
-  camera.lookAt(target);
-  camera.updateMatrixWorld(true);
-  const clip = new THREE.Matrix4().multiplyMatrices(
-    camera.projectionMatrix,
-    camera.matrixWorldInverse,
-  );
-  const v4 = new THREE.Vector4();
-  for (const c of corners) {
-    v4.set(c.x, c.y, c.z, 1).applyMatrix4(clip);
-    const w = Math.abs(v4.w);
-    if (w < 1e-7) return false;
-    const nx = v4.x / w;
-    const ny = v4.y / w;
-    if (Math.abs(nx) > ndcMargin || Math.abs(ny) > ndcMargin) return false;
-  }
-  return true;
-}
-
-function distanceForTiltedPlayfieldView(
-  camera: THREE.PerspectiveCamera,
-  fit: PlayfieldCamFit,
-  ndcMargin: number,
-): number {
-  const { target: mc, dirToCamera, corners } = fit;
-  const pos = new THREE.Vector3();
-  let lo = 0.04;
-  let hi = 0.6;
-  while (!playfieldCornersInView(camera, mc, pos.copy(mc).addScaledVector(dirToCamera, hi), corners, ndcMargin) && hi < 240) {
-    hi *= 1.75;
-  }
-  if (!playfieldCornersInView(camera, mc, pos.copy(mc).addScaledVector(dirToCamera, hi), corners, ndcMargin)) {
-    return hi;
-  }
-  for (let i = 0; i < 30; i++) {
-    const mid = (lo + hi) / 2;
-    pos.copy(mc).addScaledVector(dirToCamera, mid);
-    if (playfieldCornersInView(camera, mc, pos, corners, ndcMargin)) hi = mid;
-    else lo = mid;
-  }
-  return hi;
-}
-
-function applyPlayfieldCamera(
-  camera: THREE.PerspectiveCamera,
-  target: THREE.Vector3,
-  dirToCamera: THREE.Vector3,
-  distance: number,
-): void {
-  camera.up.set(0, 1, 0);
-  camera.position.copy(target).addScaledVector(dirToCamera, distance);
-  camera.lookAt(target);
-}
-
-/** Rectangle jouable (murs physiques + mesh tapis). */
-function boundingBoxPlayableArea(playfieldRoot: THREE.Object3D): THREE.Box3 {
-  const wallBox = new THREE.Box3(
-    new THREE.Vector3(WALL_LEFT_X - 0.012, PLAYFIELD_SURFACE_Y - 0.04, WALL_TOP_Z - 0.02),
-    new THREE.Vector3(WALL_RIGHT_X + 0.012, PLAYFIELD_SURFACE_Y + 0.1, WALL_BOTTOM_Z + 0.02),
-  );
-  const meshBox = boundingBoxPlayfieldSurface(playfieldRoot);
-  if (meshBox.isEmpty()) return wallBox;
-  return meshBox.union(wallBox);
-}
-
-function fitPlayfieldCamera(
-  camera: THREE.PerspectiveCamera,
-  fit: PlayfieldCamFit,
-  target: THREE.Vector3,
-): number {
-  const dist =
-    distanceForTiltedPlayfieldView(camera, fit, PLAYFIELD_VIEW_NDC_MARGIN) *
-    PLAYFIELD_CAM_DISTANCE_SCALE;
-  applyPlayfieldCamera(camera, target, fit.dirToCamera, dist);
-  return dist;
-}
-
-/** Boîte du tapis jouable uniquement (hors caisse / backbox). */
-function boundingBoxPlayfieldSurface(playfieldRoot: THREE.Object3D): THREE.Box3 {
-  const box = new THREE.Box3();
-  const named =
-    findObjectByNormalizedName(
-      playfieldRoot,
-      "playfield",
-      "pf_playfield",
-      "coll_playfield",
-    ) ?? null;
-  const sides =
-    findObjectByNormalizedName(
-      playfieldRoot,
-      "playfield_sides",
-      "pf_playfield_sides",
-    ) ?? null;
-  if (named) {
-    named.updateMatrixWorld(true);
-    box.setFromObject(named);
-    if (sides) {
-      sides.updateMatrixWorld(true);
-      box.union(new THREE.Box3().setFromObject(sides));
-    }
-  }
-  if (!box.isEmpty()) {
-    box.expandByScalar(0.006);
-    return box;
-  }
-
-  const tmp = new THREE.Box3();
-  let first = true;
-  const skipName = (n: string) =>
-    /backglass|backbox|cabinet|score.?board|coin|feet|foot|glass|launcher|plunger.?panel|epoxy|upright|stand|skirt|lockbar|siderail|caisse|vitre|button|monnayeur|start.?button/i.test(
-      n,
-    );
-  playfieldRoot.updateMatrixWorld(true);
-  playfieldRoot.traverse((child) => {
-    if (!(child instanceof THREE.Mesh)) return;
-    const n = child.name.toLowerCase();
-    if (skipName(n)) return;
-    if (
-      n.includes("playfield") ||
-      n.includes("plastic") ||
-      n.includes("bumper") ||
-      n.includes("pop_") ||
-      n.includes("flipper") ||
-      n.includes("separator") ||
-      n.includes("sling") ||
-      n.includes("target") ||
-      n.includes("guide") ||
-      n.includes("rail") ||
-      n.includes("rocket") ||
-      n.startsWith("coll_") ||
-      n.startsWith("pf_")
-    ) {
-      tmp.setFromObject(child);
-      if (first) {
-        box.copy(tmp);
-        first = false;
-      } else {
-        box.union(tmp);
-      }
-    }
-  });
-  if (first) {
-    box.setFromObject(playfieldRoot);
-  }
-  box.expandByScalar(0.008);
-  return box;
-}
 
 type PinballPlayfieldProps = {
   /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
@@ -665,7 +480,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     scene.add(hemiLight);
     // Spot blanc principal depuis la position caméra (PLAYFIELD_VIEW_DIR : y=0.48, z=0.88)
     const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
-    dirLight.position.set(0, 0.48, 0.88);
+    dirLight.position.copy(PLAYFIELD_VIEW_DIR);
     dirLight.castShadow = false;
     scene.add(dirLight);
     // FillLight à 0 — conservé pour UpsideDownAtmosphere
