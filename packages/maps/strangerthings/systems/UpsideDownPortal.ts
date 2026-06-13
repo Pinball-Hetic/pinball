@@ -3,7 +3,6 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import type { GameEvent } from '@pinball/game-engine';
 import { getBossDefinition } from '../bosses';
 import {
-  PORTAL_COVER_RADIUS,
   PORTAL_HOLE_RADIUS,
   PORTAL_MAGNET_RADIUS,
   PORTAL_MAGNET_STRENGTH,
@@ -14,14 +13,13 @@ import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_ANCHOR_NAMES,
-  UPSIDE_DOWN_PORTAL_COVER_LIFT,
   UPSIDE_DOWN_PORTAL_OPEN_DURATION,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_REVEAL_DELAY,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from './UpsideDownConstants';
-import { clonePlayfieldSurfaceMaterial, findObjectByNormalizedName } from '@pinball/game-engine';
+import { findObjectByNormalizedName } from '@pinball/game-engine';
 import { GlowSprite, easeInOut } from '@pinball/game-engine';
 
 type SetupConfig = {
@@ -62,15 +60,7 @@ function resolvePortalAnchor(root: THREE.Object3D): THREE.Vector3 {
   );
 }
 
-function portalCoverSurfaceY(z: number, anchorY: number): number {
-  return Math.max(surfaceYAtZ(z) + UPSIDE_DOWN_PORTAL_COVER_LIFT, anchorY);
-}
-
 export class UpsideDownPortal {
-  private cover: THREE.Mesh | null = null;
-  private coverMat: THREE.MeshStandardMaterial | null = null;
-  private coverBody: RAPIER.RigidBody | null = null;
-  private coverCollider: RAPIER.Collider | null = null;
   private sensorBody: RAPIER.RigidBody | null = null;
   private sensorCollider: RAPIER.Collider | null = null;
   private world: RAPIER.World | null = null;
@@ -82,7 +72,7 @@ export class UpsideDownPortal {
   private coreMat: THREE.MeshBasicMaterial | null = null;
   private vortexMat: THREE.MeshBasicMaterial | null = null;
   private rimGlow: GlowSprite | null = null;
-  private coreLight: THREE.PointLight | null = null; // seule PointLight conservée
+  private coreLight: THREE.PointLight | null = null;
   private accentGlow: GlowSprite | null = null;
   private vineMat: THREE.MeshStandardMaterial | null = null;
   private vines: PortalVine[] = [];
@@ -110,34 +100,7 @@ export class UpsideDownPortal {
     config.root.updateMatrixWorld(true);
 
     this.anchorPos.copy(resolvePortalAnchor(config.root));
-    this.baseY = portalCoverSurfaceY(this.anchorPos.z, this.anchorPos.y);
-
-    this.coverMat = clonePlayfieldSurfaceMaterial(config.root);
-    this.coverMat.polygonOffset = true;
-    this.coverMat.polygonOffsetFactor = -2;
-    this.coverMat.polygonOffsetUnits = -2;
-    const geo = new THREE.CylinderGeometry(PORTAL_COVER_RADIUS, PORTAL_COVER_RADIUS, 0.004, 32);
-    this.cover = new THREE.Mesh(geo, this.coverMat);
-    this.cover.position.copy(this.anchorPos);
-    this.cover.position.y = this.baseY;
-    this.cover.rotation.x = -PLAYFIELD_TILT;
-    this.cover.renderOrder = 2;
-    this.cover.visible = false;
-    config.root.add(this.cover);
-
-    const qx = Math.sin(PLAYFIELD_TILT / 2);
-    const qw = Math.cos(PLAYFIELD_TILT / 2);
-    this.coverBody = config.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed()
-        .setTranslation(this.anchorPos.x, this.baseY, this.anchorPos.z)
-        .setRotation({ x: qx, y: 0, z: 0, w: qw }),
-    );
-    this.coverCollider = config.world.createCollider(
-      RAPIER.ColliderDesc.cylinder(0.002, PORTAL_COVER_RADIUS)
-        .setRestitution(0.35)
-        .setFriction(0.15),
-      this.coverBody,
-    );
+    this.baseY = surfaceYAtZ(this.anchorPos.z);
 
     this.portalGroup = this.buildPortalVisuals();
     this.portalGroup.position.copy(this.anchorPos);
@@ -282,7 +245,7 @@ export class UpsideDownPortal {
   }
 
   reset(): void {
-    if (!this.world || !this.cover || !this.coverMat) return;
+    if (!this.world) return;
     if (!this.revealed && !this.revealing && !this.opening && !this.pendingReveal) return;
 
     this.revealed = false;
@@ -303,39 +266,10 @@ export class UpsideDownPortal {
     }
     this.removePortalSensor();
     this.onOpenChange?.(false);
-
-    this.cover.visible = false;
-    this.cover.scale.setScalar(1);
-    this.cover.position.copy(this.anchorPos);
-    this.cover.position.y = this.baseY;
-    this.coverMat.transparent = false;
-    this.coverMat.opacity = 1;
-
-    this.removePhysicsCover();
-
-    const qx = Math.sin(PLAYFIELD_TILT / 2);
-    const qw = Math.cos(PLAYFIELD_TILT / 2);
-    this.coverBody = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed()
-        .setTranslation(this.anchorPos.x, this.baseY, this.anchorPos.z)
-        .setRotation({ x: qx, y: 0, z: 0, w: qw }),
-    );
-    this.coverCollider = this.world.createCollider(
-      RAPIER.ColliderDesc.cylinder(0.002, PORTAL_COVER_RADIUS)
-        .setRestitution(0.35)
-        .setFriction(0.15),
-      this.coverBody,
-    );
   }
 
   dispose(): void {
     this.removePortalSensor();
-    this.removePhysicsCover();
-    if (this.cover) {
-      this.cover.geometry.dispose();
-      this.cover.parent?.remove(this.cover);
-    }
-    this.coverMat?.dispose();
     if (this.portalGroup) this.portalGroup.parent?.remove(this.portalGroup);
     this.rimGlow?.dispose();
     this.accentGlow?.dispose();
@@ -350,10 +284,6 @@ export class UpsideDownPortal {
     this.particles = [];
     this.vines = [];
 
-    this.cover = null;
-    this.coverMat = null;
-    this.coverBody = null;
-    this.coverCollider = null;
     this.world = null;
     this.colliderMap = null;
     this.onOpenChange = null;
@@ -474,7 +404,6 @@ export class UpsideDownPortal {
     this.rimGlow.sprite.position.y = 0.012;
     group.add(this.rimGlow.sprite);
 
-    // Seule PointLight du portail (le groupe invisible la sort du rendu).
     this.coreLight = new THREE.PointLight(0x7722cc, 0.85, 0.1, 2);
     this.coreLight.position.y = 0.004;
     group.add(this.coreLight);
@@ -535,7 +464,6 @@ export class UpsideDownPortal {
   private startOpening(): void {
     this.opening = true;
     this.revealT = 0;
-    this.removePhysicsCover();
     if (this.portalGroup) {
       this.portalGroup.visible = true;
       this.portalGroup.scale.setScalar(0.001);
@@ -546,7 +474,6 @@ export class UpsideDownPortal {
   private finishOpening(): void {
     this.opening = false;
     this.revealed = true;
-    if (this.cover) this.cover.visible = false;
     if (this.portalGroup) this.portalGroup.scale.setScalar(1);
     this.applyOpenProgress(1);
     this.createPortalSensor();
@@ -558,12 +485,6 @@ export class UpsideDownPortal {
 
     this.portalGroup.visible = p > 0.001;
     this.portalGroup.scale.setScalar(Math.max(0.001, p));
-
-    if (this.cover && this.coverMat) {
-      this.cover.visible = false;
-      this.coverMat.transparent = false;
-      this.coverMat.opacity = 1;
-    }
 
     const fx = Math.min(1, p * 1.15);
     if (this.coreMat) this.coreMat.opacity = 0.7 * fx;
@@ -591,8 +512,6 @@ export class UpsideDownPortal {
     this.revealing = true;
     this.revealed = true;
     this.revealT = 0;
-    this.removePhysicsCover();
-    if (this.cover) this.cover.visible = false;
     if (this.portalGroup) {
       this.portalGroup.visible = true;
       this.portalGroup.scale.setScalar(0.35);
@@ -629,16 +548,5 @@ export class UpsideDownPortal {
     }
     this.sensorCollider = null;
     this.sensorBody = null;
-  }
-
-  private removePhysicsCover(): void {
-    if (this.coverCollider && this.world) {
-      this.world.removeCollider(this.coverCollider, true);
-      this.coverCollider = null;
-    }
-    if (this.coverBody && this.world) {
-      this.world.removeRigidBody(this.coverBody);
-      this.coverBody = null;
-    }
   }
 }

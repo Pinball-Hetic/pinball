@@ -13,7 +13,6 @@ export const UPSIDE_DOWN_TRANSITION_HOLD =
 export const UPSIDE_DOWN_PORTAL_REVEAL_DELAY = 3;
 export const UPSIDE_DOWN_PORTAL_OPEN_DURATION = 2.5;
 export const UPSIDE_DOWN_PORTAL_OPEN_POLISH = 0.2;
-export const UPSIDE_DOWN_PORTAL_COVER_LIFT = 0.0008;
 export const UPSIDE_DOWN_PORTAL_ANCHOR_NAMES = [
   'portal_upsidedown',
   'vis_demogorgon_portal_demog_portal_ref_skeleton',
