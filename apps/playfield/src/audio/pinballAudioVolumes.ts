@@ -5,7 +5,7 @@
  *
  * Exemples :
  * - Musique trop forte → baisser `music` (ex. 50)
- * - Cloche Upside Down faible → monter `cinematic` ou `apparitionUpsideDown`
+ * - Son d.ambiance faible → monter `cinematic` (volumes spécifiques fournis par la map)
  * - Tout le jeu plus fort → monter `master` (ex. 90)
  */
 
@@ -20,8 +20,6 @@ export const AUDIO_VOLUME = {
 /** Niveau fin par fichier (0–100+, relatif à son bus ; >100 = boost). */
 export const SOUND_VOLUME = {
   earlySound: 100,
-  spawnDemogorgon: 100,
-  apparitionUpsideDown: 280,
   gameOver: 85,
 } as const;
 

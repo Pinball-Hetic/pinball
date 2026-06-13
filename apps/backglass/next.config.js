@@ -7,7 +7,9 @@ const nextConfig = {
   // le mode same-origin Fliphetic est mort. Ne pas retirer.
   skipTrailingSlashRedirect: true,
   reactStrictMode: true,
-  transpilePackages: ['@pinball/shared-types'],
+  // @pinball/maps + map-strangerthings : Next doit transpiler ces packages
+  // pour traiter le CSS Module co-localisé (art.module.css des composants ST).
+  transpilePackages: ['@pinball/shared-types', '@pinball/maps', '@pinball/map-strangerthings'],
   async rewrites() {
     return [
       {

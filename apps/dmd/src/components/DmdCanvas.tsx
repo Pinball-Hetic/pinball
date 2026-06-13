@@ -1,16 +1,18 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { DmdDisplay } from '@pinball/shared-types'
-import { DmdRenderer, GRID_W, GRID_H } from '@/dmd/DmdRenderer'
-import { layouts } from '@/dmd/layouts'
-import { applyGlitch, MatrixRain } from '@/dmd/effects'
+import { DmdRenderer, GRID_W, GRID_H, applyGlitch, MatrixRain, PALETTE_NORMAL, makeLayouts } from '@pinball/dmd-core'
+import { mapDmdContent } from '@/dmd/mapContent'
 
 const GLITCH_MS = 350
-const BURST_MS = 1200
+// Contenu DMD de la map résolu au chargement (constante module).
+const LAYOUTS = makeLayouts(mapDmdContent)
+const ALTERNATE_PALETTE = mapDmdContent.paletteAlternateWorld ?? PALETTE_NORMAL
+const BURST_MS = mapDmdContent.alternateWorldBurstMs ?? 1200
 
 interface Props {
   display: DmdDisplay
-  upsideDown: boolean
+  alternateWorld: boolean
 }
 
 const canvasStyle: CSSProperties = {
@@ -22,17 +24,17 @@ const canvasStyle: CSSProperties = {
 
 // Boucle rAF qui lit des refs : ZÉRO re-render par frame (règle projet —
 // un re-render démonterait/remonterait le canvas).
-export default function DmdCanvas({ display, upsideDown }: Props) {
+export default function DmdCanvas({ display, alternateWorld }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const displayRef = useRef(display)
-  const upsideDownRef = useRef(upsideDown)
+  const alternateWorldRef = useRef(alternateWorld)
 
   useEffect(() => {
     displayRef.current = display
   }, [display])
   useEffect(() => {
-    upsideDownRef.current = upsideDown
-  }, [upsideDown])
+    alternateWorldRef.current = alternateWorld
+  }, [alternateWorld])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -66,10 +68,10 @@ export default function DmdCanvas({ display, upsideDown }: Props) {
       // CINEMATIC : horloge relative à l'arrivée du mode (frames du clip).
       const clock = cinematic ? now - modeStartedAt : now
 
-      renderer.setPalette(upsideDownRef.current ? 'upsideDown' : 'normal')
+      renderer.setPalette(alternateWorldRef.current ? ALTERNATE_PALETTE : PALETTE_NORMAL)
       renderer.clearGrid()
-      layouts[d.mode](renderer.grid, d, clock)
-      if (upsideDownRef.current) rain.drawBackground(renderer.grid)
+      LAYOUTS[d.mode](renderer.grid, d, clock)
+      if (alternateWorldRef.current) rain.drawBackground(renderer.grid)
       // Glitch/burst NE s'appliquent PAS pendant un clip (il se suffit).
       if (!cinematic && now < glitchUntil) {
         applyGlitch(renderer.grid, GRID_W, GRID_H, (glitchUntil - now) / GLITCH_MS)

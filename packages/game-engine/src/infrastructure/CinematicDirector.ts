@@ -8,7 +8,7 @@ export interface CinematicSpec {
 
 /**
  * Directeur de cinématiques : généralise le pattern de pause
- * d'UpsideDownTransition (clip joué → physique gelée pendant sa durée).
+ * d'la transition de monde (clip joué → physique gelée pendant sa durée).
  * Le playfield combine `transitionActive || director.shouldFreeze()`.
  */
 export class CinematicDirector {

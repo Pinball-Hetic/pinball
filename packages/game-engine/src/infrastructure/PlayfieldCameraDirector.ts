@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { BossId } from '../domain/BossRegistry';
-import { getBossDefinition } from '../domain/BossRegistry';
+import type { BossDefinition, BossId } from '../domain/BossRegistry';
+import { getBossById } from '../domain/BossRegistry';
 import {
   CAMERA_CINEMATIC_DISTANCE_MIN,
   type BossCameraCinematicConfig,
@@ -23,6 +23,7 @@ export type PlayfieldCameraCapture = {
 };
 
 export class PlayfieldCameraDirector {
+  private bosses: BossDefinition[] = [];
   private camera: THREE.PerspectiveCamera | null = null;
   private base: BaseView | null = null;
   private config: BossCameraCinematicConfig | null = null;
@@ -32,6 +33,10 @@ export class PlayfieldCameraDirector {
   private readonly lookAt = new THREE.Vector3();
   private readonly panFrom = new THREE.Vector3();
   private readonly bossFocus = new THREE.Vector3();
+
+  setBosses(bosses: BossDefinition[]): void {
+    this.bosses = bosses;
+  }
 
   captureBase(capture: PlayfieldCameraCapture): void {
     this.camera = capture.camera;
@@ -114,7 +119,8 @@ export class PlayfieldCameraDirector {
   private begin(bossId: BossId, kind: 'reveal' | 'victory'): void {
     if (!this.camera || !this.base || this.phase !== 'idle') return;
 
-    const def = getBossDefinition(bossId);
+    const def = getBossById(this.bosses, bossId);
+    if (!def) return;
     const cinematic =
       kind === 'reveal' ? def.cameraCinematic : def.victoryCameraCinematic;
     this.config = cinematic;

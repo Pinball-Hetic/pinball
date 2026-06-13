@@ -4,7 +4,6 @@ import {
   WALL_LEFT_X,
   WALL_RIGHT_X,
   BALL_RADIUS,
-  BALL_SPAWN_POSITION,
 } from './Ball';
 import { FLIPPER_Z_MAX } from './FlipperConstants';
 
@@ -20,10 +19,15 @@ export function ballCenterOnSurface(z: number, margin = 0.002): number {
 export const DRAIN_Z_THRESHOLD = WALL_BOTTOM_Z + BALL_RADIUS * 2;
 
 export const BOTTOM_OUT_Z = FLIPPER_Z_MAX + 0.025;
-export const BOTTOM_OUT_LANE_SEP_X = BALL_SPAWN_POSITION.x - BALL_RADIUS * 2;
 
-export function isInBottomOutZone(x: number, z: number): boolean {
-  return z >= BOTTOM_OUT_Z && x <= BOTTOM_OUT_LANE_SEP_X;
+// Séparateur X de la zone bottom-out : dérivé du spawn (paramétré, plus de
+// constante map dans le domain). laneSepX = spawnX - 2·rayon balle.
+export function bottomOutLaneSepX(spawnX: number): number {
+  return spawnX - BALL_RADIUS * 2;
+}
+
+export function isInBottomOutZone(x: number, z: number, laneSepX: number): boolean {
+  return z >= BOTTOM_OUT_Z && x <= laneSepX;
 }
 
 // ── Diagnostic : détection d'une balle perdue (hors monde) ───────────────────

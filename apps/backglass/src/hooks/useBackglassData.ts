@@ -11,8 +11,7 @@ type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
 const EMPTY_STATS: GlobalStats = {
   totalGames: 0,
-  totalDemogorgons: 0,
-  totalPortals: 0,
+  totals: [],
   bestCombo: null,
   bestToday: null,
 }

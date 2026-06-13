@@ -4,16 +4,8 @@ export const SWING_SMOOTH = 0.78;
 export const FLIPPER_SWING_AXIS: 'x' | 'y' | 'z' = 'x';
 export const HINGE_INSET_FROM_EDGE = 0.0;
 
-// ── Fine-tuning pivot (visible avec H) ───────────────────────────────────────
-// Ajustez ces valeurs et rechargez — le debug H montre le résultat en temps réel.
-// LEFT_PIVOT_X  : négatif = décale vers la gauche
-// RIGHT_PIVOT_X : positif = décale vers la droite
-// PIVOT_Y       : positif = monte (au-dessus de la surface du playfield)
-// PIVOT_Z       : positif = avance vers le joueur
-export const FLIPPER_LEFT_PIVOT_X  =  0.02;
-export const FLIPPER_RIGHT_PIVOT_X =  -0.02;
-export const FLIPPER_PIVOT_Y       =  0.00;
-export const FLIPPER_PIVOT_Z       =  -0.018;
+// Réglage fin du pivot des flippers : déplacé dans le layout de la map
+// (layout.flipperPivots), injecté dans FlipperSplitter.attachFlipperAtHinge.
 
 // Zone flipper Z (PlayfieldGeometry + BallDiagnostics). Les bornes X sont
 // désormais dérivées des bbox mesh au chargement (cf. FlipperZones.ts).

@@ -8,9 +8,9 @@ import type {
   GameStats,
   CinematicClip,
 } from '@pinball/shared-types';
-import { CLIP_SHOW_MS, CLIP_TAKEOVER_MS } from '@pinball/shared-types';
-import type { GameEvent } from '@pinball/game-engine';
-import { getBossDefinition } from '@pinball/game-engine';
+import { clipShowMs, clipTakeoverMs, type ClipTimings } from '@pinball/shared-types';
+import type { GameEvent, BossDefinition } from '@pinball/game-engine';
+import { getBossById } from '@pinball/game-engine';
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -38,11 +38,11 @@ const DURATIONS = {
 } as const;
 
 
-// upsideDown est injecté au moment de l'emit (atmosphereRef) — la stack
+// alternateWorld est injecté au moment de l'emit (atmosphereRef) — la stack
 // stocke les displays sans ce champ. Omit distributif sur l'union.
 type DisplayBase = DmdDisplay extends infer T
   ? T extends DmdDisplay
-    ? Omit<T, 'upsideDown'>
+    ? Omit<T, 'alternateWorld'>
     : never
   : never;
 
@@ -56,7 +56,7 @@ export interface DmdOrchestrator {
   // Score broadcast bas niveau (DMD data sync, indépendant du mode display)
   emitScoreSnapshot: (s: ScoreUpdate) => void;
   emitGameStart: (player: string) => void;
-  emitGameOver: (player: string, finalScore: number, stats: GameStats) => void;
+  emitGameOver: (player: string, finalScore: number, mapId: string, stats: GameStats) => void;
   // Clip cinématique plein écran (prio max) — synchro avec playfield/backglass.
   pushCinematic: (clip: CinematicClip, value?: number) => void;
   // DMD high-level : push une display, l'orchestrator décide quoi montrer
@@ -67,33 +67,44 @@ export interface DmdOrchestrator {
   pushMultiFlash: (multiplier: number, combo: number, snap: ScoreUpdate) => void;
   pushLifeLost: (livesRemaining: number, score: number, player: string) => void;
   pushGameOver: (player: string, finalScore: number) => void;
-  setAtmosphere: (upsideDownActive: boolean) => void;
+  setAtmosphere: (alternateWorldActive: boolean) => void;
 }
 
-// Labels lisibles pour les events highlight :
-function eventLabel(event: GameEvent): string | null {
+// Labels lisibles pour les events highlight (boss defs injectées par la map) :
+function eventLabel(event: GameEvent, bosses: BossDefinition[]): string | null {
   switch (event.type) {
     case 'BOSS_REVEAL':
-      return getBossDefinition(event.bossId).hud.dmdLabel;
+      return getBossById(bosses, event.bossId)?.hud.dmdLabel ?? event.bossId.toUpperCase();
     case 'BOSS_TARGET_HIT': {
-      const def = getBossDefinition(event.bossId);
-      return event.hitCount >= def.targetHits
-        ? `${def.hud.dmdLabel} VAINCU`
-        : `${def.hud.dmdLabel} HIT ${event.hitCount}/${def.targetHits}`;
+      const def = getBossById(bosses, event.bossId);
+      const label = def?.hud.dmdLabel ?? event.bossId.toUpperCase();
+      const hits = def?.targetHits ?? event.hitCount;
+      return event.hitCount >= hits
+        ? `${label} VAINCU`
+        : `${label} HIT ${event.hitCount}/${hits}`;
     }
     case 'PORTAL_ENTER': return 'PORTAL';
     case 'RETURN_PORTAL_ENTER': return 'RETOUR';
     case 'WORLD_CYCLE_COMPLETE': return 'CYCLE COMPLET';
     case 'RAMP_HIT': return 'RAMP';
     case 'DROP_TARGET_COMPLETE': return `DROP ${event.side.toUpperCase()}`;
-    case 'ELEVEN_ASSIST': return 'ELEVEN +' + 100;
+    case 'ASSIST': {
+      const label = bosses.find((b) => b.hud.assistLabel)?.hud.assistLabel ?? 'ASSIST';
+      return label.toUpperCase();
+    }
     default: return null; // bumpers/slingshots/zones → pas de highlight, juste score
   }
 }
 
 export { eventLabel }; // exporté pour tests
 
-export function useDmdOrchestrator(): DmdOrchestrator {
+export function useDmdOrchestrator(
+  clips?: Record<string, ClipTimings>,
+): DmdOrchestrator {
+  // Table de clips de la map (manifest.clips), lue via ref pour rester à jour
+  // sans recréer l'orchestrateur.
+  const clipsRef = useRef(clips);
+  clipsRef.current = clips;
   const socketRef = useRef<PinballSocket | null>(null);
   const stackRef = useRef<PendingDisplay[]>([]);
   const lastSentRef = useRef<string>(''); // JSON.stringify de la dernière display envoyée
@@ -128,8 +139,8 @@ export function useDmdOrchestrator(): DmdOrchestrator {
     const top = stackRef.current
       .slice()
       .sort((a, b) => b.priority - a.priority)[0]!;
-    // upsideDown injecté ici → l'atmosphere voyage dans chaque display.
-    const payload = { ...top.display, upsideDown: atmosphereRef.current } as DmdDisplay;
+    // alternateWorld injecté ici → l'atmosphere voyage dans chaque display.
+    const payload = { ...top.display, alternateWorld: atmosphereRef.current } as DmdDisplay;
     const serialized = JSON.stringify(payload);
     if (serialized === lastSentRef.current) return;
     lastSentRef.current = serialized;
@@ -151,8 +162,8 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       socketRef.current?.emit('score:update', s);
     },
     emitGameStart: (player) => socketRef.current?.emit('game:start', { player }),
-    emitGameOver: (player, finalScore, stats) =>
-      socketRef.current?.emit('game:over', { player, finalScore, stats }),
+    emitGameOver: (player, finalScore, mapId, stats) =>
+      socketRef.current?.emit('game:over', { player, finalScore, mapId, stats }),
 
     pushIntro: (player) => {
       // Reset complet : l'INTRO ne s'affiche qu'au repos (ball non lancée),
@@ -185,8 +196,7 @@ export function useDmdOrchestrator(): DmdOrchestrator {
           score: snap.score,
           lives: snap.lives,
           player: snap.player,
-          hetic: snap.hetic,
-          fever: snap.fever,
+          mapState: snap.mapState,
         },
         { priority: PRIO.COMBO_FLASH, duration: DURATIONS.COMBO_FLASH },
       ),
@@ -200,8 +210,7 @@ export function useDmdOrchestrator(): DmdOrchestrator {
           score: snap.score,
           lives: snap.lives,
           player: snap.player,
-          hetic: snap.hetic,
-          fever: snap.fever,
+          mapState: snap.mapState,
         },
         { priority: PRIO.MULTI_FLASH, duration: DURATIONS.MULTI_FLASH },
       ),
@@ -231,13 +240,16 @@ export function useDmdOrchestrator(): DmdOrchestrator {
       push(
         { mode: 'CINEMATIC', clip, player, score, value },
         // Segment plein écran : le mode SCORE reprend après (fever en SCORE).
-        { priority: PRIO.CINEMATIC, duration: CLIP_TAKEOVER_MS[clip] ?? CLIP_SHOW_MS[clip] },
+        {
+          priority: PRIO.CINEMATIC,
+          duration: clipTakeoverMs(clipsRef.current, clip) ?? clipShowMs(clipsRef.current, clip),
+        },
       );
     },
 
-    setAtmosphere: (upsideDownActive) => {
-      if (atmosphereRef.current === upsideDownActive) return;
-      atmosphereRef.current = upsideDownActive;
+    setAtmosphere: (alternateWorldActive) => {
+      if (atmosphereRef.current === alternateWorldActive) return;
+      atmosphereRef.current = alternateWorldActive;
       // Re-pousse le display courant avec la nouvelle atmosphere.
       lastSentRef.current = '';
       sendCurrent();

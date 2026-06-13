@@ -11,15 +11,16 @@ model Game {
   id            String   @id @default(cuid())
   player        String // pseudo affiché — aléatoire aujourd'hui
   playerId      String? // réservé : future feature compte/pseudo (site web)
+  mapId         String   @default("strangerthings") // map jouée
   score         Int
   maxCombo      Int      @default(0)
   maxMultiplier Int      @default(1)
-  demogorgons   Int      @default(0)
-  portals       Int      @default(0)
-  hetic         Int      @default(0)
+  // Compteurs spécifiques à la map (ex ST : demogorgons/portals/hetic).
+  counters      Json     @default("{}")
   durationS     Int      @default(0)
   createdAt     DateTime @default(now())
 
   @@index([score(sort: Desc)])
   @@index([createdAt])
+  @@index([mapId, score(sort: Desc)])
 }

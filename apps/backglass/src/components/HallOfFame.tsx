@@ -5,7 +5,7 @@ import type { Reactor } from '@/hooks/useIngameReactor'
 interface HallOfFameProps {
   entries: LeaderboardEntry[]
   highlightRank?: number
-  inverted?: boolean // Upside Down : flip 3D
+  inverted?: boolean // monde alternatif : flip 3D
   reactor?: Reactor
 }
 

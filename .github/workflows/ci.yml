@@ -29,3 +29,6 @@ jobs:
 
       - name: Test all packages
         run: bun run test
+
+      - name: Validate maps
+        run: bun scripts/validate-map.ts strangerthings

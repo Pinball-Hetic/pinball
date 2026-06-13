@@ -1,0 +1,6 @@
+{
+  "extends": "../config/.eslintrc.json",
+  "rules": {
+    "@typescript-eslint/no-restricted-imports": "off"
+  }
+}

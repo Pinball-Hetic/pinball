@@ -10,7 +10,7 @@ const EMIT_RATE = 80; // sprites/s à intensité 1
 const DRIFT_Y = 0.02; // dérive verticale (unités/s)
 
 const COLOR_FIRE = 0xff6a00;
-const COLOR_UPSIDE = 0xb14dff;
+const COLOR_ALTERNATE = 0xb14dff;
 const COLOR_FEVER_A = 0xff8800;
 const COLOR_FEVER_B = 0x00c8ff;
 
@@ -90,14 +90,14 @@ export class BallTrail {
 
   /**
    * @param intensity 0..1 — densité d'émission (0 = trail off).
-   * @param opts upsideDown (teinte violette) / fever (teinte alternée).
+   * @param opts alternateWorld (teinte violette) / fever (teinte alternée).
    * @param camQuat orientation caméra pour billboarder les planes.
    */
   update(
     dt: number,
     ballPos: { x: number; y: number; z: number },
     intensity: number,
-    opts: { upsideDown: boolean; fever: boolean },
+    opts: { alternateWorld: boolean; fever: boolean },
     camQuat: THREE.Quaternion,
   ): void {
     // Émission proportionnelle à l'intensité.
@@ -105,7 +105,7 @@ export class BallTrail {
       this.emitAccum += intensity * EMIT_RATE * dt;
       while (this.emitAccum >= 1) {
         this.emitAccum -= 1;
-        let color = opts.upsideDown ? COLOR_UPSIDE : COLOR_FIRE;
+        let color = opts.alternateWorld ? COLOR_ALTERNATE : COLOR_FIRE;
         if (opts.fever) {
           this.feverFlip ^= 1;
           color = this.feverFlip ? COLOR_FEVER_A : COLOR_FEVER_B;

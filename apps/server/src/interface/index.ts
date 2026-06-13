@@ -20,18 +20,20 @@ app.get('/', (req, res) => {
   res.send('Pinball Server is running');
 });
 
-app.get('/api/leaderboard', async (_req, res) => {
+app.get('/api/leaderboard', async (req, res) => {
   try {
-    res.json(await topTen());
+    const mapId = typeof req.query.mapId === 'string' ? req.query.mapId : undefined;
+    res.json(await topTen(mapId));
   } catch (err) {
     console.error('[server] /api/leaderboard failed:', err);
     res.status(500).json({ error: 'leaderboard unavailable' });
   }
 });
 
-app.get('/api/stats', async (_req, res) => {
+app.get('/api/stats', async (req, res) => {
   try {
-    res.json(await globalStats());
+    const mapId = typeof req.query.mapId === 'string' ? req.query.mapId : undefined;
+    res.json(await globalStats(mapId));
   } catch (err) {
     console.error('[server] /api/stats failed:', err);
     res.status(500).json({ error: 'stats unavailable' });

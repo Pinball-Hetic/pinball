@@ -1,33 +1,26 @@
 import type { GameOver } from '@pinball/shared-types'
+import { counterLabels } from '@/map/content'
 import VhsGlitch from '../VhsGlitch'
 
 interface Props {
   payload: GameOver & { rank: number }
 }
 
-const HETIC = 'HETIC'.split('')
-
 export default function RecapTakeover({ payload }: Props) {
   const s = payload.stats
   const qualifying = payload.rank <= 10
 
+  // Compteurs génériques : libellés fournis par la map (counterLabels), valeurs
+  // depuis GameStats.counters. Le core n'a aucune clé ST en dur.
+  const counterCells = Object.entries(s.counters).map(([id, value]) => ({
+    label: counterLabels[id] ?? id.toUpperCase(),
+    value,
+  }))
+
   const cells: { label: string; value: React.ReactNode }[] = [
     { label: 'COMBO MAX', value: `x${s.maxCombo}` },
     { label: 'MULTIPLIER MAX', value: `x${s.maxMultiplier}` },
-    { label: 'DEMOGORGONS', value: s.demogorgons },
-    { label: 'PORTAILS', value: s.portals },
-    {
-      label: 'HETIC',
-      value: (
-        <span className="hetic-slots">
-          {HETIC.map((c, i) => (
-            <span key={i} className={i < s.hetic ? 'hetic-on' : 'hetic-off'}>
-              {c}
-            </span>
-          ))}
-        </span>
-      ),
-    },
+    ...counterCells,
     { label: 'DURÉE', value: `${s.durationS}s` },
   ]
 

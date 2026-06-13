@@ -14,6 +14,25 @@ import {
   isPinballmapNonPhysicalFloorMesh,
   SWITCH_SENSOR_NODES,
 } from './GltfNodeNames';
+import { MeshRoleResolver } from './MeshRoleResolver';
+
+// Tuning matière par mesh (= manifest.elements). Passé en brut pour ne pas
+// coupler game-engine à shared-types.
+export type MeshElements = Record<string, Record<string, number | string>>;
+
+function ancestryNames(obj: THREE.Object3D): string[] {
+  const names: string[] = [];
+  let cur: THREE.Object3D | null = obj;
+  while (cur) {
+    names.push(cur.name);
+    cur = cur.parent;
+  }
+  return names;
+}
+
+function elemNum(v: number | string | undefined, def: number): number {
+  return typeof v === 'number' ? v : def;
+}
 
 const COLLISION_SOLIDS = new Set([
   'flipper',
@@ -62,7 +81,7 @@ const TRIMESH_DEDICATED = new Set([
 ]);
 
 /**
- * Meshes racines de scène (pas sous Pinballmap ni Strangerthings) qui doivent
+ * Meshes racines de scène (hors hiérarchie GLB connue) qui doivent
  * recevoir un collider trimesh. Typiquement : petites plaques/guides ajoutés
  * pour lisser une paroi où la balle se bloquait.
  * Noms normalisés (lowercase, espaces → underscores).
@@ -237,6 +256,56 @@ function laplacianSmooth(
 }
 
 export class PlayfieldTrimeshBuilder {
+  /**
+   * Construction role-driven (GLB conventionné). Chaque mesh est classé par
+   * son rôle (MeshRoleResolver, via la hiérarchie) :
+   *  - wall_ / lane_ → trimesh solide (matière depuis elements[nom])
+   *  - floor_        → trimesh, SAUF si elements.physics === 'analytic'
+   *  - flipper_/bumper_/slingshot_/target_/sensor_/vis_ → ignorés ici
+   *    (gérés analytiquement par PlayfieldColliderFactory, ou sans physique).
+   * Les meshes d'un même nom conventionné (ex. wall_top = Mesh_2/3/4) sont
+   * fusionnés en un seul collider.
+   */
+  static buildRoleDriven(
+    playfieldRoot: THREE.Object3D,
+    world: RAPIER.World,
+    resolver: MeshRoleResolver,
+    elements: MeshElements,
+  ): void {
+    playfieldRoot.updateMatrixWorld(true);
+    const groups = new Map<string, { geos: THREE.BufferGeometry[]; role: string }>();
+
+    playfieldRoot.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const resolved = resolver.resolveFromAncestry(ancestryNames(child));
+      if (!resolved) return;
+      const { role, id } = resolved;
+      if (role !== 'wall' && role !== 'lane' && role !== 'floor') return;
+      const key = `${role}_${id}`;
+      if (role === 'floor' && elements[key]?.physics === 'analytic') return;
+      if (!groups.has(key)) groups.set(key, { geos: [], role });
+      groups.get(key)!.geos.push(extractWorldGeometry(child));
+    });
+
+    resolver.warnUnresolvedOnce();
+
+    for (const [key, g] of groups) {
+      const el = elements[key] ?? {};
+      const restitution = elemNum(el.restitution, 0.35);
+      const friction = elemNum(el.friction, 0.15);
+      const singleSided = el.singleSided === 1;
+      const doubleSided = el.doubleSided !== undefined ? el.doubleSided === 1 : !singleSided;
+      // Lissage laplacien réservé au sol (anti-accroche au roulement).
+      // Sur un mur concave il aplatit la concavité → corde de collision
+      // fantôme. Défaut: floor lissé, wall/lane bruts. Override via manifest.
+      const defaultSmooth = g.role === 'floor';
+      const smooth = el.smooth !== undefined ? el.smooth === 1 : defaultSmooth;
+      PlayfieldTrimeshBuilder.createTrimeshCollider(
+        world, g.geos, restitution, friction, smooth, doubleSided,
+      );
+    }
+  }
+
   static build(
     playfieldRoot: THREE.Object3D,
     world: RAPIER.World,

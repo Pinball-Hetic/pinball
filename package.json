@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/maps/*"
   ],
   "scripts": {
     "dev": "bun --filter \"*\" dev",

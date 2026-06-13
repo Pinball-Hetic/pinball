@@ -15,10 +15,7 @@ import {
   DetectBottomOut,
   BALL_RADIUS,
   BALL_MAX_SPEED,
-  BALL_SPAWN_POSITION,
-  SHOOTER_LANE_LEFT_WALL_TOP_Z,
-  SHOOTER_LANE_LOCK_X,
-  SHOOTER_LANE_EXIT_X,
+  bottomOutLaneSepX,
   WALL_LEFT_X,
   WALL_RIGHT_X,
   WALL_BOTTOM_Z,
@@ -37,7 +34,6 @@ import {
   computeSurfaceSnap,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
-  playfieldUsesCollOnlyCollision,
   resolvePlayfieldFlippers,
   attachFlipperAtHinge,
   applyFlipperSwing,
@@ -55,46 +51,46 @@ import {
   configureGltfRenderer,
   createGltfLoader,
   ballCenterOnSurface,
-  DROP_TARGETS,
   PlungerPhysics,
-  BumperVisuals,
-  GarlandLights,
-  DemogorgonReveal,
-  VecnaReveal,
-  BossRevealOrchestrator,
-  BossNestMarker,
-  BOSS_IDS,
-  getBossDefinition,
-  bossThresholdMet,
   type BossId,
   CinematicDirector,
   ScreenShake,
   PlayfieldCameraDirector,
   BallTrail,
   QualityGovernor,
-  DEMOGORGON_TARGET,
-  DEMOGORGON_TARGET_HITS,
   PORTAL_ENTER_SCORE,
-  ELEVEN_ASSIST_SCORE,
+  ASSIST_SCORE,
   SCORE_BUMPER,
   SCORE_SLINGSHOT,
   SCORE_RAMP,
   SCORE_DROP_COMPLETE,
-  SCORE_DEMOGORGON_REVEAL,
-  SCORE_DEMOGORGON_TARGET,
   type GameEvent,
-  UpsideDownPortal,
-  UpsideDownTransition,
-  UpsideDownAtmosphere,
   ShooterLaneGate,
 } from "@pinball/game-engine";
+import { getBossById } from "@pinball/game-engine";
+import { getMapPackage, type ResolvedMap } from "@pinball/maps";
+import { NoSignal } from "@pinball/ui";
+import { MeshRoleResolver, LayoutResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
 import type {
   ButtonAction,
   ButtonId,
   CinematicClip,
   DevGameEventTrigger,
 } from "@pinball/shared-types";
-import { CLIP_FREEZE_MS } from "@pinball/shared-types";
+import { clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
+
+const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
+// Résolu au niveau module (MAP_ID = constante build-time) → permet un garde
+// NO SIGNAL en 1ère ligne du composant, avant tout hook.
+const RESOLVED_MAP = getMapPackage(MAP_ID);
+// Définitions de boss de la map active (point de composition unique).
+const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
+const MAP_CLIPS = RESOLVED_MAP?.manifest.clips;
+// URLs de sons spécifiques à la map (reveal boss + sons d'event) à précharger.
+const MAP_SOUND_URLS: string[] = [
+  ...MAP_BOSSES.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
+  ...Object.values(RESOLVED_MAP?.manifest.sounds ?? {}).map((s) => s.url),
+];
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -107,19 +103,27 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
       return { type: "RAMP_HIT", scoreIncrement: SCORE_RAMP };
     case "DROP_TARGET_COMPLETE":
       return { type: "DROP_TARGET_COMPLETE", side: "left", scoreIncrement: SCORE_DROP_COMPLETE };
-    case "DEMOGORGON_REVEAL":
-      return { type: "BOSS_REVEAL", bossId: "demogorgon", scoreIncrement: SCORE_DEMOGORGON_REVEAL };
-    case "DEMOGORGON_TARGET_HIT":
+    case "BOSS_REVEAL": {
+      const bossId = d.bossId ?? MAP_BOSSES[0]?.id ?? "";
+      return {
+        type: "BOSS_REVEAL",
+        bossId,
+        scoreIncrement: getBossById(MAP_BOSSES, bossId)?.reveal.scoreIncrement ?? 150,
+      };
+    }
+    case "BOSS_TARGET_HIT": {
+      const bossId = d.bossId ?? MAP_BOSSES[0]?.id ?? "";
       return {
         type: "BOSS_TARGET_HIT",
-        bossId: "demogorgon",
+        bossId,
         hitCount: d.hitCount ?? 1,
-        scoreIncrement: SCORE_DEMOGORGON_TARGET,
+        scoreIncrement: getBossById(MAP_BOSSES, bossId)?.scoreTargetHit ?? 250,
       };
+    }
     case "PORTAL_ENTER":
       return { type: "PORTAL_ENTER", scoreIncrement: PORTAL_ENTER_SCORE };
-    case "ELEVEN_ASSIST":
-      return { type: "ELEVEN_ASSIST", scoreIncrement: ELEVEN_ASSIST_SCORE };
+    case "ASSIST":
+      return { type: "ASSIST", assistId: "assist", scoreIncrement: ASSIST_SCORE };
     case "DEBUG_ADD_SCORE":
       // Score brut → le pipeline score/paliers réagit naturellement.
       return { type: "ZONE_HIT", zone: "debug", scoreIncrement: d.amount ?? 1000 };
@@ -139,7 +143,8 @@ import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import {
   notifyBootPhase,
   onPlayfieldReady,
-  playUpsideDownAppearSound,
+  playMapCinematicSound,
+  warmMapSounds,
   resetPinballAudioForNewGame,
   unlockPinballAudio,
 } from "@/audio/pinballAudio";
@@ -147,10 +152,9 @@ import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 
-const PLAYFIELD_URL = "/playfield/Strangerthings.glb";
 
-type UpsideDownPersistence = "until_game_over" | "until_drain";
-const UPSIDE_DOWN_PERSISTENCE: UpsideDownPersistence = "until_game_over";
+type AlternateWorldPersistence = "until_game_over" | "until_drain";
+const ALTERNATE_WORLD_PERSISTENCE: AlternateWorldPersistence = "until_game_over";
 
 /**
  * Mode du clavier — `NEXT_PUBLIC_KEYBOARD_MODE` :
@@ -354,7 +358,15 @@ type PinballPlayfieldProps = {
   cabinetMode?: boolean;
 };
 
-export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfieldProps) {
+// Garde NO SIGNAL : map introuvable → écran de veille plein écran (pas de
+// crash). Wrapper sans hook → l'Inner (tous les hooks) n'est monté que si la
+// map existe.
+export default function PinballPlayfield(props: PinballPlayfieldProps) {
+  if (!RESOLVED_MAP) return <NoSignal reason={`MAP "${MAP_ID}" INTROUVABLE`} />;
+  return <PinballPlayfieldInner {...props} />;
+}
+
+function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   const [debugSnapshot, setDebugSnapshot] = useState<BallDiagnosticsSnapshot | null>(null);
@@ -402,7 +414,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     notifyBootPhase(bootPhase);
   }, [bootPhase]);
 
-  const dmd = useDmdOrchestrator();
+  const dmd = useDmdOrchestrator(MAP_CLIPS);
 
   // Directeur de cinématiques (stable). Ref → accessible depuis les
   // callbacks render-scope (onLifeLost) et la boucle animate (useEffect).
@@ -410,12 +422,23 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
   if (!cinematicsRef.current) cinematicsRef.current = new CinematicDirector();
   const cinematics = cinematicsRef.current;
 
+  // Map résolue (garantie non-null par le garde NO SIGNAL du wrapper).
+  const mapPackageRef = useRef<ResolvedMap>(RESOLVED_MAP!);
+  // Ref vers le module (accessible depuis les callbacks render-scope, ex. reset).
+  const mapModuleRef = useRef<MapModule | null>(null);
+  // emit (défini dans l'effet) exposé aux callbacks useGameState render-scope.
+  const emitRef = useRef<GameEventListener | null>(null);
+  const mapLayout = mapPackageRef.current.layout;
+  const mapManifest = mapPackageRef.current.manifest;
+  // manifest.glb est déjà une URL publique absolue (/maps/<id>/…).
+  const playfieldUrl = mapManifest.glb;
+
   const playCinematic = useCallback(
     (
       clip: CinematicClip,
       opts?: { once?: boolean; value?: number; onEnd?: () => void },
     ): boolean => {
-      const freezeMs = CLIP_FREEZE_MS[clip];
+      const freezeMs = clipFreezeMs(mapManifest.clips, clip);
       // Clip avec gel → passe par le director (pause physique). Sans gel
       // (freeze 0) → simple push DMD, le jeu continue.
       if (freezeMs > 0) {
@@ -448,17 +471,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     gameStateRef,
     bossHud,
     scorePops,
-    upsideDownActive,
-    upsideDownHint,
+    alternateWorldActive,
+    alternateWorldHint,
     scoreRef,
     livesRef,
     comboRef,
     multiplierRef,
     playerRef,
-    heticRef,
     isFeverActive,
     startFever,
-    clearUpsideDownSession,
+    clearAlternateWorldSession,
     resetGame,
     buildEmit,
   } = useGameState({
@@ -469,8 +491,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: comboRef.current,
         multiplier: multiplierRef.current,
         lives: livesRef.current,
-        hetic: heticRef.current,
-        fever: isFeverActive(),
+        mapState: buildMapState(),
       };
 
       dmd.emitScoreSnapshot(snap);
@@ -479,7 +500,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       // Chaque event fait switcher l'affichage. Exclusif, par priorité
       // décroissante : event labellisé → EVENT ; nouveau multiplier →
       // MULTI ; sinon combo en cours → COMBO.
-      const label = eventLabel(event);
+      const label = eventLabel(event, MAP_BOSSES);
       if (label) {
         dmd.pushEvent(label, finalPoints, snap);
       } else if (previousMultiplier !== newMultiplier) {
@@ -495,8 +516,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: livesRemaining,
-        hetic: heticRef.current,
-        fever: isFeverActive(),
+        mapState: buildMapState(),
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
@@ -504,9 +524,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (livesRemaining === 1) playCinematic('last_chance');
     },
     onGameOver: (finalScore, stats) => {
+      // Counters spécifiques map : récupérés du mapState (alimenté par le
+      // module). useGameState ne compte plus rien de ST.
+      const counters: Record<string, number> = {};
+      for (const [k, v] of Object.entries(mapStateExtraRef.current)) {
+        if (typeof v === "number") counters[k] = v;
+      }
       // Pas d'affichage GAME_OVER sur le DMD : on garde le dernier SCORE
       // jusqu'au reset (INTRO). emitGameOver sert au backglass/leaderboard.
-      dmd.emitGameOver(playerRef.current, finalScore, stats);
+      dmd.emitGameOver(playerRef.current, finalScore, MAP_ID, { ...stats, counters });
       // Clip poussé à CHAQUE game over ; DMD/backglass décident de
       // l'ampleur (le backglass connaît le rang → fanfare ou recap).
       dmd.pushCinematic('hall_of_fame');
@@ -519,8 +545,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: livesRef.current,
-        hetic: heticRef.current,
-        fever: isFeverActive(),
+        mapState: buildMapState(),
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
@@ -528,9 +553,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     onIdleReset: () => {
       cinematics.resetGame();
       resetPinballAudioForNewGame();
-      nestMarkerRef.current?.reset();
-      bossArmedAtRef.current = {};
-      bossLateHintFiredRef.current.clear();
+      mapModuleRef.current?.onGameReset();
       shooterLaneGateRef.current?.open();
       dmd.pushIntro(playerRef.current);
       dmd.emitScoreSnapshot({
@@ -539,66 +562,19 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: 0,
         multiplier: 1,
         lives: 3,
-        hetic: heticRef.current,
-        fever: false,
+        mapState: buildMapState(false),
       });
     },
-    onAtmosphereChange: (upsideDownActive) => {
-      dmd.setAtmosphere(upsideDownActive);
-      atmosphereUpsideRef.current = upsideDownActive;
-      nestMarkerRef.current?.setUpsideDown(upsideDownActive);
+    onAtmosphereChange: (alternateWorldActive) => {
+      dmd.setAtmosphere(alternateWorldActive);
+      atmosphereAlternateRef.current = alternateWorldActive;
+      // nestMarker géré par le module (réconciliation onGameEvent).
     },
-    onMilestone: (threshold) => {
-      const clip: CinematicClip =
-        threshold === 5000
-          ? "milestone_5k"
-          : threshold === 15000
-            ? "milestone_15k"
-            : threshold === 30000
-              ? "milestone_30k"
-              : "milestone_big";
-      playCinematic(clip, { value: threshold });
-      garlandLightsRef.current?.celebrate();
-      screenShakeRef.current?.add(0.4); // shake du gel palier
-    },
-    onBossArmed: (bossId) => {
-      // Le nid s'éveille : marqueur armé + bandeau DMD + frisson garlands.
-      bossArmedAtRef.current[bossId] = performance.now();
-      const snap = {
-        player: playerRef.current,
-        score: scoreRef.current,
-        combo: comboRef.current,
-        multiplier: multiplierRef.current,
-        lives: livesRef.current,
-        hetic: heticRef.current,
-        fever: isFeverActive(),
-      };
-      dmd.pushEvent("LE NID S EVEILLE", 0, snap);
-      garlandLightsRef.current?.celebrate();
-      screenShakeRef.current?.add(0.3);
-    },
-    onHeticLetter: (n) => playCinematic("hetic_letter", { value: n }),
-    onHeticComplete: () => {
-      // FEVER démarre quand le GEL du clip se termine (onEnd du director).
-      // On émet aussitôt un snapshot fever pour rendre la main au mode SCORE
-      // (bandeau + score live) sans attendre le premier hit du joueur.
-      playCinematic("hetic_complete", {
-        onEnd: () => {
-          startFever(30_000);
-          const snap = {
-            player: playerRef.current,
-            score: scoreRef.current,
-            combo: comboRef.current,
-            multiplier: multiplierRef.current,
-            lives: livesRef.current,
-            hetic: heticRef.current,
-            fever: true,
-          };
-          dmd.emitScoreSnapshot(snap);
-          dmd.pushScore(snap);
-        },
-      });
-    },
+    // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
+    // module de map (events MILESTONE / BOSS_ARMED).
+    onMilestone: (threshold) => emitRef.current?.({ type: "MILESTONE", threshold }),
+    onBossArmed: (bossId) => emitRef.current?.({ type: "BOSS_ARMED", bossId }),
+    // le bonus map (lettres + complete + fever) géré par le module de map.
     onFeverEnd: () => {
       // Re-émet un snapshot fever:false pour que DMD/backglass retombent.
       const snap = {
@@ -607,22 +583,35 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         combo: comboRef.current,
         multiplier: multiplierRef.current,
         lives: livesRef.current,
-        hetic: heticRef.current,
-        fever: false,
+        mapState: buildMapState(false),
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
     },
+  }, {
+    portalAnchor: mapLayout.sensors.portal,
+    bumperAnchors: mapLayout.bumpers,
+    atmosphereHintMs: mapLayout.atmosphere.hintMs,
+    bosses: MAP_BOSSES,
   });
 
-  const garlandLightsRef = useRef<GarlandLights | null>(null);
-  const nestMarkerRef = useRef<BossNestMarker | null>(null);
-  const bossArmedAtRef = useRef<Partial<Record<BossId, number>>>({});
-  const bossLateHintFiredRef = useRef<Set<BossId>>(new Set());
+  // Patches de mapState poussés par le module de map (ctx.setMapState). Fusionnés
+  // dans chaque snapshot. les compteurs map restent fournis par useGameState pour
+  // l'instant (migreront dans le module en phase 4.3d).
+  const mapStateExtraRef = useRef<Record<string, number | boolean>>({});
+
+  // Construction unique du mapState injecté dans chaque snapshot DMD/score.
+  // les compteurs map viennent du module de map (mapStateExtraRef) ;
+  // fever reste piloté par useGameState (mécanisme multiplicateur).
+  const buildMapState = (fever: boolean = isFeverActive()) => ({
+    ...mapStateExtraRef.current,
+    fever,
+  });
+
   const shooterLaneGateRef = useRef<ShooterLaneGate | null>(null);
   const screenShakeRef = useRef<ScreenShake | null>(null);
   if (!screenShakeRef.current) screenShakeRef.current = new ScreenShake();
-  const atmosphereUpsideRef = useRef(false);
+  const atmosphereAlternateRef = useRef(false);
 
   useEffect(() => {
     dmd.pushIntro(playerRef.current);
@@ -662,7 +651,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     // selon le frame time (1.5 → 1.25 → 1.0 → 1.0 + trail réduit/spores off).
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(clientWidth, clientHeight);
-    // Shadows désactivées : avec 13+ PointLights (guirlandes + bumpers) dans
+    // Shadows désactivées : avec 13+ PointLights (lumières décor + bumpers) dans
     // le shader, chaque pixel paie déjà lourd. La shadow map (cast + receive
     // sur tous les meshes GLB) ajoutait un pass de rendu entier + lookups PCF.
     renderer.shadowMap.enabled = false;
@@ -759,16 +748,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let drainBallUC: DrainBall | null = null;
     let bottomOutBallUC: BottomOutBall | null = null;
     let collisionProcessor: CollisionEventProcessor | null = null;
-    let bumperVisuals: BumperVisuals | null = null;
-    let garlandLights: GarlandLights | null = null;
-    let bossReveals: BossRevealOrchestrator | null = null;
-    let nestMarker: BossNestMarker | null = null;
+    const mapModule: MapModule | null = mapPackageRef.current?.module?.() ?? null;
+    mapModuleRef.current = mapModule;
+    // Hoisté : le MapContext (construit tôt) le référence via closures, mais il
+    // n'est assigné qu'une fois le pipeline d'events prêt (plus bas).
+    let emit: GameEventListener;
     let ballTrail: BallTrail | null = null;
-    let demogorgonReveal: DemogorgonReveal | null = null;
-    let vecnaReveal: VecnaReveal | null = null;
-    let upsideDownPortal: UpsideDownPortal | null = null;
-    let upsideDownTransition: UpsideDownTransition | null = null;
-    let upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
     let shooterLaneGate: ShooterLaneGate | null = null;
     let cameraDirector: PlayfieldCameraDirector | null = null;
 
@@ -780,7 +765,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         mountRef.current?.clientHeight ?? clientHeight,
       );
       ballTrail?.setMaxSprites(tier.trailMax);
-      upsideDownAtmosphere?.setSporesEnabled(tier.sporesOn);
+      mapModuleRef.current?.setSporesEnabled?.(tier.sporesOn);
     });
     let leftFlipperBody: RAPIER.RigidBody | null = null;
     let rightFlipperBody: RAPIER.RigidBody | null = null;
@@ -794,8 +779,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let prevFrameTime = 0;
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
-    let vecnaIntroHolding = false;
-    const vecnaIntroBallPos = { x: 0, y: 0, z: 0 };
+    let bossIntroHolding = false;
+    const bossIntroBallPos = { x: 0, y: 0, z: 0 };
 
 
     // ── Flipper collider debug wireframes ────────────────────────────────────
@@ -817,8 +802,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let debugCollidersOn = false;
 
     const stuckDetector = new StuckBallDetector();
-    const bottomOutDetector = new DetectBottomOut();
-    const diag = new BallDiagnostics();
+    const bottomOutDetector = new DetectBottomOut(bottomOutLaneSepX(mapLayout.spawns.ball.x));
+    const diag = new BallDiagnostics(mapLayout);
     let lastDebugPush = 0;
 
     // ── Debug : déplacer la bille à la souris (toggle `M`) ───────────────────
@@ -885,7 +870,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const maxAttempts = 3;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          return await loader.loadAsync(PLAYFIELD_URL);
+          return await loader.loadAsync(playfieldUrl);
         } catch (err) {
           console.warn(`[Playfield] GLB load attempt ${attempt}/${maxAttempts} failed`, err);
           if (attempt === maxAttempts) throw err;
@@ -907,44 +892,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         hidePinballmapDecorNodes(playfieldRoot);
         prepareGltfMaterialsForDisplay(playfieldRoot);
 
-        bumperVisuals = new BumperVisuals();
-        bumperVisuals.setup(playfieldRoot);
-        garlandLights = new GarlandLights();
-        garlandLights.setup(playfieldRoot);
-        garlandLightsRef.current = garlandLights;
-        nestMarker = new BossNestMarker();
-        nestMarker.setup({ root: playfieldRoot });
-        nestMarkerRef.current = nestMarker;
+        // garlands + bumperVisuals créés par le module de map (cluster visuals),
+        // récupérés après mapModule.setup (plus bas, après le monde physique).
+        // nestMarker + reveals boss + bossReveals : créés/possédés
+        // par le module de map (récupérés via le bridge, preload fait là-haut).
         ballTrail = new BallTrail();
         ballTrail.mount(scene);
-        demogorgonReveal = new DemogorgonReveal();
-        demogorgonReveal.setup({
-          root: playfieldRoot,
-          scene,
-          camera,
-          garlandLights,
-          bumperVisuals,
-          onFightEnd: () => collisionProcessor?.setBossFightActive('demogorgon', false),
-          onTargetReady: () => {
-            collisionProcessor?.setBossTargetArmed('demogorgon', true);
-          },
-        });
-
-        vecnaReveal = new VecnaReveal();
-        vecnaReveal.setup({
-          root: playfieldRoot,
-          camera,
-          garlandLights,
-          bumperVisuals,
-          onFightEnd: () => collisionProcessor?.setBossFightActive('vecna', false),
-          onTargetReady: () => collisionProcessor?.setBossTargetArmed('vecna', true),
-        });
-
-        bossReveals = new BossRevealOrchestrator();
-        bossReveals.register(demogorgonReveal).register(vecnaReveal);
-        await bossReveals.preloadAll(renderer, scene, camera).catch((err) => {
-          console.warn("[BossReveals] preload failed:", err);
-        });
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
@@ -978,12 +931,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         rightFlipper?.updateMatrixWorld(true);
 
         if (leftFlipper && (leftFlipper as THREE.Mesh).isMesh) {
-          leftFlipperPivot = attachFlipperAtHinge(leftFlipper, "left", pinballmap);
+          leftFlipperPivot = attachFlipperAtHinge(leftFlipper, "left", mapLayout.flipperPivots, pinballmap);
           leftFlipperObj = leftFlipper;
           leftFlashMats = collectFlashMats(leftFlipper);
         }
         if (rightFlipper && (rightFlipper as THREE.Mesh).isMesh) {
-          rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", pinballmap);
+          rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", mapLayout.flipperPivots, pinballmap);
           rightFlipperObj = rightFlipper;
           rightFlashMats = collectFlashMats(rightFlipper);
         }
@@ -996,39 +949,128 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // ── Physics ──────────────────────────────────────────────────────────
         physicsWorld = await PhysicsWorld.create();
         const world = physicsWorld.world;
+        // colliderMap créé ici (avant le ctx) pour être injecté dans le module.
+        const colliderMap = new Map<number, string>();
+
+        // ── MapContext : construit TÔT (avant UpsideDownTransition L~1034) pour
+        // que module.setup puisse créer ses systèmes avant qu'ils soient
+        // consommés. emit est hoisté (assigné plus bas) → utilisé via closures.
+        if (mapModule) {
+          const mapCtx: MapContext = {
+            scene,
+            root: playfieldRoot,
+            camera,
+            physics: physicsWorld,
+            layout: mapLayout,
+            manifest: mapManifest,
+            colliderMap,
+            get ball() {
+              return ballPhysicsInst;
+            },
+            get ballMesh() {
+              return ballMesh;
+            },
+            resetPortalTrigger: () => collisionProcessor?.resetPortalTrigger(),
+            completeWorldCycle: () => collisionProcessor?.completeWorldCycle(scoreRef.current),
+            resetStuck: () => stuckDetector.reset(),
+            enterAlternateWorld: () => collisionProcessor?.onAlternateWorldEntered(scoreRef.current),
+            playSound: (id) => {
+              const s = mapManifest.sounds?.[id];
+              if (s) playMapCinematicSound(s.url, s.volume);
+            },
+            refreshScoreSnapshot: () => {
+              const snap = {
+                player: playerRef.current,
+                score: scoreRef.current,
+                combo: comboRef.current,
+                multiplier: multiplierRef.current,
+                lives: livesRef.current,
+                mapState: buildMapState(),
+              };
+              dmd.emitScoreSnapshot(snap);
+              dmd.pushScore(snap);
+            },
+            screenShake: (amount) => screenShakeRef.current?.add(amount),
+            isFeverActive: () => isFeverActive(),
+            gameState: () => gameStateRef.current,
+            lighting: {
+              renderer,
+              ambient: ambientLight,
+              hemi: hemiLight,
+              dir: dirLight,
+              fill: fillLight,
+            },
+            resolve: (name) => findObjectByNormalizedName(playfieldRoot, name) ?? null,
+            setPortalGateOpen: (open) => collisionProcessor?.setPortalOpen(open),
+            setBossFightActive: (bossId, active) =>
+              collisionProcessor?.setBossFightActive(bossId as BossId, active),
+            setBossTargetArmed: (bossId, armed) =>
+              collisionProcessor?.setBossTargetArmed(bossId as BossId, armed),
+            bossGateContext: () => ({
+              totalScore: scoreRef.current,
+              alternateWorldActive: collisionProcessor?.isAlternateWorldActive() ?? false,
+              normalWorldScoreBaseline: collisionProcessor?.getNormalWorldScoreBaseline() ?? 0,
+              alternateWorldScoreBaseline: collisionProcessor?.getAlternateWorldScoreBaseline() ?? 0,
+            }),
+            isBossTriggered: (bossId) =>
+              collisionProcessor?.isBossTriggered(bossId as BossId) ?? false,
+            addScore: (points, label) =>
+              emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
+            setMapState: (patch) => {
+              Object.assign(mapStateExtraRef.current, patch);
+            },
+            forceMultiplier: (_value, durationMs) => startFever(durationMs),
+            pushDmdEvent: (label, points) =>
+              dmd.pushEvent(label, points, {
+                player: playerRef.current,
+                score: scoreRef.current,
+                combo: comboRef.current,
+                multiplier: multiplierRef.current,
+                lives: livesRef.current,
+                mapState: buildMapState(),
+              }),
+            playCinematic: (clipId, opts) => playCinematic(clipId, opts),
+            setAtmosphere: (active) => {
+              dmd.setAtmosphere(active);
+              atmosphereAlternateRef.current = active;
+              // nestMarker géré par le module (réconciliation).
+            },
+            emitGameEvent: (e) => emit(e),
+          };
+          mapModule.setup(mapCtx);
+        }
+        // Préchargement asynchrone du module (ex. reveals boss) — bloque le
+        // chargement comme avant.
+        await mapModule?.preload?.();
 
         shooterLaneGate = new ShooterLaneGate();
-        shooterLaneGate.bind(world);
+        shooterLaneGate.bind(world, mapLayout.shooterLane);
         shooterLaneGateRef.current = shooterLaneGate;
 
         modelRoot.updateMatrixWorld(true);
 
-        const colliderMap = new Map<number, string>();
-
-        // colliderMap est créé avant le build du trimesh pour que les bumps
-        // (Bump-left / Bump-right) puissent y être taggés directement.
-        PlayfieldTrimeshBuilder.build(playfieldRoot, world, colliderMap);
-
-        const collOnly = playfieldUsesCollOnlyCollision(playfieldRoot);
-        PlayfieldColliderFactory.createAll(
-          world,
-          colliderMap,
+        // GLB conventionné role-driven : les murs (wall_/lane_) sont des
+        // trimeshes classés par rôle ; le sol/bumpers/sensors/couloir sont
+        // analytiques (positions du layout).
+        const meshResolver = new MeshRoleResolver(mapManifest.meshAliases);
+        PlayfieldTrimeshBuilder.buildRoleDriven(
           playfieldRoot,
-          collOnly
-            ? { laneFloor: false, walls: false, bumpers: false }
-            : undefined,
+          world,
+          meshResolver,
+          mapManifest.elements ?? {},
         );
+        // Phase 3.4 — drop targets dérivés du GLB (deltas ≤ 0.7 mm validés en
+        // jeu) ; bumpers gardés au littéral (centre Box3 ≠ collider tuné). Le
+        // log de comparaison reste actif pour surveiller la dérive au réexport.
+        const derivedLayout = LayoutResolver.deriveAndCompare(playfieldRoot, meshResolver, mapLayout);
+        const resolvedLayout = LayoutResolver.withDerivedDropTargets(mapLayout, derivedLayout);
+        PlayfieldColliderFactory.createForMap(world, resolvedLayout, colliderMap);
 
-        upsideDownTransition = new UpsideDownTransition();
-        upsideDownTransition.setup({
-          root: playfieldRoot,
-          scene,
-          camera,
-          garlandLights,
-          bumperVisuals,
-        });
+        // upsideDownTransition créé/possédé par le module (récupéré via le
+        // bridge). L'orchestration (isActive/start, cycle de monde) reste ici
+        // car elle pilote la bille (spawns).
 
-        ballPhysicsInst = new BallPhysics(world);
+        ballPhysicsInst = new BallPhysics(world, mapLayout);
 
         // ── Flipper : corps cinématique + convex hull ─────────────────────────
         const makeFlipperBody = (
@@ -1133,7 +1175,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           }
         }
 
-        ballPhysicsInst.setSpawnPosition(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, BALL_SPAWN_POSITION.z);
+        ballPhysicsInst.setSpawnPosition(mapLayout.spawns.ball.x, mapLayout.spawns.ball.y, mapLayout.spawns.ball.z);
         ballPhysicsInst.body.wakeUp();
 
         // ── Plunger visual + kinematic body ──────────────────────────────────
@@ -1144,15 +1186,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const pmat = new THREE.MeshStandardMaterial({ color: 0xddaa00, metalness: 0.9, roughness: 0.15 });
         const pmesh = new THREE.Mesh(pgeo, pmat);
         pmesh.rotation.x = Math.PI / 2;
-        pmesh.position.set(BALL_SPAWN_POSITION.x, BALL_SPAWN_POSITION.y, plungerRestZ);
+        pmesh.position.set(mapLayout.spawns.ball.x, mapLayout.spawns.ball.y, plungerRestZ);
         scene.add(pmesh);
         plungerMesh = pmesh;
         disposableGeos.push(pgeo);
         disposableMats.push(pmat);
 
         plungerBody = PlungerPhysics.createBody(world, {
-          x: BALL_SPAWN_POSITION.x,
-          y: BALL_SPAWN_POSITION.y,
+          x: mapLayout.spawns.ball.x,
+          y: mapLayout.spawns.ball.y,
           z: plungerRestZ,
         });
 
@@ -1176,6 +1218,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         const camDistance = fitPlayfieldCamera(camera, fit, cameraTarget);
         playfieldCamFit = { fit, camera, cameraTarget, distance: camDistance };
         cameraDirector = new PlayfieldCameraDirector();
+        cameraDirector.setBosses(MAP_BOSSES);
         cameraDirector.captureBase({
           camera,
           target: cameraTarget,
@@ -1198,45 +1241,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
         // ── Use-cases ─────────────────────────────────────────────────────────
         const plunger = new Plunger();
-        let onPortalEnter: (() => void) | null = null;
-        let onReturnPortalEnter: (() => void) | null = null;
 
         const baseEmit = buildEmit(() => {
           if (ballMesh) ballMesh.visible = false;
           diag.noteReset("game_over_hide");
         });
-        const releaseUpsideDownWorld = () => {
+        const releaseAlternateWorld = () => {
           restoreBossCamera();
-          upsideDownPortal?.setUpsideDownActive(false);
-          upsideDownAtmosphere?.reset();
-          collisionProcessor?.resetUpsideDownSession();
-          vecnaReveal?.endFight();
-          clearUpsideDownSession();
+          mapModule?.releaseWorld?.();
+          collisionProcessor?.resetAlternateWorldSession();
+          clearAlternateWorldSession();
         };
-        // Réconcilie l'état visuel des marqueurs de nid avec la vérité du jeu :
-        // déclenché (reveal consommé) → revealed ; sinon palier atteint → armed,
-        // sinon locked. Idempotent (setState ignore l'état identique).
-        const syncNestMarkers = () => {
-          if (!nestMarker || !collisionProcessor) return;
-          const ctx = {
-            totalScore: scoreRef.current,
-            upsideDownActive: collisionProcessor.isUpsideDownActive(),
-            normalWorldScoreBaseline: collisionProcessor.getNormalWorldScoreBaseline(),
-            upsideDownScoreBaseline: collisionProcessor.getUpsideDownScoreBaseline(),
-          };
-          nestMarker.setUpsideDown(ctx.upsideDownActive);
-          for (const id of BOSS_IDS) {
-            if (collisionProcessor.isBossTriggered(id)) {
-              nestMarker.setState(id, "revealed");
-            } else {
-              nestMarker.setState(
-                id,
-                bossThresholdMet(getBossDefinition(id), ctx) ? "armed" : "locked",
-              );
-            }
-          }
-        };
-        const emit: typeof baseEmit = (event) => {
+        // Réconciliation des marqueurs de nid : gérée par le module de map
+        // (fin de mapModule.onGameEvent, après chaque event).
+        emit = (event) => {
           baseEmit(event);
           if (
             "scoreIncrement" in event
@@ -1252,95 +1270,61 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             restoreBossCamera();
           }
           if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
-          bumperVisuals?.onGameEvent(event);
-          garlandLights?.onGameEvent(event);
-          bossReveals?.onGameEvent(event);
-          upsideDownPortal?.onGameEvent(event);
-          upsideDownAtmosphere?.onGameEvent(event);
+          // bumperVisuals + garlands : onGameEvent géré par le module de map.
+          // bossReveals + upsideDownPortal + upsideDownAtmosphere : onGameEvent
+          // géré par le module de map.
+          mapModule?.onGameEvent(event);
 
           // ── Screen shake par event (juice) ───────────────────────────────────
           if (event.type === "BUMPER_HIT") screenShake.add(0.25);
           else if (event.type === "SLINGSHOT_HIT") screenShake.add(0.2);
           else if (event.type === "DROP_TARGET_HIT") screenShake.add(0.35);
           else if (event.type === "DROP_TARGET_COMPLETE") screenShake.add(0.6);
-          else if (event.type === "BOSS_TARGET_HIT" && event.bossId === "demogorgon") {
+          else if (event.type === "BOSS_TARGET_HIT") {
+            // Juice générique : tout hit de cible boss secoue l'écran.
             screenShake.add(0.5);
           }
 
-          if (event.type === "BOSS_LOCKED_HIT") {
-            // Cible verrouillée frappée : flash gris + « ENCORE X PTS » au DMD.
-            nestMarker?.flashLocked(event.bossId);
-            dmd.pushEvent(`ENCORE ${event.remaining} PTS`, 0, {
-              player: playerRef.current,
-              score: scoreRef.current,
-              combo: comboRef.current,
-              multiplier: multiplierRef.current,
-              lives: livesRef.current,
-              hetic: heticRef.current,
-              fever: isFeverActive(),
-            });
+          // BOSS_LOCKED_HIT (flash nid + « ENCORE X PTS ») : géré par le module.
+
+          if (event.type === "BOSS_REVEAL") {
+            cameraDirector?.play(event.bossId);
+          }
+          if (event.type === "BOSS_TARGET_HIT") {
+            const boss = getBossById(MAP_BOSSES, event.bossId);
+            if (boss && event.hitCount >= boss.targetHits) {
+              cameraDirector?.playVictory(event.bossId);
+            }
+          }
+          if (event.type === "RETURN_PORTAL_TRANSITION_END" || event.type === "WORLD_CYCLE_COMPLETE") {
+            restoreBossCamera();
           }
 
-          if (event.type === "BOSS_REVEAL" && event.bossId === "demogorgon") {
-            playCinematic("demogorgon_rises", { once: true });
-            cameraDirector?.play("demogorgon");
-          }
-          if (event.type === "BOSS_REVEAL" && event.bossId === "vecna") {
-            cameraDirector?.play("vecna");
-          }
-          if (
-            event.type === "BOSS_TARGET_HIT"
-            && event.hitCount >= getBossDefinition(event.bossId).targetHits
-          ) {
-            cameraDirector?.playVictory(event.bossId);
-          }
-          if (
-            event.type === "BOSS_TARGET_HIT"
-            && event.bossId === "demogorgon"
-            && event.hitCount >= DEMOGORGON_TARGET_HITS
-          ) {
-            physicsWorld?.setTimeScale(1 / 3);
-            window.setTimeout(() => {
-              physicsWorld?.setTimeScale(1);
-              playCinematic("demogorgon_slain", {
-                onEnd: () =>
-                  ballPhysicsInst?.applyEjectionForce({
-                    x: DEMOGORGON_TARGET.x,
-                    z: DEMOGORGON_TARGET.z,
-                  }),
-              });
-            }, 200);
-          }
           if (
             (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
             && gameStateRef.current === "game_over"
           ) {
             collisionProcessor?.resetAllBossFights();
             collisionProcessor?.resetScoreBaselines();
-            bossReveals?.endAllFights();
+            // bossReveals.endAllFights géré par le module (DRAIN/BOTTOM_OUT game-over).
           }
           if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
             if (
-              UPSIDE_DOWN_PERSISTENCE === "until_drain" ||
+              ALTERNATE_WORLD_PERSISTENCE === "until_drain" ||
               gameStateRef.current === "game_over"
             ) {
-              releaseUpsideDownWorld();
+              releaseAlternateWorld();
             }
           }
           if (event.type === "PORTAL_ENTER") {
-            onPortalEnter?.();
+            // Bascule de monde gérée par le module (mapModule.onGameEvent).
             dmd.pushCinematic("portal_swallow");
           }
           if (event.type === "RETURN_PORTAL_ENTER") {
-            onReturnPortalEnter?.();
             dmd.pushCinematic("portal_swallow");
           }
-          if (event.type === "PORTAL_TRANSITION_END") {
-            upsideDownPortal?.reset();
-            upsideDownPortal?.setUpsideDownActive(true);
-            collisionProcessor?.resetPortalTrigger();
-            collisionProcessor?.onUpsideDownEntered(scoreRef.current);
-          }
+          // PORTAL_TRANSITION_END (portail actif + baseline + nid) géré par le
+          // module de map.
           if (event.type === "BALL_LAUNCHED") {
             collisionProcessor?.resetPortalTrigger();
             bottomOutBallUC?.resetLatch();
@@ -1349,21 +1333,22 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             shooterLaneGate?.open();
           }
           if (event.type === 'DROP_TARGET_HIT') {
-            const meshName = event.targetId.replace('drop_', 'drop_target_');
+            // Meshes GLB conventionnés en target_<id> (ex. target_left_1) ;
+            // l'id de drop est drop_<id> → on retrouve le mesh visuel.
+            const meshName = event.targetId.replace('drop_', 'target_');
             const mesh = playfieldRootRef?.getObjectByName(meshName);
             if (mesh) mesh.visible = false;
           }
           if (event.type === 'DROP_TARGET_COMPLETE' || event.type === 'DROP_TARGET_RESET') {
-            for (const dt of DROP_TARGETS) {
-              const mesh = playfieldRootRef?.getObjectByName(dt.id.replace('drop_', 'drop_target_'));
+            for (const dt of mapLayout.dropTargets) {
+              const mesh = playfieldRootRef?.getObjectByName(dt.id.replace('drop_', 'target_'));
               if (mesh) mesh.visible = true;
             }
           }
 
-          // État des marqueurs de nid recalculé après chaque event (reveal,
-          // reset de combat, franchissement de palier, entrée/sortie Upside Down).
-          syncNestMarkers();
+          // État des marqueurs de nid : recalculé par le module de map.
         };
+        emitRef.current = emit; // expose aux callbacks useGameState (milestone/boss-armed)
         launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
         bumperHitUC = new BumperHit(ballPhysicsInst, emit);
         bumpHitUC = new BumpHit(ballPhysicsInst, emit);
@@ -1371,6 +1356,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         bottomOutBallUC = new BottomOutBall(ballPhysicsInst, emit);
 
         collisionProcessor = new CollisionEventProcessor(
+          mapLayout,
           colliderMap,
           bumperHitUC,
           bumpHitUC,
@@ -1379,87 +1365,16 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           emit,
         );
 
-        upsideDownPortal = new UpsideDownPortal();
-        upsideDownPortal.setup({
-          root: playfieldRoot,
-          world,
-          colliderMap,
-          onOpenChange: (open) => collisionProcessor?.setPortalOpen(open),
-        });
+        // upsideDownPortal créé/possédé par le module de map (récupéré plus
+        // haut via le bridge). Ses resets / setAlternateWorldActive / aimant
+        // restent pilotés ici (flow transition + cycle de monde).
 
-        upsideDownAtmosphere = new UpsideDownAtmosphere();
-        upsideDownAtmosphere.setup({
-          root: playfieldRoot,
-          garlandLights,
-          bumperVisuals,
-          lighting: {
-            scene,
-            renderer,
-            ambient: ambientLight,
-            hemi: hemiLight,
-            dir: dirLight,
-            fill: fillLight,
-          },
-        });
-        vecnaReveal?.bindUpsideDownAtmosphere(upsideDownAtmosphere);
+        // upsideDownAtmosphere créé/possédé par le module de map (récupéré
+        // plus haut via le bridge). On garde ici le binding boss + les resets.
+        // Le binding atmosphère du boss fait par le module (setup).
 
-        onPortalEnter = () => {
-          if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
-          if (upsideDownTransition.isActive()) return;
-          ballPhysicsInst.holdAtUpsideDownSpawn();
-          ballPhysicsInst.syncToMesh(ballMesh);
-          upsideDownTransition.start(
-            {
-              ballMesh,
-              ballBody: ballPhysicsInst.body,
-              onRevealStart: () => playUpsideDownAppearSound(),
-              onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
-            },
-            () => {
-              ballPhysicsInst?.spawnFromUpsideDown();
-              collisionProcessor?.resetPortalTrigger();
-              stuckDetector.reset();
-              if (ballMesh && ballPhysicsInst) {
-                ballPhysicsInst.syncToMesh(ballMesh);
-                ballMesh.visible = true;
-                ballMesh.scale.setScalar(1);
-              }
-              emit({ type: "PORTAL_TRANSITION_END" });
-            },
-          );
-        };
-
-        onReturnPortalEnter = () => {
-          if (!ballMesh || !ballPhysicsInst || !upsideDownTransition || !upsideDownPortal) return;
-          if (upsideDownTransition.isActive()) return;
-          ballPhysicsInst.holdAtNormalReturnSpawn();
-          ballPhysicsInst.syncToMesh(ballMesh);
-          upsideDownTransition.start(
-            {
-              ballMesh,
-              ballBody: ballPhysicsInst.body,
-              onRevealStart: () => playUpsideDownAppearSound(),
-              onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
-            },
-            () => {
-              restoreBossCamera();
-              ballPhysicsInst?.spawnFromNormalReturn();
-              upsideDownPortal?.reset();
-              upsideDownPortal?.setUpsideDownActive(false);
-              upsideDownAtmosphere?.reset();
-              collisionProcessor?.completeWorldCycle(scoreRef.current);
-              bossReveals?.endAllFights();
-              stuckDetector.reset();
-              if (ballMesh && ballPhysicsInst) {
-                ballPhysicsInst.syncToMesh(ballMesh);
-                ballMesh.visible = true;
-                ballMesh.scale.setScalar(1);
-              }
-              emit({ type: "WORLD_CYCLE_COMPLETE" });
-              emit({ type: "RETURN_PORTAL_TRANSITION_END" });
-            },
-          );
-        };
+        // onPortalEnter / onReturnPortalEnter (bascule de monde) gérés par le
+        // module de map (mapModule.onGameEvent sur PORTAL_ENTER/RETURN_PORTAL_ENTER).
 
         resetBallRef.current = () => {
           if (!drainBallUC || !sessionStartedRef.current) return;
@@ -1473,7 +1388,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           drainBallUC.execute();
         };
 
-        demogorgonReveal?.setEmit(emit);
+        // le reveal boss setEmit fait par le module (ctx.emitGameEvent).
 
         // ── Input handling ────────────────────────────────────────────────────
         console.log("[PinballPlayfield] KEYBOARD_MODE =", KEYBOARD_MODE);
@@ -1519,9 +1434,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                   restoreBossCamera();
                   collisionProcessor?.resetAllBossFights();
                   collisionProcessor?.resetScoreBaselines();
-                  bossReveals?.endAllFights();
-                  upsideDownPortal?.reset();
-                  upsideDownAtmosphere?.reset();
+                  mapModule?.resetWorld?.();
                   if (ballMesh) ballMesh.visible = true;
                   return;
                 }
@@ -1557,9 +1470,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 restoreBossCamera();
                 collisionProcessor?.resetAllBossFights();
                 collisionProcessor?.resetScoreBaselines();
-                bossReveals?.endAllFights();
-                upsideDownPortal?.reset();
-                upsideDownAtmosphere?.reset();
+                mapModule?.resetWorld?.();
                 if (ballMesh) ballMesh.visible = true;
               }
             }
@@ -1665,6 +1576,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         physicsReadyRef.current = true;
         setPhysicsReady(true);
         onPlayfieldReady();
+        warmMapSounds(MAP_SOUND_URLS);
         debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
@@ -1699,69 +1611,34 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       const dt = prevFrameTime > 0 ? Math.min((time - prevFrameTime) / 1000, 0.05) : 0.016;
       prevFrameTime = time;
 
-      bumperVisuals?.update(dt);
-      garlandLights?.setFever(isFeverActive());
-      garlandLights?.update(dt);
-      bossReveals?.update(dt);
-      nestMarker?.update(dt);
-      upsideDownAtmosphere?.update(dt);
-      upsideDownPortal?.update(dt);
+      // visuals + garlands (incl. setFever via ctx.isFeverActive) + bosses +
+      // monde alternatif : update(dt) géré par mapModule.update.
 
-      // Hint tardif : nid armé > 45 s sans reveal → pulse amplifié + bandeau DMD
-      // unique par partie (« LE DEMOGORGON SOMMEILLE… »).
-      if (gameStateRef.current === "playing") {
-        const nowMs = performance.now();
-        for (const id of BOSS_IDS) {
-          const armedAt = bossArmedAtRef.current[id];
-          if (
-            armedAt === undefined
-            || bossLateHintFiredRef.current.has(id)
-            || !nestMarker?.isArmed(id)
-            || nowMs - armedAt < 45000
-          ) {
-            continue;
-          }
-          bossLateHintFiredRef.current.add(id);
-          nestMarker.setLateHint(id, true);
-          const hint = getBossDefinition(id).hud.nestHintLabel;
-          if (hint) {
-            dmd.pushEvent(hint, 0, {
-              player: playerRef.current,
-              score: scoreRef.current,
-              combo: comboRef.current,
-              multiplier: multiplierRef.current,
-              lives: livesRef.current,
-              hetic: heticRef.current,
-              fever: isFeverActive(),
-            });
-          }
-        }
-      }
+      // Hint tardif du nid : géré par le module de map (mapModule.update).
 
       cinematics.update(time);
-      const transitionActive = upsideDownTransition?.isActive() ?? false;
+      mapModule?.update(dt);
+      const bossIntroActive = mapModule?.isIntroHolding?.() ?? false;
       const cameraCinematicActive = cameraDirector?.isActive() ?? false;
-      const vecnaIntroActive = bossReveals?.isGameplayFrozen() ?? false;
-      const freezeFrame = transitionActive || cinematics.shouldFreeze() || vecnaIntroActive;
+      const freezeFrame =
+        (mapModule?.shouldFreezePhysics?.() ?? false) || cinematics.shouldFreeze();
 
-      if (vecnaIntroActive && !vecnaIntroHolding && ballPhysicsInst) {
+      if (bossIntroActive && !bossIntroHolding && ballPhysicsInst) {
         const p = ballPhysicsInst.body.translation();
-        vecnaIntroBallPos.x = p.x;
-        vecnaIntroBallPos.y = p.y;
-        vecnaIntroBallPos.z = p.z;
-        vecnaIntroHolding = true;
+        bossIntroBallPos.x = p.x;
+        bossIntroBallPos.y = p.y;
+        bossIntroBallPos.z = p.z;
+        bossIntroHolding = true;
         leftTarget = 0;
         rightTarget = 0;
         ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       }
-      if (!vecnaIntroActive) {
-        vecnaIntroHolding = false;
+      if (!bossIntroActive) {
+        bossIntroHolding = false;
       }
 
-      if (transitionActive) {
-        upsideDownTransition?.update(dt);
-      } else if (!freezeFrame) {
+      if (!freezeFrame) {
         // ── Flipper cinématique : Three.js → Rapier ───────────────────────────
         // Lissage normalisé à 60 FPS : Math.pow(1 - SWING_SMOOTH, dt * 60)
         // reproduit exactement le comportement 60 Hz sur tous les écrans
@@ -1843,20 +1720,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         }
       }
 
-      if (
-        ballPhysicsInst
-        && gameStateRef.current === "playing"
-        && !freezeFrame
-        && upsideDownPortal?.isOpen()
-      ) {
-        upsideDownPortal.applyMagnet(ballPhysicsInst.body);
+      if (ballPhysicsInst && gameStateRef.current === "playing" && !freezeFrame) {
+        mapModule?.applyBallMagnet?.();
       }
 
       // Ball sync
       if (ballMesh?.visible && ballPhysicsInst) {
-        if (vecnaIntroActive && gameStateRef.current === "playing") {
+        if (bossIntroActive && gameStateRef.current === "playing") {
           ballPhysicsInst.body.setTranslation(
-            { x: vecnaIntroBallPos.x, y: vecnaIntroBallPos.y, z: vecnaIntroBallPos.z },
+            { x: bossIntroBallPos.x, y: bossIntroBallPos.y, z: bossIntroBallPos.z },
             true,
           );
           ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -1867,9 +1739,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
         // mur droit (frottement → ralentissement au lancement).
         if (gameStateRef.current === "idle" && physicsReady && !ballMoveMode) {
-          const z = BALL_SPAWN_POSITION.z;
+          const z = mapLayout.spawns.ball.z;
           ballPhysicsInst.body.setTranslation(
-            { x: BALL_SPAWN_POSITION.x, y: ballCenterOnSurface(z), z },
+            { x: mapLayout.spawns.ball.x, y: ballCenterOnSurface(z), z },
             true,
           );
           ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -1880,22 +1752,22 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         // couloir, avant l'ouverture de sortie), on fige X sur la ligne de spawn
         // et on annule la vitesse latérale → lancement parfaitement droit, sans
         // dépendre de la géométrie GLB. La balle est libérée dès qu'elle atteint
-        // la zone de sortie (Z <= SHOOTER_LANE_LEFT_WALL_TOP_Z) pour partir
+        // la zone de sortie (Z <= mapLayout.shooterLane.leftWallTopZ) pour partir
         // naturellement dans le terrain.
         if (gameStateRef.current === "playing" && !ballMoveMode && !shooterLaneGate?.isClosed()) {
           const lp = ballPhysicsInst.body.translation();
           const inLaneStraight =
-            lp.z > SHOOTER_LANE_LEFT_WALL_TOP_Z && lp.x > SHOOTER_LANE_LOCK_X;
+            lp.z > mapLayout.shooterLane.leftWallTopZ && lp.x > mapLayout.shooterLane.lockX;
           if (inLaneStraight) {
             ballPhysicsInst.body.setTranslation(
-              { x: BALL_SPAWN_POSITION.x, y: lp.y, z: lp.z },
+              { x: mapLayout.spawns.ball.x, y: lp.y, z: lp.z },
               true,
             );
             const lv = ballPhysicsInst.body.linvel();
             ballPhysicsInst.body.setLinvel({ x: 0, y: lv.y, z: lv.z }, true);
             const av = ballPhysicsInst.body.angvel();
             ballPhysicsInst.body.setAngvel({ x: av.x, y: 0, z: 0 }, true);
-          } else if (lp.x < SHOOTER_LANE_EXIT_X) {
+          } else if (lp.x < mapLayout.shooterLane.exitX) {
             shooterLaneGate?.close();
           }
         }
@@ -1906,6 +1778,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           const snap = computeSurfaceSnap(
             ballPhysicsInst.body.translation(),
             ballPhysicsInst.body.linvel(),
+            mapLayout.shooterLane,
           );
           if (snap) {
             ballPhysicsInst.body.setTranslation(snap.translation, true);
@@ -1991,8 +1864,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         plungerMesh.position.z = plungerZ;
         if (plungerBody) {
           plungerBody.setNextKinematicTranslation({
-            x: BALL_SPAWN_POSITION.x,
-            y: BALL_SPAWN_POSITION.y,
+            x: mapLayout.spawns.ball.x,
+            y: mapLayout.spawns.ball.y,
             z: plungerZ,
           });
         }
@@ -2000,7 +1873,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
       // ── OrbitControls update ─────────────────────────────────────────────
       cameraDirector?.update(dt);
-      if (orbitControls && !transitionActive && !cameraCinematicActive) orbitControls.update();
+      if (orbitControls && !freezeFrame && !cameraCinematicActive) orbitControls.update();
 
       // ── Rapier debug render (tous colliders) ─────────────────────────────
       if (debugCollidersOn && physicsWorld) {
@@ -2036,7 +1909,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           dt,
           ballMesh ? ballMesh.position : { x: 0, y: 0, z: 0 },
           intensity,
-          { upsideDown: atmosphereUpsideRef.current, fever: feverNow },
+          { alternateWorld: atmosphereAlternateRef.current, fever: feverNow },
           camera.quaternion,
         );
       }
@@ -2089,6 +1962,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     return () => {
       cancelled = true;
       cancelAnimationFrame(frameId);
+      mapModule?.dispose();
       window.removeEventListener("resize", handleResize);
       renderer.domElement.removeEventListener("pointerdown", onBallDragDown);
       window.removeEventListener("pointermove", onBallDragMove);
@@ -2098,18 +1972,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
       if (pw?._onKeyUp) document.removeEventListener("keyup", pw._onKeyUp);
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
-      bumperVisuals?.dispose();
-      garlandLights?.dispose();
-      bossReveals?.dispose();
-      nestMarker?.dispose();
-      nestMarkerRef.current = null;
+      // bumperVisuals + garlands + bossReveals + nestMarker : dispose géré par
+      // mapModule.dispose.
       ballTrail?.dispose();
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;
       cameraDirector?.dispose();
-      upsideDownPortal?.dispose();
-      upsideDownTransition?.dispose();
-      upsideDownAtmosphere?.dispose();
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();
@@ -2149,8 +2017,12 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           initialLives={INITIAL_LIVES}
           bossHud={bossHud}
           scorePops={scorePops}
-          upsideDownActive={upsideDownActive}
-          upsideDownHint={upsideDownHint}
+          alternateWorldActive={alternateWorldActive}
+          alternateWorldHint={alternateWorldHint}
+          atmosphereBannerLabel={mapLayout.atmosphere.bannerLabel}
+          atmosphereHintLabel={mapLayout.atmosphere.hintLabel}
+          attractTagline={mapManifest.attractTagline ?? mapManifest.name}
+          bosses={MAP_BOSSES}
           cabinetMode={cabinetMode}
           onAttractInteract={() => {
             if (physicsReady && !sessionStarted) beginSession();
@@ -2172,7 +2044,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           </div>
         )}
 
-        <CinematicOverlay clip={cinematicClip} />
+        <CinematicOverlay clip={cinematicClip} clipFamilies={mapManifest.clipFamilies} overlayFiles={mapManifest.overlayFiles} />
 
         <main
           ref={mountRef}
@@ -2185,7 +2057,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               : "h-screen w-full touch-none outline-none focus:outline-none"
           }
           tabIndex={0}
-          aria-label="Terrain de flipper — Q/D ou ← → pour les flippers, maintenir ESPACE et relâcher pour lancer"
+          aria-label="Terrain de flipper - Q/D ou fleches gauche/droite pour les flippers, maintenir ESPACE et relacher pour lancer"
         />
       </div>
     </div>

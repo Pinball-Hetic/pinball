@@ -7,17 +7,32 @@ import type {
   DmdDisplay,
   GameStats,
   LeaderboardEntry,
+  CinematicClip,
 } from '@pinball/shared-types'
+import { DEFAULT_MAP_ID } from '@pinball/shared-types'
+import { getMapPackage } from '@pinball/maps'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
+
+// Map active : le debug est data-driven (boutons boss + clips depuis la map).
+const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID
+const MAP_PKG = getMapPackage(MAP_ID)
+const BOSSES = MAP_PKG?.layout.bosses ?? []
+// Clips de la map (manifest.clipFamilies) + clips core génériques.
+const CINEMATIC_CLIPS = [
+  ...(Object.keys(MAP_PKG?.manifest.clipFamilies ?? {}) as CinematicClip[]),
+  'hall_of_fame' as CinematicClip,
+  'skill_shot' as CinematicClip,
+]
+// Clés de mapState éditables, déclarées par la map (pas de clé en dur).
+const MAP_STATE_NUMBERS = MAP_PKG?.manifest.debugMapState?.numbers ?? []
+const MAP_STATE_FLAGS = MAP_PKG?.manifest.debugMapState?.flags ?? []
 
 const PLAYER = 'DEBUG'
 const DEBUG_STATS: GameStats = {
   maxCombo: 12,
   maxMultiplier: 5,
-  demogorgons: 2,
-  portals: 1,
-  hetic: 5,
+  counters: {},
   durationS: 88,
 }
 
@@ -31,7 +46,10 @@ export default function DebugPage() {
   const [combo, setCombo] = useState(6)
   const [multi, setMulti] = useState(3)
   const [lives, setLives] = useState(2)
-  const [hetic, setHetic] = useState(3)
+  // mapState numérique générique (clés = MAP_STATE_NUMBERS de la map).
+  const [mapNums, setMapNums] = useState<Record<string, number>>(() =>
+    Object.fromEntries(MAP_STATE_NUMBERS.map((k) => [k, 0])),
+  )
   const udRef = useRef(ud)
   udRef.current = ud
 
@@ -48,10 +66,18 @@ export default function DebugPage() {
     }
   }, [])
 
-  const triggerEvent = (type: DevGameEventTrigger['type'], hitCount?: number) =>
-    socketRef.current?.emit('dev:trigger-game-event', { type, hitCount })
+  const triggerEvent = (
+    type: DevGameEventTrigger['type'],
+    extra?: { bossId?: string; hitCount?: number },
+  ) => socketRef.current?.emit('dev:trigger-game-event', { type, ...extra })
 
   const pushDisplay = (d: DmdDisplay) => socketRef.current?.emit('dmd:display', d)
+
+  // Construit le mapState générique (numériques + flags à false) pour les events.
+  const mapStateOf = (nums: Record<string, number>) => ({
+    ...nums,
+    ...Object.fromEntries(MAP_STATE_FLAGS.map((f) => [f, false])),
+  })
 
   const scoreSnap = () => ({
     player: PLAYER,
@@ -59,15 +85,14 @@ export default function DebugPage() {
     combo,
     multiplier: multi,
     lives,
-    hetic,
-    fever: false,
-    upsideDown: udRef.current,
+    mapState: mapStateOf(mapNums),
+    alternateWorld: udRef.current,
   })
 
   const addScore = (amount: number) =>
     socketRef.current?.emit('dev:trigger-game-event', { type: 'DEBUG_ADD_SCORE', amount })
 
-  const heticComplete = async () => {
+  const dropTargetCompleteX5 = async () => {
     for (let i = 0; i < 5; i++) {
       triggerEvent('DROP_TARGET_COMPLETE')
       // eslint-disable-next-line no-await-in-loop
@@ -80,6 +105,7 @@ export default function DebugPage() {
     socketRef.current?.emit('game:over', {
       player: PLAYER,
       finalScore: 3200,
+      mapId: MAP_ID,
       stats: DEBUG_STATS,
       debug: true,
     })
@@ -96,6 +122,7 @@ export default function DebugPage() {
     socketRef.current?.emit('game:over', {
       player: PLAYER,
       finalScore: tenth + 1000,
+      mapId: MAP_ID,
       stats: DEBUG_STATS,
       debug: true,
     })
@@ -113,8 +140,7 @@ export default function DebugPage() {
         combo: i,
         multiplier: 1 + Math.floor(i / 3),
         lives: 3,
-        hetic: 0,
-        fever: false,
+        mapState: mapStateOf(Object.fromEntries(MAP_STATE_NUMBERS.map((k) => [k, 0]))),
       })
       // eslint-disable-next-line no-await-in-loop
       await wait(150)
@@ -134,7 +160,7 @@ export default function DebugPage() {
           onChange={(e) => setUd(e.target.checked)}
           className="w-5 h-5 accent-fuchsia-500"
         />
-        <span className={ud ? 'text-fuchsia-400' : 'text-zinc-400'}>UPSIDE DOWN</span>
+        <span className={ud ? 'text-fuchsia-400' : 'text-zinc-400'}>MONDE ALTERNATIF</span>
       </label>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -147,19 +173,27 @@ export default function DebugPage() {
           <Btn onClick={() => triggerEvent('SLINGSHOT_HIT')}>SLINGSHOT</Btn>
           <Btn onClick={() => triggerEvent('RAMP_HIT')}>RAMP</Btn>
           <Btn onClick={() => triggerEvent('DROP_TARGET_COMPLETE')}>DROP COMPLETE</Btn>
-          <Btn onClick={() => triggerEvent('DEMOGORGON_REVEAL')}>DEMOGORGON REVEAL</Btn>
-          <Btn onClick={() => triggerEvent('DEMOGORGON_TARGET_HIT', 1)}>DEMOGORGON HIT 1/2</Btn>
-          <Btn onClick={() => triggerEvent('DEMOGORGON_TARGET_HIT', 5)}>
-            DEMOGORGON HIT 2/2 (victoire)
-          </Btn>
+          {BOSSES.map((b) => (
+            <span key={b.id} className="contents">
+              <Btn onClick={() => triggerEvent('BOSS_REVEAL', { bossId: b.id })}>
+                {b.hud.dmdLabel} REVEAL
+              </Btn>
+              <Btn onClick={() => triggerEvent('BOSS_TARGET_HIT', { bossId: b.id, hitCount: 1 })}>
+                {b.hud.dmdLabel} HIT 1
+              </Btn>
+              <Btn onClick={() => triggerEvent('BOSS_TARGET_HIT', { bossId: b.id, hitCount: b.targetHits })}>
+                {b.hud.dmdLabel} HIT {b.targetHits} (victoire)
+              </Btn>
+            </span>
+          ))}
           <Btn onClick={() => triggerEvent('PORTAL_ENTER')}>PORTAL ENTER</Btn>
-          <Btn onClick={() => triggerEvent('ELEVEN_ASSIST')}>ELEVEN ASSIST</Btn>
+          <Btn onClick={() => triggerEvent('ASSIST')}>ASSIST</Btn>
           <Btn onClick={() => triggerEvent('DRAIN')}>DRAIN</Btn>
           <Btn onClick={() => triggerEvent('BOTTOM_OUT')}>BOTTOM_OUT</Btn>
         </Group>
 
         <Group title="DMD direct">
-          <Btn onClick={() => pushDisplay({ mode: 'INTRO', player: PLAYER, upsideDown: ud })}>
+          <Btn onClick={() => pushDisplay({ mode: 'INTRO', player: PLAYER, alternateWorld: ud })}>
             INTRO
           </Btn>
           <div className="grid grid-cols-5 gap-1 my-1">
@@ -167,14 +201,21 @@ export default function DebugPage() {
             <NumIn label="combo" value={combo} onChange={setCombo} />
             <NumIn label="multi" value={multi} onChange={setMulti} />
             <NumIn label="lives" value={lives} onChange={setLives} />
-            <NumIn label="hetic" value={hetic} onChange={setHetic} />
+            {MAP_STATE_NUMBERS.map((k) => (
+              <NumIn
+                key={k}
+                label={k}
+                value={mapNums[k] ?? 0}
+                onChange={(n) => setMapNums((prev) => ({ ...prev, [k]: n }))}
+              />
+            ))}
           </div>
           <Btn onClick={() => pushDisplay({ mode: 'SCORE', ...scoreSnap() })}>SCORE</Btn>
           <Btn
             onClick={() =>
               pushDisplay({
                 mode: 'EVENT',
-                label: 'DEMOGORGON',
+                label: BOSSES[0]?.hud.dmdLabel ?? 'BOSS',
                 points: 250,
                 ...scoreSnap(),
               })
@@ -190,42 +231,26 @@ export default function DebugPage() {
           </Btn>
           <Btn
             onClick={() =>
-              pushDisplay({ mode: 'LIFE_LOST', livesRemaining: lives, score, player: PLAYER, upsideDown: ud })
+              pushDisplay({ mode: 'LIFE_LOST', livesRemaining: lives, score, player: PLAYER, alternateWorld: ud })
             }
           >
             LIFE_LOST
           </Btn>
           <Btn
             onClick={() =>
-              pushDisplay({ mode: 'GAME_OVER', player: PLAYER, finalScore: score, upsideDown: ud })
+              pushDisplay({ mode: 'GAME_OVER', player: PLAYER, finalScore: score, alternateWorld: ud })
             }
           >
             GAME_OVER
           </Btn>
-          {(
-            [
-              ['demogorgon_rises'],
-              ['portal_swallow'],
-              ['demogorgon_slain'],
-              ['last_chance'],
-              ['hall_of_fame'],
-              ['milestone_5k', 5000],
-              ['milestone_15k', 15000],
-              ['milestone_30k', 30000],
-              ['milestone_big', 75000],
-              ['hetic_letter', 3],
-              ['hetic_complete'],
-              ['skill_shot'],
-            ] as const
-          ).map(([clip, value]) => (
+          {CINEMATIC_CLIPS.map((clip) => (
             <Btn
               key={clip}
               onClick={() =>
-                pushDisplay({ mode: 'CINEMATIC', clip, player: PLAYER, score, value, upsideDown: ud })
+                pushDisplay({ mode: 'CINEMATIC', clip, player: PLAYER, score, alternateWorld: ud })
               }
             >
               CINEMATIC: {clip}
-              {value != null ? ` (${value})` : ''}
             </Btn>
           ))}
         </Group>
@@ -240,11 +265,11 @@ export default function DebugPage() {
           <Btn onClick={() => addScore(30000)}>+30 000</Btn>
         </Group>
 
-        <Group title="HETIC">
+        <Group title="Drop targets / collecte">
           <Btn onClick={() => triggerEvent('DROP_TARGET_COMPLETE')}>
-            LETTRE +1 (drop complete)
+            DROP COMPLETE +1
           </Btn>
-          <Btn onClick={heticComplete}>HETIC COMPLET (×5)</Btn>
+          <Btn onClick={dropTargetCompleteX5}>DROP COMPLETE (×5)</Btn>
         </Group>
 
         <Group title="Partie simulée">

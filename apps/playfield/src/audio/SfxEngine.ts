@@ -58,7 +58,7 @@ export class SfxEngine {
     });
   }
 
-  playElevenAssist(): void {
+  playAssist(): void {
     this.playNow(() => {
       this.playTone(140, 0.22, "sine", 0.16, -40);
       this.playTone(420, 0.1, "triangle", 0.08, 80);
