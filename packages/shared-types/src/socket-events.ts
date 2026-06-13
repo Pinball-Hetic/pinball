@@ -12,6 +12,8 @@ export interface ServerToClientEvents {
   'dmd:display': (data: DmdDisplay) => void
   // Page /debug → injecte un GameEvent dans le playfield (chaîne complète).
   'dev:trigger-game-event': (data: DevGameEventTrigger) => void
+  // Émis au seul socket émetteur du game:over (pas un broadcast).
+  'game:registered': (data: GameRegistered) => void
 }
 
 export interface ClientToServerEvents {
@@ -124,6 +126,16 @@ export interface GameOver {
   // Émis depuis /debug → relay seul, PAS de persistence (ne pollue pas le leaderboard).
   debug?: boolean
 }
+
+export interface GameRegistered {
+  code: string // token de claim
+  claimUrl: string // URL encodée dans le QR
+  qrDataUrl: string // PNG data-url du QR (généré backend)
+}
+
+// Limite d'affichage du pseudo (tronqué par les écrans). Le max réel de
+// saisie sera défini côté API globale.
+export const PSEUDO_MAX_DISPLAY = 12
 
 export interface LeaderboardEntry {
   rank: number
