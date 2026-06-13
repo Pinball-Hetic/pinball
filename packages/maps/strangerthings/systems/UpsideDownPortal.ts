@@ -122,6 +122,7 @@ export class UpsideDownPortal {
     this.cover.position.y = this.baseY;
     this.cover.rotation.x = -PLAYFIELD_TILT;
     this.cover.renderOrder = 2;
+    this.cover.visible = false;
     config.root.add(this.cover);
 
     const qx = Math.sin(PLAYFIELD_TILT / 2);
@@ -303,7 +304,7 @@ export class UpsideDownPortal {
     this.removePortalSensor();
     this.onOpenChange?.(false);
 
-    this.cover.visible = true;
+    this.cover.visible = false;
     this.cover.scale.setScalar(1);
     this.cover.position.copy(this.anchorPos);
     this.cover.position.y = this.baseY;
@@ -559,15 +560,9 @@ export class UpsideDownPortal {
     this.portalGroup.scale.setScalar(Math.max(0.001, p));
 
     if (this.cover && this.coverMat) {
-      if (p < 0.5) {
-        this.cover.visible = true;
-        this.coverMat.transparent = true;
-        this.coverMat.opacity = 1 - p / 0.5;
-      } else {
-        this.cover.visible = false;
-        this.coverMat.transparent = false;
-        this.coverMat.opacity = 1;
-      }
+      this.cover.visible = false;
+      this.coverMat.transparent = false;
+      this.coverMat.opacity = 1;
     }
 
     const fx = Math.min(1, p * 1.15);
