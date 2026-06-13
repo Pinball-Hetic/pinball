@@ -10,16 +10,18 @@ import {
   PORTAL_SENSOR_RADIUS,
 } from '@pinball/game-engine';
 import { layout } from '../layout';
-import { PLAYFIELD_TILT } from '@pinball/game-engine';
+import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
+  UPSIDE_DOWN_PORTAL_ANCHOR_NAMES,
+  UPSIDE_DOWN_PORTAL_COVER_LIFT,
   UPSIDE_DOWN_PORTAL_OPEN_DURATION,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_REVEAL_DELAY,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from './UpsideDownConstants';
-import { findObjectByNormalizedName } from '@pinball/game-engine';
+import { clonePlayfieldSurfaceMaterial, findObjectByNormalizedName } from '@pinball/game-engine';
 import { GlowSprite, easeInOut } from '@pinball/game-engine';
 
 type SetupConfig = {
@@ -28,20 +30,6 @@ type SetupConfig = {
   colliderMap: Map<number, string>;
   onOpenChange?: (open: boolean) => void;
 };
-
-function playfieldMaterialFromTable(root: THREE.Object3D): THREE.MeshStandardMaterial {
-  const table = findObjectByNormalizedName(root, 'table.005', 'table005');
-  if (table instanceof THREE.Mesh) {
-    const src = table.material;
-    const mat = (Array.isArray(src) ? src[0] : src) as THREE.Material;
-    if (mat instanceof THREE.MeshStandardMaterial) return mat.clone();
-  }
-  return new THREE.MeshStandardMaterial({
-    color: 0xff5010,
-    metalness: 0.19,
-    roughness: 0.45,
-  });
-}
 
 type PortalParticle = {
   mesh: THREE.Mesh;
@@ -57,6 +45,26 @@ type PortalVine = {
 };
 
 const _vinePoint = new THREE.Vector3();
+const _portalAnchor = new THREE.Vector3();
+
+function resolvePortalAnchor(root: THREE.Object3D): THREE.Vector3 {
+  for (const name of UPSIDE_DOWN_PORTAL_ANCHOR_NAMES) {
+    const node = findObjectByNormalizedName(root, name);
+    if (node) {
+      node.getWorldPosition(_portalAnchor);
+      return _portalAnchor.clone();
+    }
+  }
+  return _portalAnchor.set(
+    layout.sensors.portal.x,
+    layout.sensors.portal.y,
+    layout.sensors.portal.z,
+  );
+}
+
+function portalCoverSurfaceY(z: number, anchorY: number): number {
+  return Math.max(surfaceYAtZ(z) + UPSIDE_DOWN_PORTAL_COVER_LIFT, anchorY);
+}
 
 export class UpsideDownPortal {
   private cover: THREE.Mesh | null = null;
@@ -101,15 +109,13 @@ export class UpsideDownPortal {
 
     config.root.updateMatrixWorld(true);
 
-    const anchor = findObjectByNormalizedName(config.root, 'portal_upsidedown');
-    if (anchor) {
-      anchor.getWorldPosition(this.anchorPos);
-    } else {
-      this.anchorPos.set(layout.sensors.portal.x, layout.sensors.portal.y, layout.sensors.portal.z);
-    }
-    this.baseY = this.anchorPos.y + 0.0015;
+    this.anchorPos.copy(resolvePortalAnchor(config.root));
+    this.baseY = portalCoverSurfaceY(this.anchorPos.z, this.anchorPos.y);
 
-    this.coverMat = playfieldMaterialFromTable(config.root);
+    this.coverMat = clonePlayfieldSurfaceMaterial(config.root);
+    this.coverMat.polygonOffset = true;
+    this.coverMat.polygonOffsetFactor = -2;
+    this.coverMat.polygonOffsetUnits = -2;
     const geo = new THREE.CylinderGeometry(PORTAL_COVER_RADIUS, PORTAL_COVER_RADIUS, 0.004, 32);
     this.cover = new THREE.Mesh(geo, this.coverMat);
     this.cover.position.copy(this.anchorPos);
