@@ -10,7 +10,7 @@ const HIT_SURGE_DURATION = 0.3;
 const HIT_SURGE_BOOST = 0.55;
 
 /**
- * Chaque guirlande dans le GLB Strangerthings.glb possède :
+ * Chaque guirlande dans le GLB newStrangerthings.glb possède :
  *  - baseColorTexture  : câble sombre + bulbes colorés
  *  - emissiveTexture   : carte de brillance des bulbes
  *  - emissiveFactor    : [1,1,1] (blanc = multiplicateur neutre)
