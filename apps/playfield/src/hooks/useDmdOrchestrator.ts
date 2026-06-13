@@ -7,6 +7,7 @@ import type {
   ScoreUpdate,
   GameStats,
   CinematicClip,
+  GameRegistered,
 } from '@pinball/shared-types';
 import { clipShowMs, clipTakeoverMs, type ClipTimings } from '@pinball/shared-types';
 import type { GameEvent, BossDefinition } from '@pinball/game-engine';
@@ -100,11 +101,15 @@ export { eventLabel }; // exporté pour tests
 
 export function useDmdOrchestrator(
   clips?: Record<string, ClipTimings>,
+  onGameRegistered?: (data: GameRegistered) => void,
 ): DmdOrchestrator {
   // Table de clips de la map (manifest.clips), lue via ref pour rester à jour
   // sans recréer l'orchestrateur.
   const clipsRef = useRef(clips);
   clipsRef.current = clips;
+  // Callback game:registered tenu à jour par ref (pas de re-render réseau).
+  const onRegisteredRef = useRef(onGameRegistered);
+  onRegisteredRef.current = onGameRegistered;
   const socketRef = useRef<PinballSocket | null>(null);
   const stackRef = useRef<PendingDisplay[]>([]);
   const lastSentRef = useRef<string>(''); // JSON.stringify de la dernière display envoyée
@@ -116,6 +121,10 @@ export function useDmdOrchestrator(
     const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
     const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling'];
     socketRef.current = io(url, { transports });
+
+    // game:registered → routé au callback (QR de fin de partie). Nettoyé au
+    // disconnect du cleanup ci-dessous.
+    socketRef.current.on('game:registered', (d) => onRegisteredRef.current?.(d));
 
     // Tick d'expiration : retire les displays expirés et émet la plus
     // prioritaire restante (ou SCORE par défaut).
