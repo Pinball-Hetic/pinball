@@ -50,6 +50,7 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
       NEXT_PUBLIC_KEYBOARD_MODE: "simulate-esp32"
+      NEXT_PUBLIC_MAP_ID: "zelda"
       NODE_OPTIONS: "--max-old-space-size=2560"
     ports:
       - "3333:3000"
