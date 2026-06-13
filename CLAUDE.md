@@ -40,10 +40,11 @@ packages/
 > `mapAssetUrl(id, rel)` → `/maps/<id>/…`, depuis `manifest.id` (zéro littéral).
 >
 > **Id par défaut** : `DEFAULT_MAP_ID` (shared-types) — pas de sélecteur,
-> `NEXT_PUBLIC_MAP_ID` non défini → cette map. **Anti-fuite** : `task
-> check:leaks` (bloquant en CI) interdit les termes `manifest.forbiddenInCore`
-> hors `packages/maps/` (whitelist étroite documentée). Conventions GLB +
-> authoring : `docs/MAP_AUTHORING.md`.
+> `NEXT_PUBLIC_MAP_ID` non défini → cette map. **Étanchéité map** : la règle
+> ESLint `no-restricted-imports` interdit d'importer `@pinball/map-*` hors du
+> registry ; la convention « pas de contenu ST dans le core/apps » est vérifiée
+> à la revue (plus de guard automatique). Conventions GLB + authoring :
+> `docs/MAP_AUTHORING.md`.
 
 ### `packages/game-engine` — Physics, game logic, no React
 Clean architecture: domain / infrastructure / use-cases.

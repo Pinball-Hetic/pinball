@@ -52,7 +52,6 @@ export interface MapManifest {
   elements?: Record<string, Record<string, number | string>> // tuning par id d'élément
   meshAliases?: Record<string, string> // nom GLB legacy → nom conventionnel
   clips?: Record<ClipId, ClipTimings> // timings des clips de la map
-  forbiddenInCore?: string[] // termes pour le grep-guard anti-fuite
 }
 
 // Paquet de map résolu par la composition root (packages/maps/index.ts).

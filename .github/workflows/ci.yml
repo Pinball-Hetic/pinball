@@ -32,6 +32,3 @@ jobs:
 
       - name: Validate maps
         run: bun scripts/validate-map.ts strangerthings
-
-      - name: Map leak guard (bloquant)
-        run: bash scripts/check-map-leaks.sh

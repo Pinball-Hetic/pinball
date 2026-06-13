@@ -92,8 +92,8 @@ elements: {
    construire les chemins depuis `manifest.id`, jamais en dur. Le package
    expose un helper `mapAsset(rel)` lié à son id (cf. `manifest.ts`).
 3. Renseigner `manifest` (scoring, rules, glb, meshAliases, **clips**,
-   sounds, preload, clipFamilies, counterLabels, debugMapState,
-   forbiddenInCore) et `layout` (positions sans mesh : spawns, couloir,
+   sounds, preload, clipFamilies, counterLabels, debugMapState) et `layout`
+   (positions sans mesh : spawns, couloir,
    bosses). Les timings de cinématiques vivent dans `manifest.clips`
    (showMs/freezeMs/takeoverMs), plus dans le core.
 4. Enregistrer la map dans le registry par surface de `packages/maps/` :
@@ -107,9 +107,10 @@ elements: {
 7. `NEXT_PUBLIC_MAP_ID=<id>` → tester en jeu (défaut : `DEFAULT_MAP_ID`).
 
 Contenus `module/` (comportement playfield), `dmd/`, `backglass/` sont
-optionnels : absents → fallback **NO SIGNAL**. Le grep-guard
-`task check:leaks` est **bloquant** : aucun terme de `forbiddenInCore`
-ne doit fuiter dans le core/apps (hors whitelist documentée).
+optionnels : absents → fallback **NO SIGNAL**. La convention « aucun contenu
+spécifique de map dans le core/apps » est vérifiée à la revue (plus de guard
+automatique) ; la règle ESLint `no-restricted-imports` empêche d'importer
+`@pinball/map-*` hors du registry `packages/maps/`.
 
 ---
 
