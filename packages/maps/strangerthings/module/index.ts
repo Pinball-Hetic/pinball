@@ -158,16 +158,14 @@ export function createModule(): MapModule {
       if (e.type === 'BOSS_TARGET_HIT' && e.bossId === 'demogorgon') {
         const demo = ctx.layout.bosses.find((b) => b.id === 'demogorgon')
         if (demo && e.hitCount >= demo.targetHits) {
-          // Slow-mo 400ms avant la cinématique de victoire (gel ensuite).
           ctx.physics.setTimeScale(1 / 3)
           window.setTimeout(() => {
             ctx.physics.setTimeScale(1)
             ctx.playCinematic('demogorgon_slain', {
-              // Reprise « avec un bang » : impulse radial depuis la cible.
               onEnd: () =>
                 ctx.ball?.applyEjectionForce({ x: demo.target.x, z: demo.target.z }),
             })
-          }, 400)
+          }, 200)
         }
       }
 

@@ -1,5 +1,5 @@
-// Identifiant de boss générique (les ids concrets sont fournis par les
-// définitions de boss de la map, pas codés dans le moteur).
+import type { BossCameraCinematicConfig } from './CameraCinematicConstants';
+
 export type BossId = string;
 
 export type BossTargetPosition = {
@@ -60,7 +60,6 @@ export type BossHudConfig = {
   victoryClass: string;
   assistLabel?: string;
   victoryClearMs: number;
-  /** Bandeau DMD du hint tardif (nid armé > 45 s sans reveal). Absent → pas de hint. */
   nestHintLabel?: string;
 };
 
@@ -80,18 +79,15 @@ export type BossDefinition = {
   hud: BossHudConfig;
   unlocksPortal: boolean;
   unlocksReturnPortal: boolean;
+  cameraCinematic: BossCameraCinematicConfig;
+  victoryCameraCinematic: BossCameraCinematicConfig;
   targetMeshTheme: BossTargetMeshTheme;
   targetPulse: BossTargetPulseConfig;
-  /** Son joué au reveal du boss (URL asset map). Absent → pas de son dédié. */
   revealSoundUrl?: string;
-  /** Volume du son de reveal (0–100+, relatif au bus). Défaut 100. */
   revealSoundVolume?: number;
-  /** Assist périodique associé à ce boss (allié qui aide pendant le fight).
-   *  `id` est matché contre ASSIST.assistId. Absent → ce boss n'a pas d'assist. */
   assist?: { id: string };
 };
 
-/** Contexte minimal pour évaluer le gate de reveal d'un boss (score + monde alternatif). */
 export type BossGateContext = {
   totalScore: number;
   alternateWorldActive: boolean;
@@ -99,7 +95,6 @@ export type BossGateContext = {
   alternateWorldScoreBaseline: number;
 };
 
-/** Score effectif d'un boss depuis l'entrée dans son monde. */
 export function bossEffectiveScore(def: BossDefinition, ctx: BossGateContext): number {
   const baseline = def.reveal.requiresAlternateWorld
     ? ctx.alternateWorldScoreBaseline
@@ -107,21 +102,17 @@ export function bossEffectiveScore(def: BossDefinition, ctx: BossGateContext): n
   return ctx.totalScore - baseline;
 }
 
-/** True si le palier de score du boss est franchi ET son gate monde alternatif satisfait. */
 export function bossThresholdMet(def: BossDefinition, ctx: BossGateContext): boolean {
   if (def.reveal.requiresAlternateWorld && !ctx.alternateWorldActive) return false;
   if (!def.reveal.requiresAlternateWorld && ctx.alternateWorldActive) return false;
   return bossEffectiveScore(def, ctx) >= def.reveal.scoreThreshold;
 }
 
-/** Points restants avant le palier, arrondis à la centaine supérieure (≥ 0). */
 export function bossPointsRemaining(def: BossDefinition, ctx: BossGateContext): number {
   const gap = def.reveal.scoreThreshold - bossEffectiveScore(def, ctx);
   return Math.max(0, Math.ceil(gap / 100) * 100);
 }
 
-// Helpers génériques de lookup sur un jeu de définitions injecté (le moteur ne
-// possède plus de registry boss — les apps passent layout.bosses).
 export function findBossByColliderRole(
   bosses: BossDefinition[],
   role: string,

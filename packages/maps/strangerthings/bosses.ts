@@ -1,4 +1,10 @@
 import type { BossDefinition, BossId } from '@pinball/game-engine'
+import {
+  DEMOGORGON_CAMERA_CINEMATIC,
+  DEMOGORGON_VICTORY_CAMERA_CINEMATIC,
+  VECNA_CAMERA_CINEMATIC,
+  VECNA_VICTORY_CAMERA_CINEMATIC,
+} from './cameraCinematics'
 import { mapAsset } from './manifest'
 
 // Définitions de boss Stranger Things (déplacées de game-engine/BossRegistry).
@@ -32,6 +38,8 @@ export const bossDefinitions: BossDefinition[] = [
     },
     unlocksPortal: true,
     unlocksReturnPortal: false,
+    cameraCinematic: DEMOGORGON_CAMERA_CINEMATIC,
+    victoryCameraCinematic: DEMOGORGON_VICTORY_CAMERA_CINEMATIC,
     revealSoundUrl: mapAsset('audio/spawnDG.mp3'),
     revealSoundVolume: 100,
     // Eleven aide pendant le fight (cf. DemogorgonReveal émet ASSIST id 'eleven').
@@ -94,6 +102,8 @@ export const bossDefinitions: BossDefinition[] = [
     },
     unlocksPortal: false,
     unlocksReturnPortal: true,
+    cameraCinematic: VECNA_CAMERA_CINEMATIC,
+    victoryCameraCinematic: VECNA_VICTORY_CAMERA_CINEMATIC,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,

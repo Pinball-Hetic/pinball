@@ -42,7 +42,7 @@ export const manifest: MapManifest = {
   clips: {
     demogorgon_rises: { showMs: 10_000, freezeMs: 6_000 }, // 6s gel + 4s célébration
     portal_swallow: { showMs: 4_000, freezeMs: 4_000 },
-    demogorgon_slain: { showMs: 15_000, freezeMs: 8_000 }, // 8s gel + 7s célébration
+    demogorgon_slain: { showMs: 15_000, freezeMs: 2_600 },
     last_chance: { showMs: 2_000, freezeMs: 0 },
     hall_of_fame: { showMs: 25_000, freezeMs: 0 },
     milestone_5k: { showMs: 4_000, freezeMs: 0 },

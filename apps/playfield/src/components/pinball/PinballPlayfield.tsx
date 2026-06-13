@@ -55,6 +55,7 @@ import {
   type BossId,
   CinematicDirector,
   ScreenShake,
+  PlayfieldCameraDirector,
   BallTrail,
   QualityGovernor,
   PORTAL_ENTER_SCORE,
@@ -640,6 +641,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       fit: PlayfieldCamFit;
       camera: THREE.PerspectiveCamera;
       cameraTarget: THREE.Vector3;
+      distance: number;
     } | null = null;
     let orbitControls: OrbitControls | null = null;
 
@@ -753,6 +755,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     let emit: GameEventListener;
     let ballTrail: BallTrail | null = null;
     let shooterLaneGate: ShooterLaneGate | null = null;
+    let cameraDirector: PlayfieldCameraDirector | null = null;
 
     // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
     const quality = new QualityGovernor((tier) => {
@@ -1212,8 +1215,19 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         camera.far = Math.max(80, msz.length() * 120);
         camera.updateProjectionMatrix();
 
-        fitPlayfieldCamera(camera, fit, cameraTarget);
-        playfieldCamFit = { fit, camera, cameraTarget };
+        const camDistance = fitPlayfieldCamera(camera, fit, cameraTarget);
+        playfieldCamFit = { fit, camera, cameraTarget, distance: camDistance };
+        cameraDirector = new PlayfieldCameraDirector();
+        cameraDirector.setBosses(MAP_BOSSES);
+        cameraDirector.captureBase({
+          camera,
+          target: cameraTarget,
+          dirToCamera: fit.dirToCamera,
+          distance: camDistance,
+        });
+        const restoreBossCamera = () => {
+          cameraDirector?.restore();
+        };
 
         // ── OrbitControls — caméra libre ─────────────────────────────────────
         orbitControls = new OrbitControls(camera, renderer.domElement);
@@ -1233,6 +1247,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           diag.noteReset("game_over_hide");
         });
         const releaseAlternateWorld = () => {
+          restoreBossCamera();
           mapModule?.releaseWorld?.();
           collisionProcessor?.resetAlternateWorldSession();
           clearAlternateWorldSession();
@@ -1251,6 +1266,9 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           diag.noteEvent(event.type);
           if (event.type === "DRAIN") diag.noteReset("drain");
           if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
+          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
+            restoreBossCamera();
+          }
           if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
           // bumperVisuals + garlands : onGameEvent géré par le module de map.
           // bossReveals + upsideDownPortal + upsideDownAtmosphere : onGameEvent
@@ -1269,8 +1287,19 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
           // BOSS_LOCKED_HIT (flash nid + « ENCORE X PTS ») : géré par le module.
 
-          // Cinématiques boss (reveal + victoire) : gérées par le
-          // module de map (mapModule.onGameEvent).
+          if (event.type === "BOSS_REVEAL") {
+            cameraDirector?.play(event.bossId);
+          }
+          if (event.type === "BOSS_TARGET_HIT") {
+            const boss = getBossById(MAP_BOSSES, event.bossId);
+            if (boss && event.hitCount >= boss.targetHits) {
+              cameraDirector?.playVictory(event.bossId);
+            }
+          }
+          if (event.type === "RETURN_PORTAL_TRANSITION_END" || event.type === "WORLD_CYCLE_COMPLETE") {
+            restoreBossCamera();
+          }
+
           if (
             (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
             && gameStateRef.current === "game_over"
@@ -1402,6 +1431,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
                 );
                 if (gameStateRef.current === "game_over") {
                   resetGame();
+                  restoreBossCamera();
                   collisionProcessor?.resetAllBossFights();
                   collisionProcessor?.resetScoreBaselines();
                   mapModule?.resetWorld?.();
@@ -1437,6 +1467,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             if (data.id === "START") {
               if (data.action === "DOWN" && gameStateRef.current === "game_over") {
                 resetGame();
+                restoreBossCamera();
                 collisionProcessor?.resetAllBossFights();
                 collisionProcessor?.resetScoreBaselines();
                 mapModule?.resetWorld?.();
@@ -1587,10 +1618,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
       cinematics.update(time);
       mapModule?.update(dt);
-      // Gel + intro boss pilotés par le module (shouldFreezePhysics inclut
-      // transition + intro boss). transition.update est dans mapModule.update.
       const bossIntroActive = mapModule?.isIntroHolding?.() ?? false;
-      const freezeFrame = (mapModule?.shouldFreezePhysics?.() ?? false) || cinematics.shouldFreeze();
+      const cameraCinematicActive = cameraDirector?.isActive() ?? false;
+      const freezeFrame =
+        (mapModule?.shouldFreezePhysics?.() ?? false) || cinematics.shouldFreeze();
 
       if (bossIntroActive && !bossIntroHolding && ballPhysicsInst) {
         const p = ballPhysicsInst.body.translation();
@@ -1841,7 +1872,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       }
 
       // ── OrbitControls update ─────────────────────────────────────────────
-      if (orbitControls && !freezeFrame) orbitControls.update();
+      cameraDirector?.update(dt);
+      if (orbitControls && !freezeFrame && !cameraCinematicActive) orbitControls.update();
 
       // ── Rapier debug render (tous colliders) ─────────────────────────────
       if (debugCollidersOn && physicsWorld) {
@@ -1901,11 +1933,23 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       if (playfieldCamFit) {
-        fitPlayfieldCamera(
+        const dist = fitPlayfieldCamera(
           playfieldCamFit.camera,
           playfieldCamFit.fit,
           playfieldCamFit.cameraTarget,
         );
+        playfieldCamFit.distance = dist;
+        if (cameraDirector) {
+          if (cameraDirector.isActive()) {
+            cameraDirector.restore();
+          }
+          cameraDirector.captureBase({
+            camera: playfieldCamFit.camera,
+            target: playfieldCamFit.cameraTarget,
+            dirToCamera: playfieldCamFit.fit.dirToCamera,
+            distance: dist,
+          });
+        }
       } else {
         camera.up.set(0, 1, 0);
         camera.lookAt(cameraTarget);
@@ -1933,8 +1977,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       ballTrail?.dispose();
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;
-      // upsideDownPortal + transition + atmosphere : dispose géré par
-      // mapModule.dispose.
+      cameraDirector?.dispose();
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
       renderer.dispose();

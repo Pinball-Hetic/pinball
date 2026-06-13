@@ -13,12 +13,14 @@ import { layout } from '../layout';
 import { PLAYFIELD_TILT } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
+  UPSIDE_DOWN_PORTAL_OPEN_DURATION,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
+  UPSIDE_DOWN_PORTAL_REVEAL_DELAY,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from './UpsideDownConstants';
 import { findObjectByNormalizedName } from '@pinball/game-engine';
-import { GlowSprite } from '@pinball/game-engine';
+import { GlowSprite, easeInOut } from '@pinball/game-engine';
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -82,6 +84,9 @@ export class UpsideDownPortal {
   private anchorPos = new THREE.Vector3();
   private alternateWorldActive = false;
   private revealed = false;
+  private pendingReveal = false;
+  private pendingT = 0;
+  private opening = false;
   private revealing = false;
   private revealT = 0;
   private pulseT = 0;
@@ -152,13 +157,13 @@ export class UpsideDownPortal {
   }
 
   onGameEvent(event: GameEvent): void {
-    if (this.revealed || this.revealing) return;
+    if (this.revealed || this.revealing || this.opening || this.pendingReveal) return;
     if (event.type !== 'BOSS_TARGET_HIT') return;
     const def = getBossDefinition(event.bossId);
     if (event.hitCount < def.targetHits) return;
 
     if (def.unlocksPortal && !this.alternateWorldActive) {
-      this.beginReveal();
+      this.scheduleReveal();
       return;
     }
     if (def.unlocksReturnPortal && this.alternateWorldActive) {
@@ -189,6 +194,21 @@ export class UpsideDownPortal {
 
   update(dt: number): void {
     this.pulseT += dt;
+
+    if (this.pendingReveal) {
+      this.pendingT += dt;
+      if (this.pendingT >= UPSIDE_DOWN_PORTAL_REVEAL_DELAY) {
+        this.pendingReveal = false;
+        this.startOpening();
+      }
+    }
+
+    if (this.opening) {
+      this.revealT += dt;
+      const rawT = Math.min(1, this.revealT / UPSIDE_DOWN_PORTAL_OPEN_DURATION);
+      this.applyOpenProgress(easeInOut(rawT));
+      if (rawT >= 1) this.finishOpening();
+    }
 
     if (this.revealing && this.portalGroup) {
       this.revealT += dt;
@@ -256,9 +276,12 @@ export class UpsideDownPortal {
 
   reset(): void {
     if (!this.world || !this.cover || !this.coverMat) return;
-    if (!this.revealed && !this.revealing) return;
+    if (!this.revealed && !this.revealing && !this.opening && !this.pendingReveal) return;
 
     this.revealed = false;
+    this.pendingReveal = false;
+    this.pendingT = 0;
+    this.opening = false;
     this.revealing = false;
     this.revealT = 0;
     this.suckBoost = 0;
@@ -337,6 +360,9 @@ export class UpsideDownPortal {
     this.accentGlow = null;
     this.vineMat = null;
     this.revealed = false;
+    this.pendingReveal = false;
+    this.pendingT = 0;
+    this.opening = false;
     this.revealing = false;
     this.revealT = 0;
     this.suckBoost = 0;
@@ -491,6 +517,72 @@ export class UpsideDownPortal {
       group.add(mesh);
       this.ownedGeos.push(geo);
       this.vines.push({ mesh, phase: i * 1.9 });
+    }
+  }
+
+  private scheduleReveal(): void {
+    this.pendingReveal = true;
+    this.pendingT = 0;
+  }
+
+  private startOpening(): void {
+    this.opening = true;
+    this.revealT = 0;
+    this.removePhysicsCover();
+    if (this.portalGroup) {
+      this.portalGroup.visible = true;
+      this.portalGroup.scale.setScalar(0.001);
+    }
+    this.applyOpenProgress(0);
+  }
+
+  private finishOpening(): void {
+    this.opening = false;
+    this.revealed = true;
+    if (this.cover) this.cover.visible = false;
+    if (this.portalGroup) this.portalGroup.scale.setScalar(1);
+    this.applyOpenProgress(1);
+    this.createPortalSensor();
+    this.onOpenChange?.(true);
+  }
+
+  private applyOpenProgress(p: number): void {
+    if (!this.portalGroup) return;
+
+    this.portalGroup.visible = p > 0.001;
+    this.portalGroup.scale.setScalar(Math.max(0.001, p));
+
+    if (this.cover && this.coverMat) {
+      if (p < 0.5) {
+        this.cover.visible = true;
+        this.coverMat.transparent = true;
+        this.coverMat.opacity = 1 - p / 0.5;
+      } else {
+        this.cover.visible = false;
+        this.coverMat.transparent = false;
+        this.coverMat.opacity = 1;
+      }
+    }
+
+    const fx = Math.min(1, p * 1.15);
+    if (this.coreMat) this.coreMat.opacity = 0.7 * fx;
+    if (this.vortexMat) this.vortexMat.opacity = 0.35 * fx;
+    if (this.outerRingMat) {
+      this.outerRingMat.transparent = true;
+      this.outerRingMat.opacity = 0.95 * fx;
+    }
+    if (this.innerRingMat) {
+      this.innerRingMat.transparent = true;
+      this.innerRingMat.opacity = 0.88 * fx;
+    }
+    if (this.rimGlow) this.rimGlow.set(0.55 * fx, 0.9 * fx);
+    if (this.accentGlow) this.accentGlow.set(0.48 * fx, fx);
+    if (this.coreLight) this.coreLight.intensity = 0.85 * fx;
+    if (this.vineMat) this.vineMat.emissiveIntensity = 0.35 * fx;
+
+    for (const part of this.particles) {
+      part.mesh.visible = p > 0.08;
+      part.mesh.scale.setScalar(0.55 * fx);
     }
   }
 
