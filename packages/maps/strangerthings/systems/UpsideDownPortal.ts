@@ -13,12 +13,11 @@ import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
 import {
   UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_ANCHOR_NAMES,
-  UPSIDE_DOWN_PORTAL_OPEN_DURATION,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
-  UPSIDE_DOWN_PORTAL_REVEAL_DELAY,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from './UpsideDownConstants';
+import { mapPortalRevealProgress, portalRevealTotalDuration } from './PortalRevealCurve';
 import { findObjectByNormalizedName, canonicalGltfName } from '@pinball/game-engine';
 import type { BossId } from '@pinball/game-engine';
 import { GlowSprite, easeInOut } from '@pinball/game-engine';
@@ -99,18 +98,6 @@ export class UpsideDownPortal {
   private pulseT = 0;
   private baseY = 0;
   private suckBoost = 0;
-
-  private totalRevealDuration(): number {
-    return UPSIDE_DOWN_PORTAL_REVEAL_DELAY + UPSIDE_DOWN_PORTAL_OPEN_DURATION;
-  }
-
-  private mapRevealProgress(u: number): number {
-    const total = this.totalRevealDuration();
-    const delayFrac = UPSIDE_DOWN_PORTAL_REVEAL_DELAY / total;
-    if (u <= delayFrac) return (u / delayFrac) * 0.28;
-    const tail = (u - delayFrac) / (1 - delayFrac);
-    return 0.28 + easeInOut(tail) * 0.72;
-  }
 
   setup(config: SetupConfig): void {
     this.dispose();
@@ -217,8 +204,8 @@ export class UpsideDownPortal {
 
     if (this.opening && !this.revealed) {
       this.revealT += dt;
-      const u = Math.min(1, this.revealT / this.totalRevealDuration());
-      this.applyOpenProgress(this.mapRevealProgress(u));
+      const u = Math.min(1, this.revealT / portalRevealTotalDuration());
+      this.applyOpenProgress(mapPortalRevealProgress(u));
       if (u >= 1) this.finishOpening();
     }
 

@@ -16,7 +16,17 @@ import {
   VECNA_WALK_FADE_OUT,
   VECNA_WALK_SETTLE_FACING,
 } from './VecnaConstants';
-import { PLAYFIELD_TILT, surfaceYAtZ, easeOut, findGltfAnimationClip, createGltfLoader, applySkinnedModelFit, fitSkinnedModelWithRetry, updateSkinnedBindPose, warmupObject3D } from '@pinball/game-engine';
+import {
+  PLAYFIELD_TILT,
+  surfaceYAtZ,
+  easeOut,
+  findGltfAnimationClip,
+  createGltfLoader,
+  applySkinnedModelFit,
+  fitSkinnedModelWithRetry,
+  updateSkinnedBindPose,
+  warmupObject3D,
+} from '@pinball/game-engine';
 
 type AnimState = 'walk' | 'fight' | 'hit' | 'victory';
 
