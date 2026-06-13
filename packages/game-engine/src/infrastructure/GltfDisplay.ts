@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { PLAYFIELD_MAP_COLOR_DARKEN, PLAYFIELD_TONE_MAPPING_EXPOSURE } from '../domain/PlayfieldVisualConstants';
+import {
+  PLAYFIELD_MAP_COLOR_DARKEN,
+  PLAYFIELD_TONE_MAPPING_EXPOSURE,
+  PLAYFIELD_ENV_METALLIC,
+  PLAYFIELD_ENV_SEMI,
+  PLAYFIELD_ENV_BASE,
+} from '../domain/PlayfieldVisualConstants';
 import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh } from './GltfNodeNames';
 
 const TEXTURE_KEYS = [
@@ -53,6 +59,16 @@ export function prepareGltfMaterialsForDisplay(root: THREE.Object3D): void {
       }
       if (shouldDarkenMapMaterial(obj)) {
         material.color.multiplyScalar(PLAYFIELD_MAP_COLOR_DARKEN);
+      }
+      // Boost envMapIntensity selon le niveau de metalness.
+      // Les matériaux métalliques (or, gemmes) doivent refléter fortement
+      // l'environment pour atteindre l'aspect Vectary (vivid gold, vivid gems).
+      if (material.metalness >= 0.5) {
+        material.envMapIntensity = PLAYFIELD_ENV_METALLIC;
+      } else if (material.metalness >= 0.2) {
+        material.envMapIntensity = PLAYFIELD_ENV_SEMI;
+      } else {
+        material.envMapIntensity = PLAYFIELD_ENV_BASE;
       }
     }
   });
