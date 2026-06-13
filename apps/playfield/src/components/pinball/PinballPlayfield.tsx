@@ -413,11 +413,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     onAtmosphereChange: (alternateWorldActive) => {
       dmd.setAtmosphere(alternateWorldActive);
       atmosphereAlternateRef.current = alternateWorldActive;
-      // nestMarker géré par le module (réconciliation onGameEvent).
     },
-    // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
-    // module de map (events MILESTONE / BOSS_ARMED).
-    onMilestone: (threshold) => emitRef.current?.({ type: "MILESTONE", threshold }),
     onBossArmed: (bossId) => emitRef.current?.({ type: "BOSS_ARMED", bossId }),
     // le bonus map (lettres + complete + fever) géré par le module de map.
     onFeverEnd: () => {

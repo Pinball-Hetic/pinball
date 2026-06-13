@@ -121,20 +121,6 @@ export function createModule(): MapModule {
       if (e.type === 'BOSS_LOCKED_HIT') {
         ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
       }
-      // Palier de score : cinématique + frisson garlands + shake.
-      if (e.type === 'MILESTONE') {
-        const clip =
-          e.threshold === 5000
-            ? 'milestone_5k'
-            : e.threshold === 15000
-              ? 'milestone_15k'
-              : e.threshold === 30000
-                ? 'milestone_30k'
-                : 'milestone_big'
-        ctx.playCinematic(clip, { value: e.threshold })
-        garlands?.celebrate()
-        ctx.screenShake(0.4)
-      }
       // Entrée Upside Down confirmée (fin de transition) : portail actif +
       // baseline core + nid en mode Upside Down.
       if (e.type === 'PORTAL_TRANSITION_END') {
