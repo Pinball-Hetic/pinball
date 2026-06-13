@@ -69,6 +69,7 @@ import {
   type BossId,
   CinematicDirector,
   ScreenShake,
+  PlayfieldCameraDirector,
   BallTrail,
   QualityGovernor,
   DEMOGORGON_TARGET,
@@ -651,6 +652,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       fit: PlayfieldCamFit;
       camera: THREE.PerspectiveCamera;
       cameraTarget: THREE.Vector3;
+      distance: number;
     } | null = null;
     let orbitControls: OrbitControls | null = null;
 
@@ -768,6 +770,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let upsideDownTransition: UpsideDownTransition | null = null;
     let upsideDownAtmosphere: UpsideDownAtmosphere | null = null;
     let shooterLaneGate: ShooterLaneGate | null = null;
+    let cameraDirector: PlayfieldCameraDirector | null = null;
 
     // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
     const quality = new QualityGovernor((tier) => {
@@ -922,7 +925,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           garlandLights,
           bumperVisuals,
           onFightEnd: () => collisionProcessor?.setBossFightActive('demogorgon', false),
-          onTargetReady: () => collisionProcessor?.setBossTargetArmed('demogorgon', true),
+          onTargetReady: () => {
+            collisionProcessor?.setBossTargetArmed('demogorgon', true);
+            cameraDirector?.restore();
+          },
         });
 
         vecnaReveal = new VecnaReveal();
@@ -1168,8 +1174,15 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
         camera.far = Math.max(80, msz.length() * 120);
         camera.updateProjectionMatrix();
 
-        fitPlayfieldCamera(camera, fit, cameraTarget);
-        playfieldCamFit = { fit, camera, cameraTarget };
+        const camDistance = fitPlayfieldCamera(camera, fit, cameraTarget);
+        playfieldCamFit = { fit, camera, cameraTarget, distance: camDistance };
+        cameraDirector = new PlayfieldCameraDirector();
+        cameraDirector.captureBase({
+          camera,
+          target: cameraTarget,
+          dirToCamera: fit.dirToCamera,
+          distance: camDistance,
+        });
 
         // ── OrbitControls — caméra libre ─────────────────────────────────────
         orbitControls = new OrbitControls(camera, renderer.domElement);
@@ -1264,6 +1277,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
           if (event.type === "BOSS_REVEAL" && event.bossId === "demogorgon") {
             playCinematic("demogorgon_rises", { once: true });
+            cameraDirector?.play("demogorgon");
           }
           if (
             event.type === "BOSS_TARGET_HIT"
@@ -1712,6 +1726,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
 
       cinematics.update(time);
       const transitionActive = upsideDownTransition?.isActive() ?? false;
+      const cameraCinematicActive = cameraDirector?.isActive() ?? false;
       const vecnaIntroActive = bossReveals?.isGameplayFrozen() ?? false;
       const freezeFrame = transitionActive || cinematics.shouldFreeze() || vecnaIntroActive;
 
@@ -1970,7 +1985,8 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       }
 
       // ── OrbitControls update ─────────────────────────────────────────────
-      if (orbitControls && !transitionActive) orbitControls.update();
+      cameraDirector?.update(dt);
+      if (orbitControls && !transitionActive && !cameraCinematicActive) orbitControls.update();
 
       // ── Rapier debug render (tous colliders) ─────────────────────────────
       if (debugCollidersOn && physicsWorld) {
@@ -2030,11 +2046,20 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       if (playfieldCamFit) {
-        fitPlayfieldCamera(
+        const dist = fitPlayfieldCamera(
           playfieldCamFit.camera,
           playfieldCamFit.fit,
           playfieldCamFit.cameraTarget,
         );
+        playfieldCamFit.distance = dist;
+        if (cameraDirector && !cameraDirector.isActive()) {
+          cameraDirector.captureBase({
+            camera: playfieldCamFit.camera,
+            target: playfieldCamFit.cameraTarget,
+            dirToCamera: playfieldCamFit.fit.dirToCamera,
+            distance: dist,
+          });
+        }
       } else {
         camera.up.set(0, 1, 0);
         camera.lookAt(cameraTarget);
@@ -2064,6 +2089,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       ballTrail?.dispose();
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;
+      cameraDirector?.dispose();
       upsideDownPortal?.dispose();
       upsideDownTransition?.dispose();
       upsideDownAtmosphere?.dispose();
