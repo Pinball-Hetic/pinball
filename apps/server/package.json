@@ -11,10 +11,12 @@
     "@pinball/shared-types": "workspace:*",
     "express": "^5.2.1",
     "socket.io": "^4.8.3",
-    "@prisma/client": "^6.19.2"
+    "@prisma/client": "^6.19.2",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
+    "@types/qrcode": "^1.5.5",
     "tsx": "^4.19.3",
     "prisma": "^6.19.2"
   }
