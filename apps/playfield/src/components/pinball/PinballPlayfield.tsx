@@ -139,6 +139,7 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
+import { playfieldToScreenPercentForMode } from "@/utils/playfieldScreen";
 import {
   notifyBootPhase,
   onPlayfieldReady,
@@ -1842,6 +1843,14 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       ? "absolute inset-0 h-full w-full touch-none outline-none focus:outline-none"
       : "h-screen w-full touch-none outline-none focus:outline-none";
 
+  const plungerAnchor = IS_PORTRAIT_FILL
+    ? playfieldToScreenPercentForMode(
+        mapLayout.spawns.ball.x,
+        mapLayout.spawns.ball.z,
+        "portrait-fill",
+      )
+    : undefined;
+
   return (
     <div className={rootClassName}>
       <div className={frameClassName} style={cabinetFrameStyle}>
@@ -1862,6 +1871,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           bosses={MAP_BOSSES}
           cabinetMode={cabinetMode}
           portraitFill={IS_PORTRAIT_FILL}
+          plungerAnchor={plungerAnchor}
           onAttractInteract={() => {
             if (physicsReady && !sessionStarted) beginSession();
           }}

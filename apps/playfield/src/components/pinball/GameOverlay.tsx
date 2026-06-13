@@ -22,6 +22,7 @@ interface GameOverlayProps {
   bosses: BossDefinition[];
   cabinetMode?: boolean;
   portraitFill?: boolean;
+  plungerAnchor?: { x: number; y: number };
   onAttractInteract?: () => void;
 }
 
@@ -34,7 +35,12 @@ type OverlayLayout = {
   bossAssist: string;
   bottomHint: string;
   powerHint: string;
-  attractControls: string;
+  attractShell: string;
+  attractTitle: string;
+  attractSubtitle: string;
+  attractPrompt: string;
+  attractTapHint: string | null;
+  attractControls: string | null;
 };
 
 const PORTRAIT_BOSS_BOTTOM: Record<string, string> = {
@@ -57,8 +63,15 @@ function overlayLayout(portraitFill: boolean): OverlayLayout {
         "pointer-events-none absolute inset-x-0 top-[max(4rem,calc(env(safe-area-inset-top)+3rem))] z-10 flex justify-center",
       bottomHint: "bottom-[max(1rem,env(safe-area-inset-bottom))]",
       powerHint: "bottom-[max(3.25rem,env(safe-area-inset-bottom))]",
-      attractControls:
-        "absolute bottom-[max(1rem,env(safe-area-inset-bottom))] text-center font-mono text-[10px] text-zinc-600 space-y-1 leading-relaxed",
+      attractShell:
+        "absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#0a0e18]/75 via-[#0a0e18]/55 to-[#0a0e18]/85 px-4 pb-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))] pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-[2px]",
+      attractTitle:
+        "mt-2 font-mono text-3xl font-bold uppercase tracking-[0.16em] text-zinc-100 drop-shadow-[0_0_24px_rgba(255,180,0,0.35)]",
+      attractSubtitle: "mt-3 max-w-[16rem] text-sm leading-relaxed text-zinc-400",
+      attractPrompt:
+        "rounded-full border border-amber-500/30 bg-black/50 px-8 py-4 font-mono backdrop-blur-sm",
+      attractTapHint: "text-[10px] uppercase tracking-[0.22em] text-zinc-600",
+      attractControls: null,
     };
   }
   return {
@@ -71,6 +84,14 @@ function overlayLayout(portraitFill: boolean): OverlayLayout {
     bossAssist: "pointer-events-none absolute inset-x-0 top-24 z-10 flex justify-center",
     bottomHint: "bottom-6",
     powerHint: "bottom-6",
+    attractShell:
+      "absolute inset-0 z-20 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#0a0e18]/75 via-[#0a0e18]/55 to-[#0a0e18]/85 px-6 backdrop-blur-[2px]",
+    attractTitle:
+      "mt-3 font-mono text-4xl font-bold uppercase tracking-[0.18em] text-zinc-100 drop-shadow-[0_0_24px_rgba(255,180,0,0.35)] sm:text-5xl",
+    attractSubtitle: "mt-3 max-w-xs text-sm leading-relaxed text-zinc-400",
+    attractPrompt:
+      "rounded-full border border-amber-500/30 bg-black/50 px-6 py-3 font-mono backdrop-blur-sm",
+    attractTapHint: "text-[10px] uppercase tracking-[0.22em] text-zinc-600",
     attractControls:
       "absolute bottom-8 text-center font-mono text-[10px] text-zinc-600 space-y-1 leading-relaxed",
   };
@@ -98,6 +119,7 @@ export default function GameOverlay({
   bosses,
   cabinetMode = false,
   portraitFill = false,
+  plungerAnchor,
   onAttractInteract,
 }: GameOverlayProps) {
   void cabinetMode;
@@ -244,37 +266,34 @@ export default function GameOverlay({
       )}
 
       {bootPhase === "attract" && (
-        <div
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-[#0a0e18]/75 via-[#0a0e18]/55 to-[#0a0e18]/85 px-6 backdrop-blur-[2px]"
-          onPointerDown={onAttractInteract}
-        >
+        <div className={layout.attractShell} onPointerDown={onAttractInteract}>
           <div className="text-center">
             <p className="font-mono text-[10px] uppercase tracking-[0.55em] text-red-400/80">
               {attractTagline}
             </p>
-            <h1 className="mt-3 font-mono text-4xl font-bold uppercase tracking-[0.18em] text-zinc-100 drop-shadow-[0_0_24px_rgba(255,180,0,0.35)] sm:text-5xl">
-              Pinball
-            </h1>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-zinc-400">
+            <h1 className={layout.attractTitle}>Pinball</h1>
+            <p className={layout.attractSubtitle}>
               Le plateau est prêt. Entrez dans la partie pour lancer la balle.
             </p>
           </div>
 
           <div className="flex flex-col items-center gap-3">
-            <div className="rounded-full border border-amber-500/30 bg-black/50 px-6 py-3 font-mono backdrop-blur-sm">
+            <div className={layout.attractPrompt}>
               <p className="animate-pulse text-sm uppercase tracking-[0.28em] text-amber-200/90">
                 ESPACE ou START pour jouer
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-[0.22em] text-zinc-600">
-              ou cliquez sur le plateau
-            </p>
+            {layout.attractTapHint && (
+              <p className={layout.attractTapHint}>ou cliquez sur le plateau</p>
+            )}
           </div>
 
-          <div className={layout.attractControls}>
-            <p>Q / D — Flippers</p>
-            <p>ESPACE (en jeu) — Charger puis relâcher pour lancer</p>
-          </div>
+          {layout.attractControls && (
+            <div className={layout.attractControls}>
+              <p>Q / D — Flippers</p>
+              <p>ESPACE (en jeu) — Charger puis relâcher pour lancer</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -289,7 +308,13 @@ export default function GameOverlay({
         </div>
       )}
 
-      {showPowerBar && <PlungerPowerBar charge={plungerCharge} />}
+      {showPowerBar && (
+        <PlungerPowerBar
+          charge={plungerCharge}
+          portraitFill={portraitFill}
+          anchor={plungerAnchor}
+        />
+      )}
 
       {showPowerBar && (
         <div className={`pointer-events-none absolute inset-x-0 ${layout.powerHint} z-10 flex justify-center px-4`}>
