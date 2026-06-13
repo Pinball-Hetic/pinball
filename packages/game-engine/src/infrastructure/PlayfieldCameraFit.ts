@@ -161,14 +161,14 @@ function playfieldNdcXWithinLimit(
   return playfieldNdcMaxAbsAxis(camera, target, camPos, corners, 'x') <= ndcXLimit;
 }
 
-function playfieldNdcYCoversLimit(
+function playfieldNdcYWithinLimit(
   camera: THREE.PerspectiveCamera,
   target: THREE.Vector3,
   camPos: THREE.Vector3,
   corners: readonly THREE.Vector3[],
   ndcYLimit: number,
 ): boolean {
-  return playfieldNdcMaxAbsAxis(camera, target, camPos, corners, 'y') >= ndcYLimit;
+  return playfieldNdcMaxAbsAxis(camera, target, camPos, corners, 'y') <= ndcYLimit;
 }
 
 function distanceForCameraFit(
@@ -195,31 +195,6 @@ function distanceForCameraFit(
   return hi;
 }
 
-function distanceForCameraCoverWithin(
-  camera: THREE.PerspectiveCamera,
-  fit: PlayfieldCamFit,
-  coversAtDistance: (camPos: THREE.Vector3) => boolean,
-  maxDistance: number,
-): number {
-  const { target: mc, dirToCamera } = fit;
-  const pos = _camPosScratch;
-  pos.copy(mc).addScaledVector(dirToCamera, maxDistance);
-  if (coversAtDistance(pos)) return maxDistance;
-
-  let lo = 0.04;
-  while (!coversAtDistance(pos.copy(mc).addScaledVector(dirToCamera, lo)) && lo > 1e-4) {
-    lo /= 1.75;
-  }
-  let hi = maxDistance;
-  for (let i = 0; i < 30; i++) {
-    const mid = (lo + hi) / 2;
-    pos.copy(mc).addScaledVector(dirToCamera, mid);
-    if (coversAtDistance(pos)) lo = mid;
-    else hi = mid;
-  }
-  return lo;
-}
-
 function distanceForPortraitWidthFirstView(
   camera: THREE.PerspectiveCamera,
   fit: PlayfieldCamFit,
@@ -231,16 +206,14 @@ function distanceForPortraitWidthFirstView(
   );
 }
 
-function distanceForPortraitHeightCoverView(
+function distanceForPortraitHeightContainView(
   camera: THREE.PerspectiveCamera,
   fit: PlayfieldCamFit,
   ndcYLimit: number,
-  widthDistance: number,
 ): number {
   const { target, corners } = fit;
-  return distanceForCameraCoverWithin(camera, fit, (camPos) =>
-    playfieldNdcYCoversLimit(camera, target, camPos, corners, ndcYLimit),
-    widthDistance,
+  return distanceForCameraFit(camera, fit, (camPos) =>
+    playfieldNdcYWithinLimit(camera, target, camPos, corners, ndcYLimit),
   );
 }
 
@@ -416,8 +389,8 @@ function fitPlayfieldCameraPortraitFill(
   const ndcY = debugTuning?.portraitNdcY ?? PLAYFIELD_PORTRAIT_NDC_Y;
   const scale = debugTuning?.distanceScale ?? 1;
   const dWidth = distanceForPortraitWidthFirstView(camera, fit, ndcX);
-  const dist =
-    distanceForPortraitHeightCoverView(camera, fit, ndcY, dWidth) * scale;
+  const dHeight = distanceForPortraitHeightContainView(camera, fit, ndcY);
+  const dist = Math.max(dWidth, dHeight) * scale;
   applyPlayfieldCamera(camera, target, fit.dirToCamera, dist);
   return dist;
 }
