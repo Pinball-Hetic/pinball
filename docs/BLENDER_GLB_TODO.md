@@ -121,19 +121,28 @@ Le « nid » qui couvre le trou du Demogorgon avant son apparition est un mesh
 physique). Il est rendu **tel quel**, le code n'y touche jamais (pas de
 rotation appliquée).
 
-**Constat** : il apparaît tourné sur l'axe Y (vu en jeu). Or les transforms de
-nœuds du GLB n'ont **aucune rotation Y** (uniquement l'inclinaison plateau sur
-X). Donc le yaw est **figé dans la géométrie du mesh** (modélisée/exportée de
-travers), pas dans une transform de nœud → invisible au dump, à corriger dans
-Blender.
+**Cause réelle** : c'est un mesh **skinné** (squelette `..._skeleton` + 8 joints
+`joint_Portal_Rim_*` posés en cercle, plusieurs avec de grosses rotations Y) et
+le GLB embarque **5 animations** (`Open`, `Close`, `OpenIdle`, `CloseIdle`,
+`Exit`). En Blender, la pose de repos s'affiche correctement. **En jeu**, le
+moteur rend le mesh skinné **sans lecteur d'animation** (le code ne joue aucun
+de ces clips → pose de *bind*), ce qui le déforme/oriente de travers. Le rig
+n'est piloté par aucun code (ni avant ni après le refacto).
 
-| Élément | Constat (GLB actuel) | Action Blender |
-|---|---|---|
-| `vis_demogorgon_portal_rig` | Géométrie orientée d'un yaw (rotation Y apparente), alors que les nœuds sont en rotation X seule | Redresser l'orientation du mesh (appliquer la rotation au niveau objet, `Ctrl+A` → Rotation, ou corriger le yaw de modélisation) pour qu'il soit droit, face au joueur |
-| Position du nid | Centré en (0.002, 1.017, **−0.064**) ; la cible Demogorgon est en (0, 1.012, **−0.02**) → décalé ~4 cm en profondeur | Vérifier que le nid couvre bien le trou de la cible (recentrer sur z ≈ −0.02 si besoin) |
+**Action Blender (recommandée) — dé-rigger** : comme le jeu n'anime pas ce
+portail, le sortir de l'état skinné garantit un rendu identique au viewport.
 
-> Pas de correctif code : un `vis_` est du contenu visuel pur. Le redressage se
-> fait à l'export Blender (le moteur affiche la géométrie telle qu'elle vient).
+| Étape | Action Blender |
+|---|---|
+| 1 | Mettre le rig dans la pose voulue (ex. frame de `CloseIdle` — portail fermé qui couvre le trou) |
+| 2 | Appliquer le modificateur Armature sur le mesh (`Ctrl+A` pose → Apply / Visual Geometry to Mesh), supprimer l'armature |
+| 3 | Garder le nom de rôle `vis_demogorgon_portal_rig` (mesh statique, plus de squelette ni d'animations dans l'export) |
+| 4 | Vérifier le centrage : nid en (0.002, 1.017, **−0.064**) ; cible Demogorgon en (0, 1.012, **−0.02**) → recentrer sur z ≈ −0.02 si le nid ne couvre pas pile le trou |
+
+> Alternative (si on veut garder l'anim Open/Close à terme) : le jeu devrait
+> piloter le rig (lecteur d'animation sur `vis_demogorgon_portal_rig`,
+> Open au reveal / CloseIdle sinon). C'est du dev gameplay, hors du périmètre
+> actuel — tant que ce n'est pas câblé, un mesh statique est la bonne option.
 
 ## Checklist de validation post-réexport
 
