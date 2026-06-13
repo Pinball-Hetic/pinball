@@ -28,6 +28,9 @@ services:
     environment:
       DATABASE_URL: "postgresql://dev_user:dev_password@db:5432/pinball_dev?schema=public"
       NODE_ENV: development
+      GLOBAL_API_URL: "http://gateway.flipper-website.orb.local"
+      CABINET_ID: "borne-dev"
+      CABINET_KEY: "${CABINET_KEY}" # injecté depuis .env (gitignoré), jamais en dur
     ports:
       - "3334:3001"
     volumes:
