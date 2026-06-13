@@ -52,6 +52,7 @@ import {
   ScreenShake,
   PlayfieldCameraDirector,
   PLAYFIELD_VIEW_DIR,
+  parsePlayfieldViewMode,
   boundingBoxPlayableArea,
   fillPlayfieldBoxCorners,
   fitPlayfieldCamera,
@@ -167,6 +168,8 @@ const ALTERNATE_WORLD_PERSISTENCE: AlternateWorldPersistence = "until_game_over"
 type KeyboardMode = "direct" | "simulate-esp32" | "disabled";
 const KEYBOARD_MODE: KeyboardMode =
   (process.env.NEXT_PUBLIC_KEYBOARD_MODE as KeyboardMode) || "direct";
+
+const PLAYFIELD_VIEW_MODE = parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE);
 
 type PinballPlayfieldProps = {
   /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
@@ -1033,7 +1036,9 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         camera.far = Math.max(80, msz.length() * 120);
         camera.updateProjectionMatrix();
 
-        const camDistance = fitPlayfieldCamera(camera, fit, cameraTarget);
+        const camDistance = fitPlayfieldCamera(camera, fit, cameraTarget, {
+          viewMode: PLAYFIELD_VIEW_MODE,
+        });
         playfieldCamFit = { fit, camera, cameraTarget, distance: camDistance };
         cameraDirector = new PlayfieldCameraDirector();
         cameraDirector.setBosses(MAP_BOSSES);
@@ -1766,6 +1771,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           playfieldCamFit.camera,
           playfieldCamFit.fit,
           playfieldCamFit.cameraTarget,
+          { viewMode: PLAYFIELD_VIEW_MODE },
         );
         playfieldCamFit.distance = dist;
         if (cameraDirector) {

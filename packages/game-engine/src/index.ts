@@ -5,6 +5,7 @@ export * from './domain/GameEvents';
 export * from './domain/FlipperConstants';
 export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
+export * from './domain/PlayfieldViewMode';
 export * from './domain/ScoringConstants';
 export * from './domain/BossRegistry';
 export * from './domain/CameraCinematicConstants';

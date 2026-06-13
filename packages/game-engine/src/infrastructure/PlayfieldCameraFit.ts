@@ -7,6 +7,8 @@ import {
   WALL_TOP_Z,
 } from '../domain/Ball';
 import { findObjectByNormalizedName } from './GltfNodeNames';
+import type { PlayfieldViewMode } from '../domain/PlayfieldViewMode';
+import { DEFAULT_PLAYFIELD_VIEW_MODE } from '../domain/PlayfieldViewMode';
 
 export const PLAYFIELD_VIEW_DIR = new THREE.Vector3(0, 0.48, 0.88).normalize();
 export const PLAYFIELD_VIEW_NDC_MARGIN = 0.78;
@@ -16,6 +18,10 @@ export type PlayfieldCamFit = {
   target: THREE.Vector3;
   dirToCamera: THREE.Vector3;
   corners: THREE.Vector3[];
+};
+
+export type PlayfieldCameraFitOptions = {
+  viewMode?: PlayfieldViewMode;
 };
 
 export function fillPlayfieldBoxCorners(box: THREE.Box3, reuse: THREE.Vector3[]): THREE.Vector3[] {
@@ -174,6 +180,21 @@ export function boundingBoxPlayableArea(playfieldRoot: THREE.Object3D): THREE.Bo
 }
 
 export function fitPlayfieldCamera(
+  camera: THREE.PerspectiveCamera,
+  fit: PlayfieldCamFit,
+  target: THREE.Vector3,
+  options?: PlayfieldCameraFitOptions,
+): number {
+  const viewMode = options?.viewMode ?? DEFAULT_PLAYFIELD_VIEW_MODE;
+  switch (viewMode) {
+    case 'portrait-fill':
+      return fitPlayfieldCameraLegacy(camera, fit, target);
+    default:
+      return fitPlayfieldCameraLegacy(camera, fit, target);
+  }
+}
+
+function fitPlayfieldCameraLegacy(
   camera: THREE.PerspectiveCamera,
   fit: PlayfieldCamFit,
   target: THREE.Vector3,
