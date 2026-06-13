@@ -295,7 +295,11 @@ export class PlayfieldTrimeshBuilder {
       const friction = elemNum(el.friction, 0.15);
       const singleSided = el.singleSided === 1;
       const doubleSided = el.doubleSided !== undefined ? el.doubleSided === 1 : !singleSided;
-      const smooth = el.smooth !== undefined ? el.smooth === 1 : true;
+      // Lissage laplacien réservé au sol (anti-accroche au roulement).
+      // Sur un mur concave il aplatit la concavité → corde de collision
+      // fantôme. Défaut: floor lissé, wall/lane bruts. Override via manifest.
+      const defaultSmooth = g.role === 'floor';
+      const smooth = el.smooth !== undefined ? el.smooth === 1 : defaultSmooth;
       PlayfieldTrimeshBuilder.createTrimeshCollider(
         world, g.geos, restitution, friction, smooth, doubleSided,
       );
