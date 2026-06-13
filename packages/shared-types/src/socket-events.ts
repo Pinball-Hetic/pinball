@@ -129,8 +129,7 @@ export interface GameOver {
 
 export interface GameRegistered {
   code: string // token de claim
-  claimUrl: string // URL encodée dans le QR
-  qrDataUrl: string // PNG data-url du QR (généré backend)
+  claimUrl: string // URL encodée dans le QR (rendu client-side)
 }
 
 // Limite d'affichage du pseudo (tronqué par les écrans). Le max réel de
