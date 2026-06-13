@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, type CSSProperties } from "re
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import {
   PhysicsWorld,
@@ -645,6 +646,14 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     configureGltfRenderer(renderer);
+
+    // Environment map neutre — indispensable pour les matériaux métalliques/
+    // glossy (or, gemmes, chrome). Sans envmap, metalness=1 → rendu noir.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    // blur=0.01 → reflets nets (moins de flou environment) → gemmes/or plus vifs.
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.01).texture;
+    pmrem.dispose();
     // Démarrage à 1.5 (HiDPI plafonné) ; le QualityGovernor ajuste ensuite
     // selon le frame time (1.5 → 1.25 → 1.0 → 1.0 + trail réduit/spores off).
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -655,20 +664,21 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     renderer.shadowMap.enabled = false;
     mountEl.appendChild(renderer.domElement);
 
-    // Lumière ambiante minimale pour éviter les noirs purs dans les ombres
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+    // Ambiante faible → zones sombres restent sombres (contraste fort).
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.22);
     scene.add(ambientLight);
-    // HemiLight à 0 — conservé uniquement pour la compatibilité UpsideDownAtmosphere
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
+    // HemiLight — faible, contribution uniquement pour déboucher le bas du modèle.
+    const hemiLight = new THREE.HemisphereLight(0xfff8e8, 0x111108, 0.15);
     scene.add(hemiLight);
-    // Spot blanc principal depuis la position caméra (PLAYFIELD_VIEW_DIR : y=0.48, z=0.88)
+    // Directionnel principal depuis le haut-devant → éclaire les surfaces
+    // horizontales (logo Hyrule, couronnes bumpers) et crée des ombres portées.
     const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
-    dirLight.position.set(0, 0.48, 0.88);
+    dirLight.position.set(0, 1.0, 0.6);
     dirLight.castShadow = false;
     scene.add(dirLight);
-    // FillLight à 0 — conservé pour UpsideDownAtmosphere
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0);
-    fillLight.position.set(0, 1, -1);
+    // Fill contre-jour léger depuis la caméra (z+) → évite les zones noires totales.
+    const fillLight = new THREE.DirectionalLight(0xfff0dd, 0.5);
+    fillLight.position.set(0, 0.3, 1.0);
     scene.add(fillLight);
 
     const modelRoot = new THREE.Group();
