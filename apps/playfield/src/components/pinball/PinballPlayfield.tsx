@@ -1184,6 +1184,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           dirToCamera: fit.dirToCamera,
           distance: camDistance,
         });
+        const restoreBossCamera = () => {
+          cameraDirector?.restore();
+        };
 
         // ── OrbitControls — caméra libre ─────────────────────────────────────
         orbitControls = new OrbitControls(camera, renderer.domElement);
@@ -1205,6 +1208,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           diag.noteReset("game_over_hide");
         });
         const releaseUpsideDownWorld = () => {
+          restoreBossCamera();
           upsideDownPortal?.setUpsideDownActive(false);
           upsideDownAtmosphere?.reset();
           collisionProcessor?.resetUpsideDownSession();
@@ -1246,6 +1250,9 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           diag.noteEvent(event.type);
           if (event.type === "DRAIN") diag.noteReset("drain");
           if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
+          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
+            restoreBossCamera();
+          }
           if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
           bumperVisuals?.onGameEvent(event);
           garlandLights?.onGameEvent(event);
@@ -1435,6 +1442,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
               onTremorStart: () => emit({ type: "PORTAL_TREMOR" }),
             },
             () => {
+              restoreBossCamera();
               ballPhysicsInst?.spawnFromNormalReturn();
               upsideDownPortal?.reset();
               upsideDownPortal?.setUpsideDownActive(false);
@@ -1508,6 +1516,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
                 );
                 if (gameStateRef.current === "game_over") {
                   resetGame();
+                  restoreBossCamera();
                   collisionProcessor?.resetAllBossFights();
                   collisionProcessor?.resetScoreBaselines();
                   bossReveals?.endAllFights();
@@ -1545,6 +1554,7 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
             if (data.id === "START") {
               if (data.action === "DOWN" && gameStateRef.current === "game_over") {
                 resetGame();
+                restoreBossCamera();
                 collisionProcessor?.resetAllBossFights();
                 collisionProcessor?.resetScoreBaselines();
                 bossReveals?.endAllFights();
@@ -2060,7 +2070,10 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
           playfieldCamFit.cameraTarget,
         );
         playfieldCamFit.distance = dist;
-        if (cameraDirector && !cameraDirector.isActive()) {
+        if (cameraDirector) {
+          if (cameraDirector.isActive()) {
+            cameraDirector.restore();
+          }
           cameraDirector.captureBase({
             camera: playfieldCamFit.camera,
             target: playfieldCamFit.cameraTarget,
