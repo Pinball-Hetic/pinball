@@ -1,8 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { PLAYFIELD_MAP_COLOR_DARKEN, PLAYFIELD_TONE_MAPPING_EXPOSURE } from '../domain/PlayfieldVisualConstants';
-import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh } from './GltfNodeNames';
+import { PLAYFIELD_MAP_COLOR_DARKEN, PLAYFIELD_SURFACE_MATERIAL_FALLBACK, PLAYFIELD_TONE_MAPPING_EXPOSURE } from '../domain/PlayfieldVisualConstants';
+import { canonicalGltfName, findObjectByNormalizedName, isFlipperGltfMesh, isPinballmapRailMesh } from './GltfNodeNames';
+
+const PLAYFIELD_SURFACE_MESH_NAMES = [
+  'floor_main',
+  'playfield',
+  'table.005',
+  'table005',
+  'pinballmap',
+] as const;
 
 const TEXTURE_KEYS = [
   'map',
@@ -22,7 +30,7 @@ function shouldDarkenMapMaterial(mesh: THREE.Mesh): boolean {
   // (gérés en amont), ces patterns ne matchaient plus → retombée identique.
   if (/^bumper_ring/.test(n) || /^bumper-\d+$/.test(n)) return false;
 
-  if (n === 'playfield' || /^table(\.\d+)?$/.test(n) || n === 'pinballmap') return true;
+  if (n === 'playfield' || n === 'floor_main' || /^table(\.\d+)?$/.test(n) || n === 'pinballmap') return true;
 
   if (
     n === 'playfield_sides'
@@ -70,4 +78,15 @@ export function createGltfLoader(decoderPath = '/draco/'): GLTFLoader {
   const loader = new GLTFLoader();
   loader.setDRACOLoader(dracoLoader);
   return loader;
+}
+
+export function clonePlayfieldSurfaceMaterial(root: THREE.Object3D): THREE.MeshStandardMaterial {
+  for (const name of PLAYFIELD_SURFACE_MESH_NAMES) {
+    const mesh = findObjectByNormalizedName(root, name);
+    if (!(mesh instanceof THREE.Mesh)) continue;
+    const src = mesh.material;
+    const mat = (Array.isArray(src) ? src[0] : src) as THREE.Material;
+    if (mat instanceof THREE.MeshStandardMaterial) return mat.clone();
+  }
+  return new THREE.MeshStandardMaterial({ ...PLAYFIELD_SURFACE_MATERIAL_FALLBACK });
 }
