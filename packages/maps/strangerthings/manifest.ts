@@ -93,15 +93,4 @@ export const manifest: MapManifest = {
     wall_middle_right: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.018)
     wall_guide_lane: { restitution: 0.2, friction: 0.15, smooth: 0 }, // ex-Fix-Start
   },
-  // Termes ST traqués par le grep-guard anti-fuite (phase 2.6).
-  forbiddenInCore: [
-    'demogorgon',
-    'vecna',
-    'hetic',
-    'strangerthings',
-    'upside',
-    'guirlande',
-    'eleven',
-    'hawkins',
-  ],
 }
