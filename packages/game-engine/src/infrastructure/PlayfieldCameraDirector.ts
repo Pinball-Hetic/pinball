@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import type { BossDefinition, BossId } from '../domain/BossRegistry';
 import { getBossById } from '../domain/BossRegistry';
 import {
-  CAMERA_CINEMATIC_DISTANCE_MIN,
+  cinematicZoomDistance,
   type BossCameraCinematicConfig,
 } from '../domain/CameraCinematicConstants';
+import type { PlayfieldViewMode } from '../domain/PlayfieldViewMode';
+import { DEFAULT_PLAYFIELD_VIEW_MODE } from '../domain/PlayfieldViewMode';
 import { easeInOut, easeOut } from './CinematicEasing';
 
 type Phase = 'idle' | 'zoomIn' | 'hold' | 'zoomOut';
@@ -27,6 +29,7 @@ export class PlayfieldCameraDirector {
   private camera: THREE.PerspectiveCamera | null = null;
   private base: BaseView | null = null;
   private config: BossCameraCinematicConfig | null = null;
+  private viewMode: PlayfieldViewMode = DEFAULT_PLAYFIELD_VIEW_MODE;
   private phase: Phase = 'idle';
   private elapsed = 0;
   private zoomedDistance = 0;
@@ -36,6 +39,10 @@ export class PlayfieldCameraDirector {
 
   setBosses(bosses: BossDefinition[]): void {
     this.bosses = bosses;
+  }
+
+  setViewMode(viewMode: PlayfieldViewMode): void {
+    this.viewMode = viewMode;
   }
 
   captureBase(capture: PlayfieldCameraCapture): void {
@@ -138,9 +145,10 @@ export class PlayfieldCameraDirector {
     } else {
       this.panFrom.copy(this.base.target);
     }
-    this.zoomedDistance = Math.max(
-      CAMERA_CINEMATIC_DISTANCE_MIN,
-      this.base.distance * cinematic.distanceScale,
+    this.zoomedDistance = cinematicZoomDistance(
+      this.base.distance,
+      cinematic.distanceScale,
+      this.viewMode === 'portrait-fill',
     );
     this.phase = 'zoomIn';
     this.elapsed = 0;

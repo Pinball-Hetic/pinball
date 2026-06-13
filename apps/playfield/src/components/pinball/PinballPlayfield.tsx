@@ -1059,6 +1059,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         // ── Caméra cabine fixe (non rotatable) — tapis jouable uniquement ───────
         modelRoot.updateMatrixWorld(true);
         cameraDirector = new PlayfieldCameraDirector();
+        cameraDirector.setViewMode(PLAYFIELD_VIEW_MODE);
         cameraDirector.setBosses(MAP_BOSSES);
         const camFrameBox = syncPlayfieldCamera(playfieldRoot);
         const msz = camFrameBox.getSize(new THREE.Vector3());
