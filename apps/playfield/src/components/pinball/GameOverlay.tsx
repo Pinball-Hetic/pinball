@@ -1,7 +1,10 @@
+import type { CSSProperties } from "react";
 import type { BossDefinition } from "@pinball/game-engine";
+import type { MapManifest } from "@pinball/shared-types";
 import type { BossHudState, ScorePop } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
 import PlungerPowerBar from "./PlungerPowerBar";
+import StyledQrCode from "./StyledQrCode";
 
 export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
 
@@ -22,8 +25,11 @@ interface GameOverlayProps {
   bosses: BossDefinition[];
   cabinetMode?: boolean;
   onAttractInteract?: () => void;
-  gameOverQrDataUrl?: string | null;
+  gameOverClaimUrl?: string | null;
   gameOverScore?: number;
+  mapTheme?: CSSProperties;
+  outro?: MapManifest["outro"];
+  qrLogo?: string;
 }
 
 export default function GameOverlay({
@@ -43,8 +49,11 @@ export default function GameOverlay({
   bosses,
   cabinetMode = false,
   onAttractInteract,
-  gameOverQrDataUrl = null,
+  gameOverClaimUrl = null,
   gameOverScore = 0,
+  mapTheme,
+  outro,
+  qrLogo,
 }: GameOverlayProps) {
   void cabinetMode;
 
@@ -54,6 +63,14 @@ export default function GameOverlay({
   const showPowerBar =
     bootPhase === "in_game" && gameState === "idle" && plungerCharge !== null;
   const showGameOver = bootPhase === "in_game" && gameState === "game_over";
+
+  // Couleur d'accent de l'outro : glow normal vs monde inversé. Fallbacks
+  // neutres → une map sans theme reste propre (pas de ST en dur).
+  const glow = alternateWorldActive ? "var(--glow-alt, #b14dff)" : "var(--glow, #ff2d2d)";
+  const dot = "var(--vignette, #2a0606)";
+  const title = outro?.title ?? "FIN DE PARTIE";
+  const scanLabel = outro?.scanLabel ?? "Scanne pour t'inscrire au classement";
+  const replayLabel = outro?.replayLabel ?? "START — Rejouer";
 
   const showResetBall =
     bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
@@ -222,42 +239,73 @@ export default function GameOverlay({
       )}
 
       {showGameOver && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[1px]">
-          <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/15 bg-black/60 px-8 py-6 font-mono backdrop-blur-md">
-            <p className="text-2xl font-bold uppercase tracking-[0.3em] text-zinc-100 drop-shadow-[0_0_16px_rgba(255,255,255,0.25)]">
-              Fin de partie
-            </p>
-            <p className="text-4xl font-bold tabular-nums text-amber-300 drop-shadow-[0_0_14px_rgba(255,180,0,0.45)]">
-              {gameOverScore.toLocaleString("fr-FR")}
-            </p>
+        <div
+          className="crt-scanlines pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 backdrop-blur-[2px]"
+          style={{
+            ...mapTheme,
+            background:
+              "radial-gradient(ellipse at center, var(--vignette, #14181f) 0%, #000000 78%)",
+          }}
+        >
+          <p
+            className="vhs-flicker font-black uppercase tracking-[0.28em] text-3xl sm:text-4xl"
+            style={{
+              fontFamily: "var(--st-font, serif)",
+              color: "var(--foreground, #ede4d3)",
+              textShadow: `0 0 18px ${glow}, 0 0 42px ${glow}99`,
+            }}
+          >
+            {title}
+          </p>
 
-            {gameOverQrDataUrl ? (
-              <img
-                src={gameOverQrDataUrl}
-                alt="QR classement"
-                className="h-40 w-40 rounded bg-white p-2"
-              />
+          <p
+            className="font-black tabular-nums text-5xl sm:text-6xl"
+            style={{
+              fontFamily: "var(--st-font, serif)",
+              color: "var(--foreground, #ede4d3)",
+              textShadow: `0 0 16px ${glow}, 0 0 40px ${glow}80`,
+            }}
+          >
+            {gameOverScore.toLocaleString("fr-FR")}
+          </p>
+
+          <div className="relative px-5 pt-5">
+            <p
+              className="absolute inset-x-0 -top-1 text-center font-mono text-[9px] uppercase tracking-[0.4em]"
+              style={{ color: glow, textShadow: `0 0 10px ${glow}` }}
+            >
+              Transmission entrante
+            </p>
+            {/* 4 coins crochets */}
+            <span className="absolute left-0 top-3 h-5 w-5 border-l-2 border-t-2" style={{ borderColor: glow }} />
+            <span className="absolute right-0 top-3 h-5 w-5 border-r-2 border-t-2" style={{ borderColor: glow }} />
+            <span className="absolute bottom-0 left-0 h-5 w-5 border-b-2 border-l-2" style={{ borderColor: glow }} />
+            <span className="absolute bottom-0 right-0 h-5 w-5 border-b-2 border-r-2" style={{ borderColor: glow }} />
+
+            {gameOverClaimUrl ? (
+              <StyledQrCode value={gameOverClaimUrl} color={glow} dotColor={dot} logoUrl={qrLogo} />
             ) : (
-              <div className="flex h-40 w-40 items-center justify-center rounded border border-white/10 bg-black/40">
-                <p className="animate-pulse text-[10px] uppercase tracking-[0.2em] text-zinc-400">
+              <div className="flex h-[180px] w-[180px] items-center justify-center rounded-lg border border-white/10 bg-black/40">
+                <p className="animate-pulse font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400">
                   Génération du code…
                 </p>
               </div>
             )}
-
-            <div className="text-center leading-relaxed">
-              <p className="text-xs uppercase tracking-[0.2em] text-zinc-200">
-                Scanne pour inscrire ton pseudo au classement
-              </p>
-              <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
-                Ton score t&apos;attend dans le Hall of Fame
-              </p>
-            </div>
-
-            <p className="animate-pulse text-[10px] uppercase tracking-[0.22em] text-zinc-500">
-              START pour rejouer · sans scan = anonyme
-            </p>
           </div>
+
+          <p
+            className="max-w-xs text-center font-mono text-xs uppercase tracking-[0.18em]"
+            style={{ color: "var(--foreground, #ede4d3)", opacity: 0.8 }}
+          >
+            {scanLabel}
+          </p>
+
+          <p
+            className="animate-pulse font-mono text-[11px] uppercase tracking-[0.24em]"
+            style={{ color: glow, textShadow: `0 0 12px ${glow}` }}
+          >
+            {replayLabel}
+          </p>
         </div>
       )}
 
