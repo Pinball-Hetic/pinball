@@ -43,10 +43,10 @@ export const DEMOGORGON_VICTORY_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
 export const VECNA_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
   lookAtLift: 0.035,
   panFrom: { x: VECNA_SPAWN.x, y: 1.012, z: VECNA_SPAWN.z },
-  zoomInDuration: VECNA_WALK_DURATION + VECNA_WALK_SETTLE_FACING,
-  holdDuration: 0.3,
-  zoomOutDuration: 0.45,
-  distanceScale: 0.78,
+  zoomInDuration: VECNA_WALK_DURATION + VECNA_WALK_SETTLE_FACING + 0.35,
+  holdDuration: 1.0,
+  zoomOutDuration: 1.05,
+  distanceScale: 0.58,
 };
 
 export const VECNA_VICTORY_CAMERA_CINEMATIC: BossCameraCinematicConfig = {

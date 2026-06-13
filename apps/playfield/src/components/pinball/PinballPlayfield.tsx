@@ -795,7 +795,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
     let vecnaIntroHolding = false;
-    let vecnaIntroWasActive = false;
     const vecnaIntroBallPos = { x: 0, y: 0, z: 0 };
 
 
@@ -1763,10 +1762,6 @@ export default function PinballPlayfield({ cabinetMode = false }: PinballPlayfie
       if (!vecnaIntroActive) {
         vecnaIntroHolding = false;
       }
-      if (vecnaIntroWasActive && !vecnaIntroActive) {
-        cameraDirector?.restore();
-      }
-      vecnaIntroWasActive = vecnaIntroActive;
 
       if (transitionActive) {
         upsideDownTransition?.update(dt);
