@@ -11,6 +11,7 @@ import type { PlayfieldViewMode } from '../domain/PlayfieldViewMode';
 import { DEFAULT_PLAYFIELD_VIEW_MODE } from '../domain/PlayfieldViewMode';
 
 export const PLAYFIELD_VIEW_DIR = new THREE.Vector3(0, 0.48, 0.88).normalize();
+export const PLAYFIELD_PORTRAIT_VIEW_DIR = new THREE.Vector3(0, 0.65, 0.75).normalize();
 export const PLAYFIELD_VIEW_NDC_MARGIN = 0.78;
 export const PLAYFIELD_CAM_DISTANCE_SCALE = 1.05;
 export const PLAYFIELD_PORTRAIT_NDC_X = 1;
@@ -31,6 +32,15 @@ export type PlayfieldCamFit = {
 export type PlayfieldCameraFitOptions = {
   viewMode?: PlayfieldViewMode;
 };
+
+export function playfieldViewDirForMode(viewMode: PlayfieldViewMode): THREE.Vector3 {
+  switch (viewMode) {
+    case 'portrait-fill':
+      return PLAYFIELD_PORTRAIT_VIEW_DIR;
+    case 'legacy':
+      return PLAYFIELD_VIEW_DIR;
+  }
+}
 
 export function fillPlayfieldBoxCorners(box: THREE.Box3, reuse: THREE.Vector3[]): THREE.Vector3[] {
   reuse.length = 0;

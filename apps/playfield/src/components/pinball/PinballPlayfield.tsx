@@ -51,7 +51,7 @@ import {
   CinematicDirector,
   ScreenShake,
   PlayfieldCameraDirector,
-  PLAYFIELD_VIEW_DIR,
+  playfieldViewDirForMode,
   parsePlayfieldViewMode,
   boundingBoxPlayableArea,
   fillPlayfieldBoxCorners,
@@ -170,6 +170,7 @@ const KEYBOARD_MODE: KeyboardMode =
   (process.env.NEXT_PUBLIC_KEYBOARD_MODE as KeyboardMode) || "direct";
 
 const PLAYFIELD_VIEW_MODE = parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE);
+const PLAYFIELD_VIEW_DIR = playfieldViewDirForMode(PLAYFIELD_VIEW_MODE);
 
 type PinballPlayfieldProps = {
   /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
@@ -481,7 +482,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     // HemiLight à 0 — conservé uniquement pour la compatibilité UpsideDownAtmosphere
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
     scene.add(hemiLight);
-    // Spot blanc principal depuis la position caméra (PLAYFIELD_VIEW_DIR : y=0.48, z=0.88)
     const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
     dirLight.position.copy(PLAYFIELD_VIEW_DIR);
     dirLight.castShadow = false;
