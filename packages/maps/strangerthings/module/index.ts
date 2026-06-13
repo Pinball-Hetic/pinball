@@ -112,9 +112,7 @@ export function createModule(): MapModule {
 
       const ctx = ctxRef
       if (!ctx) return
-      // Cible verrouillée frappée : flash gris + « ENCORE X PTS » au DMD.
       if (e.type === 'BOSS_LOCKED_HIT') {
-        nestMarker?.flashLocked(e.bossId)
         ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
       }
       // Palier de score : cinématique + frisson garlands + shake.
