@@ -52,6 +52,7 @@ import {
   ScreenShake,
   PlayfieldCameraDirector,
   playfieldViewDirForMode,
+  playfieldCameraTargetForMode,
   parsePlayfieldViewMode,
   boundingBoxPlayableArea,
   fillPlayfieldBoxCorners,
@@ -1022,7 +1023,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         // ── Caméra cabine fixe (non rotatable) — tapis jouable uniquement ───────
         modelRoot.updateMatrixWorld(true);
         const camFrameBox = boundingBoxPlayableArea(playfieldRoot);
-        camFrameBox.getCenter(cameraTarget);
+        playfieldCameraTargetForMode(PLAYFIELD_VIEW_MODE, camFrameBox, cameraTarget);
         const camCorners: THREE.Vector3[] = [];
         fillPlayfieldBoxCorners(camFrameBox, camCorners);
         const fit: PlayfieldCamFit = {

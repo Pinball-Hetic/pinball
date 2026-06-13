@@ -16,6 +16,8 @@ export const PLAYFIELD_VIEW_NDC_MARGIN = 0.78;
 export const PLAYFIELD_CAM_DISTANCE_SCALE = 1.05;
 export const PLAYFIELD_PORTRAIT_NDC_X = 1;
 export const PLAYFIELD_PORTRAIT_NDC_Y = 1;
+export const PLAYFIELD_PORTRAIT_LOOK_Z_BIAS = 0.24;
+export const PLAYFIELD_PORTRAIT_LOOK_Y_BIAS = 0.32;
 
 const _clipMatrix = new THREE.Matrix4();
 const _ndcPoint = new THREE.Vector4();
@@ -40,6 +42,19 @@ export function playfieldViewDirForMode(viewMode: PlayfieldViewMode): THREE.Vect
     case 'legacy':
       return PLAYFIELD_VIEW_DIR;
   }
+}
+
+export function playfieldCameraTargetForMode(
+  viewMode: PlayfieldViewMode,
+  frameBox: THREE.Box3,
+  out: THREE.Vector3,
+): THREE.Vector3 {
+  frameBox.getCenter(out);
+  if (viewMode !== 'portrait-fill') return out;
+
+  out.y = THREE.MathUtils.lerp(out.y, PLAYFIELD_SURFACE_Y, PLAYFIELD_PORTRAIT_LOOK_Y_BIAS);
+  out.z = THREE.MathUtils.lerp(out.z, frameBox.max.z, PLAYFIELD_PORTRAIT_LOOK_Z_BIAS);
+  return out;
 }
 
 export function fillPlayfieldBoxCorners(box: THREE.Box3, reuse: THREE.Vector3[]): THREE.Vector3[] {
