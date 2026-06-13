@@ -1,3 +1,4 @@
+import { cx } from './artStyles'
 import { useEffect, useRef } from 'react'
 import type { Reactor } from './reactor'
 
@@ -18,9 +19,9 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
     return reactor.on((r) => {
       if (r.kind === 'event' && r.label === 'RAMP' && beamRef.current) {
         const el = beamRef.current
-        el.classList.remove('ramp-beam-on')
+        el.classList.remove(cx('ramp-beam-on'))
         void el.offsetWidth // reflow → relance l'animation
-        el.classList.add('ramp-beam-on')
+        el.classList.add(cx('ramp-beam-on'))
       }
     })
   }, [reactor])
@@ -30,7 +31,7 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
 
   return (
     <div
-      className="side-art"
+      className={cx('side-art')}
       style={
         {
           '--sway-dur': `${swayDur}s`,
@@ -39,8 +40,8 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
         } as React.CSSProperties
       }
     >
-      <div ref={beamRef} className="ramp-beam" />
-      <svg viewBox="0 0 320 660" preserveAspectRatio="xMidYMid slice" className="side-art-svg">
+      <div ref={beamRef} className={cx('ramp-beam')} />
+      <svg viewBox="0 0 320 660" preserveAspectRatio="xMidYMid slice" className={cx('side-art-svg')}>
         <defs>
           <radialGradient id="demoGrad" cx="50%" cy="40%" r="70%">
             <stop offset="0%" stopColor={upside ? '#1a0a2a' : '#1a0505'} />
@@ -56,7 +57,7 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
 
         {/* Silhouette demogorgon — corps + tête en pétales */}
         <g
-          className="demo-body"
+          className={cx('demo-body')}
           fill="#050505"
           stroke={glow}
           strokeOpacity="0.5"
@@ -72,7 +73,7 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
             return (
               <path
                 key={i}
-                className="demo-petal"
+                className={cx('demo-petal')}
                 style={{ animationDelay: `${i * 0.15}s` }}
                 d={`M160 215 Q${(160 + x) / 2} ${(215 + y) / 2 - 30} ${x} ${y} Q${(160 + x) / 2} ${(215 + y) / 2 + 10} 160 215 Z`}
               />
@@ -87,7 +88,7 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
         {[40, 110, 200, 280].map((x, i) => (
           <path
             key={x}
-            className="vine"
+            className={cx('vine')}
             style={{ animationDelay: `${i * 0.6}s` }}
             d={`M${x} 660 C${x + 30} 520 ${x - 30} 380 ${x + 15} 220 C${x + 25} 150 ${x - 10} 80 ${x} 0`}
             stroke="url(#vineGrad)"

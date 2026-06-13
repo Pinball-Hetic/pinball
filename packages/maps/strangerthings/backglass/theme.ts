@@ -12,7 +12,7 @@ export const backglassTheme: ThemeTokens = {
   '--st-font': "'Times New Roman', Georgia, serif",
   '--stage-bg': 'radial-gradient(ellipse at 50% 38%, #160a10 0%, #060406 60%, #000 100%)',
   '--stage-filter': 'none',
-  '--joyce-bg': 'linear-gradient(180deg, #1c1209 0%, #120b06 100%)',
+  '--header-bg': 'linear-gradient(180deg, #1c1209 0%, #120b06 100%)',
   '--fever-a': '#ff7700',
   '--fever-b': '#00c7ff',
 }
@@ -24,5 +24,5 @@ export const backglassThemeAlternate: ThemeTokens = {
   '--vignette': '#1a0640',
   '--stage-bg': 'radial-gradient(ellipse at 50% 38%, #1a0a2a 0%, #06040c 60%, #000 100%)',
   '--stage-filter': 'hue-rotate(8deg) saturate(1.1)',
-  '--joyce-bg': 'linear-gradient(180deg, #150a22 0%, #0b0614 100%)',
+  '--header-bg': 'linear-gradient(180deg, #150a22 0%, #0b0614 100%)',
 }

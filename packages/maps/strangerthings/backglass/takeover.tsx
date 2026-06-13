@@ -1,3 +1,4 @@
+import { cx } from './artStyles'
 import type { ComponentType, ReactNode } from 'react'
 import type { GameOver } from '@pinball/shared-types'
 import SideArt from './SideArt'
@@ -15,20 +16,21 @@ export interface MapTakeoverContext {
 
 // Visuel de takeover propre à la map pour un clip (ou une clé d'event-scene).
 // Retourne null si le clip n'a pas de takeover ST → le core gère
-// hall_of_fame + le fallback générique. Les classes CSS référencées sont
-// définies dans le globals.css de l'app backglass (thème ST à extraire — TODO).
+// hall_of_fame + le fallback générique. Styles ST dans ./art.module.css
+// (co-localisé) ; classes structurelles génériques (tk-center/kicker/score,
+// glitch-text, tk-confetti…) dans le globals de l'app.
 export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactNode | null {
   const { payload, Vhs } = ctx
   switch (clip) {
     case 'demogorgon_rises':
       return (
-        <Vhs className="tk-cine-rises">
-          <div className="cine-blackout" />
-          <div className="cine-giant-side">
+        <Vhs className={cx('tk-cine-rises')}>
+          <div className={cx('cine-blackout')} />
+          <div className={cx('cine-giant-side')}>
             <SideArt mood="alternate" agitation={1} />
           </div>
           <div className="tk-center">
-            <div className="glitch-text cine-run" data-text="RUN">
+            <div className={cx('glitch-text', 'cine-run')} data-text="RUN">
               RUN
             </div>
           </div>
@@ -37,8 +39,8 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
 
     case 'portal_swallow':
       return (
-        <Vhs className="tk-cine-portal">
-          <div className="cine-portal-wave" />
+        <Vhs className={cx('tk-cine-portal')}>
+          <div className={cx('cine-portal-wave')} />
         </Vhs>
       )
 
@@ -46,24 +48,24 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
       return (
         <>
           <DemogorgonTakeover />
-          <div className="cine-demo-count">+1 DEMOGORGON</div>
+          <div className={cx('cine-demo-count')}>+1 DEMOGORGON</div>
         </>
       )
 
     case 'last_chance':
       return (
-        <Vhs className="tk-cine-last">
-          <div className="cine-last-vignette" />
+        <Vhs className={cx('tk-cine-last')}>
+          <div className={cx('cine-last-vignette')} />
           <div className="tk-center">
-            <div className="tk-kicker cine-last-text">DERNIÈRE VIE</div>
+            <div className={cx('tk-kicker', 'cine-last-text')}>DERNIÈRE VIE</div>
           </div>
         </Vhs>
       )
 
     case 'milestone_30k':
       return (
-        <Vhs className="tk-cine-rocket">
-          <div className="cine-rocket" />
+        <Vhs className={cx('tk-cine-rocket')}>
+          <div className={cx('cine-rocket')} />
           <div className="tk-center">
             <div className="tk-kicker tabular-nums">30 000</div>
           </div>
@@ -72,7 +74,7 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
 
     case 'milestone_big':
       return (
-        <Vhs className="tk-cine-fireworks">
+        <Vhs className={cx('tk-cine-fireworks')}>
           <div className="tk-confetti">
             {Array.from({ length: 50 }).map((_, i) => (
               <span
@@ -97,8 +99,8 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
 
     case 'hetic_complete':
       return (
-        <Vhs className="tk-cine-hetic">
-          <div className="cine-hetic-letters">
+        <Vhs className={cx('tk-cine-hetic')}>
+          <div className={cx('cine-hetic-letters')}>
             {'HETIC'.split('').map((c, i) => (
               <span key={i} style={{ animationDelay: `${i * 0.12}s` }}>
                 {c}
@@ -106,7 +108,7 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
             ))}
           </div>
           <div className="tk-center">
-            <div className="tk-kicker cine-fever-text">FEVER</div>
+            <div className={cx('tk-kicker', 'cine-fever-text')}>FEVER</div>
           </div>
         </Vhs>
       )

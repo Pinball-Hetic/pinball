@@ -1,3 +1,4 @@
+import { cx } from './artStyles'
 import { useEffect, useRef } from 'react'
 import type { Reactor } from './reactor'
 
@@ -158,26 +159,26 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
   }, [])
 
   return (
-    <div className="joyce-wall">
+    <div className={cx('joyce-wall')}>
       {[ROW1, ROW2].map((row, r) => (
-        <div key={r} className="joyce-row">
+        <div key={r} className={cx('joyce-row')}>
           {row.map((letter, c) => {
             const idx = r * 13 + c
             const color = colorFor(idx)
             return (
-              <div key={letter} className="joyce-cell">
+              <div key={letter} className={cx('joyce-cell')}>
                 <span
                   ref={(el) => {
                     bulbRefs.current[idx] = el
                   }}
-                  className="joyce-bulb"
+                  className={cx('joyce-bulb')}
                   style={{ background: color, opacity: 0.25, boxShadow: `0 0 4px 1px ${color}55` }}
                 />
                 <span
                   ref={(el) => {
                     letterRefs.current[idx] = el
                   }}
-                  className="joyce-letter"
+                  className={cx('joyce-letter')}
                   style={{ color: '#d8c9b0', opacity: 0.5 }}
                 >
                   {letter}

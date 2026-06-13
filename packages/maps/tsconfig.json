@@ -3,6 +3,6 @@
   "compilerOptions": {
     "jsx": "react-jsx"
   },
-  "include": ["index.ts", "backglass.ts", "dmd.ts"],
+  "include": ["index.ts", "backglass.ts", "dmd.ts", "css-modules.d.ts"],
   "exclude": ["node_modules", "strangerthings"]
 }
