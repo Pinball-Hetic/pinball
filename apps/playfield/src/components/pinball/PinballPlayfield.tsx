@@ -1861,6 +1861,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           attractTagline={mapManifest.attractTagline ?? mapManifest.name}
           bosses={MAP_BOSSES}
           cabinetMode={cabinetMode}
+          portraitFill={IS_PORTRAIT_FILL}
           onAttractInteract={() => {
             if (physicsReady && !sessionStarted) beginSession();
           }}

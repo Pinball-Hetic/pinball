@@ -21,7 +21,64 @@ interface GameOverlayProps {
   attractTagline: string;
   bosses: BossDefinition[];
   cabinetMode?: boolean;
+  portraitFill?: boolean;
   onAttractInteract?: () => void;
+}
+
+type OverlayLayout = {
+  header: string;
+  livesSize: string;
+  keyboardHints: string | null;
+  alternateWorldBanner: string;
+  upsideDownHint: string;
+  bossAssist: string;
+  bottomHint: string;
+  powerHint: string;
+  attractControls: string;
+};
+
+const PORTRAIT_BOSS_BOTTOM: Record<string, string> = {
+  "bottom-8": "bottom-[22%]",
+  "bottom-24": "bottom-[32%]",
+};
+
+function overlayLayout(portraitFill: boolean): OverlayLayout {
+  if (portraitFill) {
+    return {
+      header:
+        "pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[max(0.5rem,env(safe-area-inset-top))]",
+      livesSize: "text-base",
+      keyboardHints: null,
+      alternateWorldBanner:
+        "pointer-events-none absolute inset-x-0 top-[max(2.5rem,calc(env(safe-area-inset-top)+1.75rem))] z-10 flex justify-center",
+      upsideDownHint:
+        "pointer-events-none absolute inset-x-0 bottom-[max(6.5rem,calc(env(safe-area-inset-bottom)+5.5rem))] z-10 flex justify-center px-4",
+      bossAssist:
+        "pointer-events-none absolute inset-x-0 top-[max(4rem,calc(env(safe-area-inset-top)+3rem))] z-10 flex justify-center",
+      bottomHint: "bottom-[max(1rem,env(safe-area-inset-bottom))]",
+      powerHint: "bottom-[max(3.25rem,env(safe-area-inset-bottom))]",
+      attractControls:
+        "absolute bottom-[max(1rem,env(safe-area-inset-bottom))] text-center font-mono text-[10px] text-zinc-600 space-y-1 leading-relaxed",
+    };
+  }
+  return {
+    header:
+      "pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-5 pt-4",
+    livesSize: "text-lg",
+    keyboardHints: "text-right font-mono text-[10px] text-zinc-500 space-y-0.5 leading-relaxed",
+    alternateWorldBanner: "pointer-events-none absolute inset-x-0 top-[4.75rem] z-10 flex justify-center",
+    upsideDownHint: "pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center px-6",
+    bossAssist: "pointer-events-none absolute inset-x-0 top-24 z-10 flex justify-center",
+    bottomHint: "bottom-6",
+    powerHint: "bottom-6",
+    attractControls:
+      "absolute bottom-8 text-center font-mono text-[10px] text-zinc-600 space-y-1 leading-relaxed",
+  };
+}
+
+function bossBottomClass(legacyClass: string, portraitFill: boolean): string {
+  if (!portraitFill) return legacyClass;
+  return PORTRAIT_BOSS_BOTTOM[legacyClass] ?? "bottom-[22%]";
 }
 
 export default function GameOverlay({
@@ -40,9 +97,11 @@ export default function GameOverlay({
   attractTagline,
   bosses,
   cabinetMode = false,
+  portraitFill = false,
   onAttractInteract,
 }: GameOverlayProps) {
   void cabinetMode;
+  const layout = overlayLayout(portraitFill);
 
   const showHud = bootPhase === "in_game";
   const showLaunchHint =
@@ -65,9 +124,9 @@ export default function GameOverlay({
       <ScorePopFeedback pops={scorePops} />
 
       {showHud && (
-        <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-5 pt-4">
+        <header className={layout.header}>
           <div className="font-mono space-y-1.5">
-            <div className="flex gap-1.5 text-lg">
+            <div className={`flex gap-1.5 ${layout.livesSize}`}>
               {Array.from({ length: initialLives }).map((_, i) => (
                 <span
                   key={i}
@@ -88,18 +147,20 @@ export default function GameOverlay({
               </button>
             )}
           </div>
-          <div className="text-right font-mono text-[10px] text-zinc-500 space-y-0.5 leading-relaxed">
-            <div>Q / ← — Flipper gauche</div>
-            <div>D / → — Flipper droit</div>
-            <div>ESPACE — Charger / lancer</div>
-            <div>R — Reset balle (−1 vie)</div>
-            <div>H — Debug colliders</div>
-          </div>
+          {layout.keyboardHints && (
+            <div className={layout.keyboardHints}>
+              <div>Q / ← — Flipper gauche</div>
+              <div>D / → — Flipper droit</div>
+              <div>ESPACE — Charger / lancer</div>
+              <div>R — Reset balle (−1 vie)</div>
+              <div>H — Debug colliders</div>
+            </div>
+          )}
         </header>
       )}
 
       {showAlternateWorldBanner && (
-        <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-10 flex justify-center">
+        <div className={layout.alternateWorldBanner}>
           <div className="rounded border border-violet-500/25 bg-black/45 px-3 py-1 font-mono backdrop-blur-sm">
             <p className="text-[10px] uppercase tracking-[0.45em] text-violet-300/80 drop-shadow-[0_0_10px_rgba(140,80,200,0.45)]">
               {atmosphereBannerLabel}
@@ -109,7 +170,7 @@ export default function GameOverlay({
       )}
 
       {showAlternateWorldHint && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center px-6">
+        <div className={layout.upsideDownHint}>
           <p className="animate-pulse text-center font-mono text-xs uppercase tracking-[0.22em] text-violet-200/75 drop-shadow-[0_0_12px_rgba(150,90,220,0.55)] sm:text-sm">
             {atmosphereHintLabel}
           </p>
@@ -130,7 +191,7 @@ export default function GameOverlay({
         return (
           <div key={bossId}>
             {hud.assistFlash && def.hud.assistLabel && !hud.victory && (
-              <div className="pointer-events-none absolute inset-x-0 top-24 z-10 flex justify-center">
+              <div className={layout.bossAssist}>
                 <p className="font-mono text-sm font-bold uppercase tracking-[0.25em] text-violet-300 drop-shadow-[0_0_14px_rgba(180,100,255,0.85)] sm:text-base">
                   {def.hud.assistLabel}
                 </p>
@@ -139,7 +200,7 @@ export default function GameOverlay({
 
             {!hud.victory && (
               <div
-                className={`pointer-events-none absolute inset-x-0 ${def.hud.bottomClass} z-10 flex justify-center`}
+                className={`pointer-events-none absolute inset-x-0 ${bossBottomClass(def.hud.bottomClass, portraitFill)} z-10 flex justify-center`}
               >
                 <div
                   className={`rounded border ${def.hud.borderClass} bg-black/70 px-4 py-2 text-center font-mono backdrop-blur-sm`}
@@ -210,7 +271,7 @@ export default function GameOverlay({
             </p>
           </div>
 
-          <div className="absolute bottom-8 text-center font-mono text-[10px] text-zinc-600 space-y-1 leading-relaxed">
+          <div className={layout.attractControls}>
             <p>Q / D — Flippers</p>
             <p>ESPACE (en jeu) — Charger puis relâcher pour lancer</p>
           </div>
@@ -231,7 +292,7 @@ export default function GameOverlay({
       {showPowerBar && <PlungerPowerBar charge={plungerCharge} />}
 
       {showPowerBar && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center px-4">
+        <div className={`pointer-events-none absolute inset-x-0 ${layout.powerHint} z-10 flex justify-center px-4`}>
           <p className="animate-pulse font-mono text-[11px] uppercase tracking-[0.22em] text-amber-200/80">
             Relâcher ESPACE pour lancer
           </p>
@@ -239,7 +300,7 @@ export default function GameOverlay({
       )}
 
       {showLaunchHint && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex flex-col items-center gap-2 px-4">
+        <div className={`pointer-events-none absolute inset-x-0 ${layout.bottomHint} z-10 flex flex-col items-center gap-2 px-4`}>
           {lives < initialLives && (
             <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
               Bille perdue — {lives} vie{lives > 1 ? "s" : ""} restante{lives > 1 ? "s" : ""}
