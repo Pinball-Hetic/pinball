@@ -19,7 +19,8 @@ import {
   UPSIDE_DOWN_PORTAL_REVEAL_DELAY,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from './UpsideDownConstants';
-import { findObjectByNormalizedName } from '@pinball/game-engine';
+import { findObjectByNormalizedName, canonicalGltfName } from '@pinball/game-engine';
+import type { BossId } from '@pinball/game-engine';
 import { GlowSprite, easeInOut } from '@pinball/game-engine';
 
 type SetupConfig = {
@@ -60,7 +61,17 @@ function resolvePortalAnchor(root: THREE.Object3D): THREE.Vector3 {
   );
 }
 
+function collectGlbPortalMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    if (canonicalGltfName(obj.name).includes('demogorgon_portal')) meshes.push(obj);
+  });
+  return meshes;
+}
+
 export class UpsideDownPortal {
+  private glbPortalMeshes: THREE.Mesh[] = [];
   private sensorBody: RAPIER.RigidBody | null = null;
   private sensorCollider: RAPIER.Collider | null = null;
   private world: RAPIER.World | null = null;
@@ -82,14 +93,24 @@ export class UpsideDownPortal {
   private anchorPos = new THREE.Vector3();
   private alternateWorldActive = false;
   private revealed = false;
-  private pendingReveal = false;
-  private pendingT = 0;
   private opening = false;
   private revealing = false;
   private revealT = 0;
   private pulseT = 0;
   private baseY = 0;
   private suckBoost = 0;
+
+  private totalRevealDuration(): number {
+    return UPSIDE_DOWN_PORTAL_REVEAL_DELAY + UPSIDE_DOWN_PORTAL_OPEN_DURATION;
+  }
+
+  private mapRevealProgress(u: number): number {
+    const total = this.totalRevealDuration();
+    const delayFrac = UPSIDE_DOWN_PORTAL_REVEAL_DELAY / total;
+    if (u <= delayFrac) return (u / delayFrac) * 0.28;
+    const tail = (u - delayFrac) / (1 - delayFrac);
+    return 0.28 + easeInOut(tail) * 0.72;
+  }
 
   setup(config: SetupConfig): void {
     this.dispose();
@@ -101,8 +122,11 @@ export class UpsideDownPortal {
 
     this.anchorPos.copy(resolvePortalAnchor(config.root));
     this.baseY = surfaceYAtZ(this.anchorPos.z);
+    this.glbPortalMeshes = collectGlbPortalMeshes(config.root);
+    this.setGlbPortalVisible(true);
 
     this.portalGroup = this.buildPortalVisuals();
+    this.portalGroup.renderOrder = 10;
     this.portalGroup.position.copy(this.anchorPos);
     this.portalGroup.position.y = this.baseY - 0.0005;
     this.portalGroup.rotation.x = -PLAYFIELD_TILT;
@@ -127,11 +151,20 @@ export class UpsideDownPortal {
   }
 
   onGameEvent(event: GameEvent): void {
-    if (this.revealed || this.revealing || this.opening || this.pendingReveal) return;
     if (event.type !== 'BOSS_TARGET_HIT') return;
     const def = getBossDefinition(event.bossId);
     if (event.hitCount < def.targetHits) return;
+    this.tryOpenForBoss(event.bossId);
+  }
 
+  notifyBossDefeated(bossId: BossId, alternateWorldActive: boolean): void {
+    this.alternateWorldActive = alternateWorldActive;
+    this.tryOpenForBoss(bossId);
+  }
+
+  private tryOpenForBoss(bossId: BossId): void {
+    if (this.revealed || this.revealing || this.opening) return;
+    const def = getBossDefinition(bossId);
     if (def.unlocksPortal && !this.alternateWorldActive) {
       this.scheduleReveal();
       return;
@@ -139,6 +172,23 @@ export class UpsideDownPortal {
     if (def.unlocksReturnPortal && this.alternateWorldActive) {
       this.beginReveal();
     }
+  }
+
+  private setGlbPortalOpacity(opacity: number): void {
+    const clamped = THREE.MathUtils.clamp(opacity, 0, 1);
+    for (const mesh of this.glbPortalMeshes) {
+      mesh.visible = clamped > 0.01;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const mat of mats) {
+        if (!(mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshBasicMaterial)) continue;
+        mat.transparent = clamped < 0.999;
+        mat.opacity = clamped;
+      }
+    }
+  }
+
+  private setGlbPortalVisible(visible: boolean): void {
+    this.setGlbPortalOpacity(visible ? 1 : 0);
   }
 
   applyMagnet(body: RAPIER.RigidBody): void {
@@ -165,26 +215,18 @@ export class UpsideDownPortal {
   update(dt: number): void {
     this.pulseT += dt;
 
-    if (this.pendingReveal) {
-      this.pendingT += dt;
-      if (this.pendingT >= UPSIDE_DOWN_PORTAL_REVEAL_DELAY) {
-        this.pendingReveal = false;
-        this.startOpening();
-      }
-    }
-
-    if (this.opening) {
+    if (this.opening && !this.revealed) {
       this.revealT += dt;
-      const rawT = Math.min(1, this.revealT / UPSIDE_DOWN_PORTAL_OPEN_DURATION);
-      this.applyOpenProgress(easeInOut(rawT));
-      if (rawT >= 1) this.finishOpening();
+      const u = Math.min(1, this.revealT / this.totalRevealDuration());
+      this.applyOpenProgress(this.mapRevealProgress(u));
+      if (u >= 1) this.finishOpening();
     }
 
     if (this.revealing && this.portalGroup) {
       this.revealT += dt;
       const t = Math.min(1, this.revealT / UPSIDE_DOWN_PORTAL_OPEN_POLISH);
       const ease = 1 - Math.pow(1 - t, 3);
-      this.portalGroup.scale.setScalar(0.35 + ease * 0.65);
+      this.applyOpenProgress(0.35 + ease * 0.65);
       if (t >= 1) this.revealing = false;
     }
 
@@ -246,16 +288,23 @@ export class UpsideDownPortal {
 
   reset(): void {
     if (!this.world) return;
-    if (!this.revealed && !this.revealing && !this.opening && !this.pendingReveal) return;
+    if (!this.revealed && !this.revealing && !this.opening) {
+      this.setGlbPortalVisible(true);
+      return;
+    }
+    this.closePortal(true);
+  }
 
+  hideForCinematic(): void {
+    this.closePortal(false);
+  }
+
+  private closePortal(glbVisible: boolean): void {
     this.revealed = false;
-    this.pendingReveal = false;
-    this.pendingT = 0;
     this.opening = false;
     this.revealing = false;
     this.revealT = 0;
     this.suckBoost = 0;
-
     if (this.portalGroup) {
       this.portalGroup.visible = false;
       this.portalGroup.scale.setScalar(1);
@@ -264,6 +313,7 @@ export class UpsideDownPortal {
       vine.mesh.position.y = 0;
       vine.mesh.rotation.z = 0;
     }
+    this.setGlbPortalVisible(glbVisible);
     this.removePortalSensor();
     this.onOpenChange?.(false);
   }
@@ -297,12 +347,11 @@ export class UpsideDownPortal {
     this.accentGlow = null;
     this.vineMat = null;
     this.revealed = false;
-    this.pendingReveal = false;
-    this.pendingT = 0;
     this.opening = false;
     this.revealing = false;
     this.revealT = 0;
     this.suckBoost = 0;
+    this.glbPortalMeshes = [];
   }
 
   private buildPortalVisuals(): THREE.Group {
@@ -457,17 +506,9 @@ export class UpsideDownPortal {
   }
 
   private scheduleReveal(): void {
-    this.pendingReveal = true;
-    this.pendingT = 0;
-  }
-
-  private startOpening(): void {
     this.opening = true;
     this.revealT = 0;
-    if (this.portalGroup) {
-      this.portalGroup.visible = true;
-      this.portalGroup.scale.setScalar(0.001);
-    }
+    if (this.portalGroup) this.portalGroup.visible = true;
     this.applyOpenProgress(0);
   }
 
@@ -483,10 +524,14 @@ export class UpsideDownPortal {
   private applyOpenProgress(p: number): void {
     if (!this.portalGroup) return;
 
-    this.portalGroup.visible = p > 0.001;
-    this.portalGroup.scale.setScalar(Math.max(0.001, p));
+    const portalOn = easeInOut(p);
+    const glbOff = easeInOut(Math.min(1, p / 0.42));
+    const fx = Math.min(1, 0.22 + portalOn * 0.78);
+    this.setGlbPortalOpacity(1 - glbOff);
 
-    const fx = Math.min(1, p * 1.15);
+    this.portalGroup.visible = fx > 0.01;
+    this.portalGroup.scale.setScalar(0.14 + portalOn * 0.86);
+
     if (this.coreMat) this.coreMat.opacity = 0.7 * fx;
     if (this.vortexMat) this.vortexMat.opacity = 0.35 * fx;
     if (this.outerRingMat) {
@@ -512,10 +557,8 @@ export class UpsideDownPortal {
     this.revealing = true;
     this.revealed = true;
     this.revealT = 0;
-    if (this.portalGroup) {
-      this.portalGroup.visible = true;
-      this.portalGroup.scale.setScalar(0.35);
-    }
+    if (this.portalGroup) this.portalGroup.visible = true;
+    this.applyOpenProgress(0.35);
     this.createPortalSensor();
     this.onOpenChange?.(true);
   }

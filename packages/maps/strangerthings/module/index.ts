@@ -107,10 +107,16 @@ export function createModule(): MapModule {
       bumperVisuals?.onGameEvent(e)
       garlands?.onGameEvent(e)
       atmosphere?.onGameEvent(e)
+      const ctx = ctxRef
+      if (e.type === 'BOSS_TARGET_HIT' && ctx) {
+        const boss = ctx.layout.bosses.find((b) => b.id === e.bossId)
+        if (boss && e.hitCount >= boss.targetHits) {
+          portal?.notifyBossDefeated(e.bossId, ctx.bossGateContext().alternateWorldActive)
+        }
+      }
       portal?.onGameEvent(e)
       bossReveals?.onGameEvent(e)
 
-      const ctx = ctxRef
       if (!ctx) return
       if (e.type === 'BOSS_LOCKED_HIT') {
         ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
@@ -201,6 +207,7 @@ export function createModule(): MapModule {
         const ball = ctx.ball
         const mesh = ctx.ballMesh
         if (ball && mesh && transition && !transition.isActive()) {
+          portal?.hideForCinematic()
           ball.holdAtAlternateWorldSpawn()
           ball.syncToMesh(mesh)
           transition.start(
@@ -226,6 +233,7 @@ export function createModule(): MapModule {
         const ball = ctx.ball
         const mesh = ctx.ballMesh
         if (ball && mesh && transition && !transition.isActive()) {
+          portal?.hideForCinematic()
           ball.holdAtNormalReturnSpawn()
           ball.syncToMesh(mesh)
           transition.start(
