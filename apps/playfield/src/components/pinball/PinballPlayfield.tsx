@@ -881,6 +881,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     const init = async () => {
       try {
         const gltf = await loadPlayfieldGlb();
+        if (cancelled) return; // StrictMode : démontage du 1er mount en vol
         const playfieldRoot = gltf.scene;
         playfieldRootRef = playfieldRoot;
         collectDisposables(playfieldRoot);
@@ -945,6 +946,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
         // ── Physics ──────────────────────────────────────────────────────────
         physicsWorld = await PhysicsWorld.create();
+        if (cancelled) return; // bail avant colliders/bille — World nettoyé au cleanup
         const world = physicsWorld.world;
         // colliderMap créé ici (avant le ctx) pour être injecté dans le module.
         const colliderMap = new Map<number, string>();
@@ -1039,6 +1041,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         // Préchargement asynchrone du module (ex. reveals boss) — bloque le
         // chargement comme avant.
         await mapModule?.preload?.();
+        if (cancelled) return; // bail avant la création de la bille/colliders
 
         shooterLaneGate = new ShooterLaneGate();
         shooterLaneGate.bind(world, mapLayout.shooterLane);
