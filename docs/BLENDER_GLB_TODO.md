@@ -139,6 +139,12 @@ portail, le sortir de l'état skinné garantit un rendu identique au viewport.
 | 3 | Garder le nom de rôle `vis_demogorgon_portal_rig` (mesh statique, plus de squelette ni d'animations dans l'export) |
 | 4 | Vérifier le centrage : nid en (0.002, 1.017, **−0.064**) ; cible Demogorgon en (0, 1.012, **−0.02**) → recentrer sur z ≈ −0.02 si le nid ne couvre pas pile le trou |
 
+> ⚠️ **Piège export** (déjà arrivé) : exporter **toute la scène**, pas l'objet
+> sélectionné. Décocher *"Selected Objects"* dans le dialog glTF, sinon l'export
+> ne contient qu'un nœud (ex. 384 octets = juste le portail) et écrase la map
+> complète (37 Mo). Toujours re-valider après export : `task maps:sync-assets --
+> strangerthings && task maps:validate -- strangerthings`.
+>
 > Alternative (si on veut garder l'anim Open/Close à terme) : le jeu devrait
 > piloter le rig (lecteur d'animation sur `vis_demogorgon_portal_rig`,
 > Open au reveal / CloseIdle sinon). C'est du dev gameplay, hors du périmètre
