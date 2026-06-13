@@ -190,8 +190,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   useEffect(() => {
     if (!IS_PORTRAIT_FILL) return;
     document.documentElement.classList.add('playfield-portrait-fill');
+    document.body.classList.add('playfield-portrait-fill');
     return () => {
       document.documentElement.classList.remove('playfield-portrait-fill');
+      document.body.classList.remove('playfield-portrait-fill');
     };
   }, []);
 
