@@ -22,6 +22,8 @@ interface GameOverlayProps {
   bosses: BossDefinition[];
   cabinetMode?: boolean;
   onAttractInteract?: () => void;
+  gameOverQrDataUrl?: string | null;
+  gameOverScore?: number;
 }
 
 export default function GameOverlay({
@@ -41,6 +43,8 @@ export default function GameOverlay({
   bosses,
   cabinetMode = false,
   onAttractInteract,
+  gameOverQrDataUrl = null,
+  gameOverScore = 0,
 }: GameOverlayProps) {
   void cabinetMode;
 
@@ -218,13 +222,42 @@ export default function GameOverlay({
       )}
 
       {showGameOver && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur-[1px]">
-          <p className="font-mono text-4xl font-bold uppercase tracking-[0.25em] text-red-400 drop-shadow-[0_0_16px_rgba(239,68,68,0.8)]">
-            Game Over
-          </p>
-          <p className="animate-pulse font-mono text-sm uppercase tracking-[0.3em] text-zinc-400">
-            ESPACE pour rejouer
-          </p>
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[1px]">
+          <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/15 bg-black/60 px-8 py-6 font-mono backdrop-blur-md">
+            <p className="text-2xl font-bold uppercase tracking-[0.3em] text-zinc-100 drop-shadow-[0_0_16px_rgba(255,255,255,0.25)]">
+              Fin de partie
+            </p>
+            <p className="text-4xl font-bold tabular-nums text-amber-300 drop-shadow-[0_0_14px_rgba(255,180,0,0.45)]">
+              {gameOverScore.toLocaleString("fr-FR")}
+            </p>
+
+            {gameOverQrDataUrl ? (
+              <img
+                src={gameOverQrDataUrl}
+                alt="QR classement"
+                className="h-40 w-40 rounded bg-white p-2"
+              />
+            ) : (
+              <div className="flex h-40 w-40 items-center justify-center rounded border border-white/10 bg-black/40">
+                <p className="animate-pulse text-[10px] uppercase tracking-[0.2em] text-zinc-400">
+                  Génération du code…
+                </p>
+              </div>
+            )}
+
+            <div className="text-center leading-relaxed">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-200">
+                Scanne pour inscrire ton pseudo au classement
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
+                Ton score t&apos;attend dans le Hall of Fame
+              </p>
+            </div>
+
+            <p className="animate-pulse text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+              START pour rejouer · sans scan = anonyme
+            </p>
+          </div>
         </div>
       )}
 

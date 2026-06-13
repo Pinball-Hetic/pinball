@@ -383,6 +383,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const [physicsReady, setPhysicsReady] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [plungerCharge, setPlungerCharge] = useState<number | null>(null);
+  // Outro game-over : QR de claim (arrive async via game:registered) + score
+  // figé affiché dans l'overlay.
+  const [gameOverQr, setGameOverQr] = useState<{ qrDataUrl: string } | null>(null);
+  const [finalScore, setFinalScore] = useState(0);
   const physicsReadyRef = useRef(false);
   const sessionStartedRef = useRef(false);
   /** Appelé depuis le game loop quand la session démarre (affiche la balle). */
@@ -414,7 +418,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     notifyBootPhase(bootPhase);
   }, [bootPhase]);
 
-  const dmd = useDmdOrchestrator(MAP_CLIPS);
+  const dmd = useDmdOrchestrator(MAP_CLIPS, (d) => setGameOverQr({ qrDataUrl: d.qrDataUrl }));
 
   // Directeur de cinématiques (stable). Ref → accessible depuis les
   // callbacks render-scope (onLifeLost) et la boucle animate (useEffect).
@@ -524,6 +528,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       if (livesRemaining === 1) playCinematic('last_chance');
     },
     onGameOver: (finalScore, stats) => {
+      setFinalScore(finalScore); // le QR arrive ensuite via le callback (async)
       // Counters spécifiques map : récupérés du mapState (alimenté par le
       // module). useGameState ne compte plus rien de ST.
       const counters: Record<string, number> = {};
@@ -538,6 +543,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       dmd.pushCinematic('hall_of_fame');
     },
     onGameStart: () => {
+      setGameOverQr(null); // évite un QR périmé qui flashe sur la partie suivante
       dmd.emitGameStart(playerRef.current);
       const snap = {
         player: playerRef.current,
@@ -2030,6 +2036,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           onAttractInteract={() => {
             if (physicsReady && !sessionStarted) beginSession();
           }}
+          gameOverQrDataUrl={gameOverQr?.qrDataUrl ?? null}
+          gameOverScore={finalScore}
         />
 
         <BallDebugOverlay snapshot={debugSnapshot} visible={debugVisible} />
