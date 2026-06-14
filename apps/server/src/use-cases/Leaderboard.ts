@@ -17,9 +17,15 @@ export async function topTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEntry[]
   }));
 }
 
+// Anonyme stable par entrée (même affichage à chaque poll, pas de random).
+function anonName(playedAt: string): string {
+  const n = Math.abs(Date.parse(playedAt)) % 10_000;
+  return `PLAYER${n.toString().padStart(4, '0')}`;
+}
+
 // Leaderboard mondial : proxy l'API globale, mappe vers LeaderboardEntry.
-// pseudo null = score pas encore réclamé (affiché '—'). Fallback board local
-// si le global est KO (offline-safe).
+// pseudo null = score pas encore réclamé (affiché en anonyme stable). Fallback
+// board local si le global est KO (offline-safe).
 export async function worldTopTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEntry[]> {
   try {
     const data = (await getWorldLeaderboard(mapId, 10)) as {
@@ -27,7 +33,7 @@ export async function worldTopTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEn
     };
     return data.entries.map((e) => ({
       rank: e.rank,
-      name: e.pseudo ?? '—', // null = pas encore réclamé
+      name: e.pseudo ?? anonName(e.playedAt), // anonyme tant que non réclamé
       score: e.score,
       date: e.playedAt,
     }));
