@@ -89,6 +89,8 @@ export type BossDefinition = {
   latePhaseSoundUrl?: string;
   latePhaseSoundVolume?: number;
   latePhaseHitThreshold?: number;
+  /** Après BOSS_FIGHT_END, conserve revealSoundUrl jusqu'au BOSS_REVEAL de ce boss. */
+  keepMusicUntilBossReveal?: BossId;
   assist?: { id: string };
 };
 
