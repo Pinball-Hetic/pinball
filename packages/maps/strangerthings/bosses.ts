@@ -104,6 +104,8 @@ export const bossDefinitions: BossDefinition[] = [
     unlocksReturnPortal: true,
     cameraCinematic: VECNA_CAMERA_CINEMATIC,
     victoryCameraCinematic: VECNA_VICTORY_CAMERA_CINEMATIC,
+    revealSoundUrl: mapAsset('audio/vecnaTheme.mp3'),
+    revealSoundVolume: 100,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,
