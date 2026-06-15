@@ -85,6 +85,10 @@ export type BossDefinition = {
   targetPulse: BossTargetPulseConfig;
   revealSoundUrl?: string;
   revealSoundVolume?: number;
+  /** Musique de phase tardive (ex. win-music quand hitCount >= seuil). */
+  latePhaseSoundUrl?: string;
+  latePhaseSoundVolume?: number;
+  latePhaseHitThreshold?: number;
   assist?: { id: string };
 };
 
