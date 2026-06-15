@@ -3,6 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { layout } from '../layout';
 import {
   PORTAL_ENTER_TEXTURE_URL,
+  RETURN_PORTAL_TEXTURE_URL,
   UPSIDE_DOWN_TRANSITION_BLACKOUT,
   UPSIDE_DOWN_TRANSITION_HOLD,
   UPSIDE_DOWN_TRANSITION_RESTORE,
@@ -60,6 +61,7 @@ export class UpsideDownTransition {
   private elapsed = 0;
   private strobeT = 0;
   private active = false;
+  private pendingTextureUrl: string | null = null;
   private ballMesh: THREE.Object3D | null = null;
   private ballBody: RAPIER.RigidBody | null = null;
   private onComplete: CompleteHandler | null = null;
@@ -92,6 +94,7 @@ export class UpsideDownTransition {
       depth: BILLBOARD_DEPTH,
       yOffset: 0,
     });
+    void this.billboard.preloadTexture(RETURN_PORTAL_TEXTURE_URL);
   }
 
   isActive(): boolean {
@@ -102,11 +105,18 @@ export class UpsideDownTransition {
     if (!this.camera) return;
 
     const textureUrl = config.textureUrl ?? DEFAULT_TEXTURE_URL;
-    if (textureUrl !== DEFAULT_TEXTURE_URL) {
-      void this.billboard.setTextureUrl(textureUrl);
-    } else {
-      void this.billboard.setTextureUrl(DEFAULT_TEXTURE_URL);
-    }
+    this.pendingTextureUrl = textureUrl;
+    this.billboard.hide();
+
+    void this.billboard.setTextureUrl(textureUrl).then(() => {
+      if (this.pendingTextureUrl !== textureUrl) return;
+      this.beginActiveTransition(config, onComplete);
+    });
+  }
+
+  private beginActiveTransition(config: StartConfig, onComplete: CompleteHandler): void {
+    if (!this.camera) return;
+    if (this.billboard.getActiveTextureUrl() !== (config.textureUrl ?? DEFAULT_TEXTURE_URL)) return;
 
     this.active = true;
     this.phase = 'blackout';
@@ -138,6 +148,9 @@ export class UpsideDownTransition {
     this.strobeT += dt;
 
     const on = strobeOn(this.strobeT, UPSIDE_DOWN_TRANSITION_STROBE_HZ);
+    const textureReady =
+      this.billboard.isReady() &&
+      this.billboard.getActiveTextureUrl() === this.pendingTextureUrl;
 
     if (this.phase === 'blackout') {
       this.cinematicStrobe.apply(on, false, easeOut(Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_BLACKOUT)));
@@ -154,18 +167,18 @@ export class UpsideDownTransition {
     if (this.phase === 'reveal') {
       const t = Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_REVEAL);
       this.cinematicStrobe.apply(on, false, 1);
-      this.billboard.setOpacity(this.billboard.isReady() && on ? easeOut(t) * 0.95 : 0);
+      this.billboard.setOpacity(textureReady && on ? easeOut(t) * 0.95 : 0);
       if (this.elapsed >= UPSIDE_DOWN_TRANSITION_REVEAL) {
         this.phase = 'hold';
         this.elapsed = 0;
-        this.billboard.setOpacity(0.95);
+        this.billboard.setOpacity(textureReady ? 0.95 : 0);
         this.cinematicStrobe.applyHoldShade(0.72);
       }
       return;
     }
 
     if (this.phase === 'hold') {
-      this.billboard.setOpacity(0.95);
+      this.billboard.setOpacity(textureReady ? 0.95 : 0);
       this.cinematicStrobe.setShadeOpacity(0.72);
       if (this.elapsed >= UPSIDE_DOWN_TRANSITION_HOLD) {
         this.phase = 'restore';
@@ -178,7 +191,7 @@ export class UpsideDownTransition {
     if (this.phase === 'restore') {
       const darkMix = 1 - easeIn(Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_RESTORE));
       this.cinematicStrobe.apply(on, false, darkMix * 0.5);
-      this.billboard.setOpacity(0.95 * darkMix);
+      this.billboard.setOpacity(textureReady ? 0.95 * darkMix : 0);
       if (darkMix <= 0) {
         this.phase = 'tremor';
         this.elapsed = 0;
@@ -215,6 +228,7 @@ export class UpsideDownTransition {
     this.tremorStarted = false;
     this.active = false;
     this.phase = 'idle';
+    this.pendingTextureUrl = null;
   }
 
   private resetAtmosphere(): void {
@@ -224,6 +238,7 @@ export class UpsideDownTransition {
     this.strobeT = 0;
     this.active = false;
     this.tremorStarted = false;
+    this.pendingTextureUrl = null;
 
     this.cinematicStrobe.stop();
     this.billboard.hide();
