@@ -168,6 +168,7 @@ export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition
       sfx.playPortalTransitionEnd();
       break;
     case "RETURN_PORTAL_TRANSITION_END":
+      musicDirector.onReturnPortalTransitionEnd();
       sfx.playPortalTransitionEnd();
       break;
     case "BOTTOM_OUT":
