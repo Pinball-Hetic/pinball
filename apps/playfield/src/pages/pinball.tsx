@@ -1,16 +1,15 @@
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
-import { getMapPackage } from '@pinball/maps';
+import { useState } from 'react';
+import { getMapPackage, AVAILABLE_MAPS } from '@pinball/maps';
 import { DEFAULT_MAP_ID } from '@pinball/shared-types';
+import { MapSelectorScreen } from '@/components/pinball/MapSelectorScreen';
 import '@/audio/pinballAudio';
 
 const PinballPlayfield = dynamic(
   () => import('@/components/pinball/PinballPlayfield'),
   { ssr: false },
 );
-
-const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
-const PRELOAD = getMapPackage(MAP_ID)?.manifest.preload ?? [];
 
 // Type de ressource <link rel=preload> inféré depuis l'extension.
 function preloadAs(path: string): string {
@@ -20,16 +19,38 @@ function preloadAs(path: string): string {
   return 'fetch';
 }
 
+// Si NEXT_PUBLIC_MAP_ID est défini (ex: prod Fliphetic mono-map), on bypasse
+// le sélecteur et on charge directement cette map.
+const FORCED_MAP_ID = process.env.NEXT_PUBLIC_MAP_ID;
+
 export default function PinballPage() {
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(
+    FORCED_MAP_ID ?? null,
+  );
+
+  const preload = selectedMapId
+    ? (getMapPackage(selectedMapId)?.manifest.preload ?? [])
+    : [];
+
+  // Sélecteur de map — affiché si aucune map forcée et aucune map choisie.
+  if (!selectedMapId) {
+    return <MapSelectorScreen maps={AVAILABLE_MAPS} onSelect={setSelectedMapId} />;
+  }
+
   return (
     <>
       <Head>
         <link rel="preload" href="/audio/early-sound.mp3" as="audio" type="audio/mpeg" />
-        {PRELOAD.map((p) => (
+        {preload.map((p) => (
           <link key={p} rel="preload" href={p} as={preloadAs(p)} />
         ))}
       </Head>
-      <PinballPlayfield />
+      {/*
+        key={selectedMapId} → remonte complètement le composant si on change
+        de map (ex: retour menu + nouvelle sélection). Garantit que le moteur
+        physique, les loaders Three.js et les refs internes repartent à zéro.
+      */}
+      <PinballPlayfield key={selectedMapId} mapId={selectedMapId} />
     </>
   );
 }
