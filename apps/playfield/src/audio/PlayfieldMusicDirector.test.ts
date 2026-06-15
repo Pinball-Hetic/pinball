@@ -314,6 +314,35 @@ describe("PlayfieldMusicDirector", () => {
       expect(early.log).toContain("clearHandoffBlock");
       expect(early.log).toContain("engage");
     });
+
+    test("BOSS_FIGHT_END vecna après win-music conserve la piste jusqu'au retour portail", () => {
+      const { director, early, boss } = makeDirector();
+      director.onBossReveal(VECNA);
+      director.onBossTargetHit(VECNA, 7);
+      early.log.length = 0;
+
+      director.onBossFightEnd("vecna", BOSSES);
+
+      expect(boss.activeUrl).toBe(WIN_MUSIC);
+      expect(boss.playing).toBe(true);
+      expect(director.getDebugState().postVictoryMusicHeld).toBe(true);
+      expect(early.log).not.toContain("engage");
+    });
+
+    test("RETURN_PORTAL_TRANSITION_END stoppe win-music et reprend early", () => {
+      const { director, early, boss } = makeDirector();
+      director.onBossReveal(VECNA);
+      director.onBossTargetHit(VECNA, 7);
+      director.onBossFightEnd("vecna", BOSSES);
+      early.log.length = 0;
+      early.handoffBlocked = false;
+
+      director.onReturnPortalTransitionEnd();
+
+      expect(boss.playing).toBe(false);
+      expect(director.getDebugState().postVictoryMusicHeld).toBe(false);
+      expect(early.log).toContain("engage");
+    });
   });
 
   describe("BOSS_FIGHT_END sans pont", () => {

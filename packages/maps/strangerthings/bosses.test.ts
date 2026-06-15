@@ -24,3 +24,13 @@ describe('bossDefinitions', () => {
     expect(vecna.targetHits).toBe(10)
   })
 })
+
+describe('return portal textures', () => {
+  test('return portal uses fin_combat_vecna image', async () => {
+    const { RETURN_PORTAL_TEXTURE_URL, PORTAL_ENTER_TEXTURE_URL } = await import(
+      './systems/UpsideDownConstants'
+    )
+    expect(RETURN_PORTAL_TEXTURE_URL).toContain('fin_combat_vecna.png')
+    expect(PORTAL_ENTER_TEXTURE_URL).toContain('upsidedown.jpg')
+  })
+})
