@@ -80,20 +80,12 @@ import type {
 import { clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
 
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
-// Résolu au niveau module (MAP_ID = constante build-time) → permet un garde
-// NO SIGNAL en 1ère ligne du composant, avant tout hook.
-const RESOLVED_MAP = getMapPackage(MAP_ID);
-// Définitions de boss de la map active (point de composition unique).
-const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
-const MAP_CLIPS = RESOLVED_MAP?.manifest.clips;
-// URLs de sons spécifiques à la map (reveal boss + sons d'event) à précharger.
-const MAP_SOUND_URLS: string[] = [
-  ...MAP_BOSSES.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
-  ...Object.values(RESOLVED_MAP?.manifest.sounds ?? {}).map((s) => s.url),
-];
+// Résolu au niveau module (MAP_ID = constante build-time) — utilisé comme
+// fallback si aucun mapId n'est fourni en prop.
+const DEFAULT_RESOLVED_MAP = getMapPackage(MAP_ID);
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
-function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
+function toGameEvent(d: DevGameEventTrigger, mapBosses: ResolvedMap['layout']['bosses']): GameEvent | null {
   switch (d.type) {
     case "BUMPER_HIT":
       return { type: "BUMPER_HIT", bumperIndex: 0, scoreIncrement: SCORE_BUMPER };
@@ -104,20 +96,20 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
     case "DROP_TARGET_COMPLETE":
       return { type: "DROP_TARGET_COMPLETE", side: "left", scoreIncrement: SCORE_DROP_COMPLETE };
     case "BOSS_REVEAL": {
-      const bossId = d.bossId ?? MAP_BOSSES[0]?.id ?? "";
+      const bossId = d.bossId ?? mapBosses[0]?.id ?? "";
       return {
         type: "BOSS_REVEAL",
         bossId,
-        scoreIncrement: getBossById(MAP_BOSSES, bossId)?.reveal.scoreIncrement ?? 150,
+        scoreIncrement: getBossById(mapBosses, bossId)?.reveal.scoreIncrement ?? 150,
       };
     }
     case "BOSS_TARGET_HIT": {
-      const bossId = d.bossId ?? MAP_BOSSES[0]?.id ?? "";
+      const bossId = d.bossId ?? mapBosses[0]?.id ?? "";
       return {
         type: "BOSS_TARGET_HIT",
         bossId,
         hitCount: d.hitCount ?? 1,
-        scoreIncrement: getBossById(MAP_BOSSES, bossId)?.scoreTargetHit ?? 250,
+        scoreIncrement: getBossById(mapBosses, bossId)?.scoreTargetHit ?? 250,
       };
     }
     case "PORTAL_ENTER":
@@ -356,17 +348,27 @@ function boundingBoxPlayfieldSurface(playfieldRoot: THREE.Object3D): THREE.Box3 
 type PinballPlayfieldProps = {
   /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
   cabinetMode?: boolean;
+  /** Id de la map à charger. Si absent → NEXT_PUBLIC_MAP_ID ou DEFAULT_MAP_ID. */
+  mapId?: string;
 };
 
 // Garde NO SIGNAL : map introuvable → écran de veille plein écran (pas de
 // crash). Wrapper sans hook → l'Inner (tous les hooks) n'est monté que si la
 // map existe.
 export default function PinballPlayfield(props: PinballPlayfieldProps) {
-  if (!RESOLVED_MAP) return <NoSignal reason={`MAP "${MAP_ID}" INTROUVABLE`} />;
-  return <PinballPlayfieldInner {...props} />;
+  const resolvedMap = props.mapId ? getMapPackage(props.mapId) : DEFAULT_RESOLVED_MAP;
+  if (!resolvedMap) return <NoSignal reason={`MAP "${props.mapId ?? MAP_ID}" INTROUVABLE`} />;
+  return <PinballPlayfieldInner {...props} resolvedMap={resolvedMap} />;
 }
 
-function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
+function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlayfieldProps & { resolvedMap: ResolvedMap }) {
+  // Boss, clips et sons dérivés de la map sélectionnée (prop — change au remount).
+  const mapBosses = resolvedMap.layout.bosses ?? [];
+  const mapClips = resolvedMap.manifest.clips;
+  const mapSoundUrls: string[] = [
+    ...mapBosses.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
+    ...Object.values(resolvedMap.manifest.sounds ?? {}).map((s) => s.url),
+  ];
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   const [debugSnapshot, setDebugSnapshot] = useState<BallDiagnosticsSnapshot | null>(null);
@@ -414,7 +416,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     notifyBootPhase(bootPhase);
   }, [bootPhase]);
 
-  const dmd = useDmdOrchestrator(MAP_CLIPS);
+  const dmd = useDmdOrchestrator(mapClips);
 
   // Directeur de cinématiques (stable). Ref → accessible depuis les
   // callbacks render-scope (onLifeLost) et la boucle animate (useEffect).
@@ -423,7 +425,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const cinematics = cinematicsRef.current;
 
   // Map résolue (garantie non-null par le garde NO SIGNAL du wrapper).
-  const mapPackageRef = useRef<ResolvedMap>(RESOLVED_MAP!);
+  const mapPackageRef = useRef<ResolvedMap>(resolvedMap);
   // Ref vers le module (accessible depuis les callbacks render-scope, ex. reset).
   const mapModuleRef = useRef<MapModule | null>(null);
   // emit (défini dans l'effet) exposé aux callbacks useGameState render-scope.
@@ -500,7 +502,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       // Chaque event fait switcher l'affichage. Exclusif, par priorité
       // décroissante : event labellisé → EVENT ; nouveau multiplier →
       // MULTI ; sinon combo en cours → COMBO.
-      const label = eventLabel(event, MAP_BOSSES);
+      const label = eventLabel(event, mapBosses);
       if (label) {
         dmd.pushEvent(label, finalPoints, snap);
       } else if (previousMultiplier !== newMultiplier) {
@@ -592,7 +594,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     portalAnchor: mapLayout.sensors.portal,
     bumperAnchors: mapLayout.bumpers,
     atmosphereHintMs: mapLayout.atmosphere.hintMs,
-    bosses: MAP_BOSSES,
+    bosses: mapBosses,
   });
 
   // Patches de mapState poussés par le module de map (ctx.setMapState). Fusionnés
@@ -1464,7 +1466,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             // Injecte dans le emit wrapper EXISTANT → chaîne complète
             // (cinématiques, gel, DMD, backglass). DRAIN/BOTTOM_OUT
             // appellent les vrais use-cases → la bille reset réellement.
-            const ev = toGameEvent(d);
+            const ev = toGameEvent(d, mapBosses);
             if (ev) emit(ev);
           },
         };
@@ -1555,7 +1557,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         physicsReadyRef.current = true;
         setPhysicsReady(true);
         onPlayfieldReady();
-        warmMapSounds(MAP_SOUND_URLS);
+        warmMapSounds(mapSoundUrls);
         debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
@@ -1989,7 +1991,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           atmosphereBannerLabel={mapLayout.atmosphere.bannerLabel}
           atmosphereHintLabel={mapLayout.atmosphere.hintLabel}
           attractTagline={mapManifest.attractTagline ?? mapManifest.name}
-          bosses={MAP_BOSSES}
+          bosses={mapBosses}
           cabinetMode={cabinetMode}
           onAttractInteract={() => {
             if (physicsReady && !sessionStarted) beginSession();
