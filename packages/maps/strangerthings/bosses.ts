@@ -106,6 +106,9 @@ export const bossDefinitions: BossDefinition[] = [
     victoryCameraCinematic: VECNA_VICTORY_CAMERA_CINEMATIC,
     revealSoundUrl: mapAsset('audio/vecnaTheme.mp3'),
     revealSoundVolume: 100,
+    latePhaseSoundUrl: mapAsset('audio/win-music.mp3'),
+    latePhaseSoundVolume: 100,
+    latePhaseHitThreshold: 7,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,
