@@ -8,12 +8,18 @@ type PendingBossResume = {
   url: string;
   volume: number;
   bossId: BossId;
+  latePhase?: {
+    url: string;
+    volume: number;
+    hitThreshold: number;
+  };
 };
 
 /** Orchestrateur early-sound ↔ musique boss (exclusif, arrêt instant). */
 export class PlayfieldMusicDirector {
   private pendingBossResume: PendingBossResume | null = null;
   private bossFightEnded = true;
+  private latePhaseActivated = false;
   private wantsEarly = false;
   private suppressEarlyUntilReset = false;
 
@@ -30,7 +36,8 @@ export class PlayfieldMusicDirector {
     if (
       !this.wantsEarly ||
       this.suppressEarlyUntilReset ||
-      this.boss.isPlaying()
+      this.boss.isPlaying() ||
+      this.isBossFightActive()
     ) {
       return;
     }
@@ -45,17 +52,48 @@ export class PlayfieldMusicDirector {
     return !this.bossFightEnded && this.pendingBossResume !== null;
   }
 
+  private haltEarlyForBossHandoff(): void {
+    this.early.stopInstant();
+  }
+
   onBossReveal(def: BossDefinition): void {
+    this.bossFightEnded = false;
+    this.latePhaseActivated = false;
+    this.haltEarlyForBossHandoff();
+
     if (!def.revealSoundUrl) return;
 
     const url = def.revealSoundUrl;
     const volume = percentToGain(def.revealSoundVolume ?? 100);
+    const latePhase =
+      def.latePhaseSoundUrl && def.latePhaseHitThreshold != null
+        ? {
+            url: def.latePhaseSoundUrl,
+            volume: percentToGain(def.latePhaseSoundVolume ?? 100),
+            hitThreshold: def.latePhaseHitThreshold,
+          }
+        : undefined;
 
-    this.pendingBossResume = { url, volume, bossId: def.id };
-    this.bossFightEnded = false;
-
-    this.early.stopInstant();
+    this.pendingBossResume = { url, volume, bossId: def.id, latePhase };
     void this.boss.start(url, volume);
+  }
+
+  onBossTargetHit(def: BossDefinition, hitCount: number): void {
+    if (this.bossFightEnded || !this.pendingBossResume) return;
+    if (this.latePhaseActivated) return;
+    if (this.pendingBossResume.bossId !== def.id) return;
+
+    const latePhase = this.pendingBossResume.latePhase;
+    if (!latePhase || hitCount < latePhase.hitThreshold) return;
+
+    this.latePhaseActivated = true;
+    this.pendingBossResume = {
+      ...this.pendingBossResume,
+      url: latePhase.url,
+      volume: latePhase.volume,
+    };
+    this.haltEarlyForBossHandoff();
+    void this.boss.start(latePhase.url, latePhase.volume);
   }
 
   onBossFightEnd(bossId: BossId): void {
@@ -63,6 +101,8 @@ export class PlayfieldMusicDirector {
     this.boss.stopInstant();
     this.pendingBossResume = null;
     this.bossFightEnded = true;
+    this.latePhaseActivated = false;
+    this.early.clearHandoffBlock();
     this.requestEarly();
   }
 
@@ -74,7 +114,9 @@ export class PlayfieldMusicDirector {
     if (options.gameOver) {
       this.pendingBossResume = null;
       this.bossFightEnded = true;
+      this.latePhaseActivated = false;
     }
+    this.early.clearHandoffBlock();
     this.requestEarly();
   }
 
@@ -83,7 +125,7 @@ export class PlayfieldMusicDirector {
     if (this.boss.isPlaying()) return;
 
     const { url, volume } = this.pendingBossResume;
-    this.early.stopInstant();
+    this.haltEarlyForBossHandoff();
     void this.boss.start(url, volume);
   }
 
@@ -92,6 +134,7 @@ export class PlayfieldMusicDirector {
     this.boss.stopInstant();
     this.pendingBossResume = null;
     this.bossFightEnded = true;
+    this.latePhaseActivated = false;
     this.early.resetForNewGame();
     this.requestEarly();
   }
@@ -101,6 +144,7 @@ export class PlayfieldMusicDirector {
     this.boss.stopInstant();
     this.pendingBossResume = null;
     this.bossFightEnded = true;
+    this.latePhaseActivated = false;
     this.early.release();
   }
 }
