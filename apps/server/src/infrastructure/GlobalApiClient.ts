@@ -1,4 +1,5 @@
 export interface ScorePayload {
+  gameId: string; // idempotence : constant sur tous les retries d'une partie
   mapId: string;
   score: number;
   maxCombo?: number;
@@ -35,17 +36,23 @@ export async function postScore(p: ScorePayload): Promise<ScoreRegistered> {
         signal: ctrl.signal,
       });
       clearTimeout(t);
-      if (res.status === 201) return (await res.json()) as ScoreRegistered;
-      // 4xx = erreur définitive, pas de retry. 5xx = retry.
-      if (res.status >= 400 && res.status < 500) {
-        throw new Error(`global /v1/scores ${res.status}: ${await res.text()}`);
+      // 200 = replay idempotent (gameId déjà vu), 201 = créé. Même corps.
+      if (res.status === 200 || res.status === 201) {
+        return (await res.json()) as ScoreRegistered;
       }
+      // 4xx = définitif (pas de retry) → marqué pour que le catch rethrow direct.
+      if (res.status >= 400 && res.status < 500) {
+        const e = new Error(`global /v1/scores ${res.status}: ${await res.text()}`);
+        (e as { definitive?: boolean }).definitive = true;
+        throw e;
+      }
+      // 5xx → retry. Épuisé au dernier essai.
       if (attempt === MAX) throw new Error(`global /v1/scores ${res.status} (épuisé)`);
     } catch (err) {
       clearTimeout(t);
-      // AbortError (timeout) = AMBIGU (peut avoir réussi) → PAS de retry (anti-doublon, cf doc §7).
-      if ((err as Error).name === 'AbortError') throw err;
-      // erreur définitive 4xx remontée ci-dessus → rethrow
+      // 4xx définitif → pas de retry. gameId rend timeout/réseau/5xx sûrs à
+      // retenter (le global dédoublonne sur gameId → idempotent).
+      if ((err as { definitive?: boolean }).definitive) throw err;
       if (attempt === MAX) throw err;
     }
     await new Promise((r) => setTimeout(r, 500 * attempt)); // backoff
