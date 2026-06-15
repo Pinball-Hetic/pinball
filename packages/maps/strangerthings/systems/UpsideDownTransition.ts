@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { layout } from '../layout';
 import {
+  PORTAL_ENTER_TEXTURE_URL,
   UPSIDE_DOWN_TRANSITION_BLACKOUT,
   UPSIDE_DOWN_TRANSITION_HOLD,
   UPSIDE_DOWN_TRANSITION_RESTORE,
@@ -14,9 +15,8 @@ import { CameraBillboardSprite } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
-import { mapAsset } from '../manifest';
 
-const TEXTURE_URL = mapAsset('playfield/upsidedown.jpg');
+const DEFAULT_TEXTURE_URL = PORTAL_ENTER_TEXTURE_URL;
 const BILLBOARD_DEPTH = 0.38;
 const BILLBOARD_PAD = 1.12;
 
@@ -41,6 +41,8 @@ type SetupConfig = {
 type StartConfig = {
   ballMesh: THREE.Object3D;
   ballBody: RAPIER.RigidBody;
+  /** Texture plein écran (défaut : upsidedown.jpg). */
+  textureUrl?: string;
   onRevealStart?: () => void;
   onTremorStart?: () => void;
 };
@@ -84,7 +86,7 @@ export class UpsideDownTransition {
     });
 
     this.billboard.mount(config.scene, config.camera, {
-      textureUrl: TEXTURE_URL,
+      textureUrl: DEFAULT_TEXTURE_URL,
       center: new THREE.Vector2(0.5, 0.5),
       scale: fullScreenSpriteScale(config.camera, BILLBOARD_DEPTH),
       depth: BILLBOARD_DEPTH,
@@ -98,6 +100,13 @@ export class UpsideDownTransition {
 
   start(config: StartConfig, onComplete: CompleteHandler): void {
     if (!this.camera) return;
+
+    const textureUrl = config.textureUrl ?? DEFAULT_TEXTURE_URL;
+    if (textureUrl !== DEFAULT_TEXTURE_URL) {
+      void this.billboard.setTextureUrl(textureUrl);
+    } else {
+      void this.billboard.setTextureUrl(DEFAULT_TEXTURE_URL);
+    }
 
     this.active = true;
     this.phase = 'blackout';
