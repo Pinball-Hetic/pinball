@@ -10,6 +10,8 @@ export type EarlySoundPhase = "off" | "armed" | "playing" | "released";
 
 export class EarlySoundController {
   private phase: EarlySoundPhase = "off";
+  /** Bloque toute reprise tant que le boss tient la piste musique. */
+  private handoffBlocked = false;
 
   constructor(private readonly samples: SamplePlayer) {}
 
@@ -25,6 +27,7 @@ export class EarlySoundController {
   }
 
   async engage(): Promise<void> {
+    if (this.handoffBlocked) return;
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
       this.phase = "playing";
       return;
@@ -39,6 +42,7 @@ export class EarlySoundController {
   }
 
   engageSync(): void {
+    if (this.handoffBlocked) return;
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
       this.phase = "playing";
       return;
@@ -65,11 +69,17 @@ export class EarlySoundController {
 
   /** Arrêt immédiat — pas de fade (handoff vers musique boss). */
   stopInstant(): void {
+    this.handoffBlocked = true;
     this.samples.stopGaplessLoop(EARLY_SOUND_URL);
     this.phase = "off";
   }
 
+  clearHandoffBlock(): void {
+    this.handoffBlocked = false;
+  }
+
   resetForNewGame(): void {
+    this.handoffBlocked = false;
     this.samples.stopGaplessLoop(EARLY_SOUND_URL);
     this.phase = "off";
   }
