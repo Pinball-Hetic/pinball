@@ -1,9 +1,12 @@
+import type { CSSProperties } from "react";
 import type { BossDefinition } from "@pinball/game-engine";
+import type { MapManifest } from "@pinball/shared-types";
 import type { BossHudState, ScorePop } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
 import PlungerPowerBar from "./PlungerPowerBar";
 import BossHealthBar from "./BossHealthBar";
 import { bossHealthBarTheme } from "./bossHealthHud";
+import StyledQrCode from "./StyledQrCode";
 
 export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
 
@@ -26,6 +29,11 @@ interface GameOverlayProps {
   portraitFill?: boolean;
   plungerAnchor?: { x: number; y: number };
   onAttractInteract?: () => void;
+  gameOverClaimUrl?: string | null;
+  gameOverScore?: number;
+  mapTheme?: CSSProperties;
+  outro?: MapManifest["outro"];
+  qrLogo?: string;
 }
 
 type OverlayLayout = {
@@ -123,6 +131,11 @@ export default function GameOverlay({
   portraitFill = false,
   plungerAnchor,
   onAttractInteract,
+  gameOverClaimUrl = null,
+  gameOverScore = 0,
+  mapTheme,
+  outro,
+  qrLogo,
 }: GameOverlayProps) {
   void cabinetMode;
   const layout = overlayLayout(portraitFill);
@@ -133,6 +146,14 @@ export default function GameOverlay({
   const showPowerBar =
     bootPhase === "in_game" && gameState === "idle" && plungerCharge !== null;
   const showGameOver = bootPhase === "in_game" && gameState === "game_over";
+
+  // Couleur d'accent de l'outro : glow normal vs monde inversé. Fallbacks
+  // neutres → une map sans theme reste propre (pas de ST en dur).
+  const glow = alternateWorldActive ? "var(--glow-alt, #b14dff)" : "var(--glow, #ff2d2d)";
+  const dot = "var(--vignette, #2a0606)";
+  const title = outro?.title ?? "FIN DE PARTIE";
+  const scanLabel = outro?.scanLabel ?? "Scanne pour t'inscrire au classement";
+  const replayLabel = outro?.replayLabel ?? "START — Rejouer";
 
   const showResetBall =
     bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
@@ -317,12 +338,72 @@ export default function GameOverlay({
       )}
 
       {showGameOver && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur-[1px]">
-          <p className="font-mono text-4xl font-bold uppercase tracking-[0.25em] text-red-400 drop-shadow-[0_0_16px_rgba(239,68,68,0.8)]">
-            Game Over
+        <div
+          className="crt-scanlines pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 backdrop-blur-[2px]"
+          style={{
+            ...mapTheme,
+            background:
+              "radial-gradient(ellipse at center, var(--vignette, #14181f) 0%, #000000 78%)",
+          }}
+        >
+          <p
+            className="vhs-flicker font-black uppercase tracking-[0.28em] text-3xl sm:text-4xl"
+            style={{
+              fontFamily: "var(--st-font, serif)",
+              color: "var(--foreground, #ede4d3)",
+              textShadow: `0 0 18px ${glow}, 0 0 42px ${glow}99`,
+            }}
+          >
+            {title}
           </p>
-          <p className="animate-pulse font-mono text-sm uppercase tracking-[0.3em] text-zinc-400">
-            ESPACE pour rejouer
+
+          <p
+            className="font-black tabular-nums text-5xl sm:text-6xl"
+            style={{
+              fontFamily: "var(--st-font, serif)",
+              color: "var(--foreground, #ede4d3)",
+              textShadow: `0 0 16px ${glow}, 0 0 40px ${glow}80`,
+            }}
+          >
+            {gameOverScore.toLocaleString("fr-FR")}
+          </p>
+
+          <div className="relative px-5 pt-5">
+            <p
+              className="absolute inset-x-0 -top-1 text-center font-mono text-[9px] uppercase tracking-[0.4em]"
+              style={{ color: glow, textShadow: `0 0 10px ${glow}` }}
+            >
+              Transmission entrante
+            </p>
+            {/* 4 coins crochets */}
+            <span className="absolute left-0 top-3 h-5 w-5 border-l-2 border-t-2" style={{ borderColor: glow }} />
+            <span className="absolute right-0 top-3 h-5 w-5 border-r-2 border-t-2" style={{ borderColor: glow }} />
+            <span className="absolute bottom-0 left-0 h-5 w-5 border-b-2 border-l-2" style={{ borderColor: glow }} />
+            <span className="absolute bottom-0 right-0 h-5 w-5 border-b-2 border-r-2" style={{ borderColor: glow }} />
+
+            {gameOverClaimUrl ? (
+              <StyledQrCode value={gameOverClaimUrl} color={glow} dotColor={dot} logoUrl={qrLogo} />
+            ) : (
+              <div className="flex h-[180px] w-[180px] items-center justify-center rounded-lg border border-white/10 bg-black/40">
+                <p className="animate-pulse font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400">
+                  Génération du code…
+                </p>
+              </div>
+            )}
+          </div>
+
+          <p
+            className="max-w-xs text-center font-mono text-xs uppercase tracking-[0.18em]"
+            style={{ color: "var(--foreground, #ede4d3)", opacity: 0.8 }}
+          >
+            {scanLabel}
+          </p>
+
+          <p
+            className="animate-pulse font-mono text-[11px] uppercase tracking-[0.24em]"
+            style={{ color: glow, textShadow: `0 0 12px ${glow}` }}
+          >
+            {replayLabel}
           </p>
         </div>
       )}

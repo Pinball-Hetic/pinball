@@ -15,6 +15,21 @@ export const manifest: MapManifest = {
   name: 'Stranger Things',
   version: 1,
   attractTagline: 'Hawkins National Laboratory',
+  // Tokens CSS consommés par l'overlay playfield (outro). Une map sans theme
+  // → overlay garde ses défauts neutres.
+  theme: {
+    '--glow': '#ff2d2d',
+    '--glow-alt': '#b14dff', // monde inversé
+    '--st-font': "'Times New Roman', Georgia, serif",
+    '--vignette': '#2a0606',
+    '--foreground': '#ede4d3',
+  },
+  outro: {
+    title: 'FIN DE PARTIE',
+    scanLabel: 'Scanne pour graver ton nom au classement',
+    replayLabel: 'START — Rejouer',
+    qrLogo: mapAsset('playfield/demogorgon.png'),
+  },
   // Familles de cinématique (overlay fallback générique). Non listé → 'other'.
   clipFamilies: {
     demogorgon_rises: 'boss',
