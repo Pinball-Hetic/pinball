@@ -145,7 +145,7 @@ export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition
       break;
     }
     case "BOSS_FIGHT_END":
-      musicDirector.onBossFightEnd(event.bossId);
+      musicDirector.onBossFightEnd(event.bossId, bosses);
       break;
     case "BOSS_TARGET_HIT": {
       const def = getBossById(bosses, event.bossId);
