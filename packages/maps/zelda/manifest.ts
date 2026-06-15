@@ -95,4 +95,25 @@ export const manifest: MapManifest = {
     'ocarina',
     'sheikah',
   ],
+  // ─── Rendu Three.js — spécifique Zelda ────────────────────────────────────
+  // Esthétique Hyrule : marbre noir profond, or et gemmes vifs.
+  // envIntensityMetallic élevé → les matériaux métalliques (triforce, couronnes
+  // bumpers, gemmes) reflètent fortement l'environment → aspect Vectary.
+  // dirLight overhead (y fort) → éclaire les surfaces horizontales (logo, couronnes).
+  // ambient faible → zones d'ombre très sombres = contraste dramatique.
+  rendering: {
+    useEnvironment: true,
+    toneMappingExposure: 1.3,
+    colorDarken: 0.9,
+    environmentBlur: 0.01,       // reflets nets = highlights crisp sur l'or
+    envIntensityMetallic: 2.8,   // or/gemmes/chrome très réfléchissants
+    envIntensitySemi: 1.8,
+    envIntensityBase: 1.1,
+    lights: {
+      ambient: { color: 0xffffff, intensity: 0.22 },   // zones sombres restent sombres
+      hemi:    { sky: 0xfff8e8, ground: 0x111108, intensity: 0.15 },
+      dir:     { color: 0xffffff, intensity: 2.8, x: 0, y: 1.0, z: 0.6 },  // overhead → logo Hyrule
+      fill:    { color: 0xfff0dd, intensity: 0.5,  x: 0, y: 0.3, z: 1.0 }, // fill caméra
+    },
+  },
 }
