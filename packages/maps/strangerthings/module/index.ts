@@ -79,7 +79,10 @@ export function createModule(): MapModule {
         camera: ctx.camera,
         garlandLights: garlands,
         bumperVisuals,
-        onFightEnd: () => ctx.setBossFightActive('demogorgon', false),
+        onFightEnd: () => {
+          ctx.setBossFightActive('demogorgon', false);
+          ctx.emitGameEvent({ type: 'BOSS_FIGHT_END', bossId: 'demogorgon' });
+        },
         onTargetReady: () => ctx.setBossTargetArmed('demogorgon', true),
       })
       demogorgonReveal.setEmit(ctx.emitGameEvent)
@@ -89,7 +92,10 @@ export function createModule(): MapModule {
         camera: ctx.camera,
         garlandLights: garlands,
         bumperVisuals,
-        onFightEnd: () => ctx.setBossFightActive('vecna', false),
+        onFightEnd: () => {
+          ctx.setBossFightActive('vecna', false);
+          ctx.emitGameEvent({ type: 'BOSS_FIGHT_END', bossId: 'vecna' });
+        },
         onTargetReady: () => ctx.setBossTargetArmed('vecna', true),
       })
       bossReveals = new BossRevealOrchestrator()
