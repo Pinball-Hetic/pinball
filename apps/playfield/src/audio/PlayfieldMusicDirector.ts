@@ -41,6 +41,10 @@ export class PlayfieldMusicDirector {
     }
   }
 
+  private isBossFightActive(): boolean {
+    return !this.bossFightEnded && this.pendingBossResume !== null;
+  }
+
   onBossReveal(def: BossDefinition): void {
     if (!def.revealSoundUrl) return;
 
@@ -63,6 +67,9 @@ export class PlayfieldMusicDirector {
   }
 
   onDrain(options: { gameOver: boolean }): void {
+    // Vie perdue mais combat boss en cours : la musique continue sans coupure.
+    if (!options.gameOver && this.isBossFightActive()) return;
+
     this.boss.stopInstant();
     if (options.gameOver) {
       this.pendingBossResume = null;
@@ -73,6 +80,7 @@ export class PlayfieldMusicDirector {
 
   onBallLaunched(): void {
     if (this.bossFightEnded || !this.pendingBossResume) return;
+    if (this.boss.isPlaying()) return;
 
     const { url, volume } = this.pendingBossResume;
     this.early.stopInstant();
