@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { postScore } from '../infrastructure/GlobalApiClient';
 import type { GameOver, GameRegistered } from '@pinball/shared-types';
 import { prisma } from '../infrastructure/prisma';
@@ -5,6 +6,9 @@ import { prisma } from '../infrastructure/prisma';
 export async function registerScore(data: GameOver): Promise<GameRegistered> {
   const score = Math.max(1, Math.min(99_999_999, data.finalScore)); // contrat [1..99999999]
   const playedAt = new Date().toISOString(); // ISO avec offset (Z)
+  // Idempotence : un seul gameId par partie, constant sur tous les retries
+  // internes de postScore → le global dédoublonne (pas de double insert).
+  const gameId = randomUUID();
 
   // 1) record local d'abord (jamais perdu, même si global KO)
   const local = await prisma.game.create({
@@ -21,6 +25,7 @@ export async function registerScore(data: GameOver): Promise<GameRegistered> {
 
   // 2) global → code + claimUrl
   const reg = await postScore({
+    gameId,
     mapId: data.mapId,
     score,
     maxCombo: data.stats.maxCombo,
