@@ -7,45 +7,96 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
-const MAP_STYLES: Record<string, {
-  titleFont: string;
-  titleColor: string;
-  titleShadow: string;
-  titleLetterSpacing: string;
-  taglineColor: string;
-  glowColor: string;
-  topAccent: string;
-  bottomAccent: string;
-  overlayGradient: string;
+/* ─── Config visuelle par map ─────────────────────────────────────── */
+const THEME: Record<string, {
+  accent: string;
+  glow: string;
+  gradient: string;
+  logoEl: React.ReactNode;
 }> = {
   strangerthings: {
-    titleFont: '"Georgia", "Times New Roman", serif',
-    titleColor: "#ff2020",
-    titleShadow: "0 0 20px #ff000088, 0 0 60px #ff000044, 2px 2px 0 #000",
-    titleLetterSpacing: "6px",
-    taglineColor: "rgba(255,100,100,0.8)",
-    glowColor: "#e53935",
-    topAccent: "linear-gradient(to bottom, #e5393588, transparent)",
-    bottomAccent: "linear-gradient(to top, #000000ee 0%, #1a000088 50%, transparent 100%)",
-    overlayGradient: "linear-gradient(to bottom, #00000055 0%, transparent 35%, #00000088 65%, #000000ee 100%)",
+    accent: "#CC0000",
+    glow: "#CC000088",
+    gradient: "linear-gradient(to top, #000 0%, #1a0000bb 40%, transparent 100%)",
+    logoEl: (
+      <div style={{ textAlign: "center", padding: "0 12px" }}>
+        <div style={{
+          height: 3, background: "#CC0000",
+          marginBottom: 6, borderRadius: 1,
+        }} />
+        <div style={{
+          fontFamily: '"Georgia", serif',
+          fontWeight: 900,
+          fontSize: 44,
+          color: "#CC0000",
+          letterSpacing: "2px",
+          lineHeight: 1,
+          textTransform: "uppercase",
+          textShadow: "0 0 30px #CC000066",
+        }}>
+          Stranger<br />Things
+        </div>
+        <div style={{
+          height: 3, background: "#CC0000",
+          marginTop: 6, borderRadius: 1,
+        }} />
+      </div>
+    ),
   },
   zelda: {
-    titleFont: '"Georgia", "Times New Roman", serif',
-    titleColor: "#FFD700",
-    titleShadow: "0 0 20px #FFD70088, 0 0 60px #FFD70044, 2px 2px 0 #000",
-    titleLetterSpacing: "3px",
-    taglineColor: "rgba(255,215,0,0.7)",
-    glowColor: "#FFD700",
-    topAccent: "linear-gradient(to bottom, #FFD70033, transparent)",
-    bottomAccent: "linear-gradient(to top, #000000ee 0%, #1a110088 50%, transparent 100%)",
-    overlayGradient: "linear-gradient(to bottom, #00000055 0%, transparent 35%, #00000088 65%, #000000ee 100%)",
+    accent: "#C8960C",
+    glow: "#C8960C88",
+    gradient: "linear-gradient(to top, #000 0%, #1a0e00bb 40%, transparent 100%)",
+    logoEl: (
+      <div style={{ textAlign: "center", padding: "0 8px" }}>
+        <div style={{
+          fontFamily: '"Georgia", serif',
+          fontWeight: 400,
+          fontSize: 11,
+          color: "#C8960C",
+          letterSpacing: "6px",
+          textTransform: "uppercase",
+          marginBottom: 2,
+        }}>
+          The Legend of
+        </div>
+        <div style={{
+          fontFamily: '"Georgia", serif',
+          fontWeight: 900,
+          fontSize: 56,
+          lineHeight: 0.9,
+          letterSpacing: "2px",
+          textTransform: "uppercase",
+          background: "linear-gradient(to bottom, #FFE066 0%, #C8960C 40%, #7a5800 100%)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          textShadow: "none",
+          filter: "drop-shadow(0 0 12px #C8960C88)",
+        }}>
+          Zelda
+        </div>
+        <div style={{
+          fontFamily: '"Georgia", serif',
+          fontWeight: 400,
+          fontSize: 10,
+          color: "#C8960C",
+          letterSpacing: "5px",
+          textTransform: "uppercase",
+          marginTop: 4,
+        }}>
+          Ocarina of Time
+        </div>
+      </div>
+    ),
   },
 };
 
-const FALLBACK_STYLE = MAP_STYLES.strangerthings;
+const FALLBACK_THEME = THEME.strangerthings;
 
+/* ─── Composant ───────────────────────────────────────────────────── */
 export function MapSelectorScreen({ maps, onSelect }: Props) {
   const [cursor, setCursor] = useState(0);
+  const [animDir, setAnimDir] = useState<"left" | "right" | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
   const confirm = useCallback(
@@ -53,112 +104,121 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
     [maps, onSelect],
   );
 
+  const go = useCallback((dir: 1 | -1) => {
+    setAnimDir(dir === 1 ? "right" : "left");
+    setCursor((c) => (c + dir + maps.length) % maps.length);
+    setTimeout(() => setAnimDir(null), 400);
+  }, [maps.length]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      switch (e.key) {
-        case "ArrowLeft": case "a": case "A":
-          setCursor((c) => (c - 1 + maps.length) % maps.length);
-          break;
-        case "ArrowRight": case "d": case "D":
-          setCursor((c) => (c + 1) % maps.length);
-          break;
-        case "Enter": case " ": case "p": case "P":
-          setCursor((c) => { confirm(c); return c; });
-          break;
-      }
+      if (e.key === "ArrowLeft"  || e.key === "a" || e.key === "A") go(-1);
+      if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") go(1);
+      if (e.key === "Enter" || e.key === " " || e.key === "p" || e.key === "P")
+        setCursor((c) => { confirm(c); return c; });
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [maps.length, confirm]);
+  }, [go, confirm]);
 
   useEffect(() => {
-    const vid = videoRefs.current[cursor];
-    if (vid) {
-      vid.currentTime = 0;
-      vid.play().catch(() => {});
-    }
+    videoRefs.current.forEach((vid, i) => {
+      if (!vid) return;
+      if (i === cursor) {
+        vid.currentTime = 0;
+        vid.play().catch(() => {});
+      } else {
+        vid.pause();
+      }
+    });
   }, [cursor]);
 
   const active = maps[cursor];
-  const activeStyle = MAP_STYLES[active.id] ?? FALLBACK_STYLE;
+  const t = THEME[active.id] ?? FALLBACK_THEME;
 
   return (
     <div style={{
-      position: "fixed",
-      inset: 0,
+      position: "fixed", inset: 0,
       background: "#000",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      fontFamily: "'Courier New', monospace",
-      color: "#fff",
-      userSelect: "none",
-      gap: 36,
       overflow: "hidden",
+      userSelect: "none",
     }}>
-
-      {/* Ambient background glow derrière les cartes */}
+      {/* Fond ambiant animé */}
       <div style={{
-        position: "absolute",
-        inset: 0,
-        background: `radial-gradient(ellipse 60% 50% at 50% 60%, ${activeStyle.glowColor}18 0%, transparent 70%)`,
+        position: "absolute", inset: 0,
+        background: `radial-gradient(ellipse 70% 60% at 50% 55%, ${t.glow}22 0%, transparent 70%)`,
         transition: "background 0.6s ease",
         pointerEvents: "none",
       }} />
 
-      {/* Titre */}
-      <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-        <div style={{
-          fontSize: 11,
-          letterSpacing: 8,
-          color: "#666",
-          marginBottom: 6,
-          textTransform: "uppercase",
-        }}>
-          Select Your Map
-        </div>
-        <div style={{
-          width: 40,
-          height: 1,
-          background: "#333",
-          margin: "0 auto",
-        }} />
+      {/* Label haut */}
+      <div style={{
+        position: "absolute", top: 36,
+        fontSize: 10, letterSpacing: 8,
+        color: "#444", textTransform: "uppercase",
+        fontFamily: "'Courier New', monospace",
+      }}>
+        Select Your Map
       </div>
 
-      {/* Cartes */}
+      {/* ─── Carrousel ─────────────────────────────────────────────── */}
       <div style={{
         display: "flex",
-        gap: 32,
         alignItems: "center",
+        justifyContent: "center",
+        gap: 0,
+        width: "100%",
         position: "relative",
         zIndex: 1,
       }}>
         {maps.map((m, i) => {
-          const selected = i === cursor;
-          const s = MAP_STYLES[m.id] ?? FALLBACK_STYLE;
+          const diff = i - cursor;
+          const absD = Math.abs(diff);
+          const selected = diff === 0;
+
+          // Slide horizontal pur — pas de rotation
+          const translateX = diff * 510;
+          const scale = selected ? 1 : 0.82;
+          const opacity = absD > 1 ? 0 : selected ? 1 : 0.5;
+          const zIndex = selected ? 10 : 5 - absD;
+          const rotateY = 0;
+          const blur = selected ? 0 : 1.5;
+
+          const mt = THEME[m.id] ?? FALLBACK_THEME;
 
           return (
-            <button
+            <div
               key={m.id}
-              onClick={() => { setCursor(i); confirm(i); }}
+              onClick={() => selected ? confirm(i) : go(diff > 0 ? 1 : -1)}
               style={{
-                position: "relative",
+                position: "absolute",
+                width: 460,
+                height: 640,
+                borderRadius: 16,
                 overflow: "hidden",
+                border: `1.5px solid ${selected ? mt.accent : "#1a1a1a"}`,
                 background: "#0a0a0a",
-                border: `1px solid ${selected ? s.glowColor : "#222"}`,
-                borderRadius: 12,
                 cursor: "pointer",
-                width: 260,
-                height: 420,
-                padding: 0,
-                transition: "all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-                transform: selected ? "scale(1.05) translateY(-8px)" : "scale(0.9) translateY(8px)",
+                // Transform 3D
+                transform: `translateX(${translateX}px) scale(${scale}) rotateY(${rotateY}deg)`,
+                transformOrigin: "center center",
+                opacity,
+                zIndex,
+                filter: blur > 0 ? `blur(${blur}px)` : "none",
                 boxShadow: selected
-                  ? `0 0 0 1px ${s.glowColor}66, 0 20px 60px ${s.glowColor}33, 0 0 120px ${s.glowColor}11`
-                  : "0 4px 20px #00000088",
-                opacity: selected ? 1 : 0.55,
-                flexShrink: 0,
+                  ? `0 0 0 1px ${mt.accent}44, 0 24px 80px ${mt.accent}44, 0 0 160px ${mt.accent}18`
+                  : "none",
+                transition: `
+                  transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                  opacity 0.45s ease,
+                  box-shadow 0.45s ease,
+                  filter 0.45s ease,
+                  border-color 0.45s ease
+                `,
               }}
             >
               {/* Vidéo */}
@@ -166,159 +226,156 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
                 <video
                   ref={(el) => { videoRefs.current[i] = el; }}
                   src={m.previewVideo}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
+                  autoPlay={selected}
+                  loop muted playsInline
                   style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
+                    position: "absolute", inset: 0,
+                    width: "100%", height: "100%",
+                    objectFit: "contain",
                   }}
                 />
               )}
 
-              {/* Overlay gradient */}
+              {/* Gradient overlay */}
               <div style={{
-                position: "absolute",
-                inset: 0,
-                background: s.overlayGradient,
+                position: "absolute", inset: 0,
+                background: mt.gradient,
               }} />
 
-              {/* Accent haut */}
+              {/* Vignette latérale sur les non-sélectionnées */}
+              {!selected && (
+                <div style={{
+                  position: "absolute", inset: 0,
+                  background: "rgba(0,0,0,0.45)",
+                }} />
+              )}
+
+              {/* Logo centré en haut */}
               <div style={{
                 position: "absolute",
                 top: 0, left: 0, right: 0,
-                height: 80,
-                background: s.topAccent,
-              }} />
-
-              {/* Contenu bas */}
-              <div style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                padding: "24px 20px 22px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "36px 16px 0",
               }}>
-                {/* Ligne décorative */}
+                {mt.logoEl}
+              </div>
+
+              {/* Coins décoratifs */}
+              {[
+                { top: 12, left: 12, borderTop: true, borderLeft: true },
+                { top: 12, right: 12, borderTop: true, borderRight: true },
+                { bottom: 12, left: 12, borderBottom: true, borderLeft: true },
+                { bottom: 12, right: 12, borderBottom: true, borderRight: true },
+              ].map((corner, ci) => (
+                <div key={ci} style={{
+                  position: "absolute",
+                  ...corner as object,
+                  width: 18, height: 18,
+                  borderColor: selected ? `${mt.accent}88` : "#222",
+                  borderStyle: "solid",
+                  borderWidth: 0,
+                  borderTopWidth:    corner.borderTop    ? 1.5 : 0,
+                  borderLeftWidth:   corner.borderLeft   ? 1.5 : 0,
+                  borderRightWidth:  corner.borderRight  ? 1.5 : 0,
+                  borderBottomWidth: corner.borderBottom ? 1.5 : 0,
+                  transition: "border-color 0.4s",
+                }} />
+              ))}
+
+              {/* Bas de card : tagline + CTA */}
+              <div style={{
+                position: "absolute", bottom: 0, left: 0, right: 0,
+                padding: "0 24px 28px",
+              }}>
+                {/* Ligne séparatrice */}
                 <div style={{
-                  width: "100%",
                   height: 1,
-                  background: `linear-gradient(to right, transparent, ${s.glowColor}88, transparent)`,
+                  background: `linear-gradient(to right, transparent, ${mt.accent}88, transparent)`,
                   marginBottom: 14,
-                  opacity: selected ? 1 : 0.3,
-                  transition: "opacity 0.3s",
+                  opacity: selected ? 1 : 0.2,
+                  transition: "opacity 0.4s",
                 }} />
 
-                {/* Titre map */}
                 <div style={{
-                  fontFamily: s.titleFont,
-                  fontSize: 20,
-                  fontWeight: 900,
-                  color: s.titleColor,
-                  textShadow: selected ? s.titleShadow : "none",
-                  letterSpacing: s.titleLetterSpacing,
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: 9, letterSpacing: 4,
+                  color: `${mt.accent}aa`,
                   textTransform: "uppercase",
-                  lineHeight: 1.2,
-                  marginBottom: 8,
-                  transition: "text-shadow 0.3s",
-                }}>
-                  {m.name}
-                </div>
-
-                {/* Tagline */}
-                <div style={{
-                  fontSize: 9,
-                  letterSpacing: 4,
-                  color: s.taglineColor,
-                  textTransform: "uppercase",
-                  opacity: selected ? 1 : 0.5,
-                  transition: "opacity 0.3s",
+                  marginBottom: selected ? 14 : 0,
+                  transition: "margin 0.4s",
                 }}>
                   {m.tagline}
                 </div>
 
-                {/* Prompt PRESS ENTER */}
                 {selected && (
                   <div style={{
-                    marginTop: 16,
-                    fontSize: 9,
-                    letterSpacing: 3,
-                    color: `${s.glowColor}cc`,
+                    fontFamily: "'Courier New', monospace",
+                    fontSize: 9, letterSpacing: 3,
+                    color: mt.accent,
                     textTransform: "uppercase",
-                    animation: "pulse 1.4s ease-in-out infinite",
+                    animation: "blink 1.4s ease-in-out infinite",
                   }}>
-                    Press Enter to Play
+                    ↵ Press Enter to Play
                   </div>
                 )}
               </div>
-
-              {/* Coin déco haut-gauche */}
-              <div style={{
-                position: "absolute",
-                top: 14, left: 14,
-                width: 16, height: 16,
-                borderTop: `1px solid ${s.glowColor}${selected ? "99" : "33"}`,
-                borderLeft: `1px solid ${s.glowColor}${selected ? "99" : "33"}`,
-                transition: "border-color 0.3s",
-              }} />
-              {/* Coin déco bas-droit */}
-              <div style={{
-                position: "absolute",
-                bottom: 14, right: 14,
-                width: 16, height: 16,
-                borderBottom: `1px solid ${s.glowColor}${selected ? "99" : "33"}`,
-                borderRight: `1px solid ${s.glowColor}${selected ? "99" : "33"}`,
-                transition: "border-color 0.3s",
-              }} />
-            </button>
+            </div>
           );
         })}
       </div>
 
-      {/* Indicateur pagination */}
-      <div style={{
-        display: "flex",
-        gap: 10,
-        alignItems: "center",
-        position: "relative",
-        zIndex: 1,
-      }}>
-        {maps.map((_, i) => (
-          <div
-            key={i}
-            onClick={() => setCursor(i)}
-            style={{
-              width: i === cursor ? 28 : 6,
-              height: 6,
-              borderRadius: 3,
-              background: i === cursor ? activeStyle.glowColor : "#333",
-              transition: "all 0.3s ease",
-              cursor: "pointer",
-              boxShadow: i === cursor ? `0 0 8px ${activeStyle.glowColor}88` : "none",
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Navigation hint bas */}
+      {/* Flèches navigation */}
       <div style={{
         position: "absolute",
-        bottom: 28,
-        fontSize: 9,
-        letterSpacing: 4,
-        color: "#333",
-        textTransform: "uppercase",
+        bottom: 52,
+        display: "flex",
+        gap: 24,
+        alignItems: "center",
+        zIndex: 2,
       }}>
-        ← → to browse
+        <button onClick={() => go(-1)} style={{
+          background: "none", border: `1px solid #333`,
+          color: "#555", width: 40, height: 40, borderRadius: "50%",
+          cursor: "pointer", fontSize: 16,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "all 0.2s",
+          fontFamily: "monospace",
+        }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = t.accent; (e.currentTarget as HTMLButtonElement).style.color = t.accent; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#333"; (e.currentTarget as HTMLButtonElement).style.color = "#555"; }}
+        >←</button>
+
+        {/* Dots */}
+        <div style={{ display: "flex", gap: 8 }}>
+          {maps.map((_, i) => (
+            <div key={i} onClick={() => { go(i > cursor ? 1 : -1); }} style={{
+              width: i === cursor ? 24 : 6, height: 6, borderRadius: 3,
+              background: i === cursor ? t.accent : "#2a2a2a",
+              boxShadow: i === cursor ? `0 0 8px ${t.accent}` : "none",
+              transition: "all 0.35s ease",
+              cursor: "pointer",
+            }} />
+          ))}
+        </div>
+
+        <button onClick={() => go(1)} style={{
+          background: "none", border: "1px solid #333",
+          color: "#555", width: 40, height: 40, borderRadius: "50%",
+          cursor: "pointer", fontSize: 16,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "all 0.2s",
+          fontFamily: "monospace",
+        }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = t.accent; (e.currentTarget as HTMLButtonElement).style.color = t.accent; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#333"; (e.currentTarget as HTMLButtonElement).style.color = "#555"; }}
+        >→</button>
       </div>
 
       <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
+        @keyframes blink {
+          0%, 100% { opacity: 0.3; }
           50% { opacity: 1; }
         }
       `}</style>
