@@ -42,6 +42,7 @@ export const bossDefinitions: BossDefinition[] = [
     victoryCameraCinematic: DEMOGORGON_VICTORY_CAMERA_CINEMATIC,
     revealSoundUrl: mapAsset('audio/spawnDG.mp3'),
     revealSoundVolume: 100,
+    keepMusicUntilBossReveal: 'vecna',
     // Eleven aide pendant le fight (cf. DemogorgonReveal émet ASSIST id 'eleven').
     assist: { id: 'eleven' },
     targetMeshTheme: {
