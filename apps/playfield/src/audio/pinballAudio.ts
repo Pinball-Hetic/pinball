@@ -149,6 +149,7 @@ export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition
       break;
     case "BOSS_TARGET_HIT": {
       const def = getBossById(bosses, event.bossId);
+      if (def) musicDirector.onBossTargetHit(def, event.hitCount);
       sfx.playTargetHit(event.hitCount);
       if (def && event.hitCount >= def.targetHits) {
         window.setTimeout(() => sfx.playVictory(), 80);
