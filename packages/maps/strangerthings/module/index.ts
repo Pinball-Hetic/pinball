@@ -9,6 +9,7 @@ import {
   VecnaReveal,
   BossRevealOrchestrator,
 } from '../systems'
+import { RETURN_PORTAL_TEXTURE_URL } from '../systems/UpsideDownConstants'
 import { bossThresholdMet } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 
@@ -246,7 +247,7 @@ export function createModule(): MapModule {
             {
               ballMesh: mesh,
               ballBody: ball.body,
-              onRevealStart: () => ctx.playSound('upside_down_appear'),
+              textureUrl: RETURN_PORTAL_TEXTURE_URL,
               onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
             },
             () => {
