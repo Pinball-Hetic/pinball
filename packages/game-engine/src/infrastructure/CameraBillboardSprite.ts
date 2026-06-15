@@ -17,6 +17,7 @@ export class CameraBillboardSprite {
   private sprite: THREE.Sprite | null = null;
   private material: THREE.SpriteMaterial | null = null;
   private texture: THREE.Texture | null = null;
+  private readonly textureCache = new Map<string, THREE.Texture>();
   private imageReady = false;
   private depth = 0.38;
   private yOffset = 0.06;
@@ -42,41 +43,28 @@ export class CameraBillboardSprite {
     this.sprite.visible = false;
     scene.add(this.sprite);
 
-    const loader = new THREE.TextureLoader();
-    this.loadPromise = new Promise<void>((resolve) => {
-      loader.load(
-        config.textureUrl,
-        (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.userData.url = config.textureUrl;
-          this.texture = tex;
-          if (this.material) {
-            this.material.map = tex;
-            this.material.needsUpdate = true;
-          }
-          this.imageReady = true;
-          resolve();
-        },
-        undefined,
-        () => {
-          this.imageReady = true;
-          resolve();
-        },
-      );
-    });
+    this.loadPromise = this.setTextureUrl(config.textureUrl);
+  }
+
+  /** Précharge une texture sans l'afficher (évite le flash au swap). */
+  preloadTexture(url: string): Promise<void> {
+    return this.fetchTexture(url).then(() => undefined);
+  }
+
+  getActiveTextureUrl(): string | null {
+    return (this.texture?.userData?.url as string | undefined) ?? null;
   }
 
   ensureReady(): Promise<void> {
     return this.loadPromise ?? Promise.resolve();
   }
 
-  // Force l'upload GPU de la texture hors frame critique (évite le
-  // micro-freeze du premier rendu visible — texture ~16 Mo décodée).
   warmup(renderer: THREE.WebGLRenderer): void {
-    if (this.texture) renderer.initTexture(this.texture);
+    for (const tex of this.textureCache.values()) {
+      renderer.initTexture(tex);
+    }
   }
 
-  // Exposé pour compileAsync (compilation des programs du sprite au preload).
   get object3D(): THREE.Object3D | null {
     return this.sprite;
   }
@@ -103,35 +91,22 @@ export class CameraBillboardSprite {
     }
   }
 
-  /** Charge et affiche une autre texture (ex. fin de combat Vecna). */
+  /** Bascule vers une texture unique — jamais deux images sur le même sprite. */
   setTextureUrl(url: string): Promise<void> {
-    const current = this.texture?.userData?.url as string | undefined;
-    if (current === url && this.imageReady) return Promise.resolve();
+    if (this.getActiveTextureUrl() === url && this.imageReady) {
+      return Promise.resolve();
+    }
 
-    const loader = new THREE.TextureLoader();
     this.imageReady = false;
-    const load = new Promise<void>((resolve) => {
-      loader.load(
-        url,
-        (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.userData.url = url;
-          const prev = this.texture;
-          this.texture = tex;
-          if (this.material) {
-            this.material.map = tex;
-            this.material.needsUpdate = true;
-          }
-          if (prev && prev !== tex) prev.dispose();
-          this.imageReady = true;
-          resolve();
-        },
-        undefined,
-        () => {
-          this.imageReady = true;
-          resolve();
-        },
-      );
+    const load = this.fetchTexture(url).then((tex) => {
+      if (!tex || !this.material) {
+        this.imageReady = this.texture !== null;
+        return;
+      }
+      this.texture = tex;
+      this.material.map = tex;
+      this.material.needsUpdate = true;
+      this.imageReady = true;
     });
     this.loadPromise = load;
     return load;
@@ -148,9 +123,13 @@ export class CameraBillboardSprite {
 
   dispose(): void {
     if (this.material) {
-      this.material.map?.dispose();
+      this.material.map = null;
       this.material.dispose();
     }
+    for (const tex of this.textureCache.values()) {
+      tex.dispose();
+    }
+    this.textureCache.clear();
     this.sprite?.parent?.remove(this.sprite);
     this.camera = null;
     this.sprite = null;
@@ -158,5 +137,25 @@ export class CameraBillboardSprite {
     this.texture = null;
     this.imageReady = false;
     this.loadPromise = null;
+  }
+
+  private fetchTexture(url: string): Promise<THREE.Texture | null> {
+    const cached = this.textureCache.get(url);
+    if (cached) return Promise.resolve(cached);
+
+    const loader = new THREE.TextureLoader();
+    return new Promise((resolve) => {
+      loader.load(
+        url,
+        (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.userData.url = url;
+          this.textureCache.set(url, tex);
+          resolve(tex);
+        },
+        undefined,
+        () => resolve(null),
+      );
+    });
   }
 }
