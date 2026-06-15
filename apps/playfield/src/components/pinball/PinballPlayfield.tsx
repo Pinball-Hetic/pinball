@@ -50,6 +50,7 @@ import {
   hidePinballmapDecorNodes,
   prepareGltfMaterialsForDisplay,
   configureGltfRenderer,
+  getEnvironmentBlur,
   createGltfLoader,
   ballCenterOnSurface,
   PlungerPhysics,
@@ -647,40 +648,54 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let orbitControls: OrbitControls | null = null;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    configureGltfRenderer(renderer);
+    // Expose + tonemapping depuis la config de la map (pas de valeur globale).
+    const rendering = mapManifest.rendering;
+    configureGltfRenderer(renderer, rendering);
 
-    // Environment map neutre — indispensable pour les matériaux métalliques/
-    // glossy (or, gemmes, chrome). Sans envmap, metalness=1 → rendu noir.
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    pmrem.compileEquirectangularShader();
-    // blur=0.01 → reflets nets (moins de flou environment) → gemmes/or plus vifs.
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.01).texture;
-    pmrem.dispose();
-    // Démarrage à 1.5 (HiDPI plafonné) ; le QualityGovernor ajuste ensuite
-    // selon le frame time (1.5 → 1.25 → 1.0 → 1.0 + trail réduit/spores off).
+    // Environment map — uniquement pour les maps qui en ont besoin (rendering.useEnvironment).
+    // ST original : pas d'envmap → matériaux sans reflets ambiants (état git d'origine).
+    // Zelda : envmap active → or et gemmes très réfléchissants (effet Vectary).
+    if (rendering?.useEnvironment) {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), getEnvironmentBlur(rendering)).texture;
+      pmrem.dispose();
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(clientWidth, clientHeight);
-    // Shadows désactivées : avec 13+ PointLights (lumières décor + bumpers) dans
-    // le shader, chaque pixel paie déjà lourd. La shadow map (cast + receive
-    // sur tous les meshes GLB) ajoutait un pass de rendu entier + lookups PCF.
     renderer.shadowMap.enabled = false;
     mountEl.appendChild(renderer.domElement);
 
-    // Ambiante faible → zones sombres restent sombres (contraste fort).
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.22);
+    // ─── Lumières — lues depuis manifest.rendering ─────────────────────────
+    // Chaque map contrôle entièrement son setup d'éclairage. Pas de valeur
+    // partagée ici : ST (froide/cinéma) et Zelda (chaude/overhead) divergent.
+    const rl = rendering?.lights;
+    const ambientLight = new THREE.AmbientLight(
+      rl?.ambient.color    ?? 0xffffff,
+      rl?.ambient.intensity ?? 0.35,
+    );
     scene.add(ambientLight);
-    // HemiLight — faible, contribution uniquement pour déboucher le bas du modèle.
-    const hemiLight = new THREE.HemisphereLight(0xfff8e8, 0x111108, 0.15);
+
+    const hemiLight = new THREE.HemisphereLight(
+      rl?.hemi.sky       ?? 0xfff8e8,
+      rl?.hemi.ground    ?? 0x111108,
+      rl?.hemi.intensity ?? 0.2,
+    );
     scene.add(hemiLight);
-    // Directionnel principal depuis le haut-devant → éclaire les surfaces
-    // horizontales (logo Hyrule, couronnes bumpers) et crée des ombres portées.
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
-    dirLight.position.set(0, 1.0, 0.6);
+
+    const dirLight = new THREE.DirectionalLight(
+      rl?.dir.color    ?? 0xffffff,
+      rl?.dir.intensity ?? 2.5,
+    );
+    dirLight.position.set(rl?.dir.x ?? 0, rl?.dir.y ?? 0.48, rl?.dir.z ?? 0.88);
     dirLight.castShadow = false;
     scene.add(dirLight);
-    // Fill contre-jour léger depuis la caméra (z+) → évite les zones noires totales.
-    const fillLight = new THREE.DirectionalLight(0xfff0dd, 0.5);
-    fillLight.position.set(0, 0.3, 1.0);
+
+    const fillLight = new THREE.DirectionalLight(
+      rl?.fill.color    ?? 0xffeedd,
+      rl?.fill.intensity ?? 0.15,
+    );
+    fillLight.position.set(rl?.fill.x ?? -0.5, rl?.fill.y ?? 1, rl?.fill.z ?? -1);
     scene.add(fillLight);
 
     const modelRoot = new THREE.Group();
@@ -899,7 +914,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         modelRoot.add(playfieldRoot);
         removePinballmapUnusedMeshes(playfieldRoot);
         hidePinballmapDecorNodes(playfieldRoot);
-        prepareGltfMaterialsForDisplay(playfieldRoot);
+        prepareGltfMaterialsForDisplay(playfieldRoot, rendering);
 
         // garlands + bumperVisuals créés par le module de map (cluster visuals),
         // récupérés après mapModule.setup (plus bas, après le monde physique).
