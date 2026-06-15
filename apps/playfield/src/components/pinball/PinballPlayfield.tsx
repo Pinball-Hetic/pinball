@@ -386,6 +386,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   // Outro game-over : URL de claim (arrive async via game:registered) + score
   // figé affiché dans l'overlay. Le QR est rendu client-side (StyledQrCode).
   const [gameOverClaimUrl, setGameOverClaimUrl] = useState<string | null>(null);
+  const [gameOverCode, setGameOverCode] = useState<string | null>(null);
   const [finalScore, setFinalScore] = useState(0);
   const physicsReadyRef = useRef(false);
   const sessionStartedRef = useRef(false);
@@ -418,7 +419,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     notifyBootPhase(bootPhase);
   }, [bootPhase]);
 
-  const dmd = useDmdOrchestrator(MAP_CLIPS, (d) => setGameOverClaimUrl(d.claimUrl));
+  const dmd = useDmdOrchestrator(MAP_CLIPS, (d) => {
+    setGameOverClaimUrl(d.claimUrl);
+    setGameOverCode(d.code);
+  });
 
   // Directeur de cinématiques (stable). Ref → accessible depuis les
   // callbacks render-scope (onLifeLost) et la boucle animate (useEffect).
@@ -544,6 +548,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     },
     onGameStart: () => {
       setGameOverClaimUrl(null); // évite un QR périmé qui flashe sur la partie suivante
+      setGameOverCode(null);
       dmd.emitGameStart(playerRef.current);
       const snap = {
         player: playerRef.current,
@@ -2048,6 +2053,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             if (physicsReady && !sessionStarted) beginSession();
           }}
           gameOverClaimUrl={gameOverClaimUrl}
+          gameOverCode={gameOverCode}
           gameOverScore={finalScore}
           mapTheme={mapManifest.theme as CSSProperties | undefined}
           outro={mapManifest.outro}
