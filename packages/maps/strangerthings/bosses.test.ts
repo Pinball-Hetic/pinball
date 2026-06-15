@@ -9,4 +9,18 @@ describe('bossDefinitions', () => {
       expect(getBossDefinition(boss.id)).toBe(boss)
     }
   })
+
+  test('demogorgon bridges spawnDG music until vecna reveal', () => {
+    const dg = getBossDefinition('demogorgon')
+    expect(dg.revealSoundUrl).toContain('spawnDG.mp3')
+    expect(dg.keepMusicUntilBossReveal).toBe('vecna')
+  })
+
+  test('vecna has late-phase win music at 7 hits', () => {
+    const vecna = getBossDefinition('vecna')
+    expect(vecna.revealSoundUrl).toContain('vecnaTheme.mp3')
+    expect(vecna.latePhaseSoundUrl).toContain('win-music.mp3')
+    expect(vecna.latePhaseHitThreshold).toBe(7)
+    expect(vecna.targetHits).toBe(10)
+  })
 })
