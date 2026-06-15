@@ -36,6 +36,8 @@ export class PlayfieldMusicDirector {
   private wantsEarly = false;
   private suppressEarlyUntilReset = false;
 
+  private postVictoryMusicHeld = false;
+
   constructor(
     private readonly early: EarlySoundController,
     private readonly boss: BossFightMusicController,
@@ -50,6 +52,7 @@ export class PlayfieldMusicDirector {
     return (
       this.isBossFightActive() ||
       this.musicBridgeActive ||
+      this.postVictoryMusicHeld ||
       this.boss.isPlaying()
     );
   }
@@ -87,6 +90,7 @@ export class PlayfieldMusicDirector {
     this.pendingBossResume = null;
     this.bossFightEnded = true;
     this.latePhaseActivated = false;
+    this.postVictoryMusicHeld = false;
     this.clearBridge();
   }
 
@@ -152,6 +156,25 @@ export class PlayfieldMusicDirector {
       return;
     }
 
+    // Victoire Vecna : win-music continue jusqu'à la fin de la ciné retour portail.
+    if (
+      bossId === "vecna" &&
+      this.latePhaseActivated &&
+      this.boss.isPlaying()
+    ) {
+      this.bossFightEnded = true;
+      this.postVictoryMusicHeld = true;
+      return;
+    }
+
+    this.clearBossMusicState();
+    this.early.clearHandoffBlock();
+    this.requestEarly();
+  }
+
+  /** Fin cinématique retour portail (photo fin Vecna) — reprend early-sound. */
+  onReturnPortalTransitionEnd(): void {
+    if (!this.postVictoryMusicHeld && !this.boss.isPlaying()) return;
     this.clearBossMusicState();
     this.early.clearHandoffBlock();
     this.requestEarly();
@@ -194,6 +217,7 @@ export class PlayfieldMusicDirector {
     bridgeUntilBossId: BossId | null;
     pendingBossId: BossId | null;
     bossPlaying: boolean;
+    postVictoryMusicHeld: boolean;
   } {
     return {
       bossFightEnded: this.bossFightEnded,
@@ -201,6 +225,7 @@ export class PlayfieldMusicDirector {
       bridgeUntilBossId: this.bridgeUntilBossId,
       pendingBossId: this.pendingBossResume?.bossId ?? null,
       bossPlaying: this.boss.isPlaying(),
+      postVictoryMusicHeld: this.postVictoryMusicHeld,
     };
   }
 }
