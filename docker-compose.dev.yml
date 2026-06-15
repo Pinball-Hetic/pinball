@@ -29,8 +29,7 @@ services:
       DATABASE_URL: "postgresql://dev_user:dev_password@db:5432/pinball_dev?schema=public"
       NODE_ENV: development
       GLOBAL_API_URL: "${GLOBAL_API_URL}"
-      CABINET_ID: "${CABINET_ID}"
-      CABINET_KEY: "${CABINET_KEY}" # injecté depuis .env (gitignoré), jamais en dur
+      BORNE_TOKEN: "${BORNE_TOKEN}" # injecté depuis .env (gitignoré), jamais en dur
     ports:
       - "3334:3001"
     volumes:

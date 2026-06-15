@@ -17,11 +17,11 @@ export interface ScoreRegistered {
 
 export async function postScore(p: ScorePayload): Promise<ScoreRegistered> {
   const base = process.env.GLOBAL_API_URL;
-  const key = process.env.CABINET_KEY;
-  const cabinetId = process.env.CABINET_ID ?? 'borne-dev';
-  if (!base || !key) throw new Error('GLOBAL_API_URL / CABINET_KEY manquants');
+  const token = process.env.BORNE_TOKEN;
+  if (!base || !token) throw new Error('GLOBAL_API_URL / BORNE_TOKEN manquants');
 
-  const body = JSON.stringify({ cabinetId, ...p });
+  // cabinetId déduit du token côté serveur global → plus dans le payload.
+  const body = JSON.stringify(p);
   // score borné au contrat [1, 99_999_999] (clamp fait par l'appelant — voir G2)
 
   const MAX = 3;
@@ -31,7 +31,7 @@ export async function postScore(p: ScorePayload): Promise<ScoreRegistered> {
     try {
       const res = await fetch(`${base}/v1/scores`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body,
         signal: ctrl.signal,
       });
