@@ -32,5 +32,6 @@ describe('return portal textures', () => {
     )
     expect(RETURN_PORTAL_TEXTURE_URL).toContain('fin_combat_vecna.png')
     expect(PORTAL_ENTER_TEXTURE_URL).toContain('upsidedown.jpg')
+    expect(RETURN_PORTAL_TEXTURE_URL).not.toBe(PORTAL_ENTER_TEXTURE_URL)
   })
 })
