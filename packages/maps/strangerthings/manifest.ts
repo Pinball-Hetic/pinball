@@ -104,4 +104,23 @@ export const manifest: MapManifest = {
     'eleven',
     'hawkins',
   ],
+  // ─── Rendu Three.js — éclairage original ST (état avant toute modification) ─
+  // Valeurs extraites du git avant les itérations de tuning Zelda.
+  // hemi et fill à intensity 0 : conservées pour UpsideDownAtmosphere qui les
+  // réanime (elle écrase les intensités via les refs lumières).
+  rendering: {
+    useEnvironment: false,
+    toneMappingExposure: 1.38,
+    colorDarken: 0.9,
+    environmentBlur: 0.04,
+    envIntensityMetallic: 1.0,
+    envIntensitySemi: 1.0,
+    envIntensityBase: 1.0,
+    lights: {
+      ambient: { color: 0xffffff, intensity: 0.25 },
+      hemi:    { sky: 0xffffff, ground: 0x111111, intensity: 0 },
+      dir:     { color: 0xffffff, intensity: 2.8, x: 0, y: 0.48, z: 0.88 },
+      fill:    { color: 0xffffff, intensity: 0,   x: 0, y: 1,    z: -1   },
+    },
+  },
 }
