@@ -1,5 +1,8 @@
-import type { BossDefinition } from "@pinball/game-engine";
-import type { BossId } from "@pinball/game-engine";
+import {
+  getBossById,
+  type BossDefinition,
+  type BossId,
+} from "@pinball/game-engine";
 import { percentToGain } from "./pinballAudioVolumes";
 import type { BossFightMusicController } from "./BossFightMusicController";
 import type { EarlySoundController } from "./EarlySoundController";
@@ -15,10 +18,20 @@ type PendingBossResume = {
   };
 };
 
-/** Orchestrateur early-sound ↔ musique boss (exclusif, arrêt instant). */
+/**
+ * Orchestrateur musique playfield — une seule piste à la fois (early ou boss).
+ *
+ * États :
+ * - idle → early-sound (attract / début de partie)
+ * - boss_fight → boucle revealSoundUrl du boss actif
+ * - boss_bridge → musique du boss vaincu conservée jusqu'au reveal du boss suivant
+ *   (ex. spawnDG entre mort du Demogorgon et apparition de Vecna)
+ */
 export class PlayfieldMusicDirector {
   private pendingBossResume: PendingBossResume | null = null;
   private bossFightEnded = true;
+  private musicBridgeActive = false;
+  private bridgeUntilBossId: BossId | null = null;
   private latePhaseActivated = false;
   private wantsEarly = false;
   private suppressEarlyUntilReset = false;
@@ -32,12 +45,20 @@ export class PlayfieldMusicDirector {
     this.wantsEarly = wants;
   }
 
+  /** True tant qu'une piste exclusive (early ou boss) doit tenir la main. */
+  private isExclusiveMusicHeld(): boolean {
+    return (
+      this.isBossFightActive() ||
+      this.musicBridgeActive ||
+      this.boss.isPlaying()
+    );
+  }
+
   private requestEarly(sync = false): void {
     if (
       !this.wantsEarly ||
       this.suppressEarlyUntilReset ||
-      this.boss.isPlaying() ||
-      this.isBossFightActive()
+      this.isExclusiveMusicHeld()
     ) {
       return;
     }
@@ -56,7 +77,30 @@ export class PlayfieldMusicDirector {
     this.early.stopInstant();
   }
 
+  private clearBridge(): void {
+    this.musicBridgeActive = false;
+    this.bridgeUntilBossId = null;
+  }
+
+  private clearBossMusicState(): void {
+    this.boss.stopInstant();
+    this.pendingBossResume = null;
+    this.bossFightEnded = true;
+    this.latePhaseActivated = false;
+    this.clearBridge();
+  }
+
+  private buildLatePhase(def: BossDefinition) {
+    if (!def.latePhaseSoundUrl || def.latePhaseHitThreshold == null) return undefined;
+    return {
+      url: def.latePhaseSoundUrl,
+      volume: percentToGain(def.latePhaseSoundVolume ?? 100),
+      hitThreshold: def.latePhaseHitThreshold,
+    };
+  }
+
   onBossReveal(def: BossDefinition): void {
+    this.clearBridge();
     this.bossFightEnded = false;
     this.latePhaseActivated = false;
     this.haltEarlyForBossHandoff();
@@ -65,16 +109,13 @@ export class PlayfieldMusicDirector {
 
     const url = def.revealSoundUrl;
     const volume = percentToGain(def.revealSoundVolume ?? 100);
-    const latePhase =
-      def.latePhaseSoundUrl && def.latePhaseHitThreshold != null
-        ? {
-            url: def.latePhaseSoundUrl,
-            volume: percentToGain(def.latePhaseSoundVolume ?? 100),
-            hitThreshold: def.latePhaseHitThreshold,
-          }
-        : undefined;
 
-    this.pendingBossResume = { url, volume, bossId: def.id, latePhase };
+    this.pendingBossResume = {
+      url,
+      volume,
+      bossId: def.id,
+      latePhase: this.buildLatePhase(def),
+    };
     void this.boss.start(url, volume);
   }
 
@@ -96,26 +137,30 @@ export class PlayfieldMusicDirector {
     void this.boss.start(latePhase.url, latePhase.volume);
   }
 
-  onBossFightEnd(bossId: BossId): void {
-    void bossId;
-    this.boss.stopInstant();
-    this.pendingBossResume = null;
-    this.bossFightEnded = true;
-    this.latePhaseActivated = false;
+  onBossFightEnd(bossId: BossId, bosses: BossDefinition[]): void {
+    const def = getBossById(bosses, bossId);
+    const canBridge =
+      def?.keepMusicUntilBossReveal != null &&
+      this.pendingBossResume?.bossId === bossId &&
+      this.boss.isPlaying();
+
+    if (canBridge) {
+      this.bossFightEnded = true;
+      this.latePhaseActivated = false;
+      this.musicBridgeActive = true;
+      this.bridgeUntilBossId = def!.keepMusicUntilBossReveal!;
+      return;
+    }
+
+    this.clearBossMusicState();
     this.early.clearHandoffBlock();
     this.requestEarly();
   }
 
   onDrain(options: { gameOver: boolean }): void {
-    // Vie perdue mais combat boss en cours : la musique continue sans coupure.
-    if (!options.gameOver && this.isBossFightActive()) return;
+    if (!options.gameOver && this.isExclusiveMusicHeld()) return;
 
-    this.boss.stopInstant();
-    if (options.gameOver) {
-      this.pendingBossResume = null;
-      this.bossFightEnded = true;
-      this.latePhaseActivated = false;
-    }
+    this.clearBossMusicState();
     this.early.clearHandoffBlock();
     this.requestEarly();
   }
@@ -131,20 +176,31 @@ export class PlayfieldMusicDirector {
 
   onResetGame(): void {
     this.suppressEarlyUntilReset = false;
-    this.boss.stopInstant();
-    this.pendingBossResume = null;
-    this.bossFightEnded = true;
-    this.latePhaseActivated = false;
+    this.clearBossMusicState();
     this.early.resetForNewGame();
     this.requestEarly();
   }
 
   onGameOverSting(): void {
     this.suppressEarlyUntilReset = true;
-    this.boss.stopInstant();
-    this.pendingBossResume = null;
-    this.bossFightEnded = true;
-    this.latePhaseActivated = false;
+    this.clearBossMusicState();
     this.early.release();
+  }
+
+  /** Exposé pour les tests — vérifie qu'une seule source musique est active. */
+  getDebugState(): {
+    bossFightEnded: boolean;
+    musicBridgeActive: boolean;
+    bridgeUntilBossId: BossId | null;
+    pendingBossId: BossId | null;
+    bossPlaying: boolean;
+  } {
+    return {
+      bossFightEnded: this.bossFightEnded,
+      musicBridgeActive: this.musicBridgeActive,
+      bridgeUntilBossId: this.bridgeUntilBossId,
+      pendingBossId: this.pendingBossResume?.bossId ?? null,
+      bossPlaying: this.boss.isPlaying(),
+    };
   }
 }
