@@ -59,6 +59,7 @@ services:
       - ./apps/playfield/public:/app/apps/playfield/public
       - ./packages/game-engine/src:/app/packages/game-engine/src
       - ./packages/shared-types/src:/app/packages/shared-types/src
+      - ./packages/maps:/app/packages/maps
     depends_on:
       - server
     command: bun run dev
