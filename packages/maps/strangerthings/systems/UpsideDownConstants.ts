@@ -1,3 +1,10 @@
+import { mapAsset } from '../manifest';
+
+/** Cinématique entrée Upside Down (premier passage portail). */
+export const PORTAL_ENTER_TEXTURE_URL = mapAsset('playfield/upsidedown.jpg');
+/** Cinématique retour après victoire Vecna (passage balle dans le trou). */
+export const RETURN_PORTAL_TEXTURE_URL = mapAsset('playfield/fin_combat_vecna.png');
+
 export const UPSIDE_DOWN_TRANSITION_DURATION = 4;
 export const UPSIDE_DOWN_TRANSITION_BLACKOUT = 0.12;
 export const UPSIDE_DOWN_TRANSITION_REVEAL = 0.55;
