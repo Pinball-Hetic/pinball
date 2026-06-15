@@ -48,6 +48,7 @@ export class CameraBillboardSprite {
         config.textureUrl,
         (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
+          tex.userData.url = config.textureUrl;
           this.texture = tex;
           if (this.material) {
             this.material.map = tex;
@@ -100,6 +101,40 @@ export class CameraBillboardSprite {
     if (this.material) {
       this.material.opacity = THREE.MathUtils.clamp(opacity, 0, 1);
     }
+  }
+
+  /** Charge et affiche une autre texture (ex. fin de combat Vecna). */
+  setTextureUrl(url: string): Promise<void> {
+    const current = this.texture?.userData?.url as string | undefined;
+    if (current === url && this.imageReady) return Promise.resolve();
+
+    const loader = new THREE.TextureLoader();
+    this.imageReady = false;
+    const load = new Promise<void>((resolve) => {
+      loader.load(
+        url,
+        (tex) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.userData.url = url;
+          const prev = this.texture;
+          this.texture = tex;
+          if (this.material) {
+            this.material.map = tex;
+            this.material.needsUpdate = true;
+          }
+          if (prev && prev !== tex) prev.dispose();
+          this.imageReady = true;
+          resolve();
+        },
+        undefined,
+        () => {
+          this.imageReady = true;
+          resolve();
+        },
+      );
+    });
+    this.loadPromise = load;
+    return load;
   }
 
   show(): void {
