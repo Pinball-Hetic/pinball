@@ -2,6 +2,8 @@ import type { BossDefinition } from "@pinball/game-engine";
 import type { BossHudState, ScorePop } from "../../hooks/useGameState";
 import ScorePopFeedback from "./ScorePopFeedback";
 import PlungerPowerBar from "./PlungerPowerBar";
+import BossHealthBar from "./BossHealthBar";
+import { bossHealthBarTheme } from "./bossHealthHud";
 
 export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
 
@@ -220,22 +222,39 @@ export default function GameOverlay({
               </div>
             )}
 
-            {!hud.victory && (
-              <div
-                className={`pointer-events-none absolute inset-x-0 ${bossBottomClass(def.hud.bottomClass, portraitFill)} z-10 flex justify-center`}
-              >
+            {!hud.victory && (() => {
+              const healthTheme = def.hud.healthBar ? bossHealthBarTheme(bossId) : null;
+              const bottomClass = bossBottomClass(def.hud.bottomClass, portraitFill);
+
+              if (healthTheme) {
+                return (
+                  <BossHealthBar
+                    label={def.hud.label}
+                    hits={hud.hits}
+                    maxHits={def.targetHits}
+                    theme={healthTheme}
+                    bottomClass={bottomClass}
+                  />
+                );
+              }
+
+              return (
                 <div
-                  className={`rounded border ${def.hud.borderClass} bg-black/70 px-4 py-2 text-center font-mono backdrop-blur-sm`}
+                  className={`pointer-events-none absolute inset-x-0 ${bottomClass} z-10 flex justify-center`}
                 >
-                  <p className={`text-[10px] uppercase tracking-[0.35em] ${def.hud.subtitleClass}`}>
-                    {def.hud.label}
-                  </p>
-                  <p className={`mt-1 text-xl font-bold tabular-nums ${def.hud.hitsClass}`}>
-                    {hud.hits} / {def.targetHits}
-                  </p>
+                  <div
+                    className={`rounded border ${def.hud.borderClass} bg-black/70 px-4 py-2 text-center font-mono backdrop-blur-sm`}
+                  >
+                    <p className={`text-[10px] uppercase tracking-[0.35em] ${def.hud.subtitleClass}`}>
+                      {def.hud.label}
+                    </p>
+                    <p className={`mt-1 text-xl font-bold tabular-nums ${def.hud.hitsClass}`}>
+                      {hud.hits} / {def.targetHits}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {hud.victory && (
               <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
