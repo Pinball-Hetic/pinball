@@ -240,6 +240,7 @@ export function createModule(): MapModule {
         const ball = ctx.ball
         const mesh = ctx.ballMesh
         if (ball && mesh && transition && !transition.isActive()) {
+          bossReveals?.endAllFights()
           portal?.hideForCinematic()
           ball.holdAtNormalReturnSpawn()
           ball.syncToMesh(mesh)
