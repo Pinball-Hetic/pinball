@@ -3,6 +3,9 @@
  *
  * Volume final = master × bus × niveau_du_son
  *
+ * Boost global ~35 % (test borne flipper — niveaux précédents trop bas).
+ * Les ratios music/sfx/cinematic entre eux sont conservés.
+ *
  * Exemples :
  * - Musique trop forte → baisser `music` (ex. 50)
  * - Son d.ambiance faible → monter `cinematic` (volumes spécifiques fournis par la map)
@@ -11,16 +14,16 @@
 
 /** Volume global + bus par catégorie. */
 export const AUDIO_VOLUME = {
-  master: 80,
-  music: 65,
+  master: 100,
+  music: 85,
   cinematic: 100,
-  sfx: 50,
+  sfx: 68,
 } as const;
 
 /** Niveau fin par fichier (0–100+, relatif à son bus ; >100 = boost). */
 export const SOUND_VOLUME = {
   earlySound: 100,
-  gameOver: 85,
+  gameOver: 100,
 } as const;
 
 export type SoundVolumeKey = keyof typeof SOUND_VOLUME;
