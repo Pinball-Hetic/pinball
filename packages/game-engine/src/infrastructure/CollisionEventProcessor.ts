@@ -144,6 +144,12 @@ export class CollisionEventProcessor {
   }
 
   process(eventQueue: RAPIER.EventQueue, gameState: string): void {
+    // ⚠️ Rapier 0.14 (wasm-bindgen) : muter des rigid bodies depuis le callback
+    //    drainCollisionEvents provoque "recursive use / unsafe aliasing".
+    //    On collecte les actions qui touchent au monde physique pendant le drain,
+    //    et on les exécute APRÈS que le drain est terminé.
+    const deferred: Array<() => void> = [];
+
     eventQueue.drainCollisionEvents((h1, h2, started) => {
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
@@ -197,7 +203,8 @@ export class CollisionEventProcessor {
         const idx = parseInt(role.split('_')[1], 10);
         const pos = this.layout.bumpers[idx];
         if (pos) {
-          this.bumperHitUC.execute(idx, pos);
+          // Déféré : applyEjectionForce mute le rigid body de la bille.
+          deferred.push(() => this.bumperHitUC.execute(idx, pos));
         }
       }
 
@@ -206,18 +213,25 @@ export class CollisionEventProcessor {
         const now = performance.now();
         if (now - this.bumpLastHitMs[side] >= BUMP_HIT_COOLDOWN_MS) {
           this.bumpLastHitMs[side] = now;
-          this.bumpHitUC.execute(side, BUMP_EJECT_SCALE);
+          // Déféré : applyScaledEjectionForce mute le rigid body.
+          deferred.push(() => this.bumpHitUC.execute(side, BUMP_EJECT_SCALE));
         }
       }
 
       if (role === 'bottom_out' && gameState === 'playing') {
-        this.bottomOutBallUC.execute();
-        this.resetDropTargets();
+        // Déféré : resetToSpawn mute position/vitesse du rigid body.
+        deferred.push(() => {
+          this.bottomOutBallUC.execute();
+          this.resetDropTargets();
+        });
       }
 
       if (role === 'drain' && gameState === 'playing') {
-        this.drainBallUC.execute();
-        this.resetDropTargets();
+        // Déféré : resetToSpawn mute position/vitesse du rigid body.
+        deferred.push(() => {
+          this.drainBallUC.execute();
+          this.resetDropTargets();
+        });
       }
 
       if ((role === 'slingshot_left' || role === 'slingshot_right') && gameState === 'playing') {
@@ -237,6 +251,12 @@ export class CollisionEventProcessor {
         this.handleDropTarget(role);
       }
     });
+
+    // Exécution des actions différées : le drain est terminé, le monde Rapier
+    // n'a plus de borrow actif → les mutations de corps sont sûres.
+    for (const action of deferred) {
+      action();
+    }
   }
 
   resetDropTargets(): void {
