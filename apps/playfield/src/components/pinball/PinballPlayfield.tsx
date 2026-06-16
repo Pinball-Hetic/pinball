@@ -55,6 +55,7 @@ import {
   playfieldCameraUpForMode,
   parsePlayfieldViewMode,
   refitPlayfieldCamera,
+  configureSurfaceCoefficients,
   type PlayfieldCamFit,
   type PlayfieldCamera,
   DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING,
@@ -86,6 +87,10 @@ const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 // Résolu au niveau module (MAP_ID = constante build-time) → permet un garde
 // NO SIGNAL en 1ère ligne du composant, avant tout hook.
 const RESOLVED_MAP = getMapPackage(MAP_ID);
+// Courbe de surface du tapis = celle de la map (spawns, colliders, cadrage
+// caméra en dérivent). Sans ça, surfaceYAtZ resterait sur la courbe ST par
+// défaut → balle qui flotte/s'enfonce sur une map de hauteur/tilt différent.
+if (RESOLVED_MAP) configureSurfaceCoefficients(RESOLVED_MAP.layout.geometry.coefficients);
 // Définitions de boss de la map active (point de composition unique).
 const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
 const MAP_CLIPS = RESOLVED_MAP?.manifest.clips;
