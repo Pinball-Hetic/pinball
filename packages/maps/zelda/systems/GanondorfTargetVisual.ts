@@ -60,8 +60,8 @@ export class GanondorfTargetVisual {
     anchor.add(rig);
     this.rig = rig;
 
-    // Lumière orange chaude — ajoutée à la scène SEULEMENT pendant le fight.
-    this.glowLight = new THREE.PointLight(0xff8800, 0, 0.38, 2);
+    // Lumière violette — ajoutée à la scène SEULEMENT pendant le fight.
+    this.glowLight = new THREE.PointLight(0xaa00ff, 0, 0.38, 2);
     this.glowLight.position.y = 0.03;
 
     this.loadPromise = this.loadModel();
