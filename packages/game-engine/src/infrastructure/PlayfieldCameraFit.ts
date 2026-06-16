@@ -217,24 +217,6 @@ function playfieldCornersInView(
   return true;
 }
 
-function playfieldNdcXWithinLimit(
-  camera: THREE.PerspectiveCamera,
-  fit: PlayfieldCamFit,
-  camPos: THREE.Vector3,
-  ndcXLimit: number,
-): boolean {
-  return playfieldNdcMaxAbsAxis(camera, fit, camPos, 'x') <= ndcXLimit;
-}
-
-function playfieldNdcYWithinLimit(
-  camera: THREE.PerspectiveCamera,
-  fit: PlayfieldCamFit,
-  camPos: THREE.Vector3,
-  ndcYLimit: number,
-): boolean {
-  return playfieldNdcMaxAbsAxis(camera, fit, camPos, 'y') <= ndcYLimit;
-}
-
 function playfieldNdcCoversViewport(
   camera: THREE.PerspectiveCamera,
   fit: PlayfieldCamFit,
@@ -269,26 +251,6 @@ function distanceForCameraFit(
     else lo = mid;
   }
   return hi;
-}
-
-function distanceForPortraitWidthFirstView(
-  camera: THREE.PerspectiveCamera,
-  fit: PlayfieldCamFit,
-  ndcXLimit: number,
-): number {
-  return distanceForCameraFit(camera, fit, (camPos) =>
-    playfieldNdcXWithinLimit(camera, fit, camPos, ndcXLimit),
-  );
-}
-
-function distanceForPortraitHeightContainView(
-  camera: THREE.PerspectiveCamera,
-  fit: PlayfieldCamFit,
-  ndcYLimit: number,
-): number {
-  return distanceForCameraFit(camera, fit, (camPos) =>
-    playfieldNdcYWithinLimit(camera, fit, camPos, ndcYLimit),
-  );
 }
 
 function distanceForPortraitCoverView(
