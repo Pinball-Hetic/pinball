@@ -44,7 +44,11 @@ export const manifest: MapManifest = {
     milestone_big: 'milestone',
   },
   // Assets préchargés par la page playfield (URL publique /maps/<id>/…).
-  preload: [mapAsset('playfield/demogorgon.glb'), mapAsset('playfield/demogorgon.png')],
+  preload: [
+    mapAsset('playfield/demogorgon.glb'),
+    mapAsset('playfield/demogorgon.png'),
+    mapAsset('playfield/fin_combat_vecna.png'),
+  ],
   // Sons d'event de la map (joués via ctx.playSound(id)).
   sounds: {
     upside_down_appear: { url: mapAsset('audio/apparitionUpsideDown.mp3'), volume: 280 },

@@ -97,7 +97,9 @@ const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
 const MAP_CLIPS = RESOLVED_MAP?.manifest.clips;
 // URLs de sons spécifiques à la map (reveal boss + sons d'event) à précharger.
 const MAP_SOUND_URLS: string[] = [
-  ...MAP_BOSSES.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
+  ...MAP_BOSSES.flatMap((b) =>
+    [b.revealSoundUrl, b.latePhaseSoundUrl].filter((u): u is string => !!u),
+  ),
   ...Object.values(RESOLVED_MAP?.manifest.sounds ?? {}).map((s) => s.url),
 ];
 

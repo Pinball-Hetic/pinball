@@ -7,7 +7,11 @@ import {
 import { getBossById, type BossDefinition } from "@pinball/game-engine";
 import type { GameEvent, GameEventListener } from "@pinball/game-engine";
 import type { GameStats } from "@pinball/shared-types";
-import { handlePinballSoundEvent, playGameOverSound } from "../audio/pinballAudio";
+import {
+  handlePinballSoundEvent,
+  onMusicDrain,
+  onMusicGameOver,
+} from "../audio/pinballAudio";
 import { playfieldToScreenPercent, jitterScreenPoint } from "../utils/playfieldScreen";
 
 export type GameState = "idle" | "playing" | "game_over";
@@ -275,7 +279,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     setLives(newLives);
     if (newLives <= 0) {
       hideBall();
-      playGameOverSound();
+      onMusicGameOver();
       updateGameState("game_over");
       const stats: GameStats = {
         maxCombo: maxComboRef.current,
@@ -289,6 +293,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       };
       callbacks?.onGameOver?.(scoreRef.current, stats);
     } else {
+      onMusicDrain({ gameOver: false });
       updateGameState("idle");
       callbacks?.onLifeLost?.(newLives);
     }
