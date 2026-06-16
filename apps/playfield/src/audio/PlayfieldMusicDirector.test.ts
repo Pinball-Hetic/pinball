@@ -68,6 +68,7 @@ const VECNA = makeBossDef({
   revealSoundUrl: VECNA_THEME,
   latePhaseSoundUrl: WIN_MUSIC,
   latePhaseHitThreshold: 7,
+  keepMusicUntilReturnPortal: true,
 });
 
 const BOSSES = [DEMOGORGON, VECNA];
@@ -302,20 +303,26 @@ describe("PlayfieldMusicDirector", () => {
       assertNoMusicOverlap(early, boss);
     });
 
-    test("BOSS_FIGHT_END vecna (sans pont) reprend early", () => {
+    test("victoire d'un boss sans keepMusicUntilReturnPortal reprend early", () => {
+      const noHoldBoss = makeBossDef({
+        id: "nohold",
+        colliderRole: "nohold_target",
+        revealSoundUrl: VECNA_THEME,
+      });
       const { director, early, boss } = makeDirector();
-      director.onBossReveal(VECNA);
+      director.onBossReveal(noHoldBoss);
       early.log.length = 0;
       early.handoffBlocked = false;
 
-      director.onBossFightEnd("vecna", BOSSES);
+      director.onBossFightEnd("nohold", [noHoldBoss]);
 
       expect(boss.playing).toBe(false);
+      expect(director.getDebugState().postVictoryMusicHeld).toBe(false);
       expect(early.log).toContain("clearHandoffBlock");
       expect(early.log).toContain("engage");
     });
 
-    test("BOSS_FIGHT_END vecna après win-music conserve la piste jusqu'au retour portail", () => {
+    test("victoire boss keepMusicUntilReturnPortal conserve la piste (data-driven)", () => {
       const { director, early, boss } = makeDirector();
       director.onBossReveal(VECNA);
       director.onBossTargetHit(VECNA, 7);

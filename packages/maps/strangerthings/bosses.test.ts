@@ -23,6 +23,11 @@ describe('bossDefinitions', () => {
     expect(vecna.latePhaseHitThreshold).toBe(7)
     expect(vecna.targetHits).toBe(10)
   })
+
+  test('vecna keeps its music until the return portal cinematic ends', () => {
+    expect(getBossDefinition('vecna').keepMusicUntilReturnPortal).toBe(true)
+    expect(getBossDefinition('demogorgon').keepMusicUntilReturnPortal).toBeUndefined()
+  })
 })
 
 describe('return portal textures', () => {
