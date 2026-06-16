@@ -1,5 +1,5 @@
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
-import { GanondorfReveal, BossRevealOrchestrator } from '../systems'
+import { GanondorfReveal, BossRevealOrchestrator, SacredRealmAtmosphere } from '../systems'
 
 // Module de comportement Zelda. Gère les compteurs, les milestones,
 // les événements boss et le système visuel Ganondorf.
@@ -17,6 +17,7 @@ export function createModule(): MapModule {
 
   let ganondorfReveal: GanondorfReveal | null = null
   let bossReveals: BossRevealOrchestrator | null = null
+  let sacredRealm: SacredRealmAtmosphere | null = null
 
   return {
     setup(ctx: MapContext): void {
@@ -34,6 +35,19 @@ export function createModule(): MapModule {
 
       bossReveals = new BossRevealOrchestrator()
       bossReveals.register(ganondorfReveal)
+
+      sacredRealm = new SacredRealmAtmosphere()
+      sacredRealm.setup({
+        root: ctx.root,
+        lighting: {
+          scene: ctx.scene,
+          renderer: ctx.lighting.renderer,
+          ambient: ctx.lighting.ambient,
+          hemi: ctx.lighting.hemi,
+          dir: ctx.lighting.dir,
+          fill: ctx.lighting.fill,
+        },
+      })
     },
 
     async preload(): Promise<void> {
@@ -46,6 +60,7 @@ export function createModule(): MapModule {
 
     onGameEvent(e: GameEvent): void {
       bossReveals?.onGameEvent(e)
+      sacredRealm?.onGameEvent(e)
 
       const ctx = ctxRef
       if (!ctx) return
@@ -164,6 +179,7 @@ export function createModule(): MapModule {
 
     update(dt: number): void {
       bossReveals?.update(dt)
+      sacredRealm?.update(dt)
 
       const ctx = ctxRef
       if (!ctx) return
@@ -196,11 +212,11 @@ export function createModule(): MapModule {
     },
 
     releaseWorld(): void {
-      // TODO: réinitialiser l'atmosphère Sacred Realm.
+      sacredRealm?.reset()
     },
 
     resetWorld(): void {
-      // TODO: réinitialiser portail + atmosphère.
+      sacredRealm?.reset()
     },
 
     onGameReset(): void {
@@ -211,12 +227,15 @@ export function createModule(): MapModule {
       hintFired.clear()
       ctxRef?.setMapState({ ganondorfs: 0, portals: 0, hetic: 0 })
       bossReveals?.endAllFights()
+      sacredRealm?.reset()
     },
 
     dispose(): void {
       bossReveals?.dispose()
       bossReveals = null
       ganondorfReveal = null
+      sacredRealm?.dispose()
+      sacredRealm = null
       ctxRef = null
     },
   }
