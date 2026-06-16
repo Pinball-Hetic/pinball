@@ -11,6 +11,11 @@ COPY . .
 # Installation avec bun
 RUN bun install
 
+# NEXT_PUBLIC_* est inliné au BUILD par `next build` (prod) → doit être un
+# build-arg, pas un environment runtime. Défaut "direct" = comportement actuel.
+ARG NEXT_PUBLIC_KEYBOARD_MODE=direct
+ENV NEXT_PUBLIC_KEYBOARD_MODE=$NEXT_PUBLIC_KEYBOARD_MODE
+
 # Build de l'app Next.js
 RUN bun run --filter @pinball/playfield build
 

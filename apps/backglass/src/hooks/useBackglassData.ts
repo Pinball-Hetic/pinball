@@ -70,8 +70,17 @@ export function useBackglassData() {
       fetchStats()
     })
 
+    // Les claims arrivent async (téléphone, après la partie, depuis n'importe
+    // quelle borne) : poll périodique pour faire apparaître les pseudos
+    // réclamés. Le socket leaderboard:refresh couvre le rafraîchissement
+    // immédiat post-partie locale ; le poll rattrape les claims tardifs.
+    const poll = window.setInterval(() => {
+      fetchLeaderboard()
+    }, 30_000)
+
     return () => {
       socket.disconnect()
+      window.clearInterval(poll)
     }
   }, [])
 

@@ -17,6 +17,16 @@ import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { mapAsset } from '../manifest';
 
 const TEXTURE_URL = mapAsset('playfield/upsidedown.jpg');
+const BILLBOARD_DEPTH = 0.38;
+const BILLBOARD_PAD = 1.12;
+
+function fullScreenSpriteScale(camera: THREE.Camera, depth: number): THREE.Vector3 {
+  const cam = camera as THREE.PerspectiveCamera;
+  const vFov = (cam.fov * Math.PI) / 180;
+  const height = 2 * depth * Math.tan(vFov / 2) * BILLBOARD_PAD;
+  const width = height * cam.aspect * BILLBOARD_PAD;
+  return new THREE.Vector3(width, height, 1);
+}
 
 type Phase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore' | 'tremor';
 
@@ -73,7 +83,13 @@ export class UpsideDownTransition {
       ),
     });
 
-    this.billboard.mount(config.scene, config.camera, { textureUrl: TEXTURE_URL });
+    this.billboard.mount(config.scene, config.camera, {
+      textureUrl: TEXTURE_URL,
+      center: new THREE.Vector2(0.5, 0.5),
+      scale: fullScreenSpriteScale(config.camera, BILLBOARD_DEPTH),
+      depth: BILLBOARD_DEPTH,
+      yOffset: 0,
+    });
   }
 
   isActive(): boolean {

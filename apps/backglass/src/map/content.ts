@@ -4,15 +4,27 @@ import { getBackglassContent } from '@pinball/maps/backglass'
 // Résolution UNIQUE du contenu backglass de la map active (build-time via
 // NEXT_PUBLIC_MAP_ID) par le registry. Les composants/hooks consomment ces
 // exports — aucun n'importe @pinball/map-* en direct.
-const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID
+export const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID
 
 const content = getBackglassContent(MAP_ID)
 
-if (!content) {
-  // L'app backglass est buildée pour une map donnée : un contenu absent est
-  // une erreur de config (échoue tôt plutôt que crash silencieux au render).
-  throw new Error(`[backglass] aucun contenu backglass pour la map "${MAP_ID}"`)
-}
+// Robustesse : une map sans contenu backglass (id inconnu / surface absente)
+// ne doit PAS crasher — la page gate sur `hasMapContent` et affiche NO SIGNAL.
+// Les exports tombent sur des no-op pour ne pas casser les imports statiques
+// des hooks/composants montés avant le gate.
+export const hasMapContent = content != null
+
+const EMPTY = {
+  JoyceWall: () => null,
+  SideArt: () => null,
+  renderMapTakeover: () => null,
+  clipBehavior: {},
+  eventTakeovers: {},
+  counterLabels: {},
+  clips: {},
+  backglassTheme: {},
+  backglassThemeAlternate: {},
+} as unknown as NonNullable<ReturnType<typeof getBackglassContent>>
 
 export const {
   JoyceWall,
@@ -24,4 +36,4 @@ export const {
   clips,
   backglassTheme,
   backglassThemeAlternate,
-} = content
+} = content ?? EMPTY

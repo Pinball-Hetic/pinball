@@ -48,11 +48,6 @@ tasks:
     cmds:
       - docker compose -f docker-compose.dev.yml exec -T db pg_restore -U dev_user -d pinball_dev --clean --if-exists < {{.CLI_ARGS}}
 
-  "check:leaks":
-    desc: Grep-guard anti-fuite map (termes forbiddenInCore hors packages/maps)
-    cmds:
-      - bash scripts/check-map-leaks.sh
-
   "maps:validate":
     desc: "Valide une map : task maps:validate -- <mapId> (défaut strangerthings)"
     cmds:

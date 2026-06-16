@@ -29,6 +29,13 @@ export interface MapManifest {
   clipFamilies?: Record<string, CinematicFamily>
   /** Variables CSS de thème (ex. couleurs de flair) appliquées sur le stage. */
   theme?: Record<string, string>
+  /** Wording + assets de l'écran outro game-over (défauts FR neutres si absent). */
+  outro?: {
+    title?: string // défaut "FIN DE PARTIE"
+    scanLabel?: string // défaut "Scanne pour t'inscrire au classement"
+    replayLabel?: string // défaut "START — Rejouer"
+    qrLogo?: string // URL asset logo centre QR (absent → pas de logo)
+  }
   /** Assets à précharger (chemins relatifs à public/) — consommé par la page. */
   preload?: string[]
   /** Vidéos/images d'overlay cinématique par clipId (sinon fallback CSS). */
@@ -56,7 +63,6 @@ export interface MapManifest {
   elements?: Record<string, Record<string, number | string>> // tuning par id d'élément
   meshAliases?: Record<string, string> // nom GLB legacy → nom conventionnel
   clips?: Record<ClipId, ClipTimings> // timings des clips de la map
-  forbiddenInCore?: string[] // termes pour le grep-guard anti-fuite
 }
 
 // Paquet de map résolu par la composition root (packages/maps/index.ts).

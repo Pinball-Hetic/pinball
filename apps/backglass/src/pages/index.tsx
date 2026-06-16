@@ -3,7 +3,7 @@ import { NoSignal } from '@pinball/ui'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
-import { JoyceWall, SideArt, backglassTheme, backglassThemeAlternate } from '@/map/content'
+import { JoyceWall, SideArt, backglassTheme, backglassThemeAlternate, hasMapContent, MAP_ID } from '@/map/content'
 import HallOfFame from '@/components/HallOfFame'
 import StatsBanner from '@/components/StatsBanner'
 import ReactorFx from '@/components/ReactorFx'
@@ -12,7 +12,21 @@ import RecapTakeover from '@/components/takeovers/RecapTakeover'
 import AttractScene from '@/components/takeovers/AttractScene'
 import CinematicTakeover from '@/components/takeovers/CinematicTakeover'
 
+// Garde NO SIGNAL : map sans contenu backglass → écran de veille (pas de
+// crash). Wrapper sans hook → le Stage (tous les hooks + art de la map) n'est
+// monté que si le contenu existe.
 export default function BackglassPage() {
+  if (!hasMapContent) {
+    return (
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <NoSignal reason={`BACKGLASS — MAP "${MAP_ID}" INTROUVABLE`} />
+      </div>
+    )
+  }
+  return <BackglassStage />
+}
+
+function BackglassStage() {
   const { entries, stats, connected } = useBackglassData()
   const { takeover, alternateWorld, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
     useBackglassTakeover(entries)

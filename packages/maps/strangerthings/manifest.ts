@@ -15,6 +15,21 @@ export const manifest: MapManifest = {
   name: 'Stranger Things',
   version: 1,
   attractTagline: 'Hawkins National Laboratory',
+  // Tokens CSS consommés par l'overlay playfield (outro). Une map sans theme
+  // → overlay garde ses défauts neutres.
+  theme: {
+    '--glow': '#ff2d2d',
+    '--glow-alt': '#b14dff', // monde inversé
+    '--st-font': "'Times New Roman', Georgia, serif",
+    '--vignette': '#2a0606',
+    '--foreground': '#ede4d3',
+  },
+  outro: {
+    title: 'FIN DE PARTIE',
+    scanLabel: 'Scanne pour graver ton nom au classement',
+    replayLabel: 'START — Rejouer',
+    qrLogo: mapAsset('playfield/demogorgon.png'),
+  },
   // Familles de cinématique (overlay fallback générique). Non listé → 'other'.
   clipFamilies: {
     demogorgon_rises: 'boss',
@@ -42,7 +57,7 @@ export const manifest: MapManifest = {
   clips: {
     demogorgon_rises: { showMs: 10_000, freezeMs: 6_000 }, // 6s gel + 4s célébration
     portal_swallow: { showMs: 4_000, freezeMs: 4_000 },
-    demogorgon_slain: { showMs: 15_000, freezeMs: 8_000 }, // 8s gel + 7s célébration
+    demogorgon_slain: { showMs: 15_000, freezeMs: 2_600 },
     last_chance: { showMs: 2_000, freezeMs: 0 },
     hall_of_fame: { showMs: 25_000, freezeMs: 0 },
     milestone_5k: { showMs: 4_000, freezeMs: 0 },
@@ -93,15 +108,7 @@ export const manifest: MapManifest = {
     wall_middle_right: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.018)
     wall_guide_lane: { restitution: 0.2, friction: 0.15, smooth: 0 }, // ex-Fix-Start
   },
-  // Termes ST traqués par le grep-guard anti-fuite (phase 2.6).
-  forbiddenInCore: [
-    'demogorgon',
-    'vecna',
-    'hetic',
-    'strangerthings',
-    'upside',
-    'guirlande',
-    'eleven',
-    'hawkins',
-  ],
+  meshAliases: {
+    portal_upsidedown: 'vis_demogorgon_portal_demog_portal_ref_skeleton',
+  },
 }

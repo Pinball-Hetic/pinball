@@ -1,8 +1,8 @@
 [app]
 id          = "pinball-hetic"
 name        = "Pinball Hetic"
-authors     = ["Anthony", "Hugo", "Florian", "Imxran"]
-description = "Borne de flipper pédagogique HETIC — 3D playfield (Three.js + Rapier), DMD score temps réel, backglass leaderboard."
+authors     = ["Anthony", "Hugo", "Florian", "Imrane"]
+description = "Three.js pinball across all three cabinet screens — physics-driven 3D playfield, live DMD score, backglass leaderboard."
 
 [deploy]
 strategy = "branch"
@@ -17,20 +17,25 @@ dmd       = { service = "dmd",       port = 3000 }
 file          = "docker-compose.yml"
 ready_timeout = 120
 
+[esp32.esp32]
+firmware   = "firmware/build/firmware.bin"
+chip       = "esp32"
+flash_addr = "0x0"
+baud       = 115200
+required   = false
+
 # ─────────────────────────────────────────────────────────────────────────────
-# ESP32 — désactivé tant que le firmware n'existe pas.
+# ESP32 — buttons firmware (firmware/src/main.cpp, protocole BTN série).
 #
-# Pour activer :
-#   1. Builder un binaire fusionné (esptool merge_bin) -> firmware/build/buttons.bin
-#   2. S'assurer que la borne expose un périphérique ESP32 enregistré sous le
-#      nom `buttons` (cf. dashboard Fliphetic, page System > ESP32).
-#   3. Décommenter le bloc ci-dessous.
-#   4. Garder `required = false` jusqu'à validation terrain ; passer à `true`
-#      ensuite pour bloquer le chargement si le flash échoue.
+# Confirmed cabinet facts (from the reference app running on the cab):
+#   - registered device name : "esp32"      (NOT "buttons")
+#   - host serial path        : /dev/ttyUSB0 (classic ESP32, CP2102 USB-UART)
+#   - flash baud              : 115200       (921600 drops the chip mid-write)
+#   - image                   : merged, flashed at 0x0
 #
-# [esp32.buttons]
-# firmware   = "firmware/build/buttons.bin"
-# chip       = "esp32"
-# flash_addr = "0x0"
-# required   = false
+# The merged binary is produced + committed by .github/workflows/firmware.yml
+# (esptool merge_bin -> firmware/build/firmware.bin). Keep `required = false`
+# until validated on the cab; switch to `true` afterwards to abort the load
+# when flashing fails.
+
 # ─────────────────────────────────────────────────────────────────────────────

@@ -107,29 +107,19 @@ export function createModule(): MapModule {
       bumperVisuals?.onGameEvent(e)
       garlands?.onGameEvent(e)
       atmosphere?.onGameEvent(e)
+      const ctx = ctxRef
+      if (e.type === 'BOSS_TARGET_HIT' && ctx) {
+        const boss = ctx.layout.bosses.find((b) => b.id === e.bossId)
+        if (boss && e.hitCount >= boss.targetHits) {
+          portal?.notifyBossDefeated(e.bossId, ctx.bossGateContext().alternateWorldActive)
+        }
+      }
       portal?.onGameEvent(e)
       bossReveals?.onGameEvent(e)
 
-      const ctx = ctxRef
       if (!ctx) return
-      // Cible verrouillée frappée : flash gris + « ENCORE X PTS » au DMD.
       if (e.type === 'BOSS_LOCKED_HIT') {
-        nestMarker?.flashLocked(e.bossId)
         ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
-      }
-      // Palier de score : cinématique + frisson garlands + shake.
-      if (e.type === 'MILESTONE') {
-        const clip =
-          e.threshold === 5000
-            ? 'milestone_5k'
-            : e.threshold === 15000
-              ? 'milestone_15k'
-              : e.threshold === 30000
-                ? 'milestone_30k'
-                : 'milestone_big'
-        ctx.playCinematic(clip, { value: e.threshold })
-        garlands?.celebrate()
-        ctx.screenShake(0.4)
       }
       // Entrée Upside Down confirmée (fin de transition) : portail actif +
       // baseline core + nid en mode Upside Down.
@@ -158,16 +148,14 @@ export function createModule(): MapModule {
       if (e.type === 'BOSS_TARGET_HIT' && e.bossId === 'demogorgon') {
         const demo = ctx.layout.bosses.find((b) => b.id === 'demogorgon')
         if (demo && e.hitCount >= demo.targetHits) {
-          // Slow-mo 400ms avant la cinématique de victoire (gel ensuite).
           ctx.physics.setTimeScale(1 / 3)
           window.setTimeout(() => {
             ctx.physics.setTimeScale(1)
             ctx.playCinematic('demogorgon_slain', {
-              // Reprise « avec un bang » : impulse radial depuis la cible.
               onEnd: () =>
                 ctx.ball?.applyEjectionForce({ x: demo.target.x, z: demo.target.z }),
             })
-          }, 400)
+          }, 200)
         }
       }
 
@@ -205,6 +193,7 @@ export function createModule(): MapModule {
         const ball = ctx.ball
         const mesh = ctx.ballMesh
         if (ball && mesh && transition && !transition.isActive()) {
+          portal?.hideForCinematic()
           ball.holdAtAlternateWorldSpawn()
           ball.syncToMesh(mesh)
           transition.start(
@@ -230,6 +219,7 @@ export function createModule(): MapModule {
         const ball = ctx.ball
         const mesh = ctx.ballMesh
         if (ball && mesh && transition && !transition.isActive()) {
+          portal?.hideForCinematic()
           ball.holdAtNormalReturnSpawn()
           ball.syncToMesh(mesh)
           transition.start(

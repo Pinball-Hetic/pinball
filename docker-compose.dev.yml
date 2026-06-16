@@ -28,6 +28,8 @@ services:
     environment:
       DATABASE_URL: "postgresql://dev_user:dev_password@db:5432/pinball_dev?schema=public"
       NODE_ENV: development
+      GLOBAL_API_URL: "${GLOBAL_API_URL}"
+      BORNE_TOKEN: "${BORNE_TOKEN}" # injecté depuis .env (gitignoré), jamais en dur
     ports:
       - "3334:3001"
     volumes:
@@ -49,6 +51,8 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
+      # dev = next dev lit NEXT_PUBLIC à runtime, build.args inutile ici
+      # (cf. docker-compose.yml prod pour l'inline au build).
       NEXT_PUBLIC_KEYBOARD_MODE: "simulate-esp32"
       NEXT_PUBLIC_MAP_ID: "zelda"
       NODE_OPTIONS: "--max-old-space-size=2560"
@@ -59,6 +63,7 @@ services:
       - ./apps/playfield/public:/app/apps/playfield/public
       - ./packages/game-engine/src:/app/packages/game-engine/src
       - ./packages/shared-types/src:/app/packages/shared-types/src
+      - ./packages/maps:/app/packages/maps
     depends_on:
       - server
     command: bun run dev
