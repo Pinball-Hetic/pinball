@@ -21,11 +21,14 @@ services:
       dockerfile: apps/server/Dockerfile
     environment:
       DATABASE_URL: "postgresql://user:password@db:5432/pinball?schema=public"
-      # API globale (scores mondiaux + claim QR). Injectés depuis .env racine
-      # (gitignoré). Absents → outro/QR + classement mondial dégradent en
-      # local-only (pas de crash, tout est catché côté serveur).
-      GLOBAL_API_URL: "${GLOBAL_API_URL}"
-      BORNE_TOKEN: "${BORNE_TOKEN}" # token brk_ par borne, jamais en dur
+      # API globale (scores mondiaux + claim QR). Sur la borne Fliphetic ces
+      # valeurs viennent des env vars par-app du dashboard (Operations), PAS du
+      # .env racine (gitignoré, absent de la borne). Le `:-` fournit un défaut
+      # vide : sans lui, compose émet un warning que l'override Fliphetic capture
+      # dans le YAML généré → load en échec. Absents → outro/QR + classement
+      # mondial dégradent en local-only (pas de crash, catché côté serveur).
+      GLOBAL_API_URL: "${GLOBAL_API_URL:-}"
+      BORNE_TOKEN: "${BORNE_TOKEN:-}" # token brk_ par borne, jamais en dur
     depends_on:
       db:
         condition: service_healthy
