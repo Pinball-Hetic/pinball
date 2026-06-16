@@ -37,14 +37,14 @@ services:
       start_period: 15s
 
   playfield:
+    # NEXT_PUBLIC_KEYBOARD_MODE est inliné au BUILD (next build) → build-arg,
+    # PAS environment runtime. `disabled` : l'ESP32 réel pilote les boutons,
+    # le clavier de jeu reste inerte (H debug toujours actif).
     build:
       context: .
       dockerfile: apps/playfield/Dockerfile
-    # Tant que le firmware ESP32 n'existe pas, le clavier doit dispatcher
-    # via le réseau (clavier → server → input-bridge mock → broadcast).
-    # Passer à `disabled` une fois l'ESP32 réel branché.
-    environment:
-      NEXT_PUBLIC_KEYBOARD_MODE: "simulate-esp32"
+      args:
+        NEXT_PUBLIC_KEYBOARD_MODE: "disabled"
     ports:
       - "0:3000"
     depends_on:
