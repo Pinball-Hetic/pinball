@@ -156,10 +156,11 @@ export class PlayfieldMusicDirector {
       return;
     }
 
-    // Victoire Vecna : win-music continue jusqu'à la fin de la ciné retour portail.
+    // Boss déclarant keepMusicUntilReturnPortal : la musique en cours continue
+    // jusqu'à la fin de la cinématique retour portail (cf. contrat BossDefinition,
+    // déclaré côté map — aucun id de boss en dur ici).
     if (
-      bossId === "vecna" &&
-      this.latePhaseActivated &&
+      def?.keepMusicUntilReturnPortal &&
       this.boss.isPlaying()
     ) {
       this.bossFightEnded = true;
