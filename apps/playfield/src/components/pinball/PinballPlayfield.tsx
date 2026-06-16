@@ -1637,8 +1637,11 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         if (leftFlipperPivot)  applyFlipperSwing(leftFlipperPivot,  leftSwing);
         if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
 
-        syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftFlipperBodyOffset);
-        syncFlipperBody(rightFlipperBody, rightFlipperObj, rightFlipperBodyOffset);
+        // Guard : si Rapier a paniqué, on ne touche plus aux corps physiques.
+        if (physicsWorld?.isAlive) {
+          syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftFlipperBodyOffset);
+          syncFlipperBody(rightFlipperBody, rightFlipperObj, rightFlipperBodyOffset);
+        }
 
         // ── Garantie de vitesse minimale ─────────────────────────────────────
         // Le contact cinématique est quasi nul près de la charnière.
@@ -1647,7 +1650,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         // physique fait déjà mieux.
         // Seuil normalisé en vitesse angulaire (rad/s) : 0.004 * 60 = 0.24 rad/s,
         // indépendant du fps (évite que le seuil ne se déclenche jamais à 120+ Hz).
-        if (ballPhysicsInst && gameStateRef.current === 'playing' && flipperZones) {
+        if (ballPhysicsInst && physicsWorld?.isAlive && gameStateRef.current === 'playing' && flipperZones) {
           const bp = ballPhysicsInst.body.translation();
           const bv = ballPhysicsInst.body.linvel();
           const { left: lz, right: rz } = flipperZones;
@@ -1693,7 +1696,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         });
       }
 
-      if (ballPhysicsInst && !freezeFrame) {
+      if (ballPhysicsInst && physicsWorld?.isAlive && !freezeFrame) {
         diag.verbose = debugVisibleRef.current;
         const lost = diag.update(ballPhysicsInst.body, gameStateRef.current);
         if (lost && gameStateRef.current === "playing") {
@@ -1710,8 +1713,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         mapModule?.applyBallMagnet?.();
       }
 
-      // Ball sync
-      if (ballMesh?.visible && ballPhysicsInst) {
+      // Ball sync — guard : si Rapier a paniqué, ne plus toucher aux corps.
+      if (ballMesh?.visible && ballPhysicsInst && physicsWorld?.isAlive) {
         if (bossIntroActive && gameStateRef.current === "playing") {
           ballPhysicsInst.body.setTranslation(
             { x: bossIntroBallPos.x, y: bossIntroBallPos.y, z: bossIntroBallPos.z },
