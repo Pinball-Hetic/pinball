@@ -110,6 +110,8 @@ export const bossDefinitions: BossDefinition[] = [
     latePhaseSoundUrl: mapAsset('audio/win-music.mp3'),
     latePhaseSoundVolume: 100,
     latePhaseHitThreshold: 7,
+    // win-music continue pendant la cinématique retour portail (photo fin Vecna).
+    keepMusicUntilReturnPortal: true,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,
