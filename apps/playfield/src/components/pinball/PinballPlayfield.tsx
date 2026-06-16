@@ -924,6 +924,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             addScore: (points, label) =>
               emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
             addLife: () => addLife(),
+            lives: () => livesRef.current,
+            totalScore: () => scoreRef.current,
             setMapState: (patch) => {
               Object.assign(mapStateExtraRef.current, patch);
             },
