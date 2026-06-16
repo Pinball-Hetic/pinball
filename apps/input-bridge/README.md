@@ -15,6 +15,9 @@ Texte UTF-8, séparateur `\n`, baudrate par défaut **115200**.
 | `TILT:TRIGGERED`            | `tilt`   `{ state:'TRIGGERED' }` |
 | `SENSOR:<ID>:<VALUE>`       | `sensor` `{ id, value: number }` |
 
+`<ID>` = bouton physique UPPER_SNAKE. `VALID_BUTTON_IDS` dérive
+`CABINET_BUTTONS` (`@pinball/shared-types`) — tout id inconnu est droppé.
+
 Lignes vides ignorées. Format invalide → log d'erreur, pas de crash.
 
 ## Variables d'environnement
@@ -22,7 +25,7 @@ Lignes vides ignorées. Format invalide → log d'erreur, pas de crash.
 | Var                  | Défaut                | Rôle                                                |
 | -------------------- | --------------------- | --------------------------------------------------- |
 | `INPUT_BRIDGE_MODE`  | `mock`                | `mock` (binding virtuel) ou `serial` (port réel).   |
-| `SERIAL_PATH`        | `/dev/MOCK_ESP32`     | Chemin du périphérique en mode serial.              |
+| `SERIAL_PATH`        | `/dev/MOCK_ESP32`     | Chemin du périphérique en mode serial (borne : `/dev/ttyUSB0`). |
 | `SERIAL_BAUD`        | `115200`              | Baudrate **runtime** (≠ baudrate de flash esptool). |
 | `SERVER_URL`         | `http://server:3001`  | URL Socket.io interne au réseau Docker.             |
 
@@ -47,20 +50,21 @@ Ouvre `SERIAL_PATH` via `@serialport/bindings-cpp`. Réessaie 60 fois
 toutes les 500 ms (≈30 s) pour tolérer le reboot USB de l'ESP32 après
 un flash Fliphetic.
 
-## Activer le mode serial dans Docker Compose
+## Mode serial sur la borne
 
-1. Brancher l'ESP32 ; identifier le chemin stable :
-   ```sh
-   ls /dev/serial/by-id/
-   ```
-2. Dans `docker-compose.yml`, décommenter le bloc `devices:` du service
-   `input-bridge` et remplacer le chemin source par le bon.
-3. Forcer `INPUT_BRIDGE_MODE=serial` (env override compose ou `.env`).
-4. `docker compose up -d input-bridge` puis :
-   ```sh
-   docker compose logs -f input-bridge
-   ```
-   Attendre `[serial] port opened`.
+`docker-compose.yml` (prod) est déjà câblé pour l'ESP32 réel :
+`INPUT_BRIDGE_MODE=serial`, `SERIAL_PATH=/dev/ttyUSB0`, et
+`devices: ["/dev/ttyUSB0:/dev/ttyUSB0"]`. Fliphetic flashe l'ESP32 →
+`/dev/ttyUSB0` présent **avant** `compose up` (cf. cycle CLAUDE.md).
+
+> ⚠️ Mapping device DUR : sur un poste **sans** ESP32, `compose up` de
+> `docker-compose.yml` échoue à créer ce conteneur (attendu : prod = borne).
+> Le dev (`docker-compose.dev.yml`) reste en `mock`, sans `devices`.
+
+Vérifier l'ouverture du port :
+```sh
+docker compose logs -f input-bridge   # attendre "[serial] port opened"
+```
 
 ## Dev local
 

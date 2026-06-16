@@ -9,13 +9,14 @@ import type {
   ButtonId,
   ButtonAction,
 } from '@pinball/shared-types';
+import { CABINET_BUTTONS } from '@pinball/shared-types';
 
 const MODE = process.env.INPUT_BRIDGE_MODE === 'serial' ? 'serial' : 'mock';
 const SERIAL_PATH = process.env.SERIAL_PATH ?? '/dev/MOCK_ESP32';
 const SERIAL_BAUD = Number(process.env.SERIAL_BAUD ?? '115200');
 const SERVER_URL = process.env.SERVER_URL ?? 'http://server:3001';
 
-const VALID_BUTTON_IDS: readonly ButtonId[] = ['LEFT', 'RIGHT', 'PLUNGER', 'START'];
+const VALID_BUTTON_IDS: readonly ButtonId[] = CABINET_BUTTONS.map((b) => b.id);
 
 // Référence module-level vers le port ouvert, assignée dans main(). Le handler
 // `dev:simulate-button` (déclaré tôt) la lit paresseusement pour injecter du
