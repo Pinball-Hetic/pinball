@@ -1,9 +1,8 @@
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
+import { GanondorfReveal, BossRevealOrchestrator } from '../systems'
 
-// Module de comportement Zelda. Scaffold minimal : gère les compteurs,
-// les milestones, et les événements boss. Les systèmes visuels Zelda
-// (atmosphère Sacred Realm, effets Triforce, etc.) sont à implémenter
-// dans packages/maps/zelda/systems/ puis à brancher ici.
+// Module de comportement Zelda. Gère les compteurs, les milestones,
+// les événements boss et le système visuel Ganondorf.
 export function createModule(): MapModule {
   let ctxRef: MapContext | null = null
 
@@ -16,18 +15,38 @@ export function createModule(): MapModule {
   const armedAt: Record<string, number> = {}
   const hintFired = new Set<string>()
 
+  let ganondorfReveal: GanondorfReveal | null = null
+  let bossReveals: BossRevealOrchestrator | null = null
+
   return {
     setup(ctx: MapContext): void {
       ctxRef = ctx
-      // TODO: instancier les systèmes visuels Zelda ici.
-      // Ex: new SacredRealmAtmosphere().setup(...)
+
+      ganondorfReveal = new GanondorfReveal()
+      ganondorfReveal.setup({
+        root: ctx.root,
+        scene: ctx.scene,
+        camera: ctx.camera,
+        onFightEnd: () => ctx.setBossFightActive('ganondorf', false),
+        onTargetReady: () => ctx.setBossTargetArmed('ganondorf', true),
+      })
+      ganondorfReveal.setEmit(ctx.emitGameEvent)
+
+      bossReveals = new BossRevealOrchestrator()
+      bossReveals.register(ganondorfReveal)
     },
 
     async preload(): Promise<void> {
-      // TODO: précharger les assets boss Zelda (modèles 3D, textures).
+      const ctx = ctxRef
+      if (!ctx || !bossReveals) return
+      await bossReveals
+        .preloadAll(ctx.lighting.renderer, ctx.scene, ctx.camera)
+        .catch((err) => console.warn('[BossReveals] preload failed:', err))
     },
 
     onGameEvent(e: GameEvent): void {
+      bossReveals?.onGameEvent(e)
+
       const ctx = ctxRef
       if (!ctx) return
 
@@ -58,7 +77,7 @@ export function createModule(): MapModule {
 
       // Game over : fin de tous les combats.
       if ((e.type === 'DRAIN' || e.type === 'BOTTOM_OUT') && ctx.gameState() === 'game_over') {
-        // TODO: bossReveals?.endAllFights()
+        bossReveals?.endAllFights()
       }
 
       // Le nid s'éveille.
@@ -144,10 +163,10 @@ export function createModule(): MapModule {
     },
 
     update(dt: number): void {
+      bossReveals?.update(dt)
+
       const ctx = ctxRef
       if (!ctx) return
-
-      // TODO: systèmes.update(dt)
 
       // Hint tardif du nid (identique à ST).
       const now = performance.now()
@@ -161,8 +180,7 @@ export function createModule(): MapModule {
     },
 
     shouldFreezePhysics(): boolean {
-      // TODO: retourner true pendant les transitions d'atmosphère.
-      return false
+      return bossReveals?.isGameplayFrozen() ?? false
     },
 
     isIntroHolding(): boolean {
@@ -192,10 +210,13 @@ export function createModule(): MapModule {
       for (const k of Object.keys(armedAt)) delete armedAt[k]
       hintFired.clear()
       ctxRef?.setMapState({ ganondorfs: 0, portals: 0, hetic: 0 })
+      bossReveals?.endAllFights()
     },
 
     dispose(): void {
-      // TODO: dispose des systèmes visuels.
+      bossReveals?.dispose()
+      bossReveals = null
+      ganondorfReveal = null
       ctxRef = null
     },
   }
