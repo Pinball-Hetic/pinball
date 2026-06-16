@@ -16,8 +16,8 @@ const LEGACY_Y_MAX = 78;
 const LEGACY_Y_BASE = 14;
 const LEGACY_Y_SCALE = 0.68;
 
-const PORTRAIT_PAD_X = 3;
-const PORTRAIT_PAD_Y = 4;
+const PORTRAIT_PAD_X = 0;
+const PORTRAIT_PAD_Y = 0;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));

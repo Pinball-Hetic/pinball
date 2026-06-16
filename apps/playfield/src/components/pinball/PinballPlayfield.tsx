@@ -52,9 +52,11 @@ import {
   ScreenShake,
   PlayfieldCameraDirector,
   playfieldViewDirForMode,
+  playfieldCameraUpForMode,
   parsePlayfieldViewMode,
   refitPlayfieldCamera,
   type PlayfieldCamFit,
+  type PlayfieldCamera,
   DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING,
   type PlayfieldCameraDebugTuning,
   BallTrail,
@@ -483,15 +485,21 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
     // ── Three.js setup ───────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#121828");
+    scene.background = new THREE.Color("#000000");
     const loader = createGltfLoader();
 
     const { clientWidth, clientHeight } = mountEl;
-    const camera = new THREE.PerspectiveCamera(50, clientWidth / clientHeight, 0.001, 100);
+    const viewportAspect = clientWidth / Math.max(clientHeight, 1);
+    const camera: PlayfieldCamera = new THREE.PerspectiveCamera(
+      50,
+      viewportAspect,
+      0.001,
+      100,
+    );
     const cameraTarget = new THREE.Vector3();
     let playfieldCamFit: {
       fit: PlayfieldCamFit;
-      camera: THREE.PerspectiveCamera;
+      camera: PlayfieldCamera;
       cameraTarget: THREE.Vector3;
       distance: number;
     } | null = null;
@@ -552,11 +560,14 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         camera,
         target: cameraTarget,
         dirToCamera: fit.dirToCamera,
+        cameraUp: fit.cameraUp,
         distance,
+        aspect: mountEl.clientWidth / Math.max(mountEl.clientHeight, 1),
       });
     };
 
     const syncPlayfieldCamera = (root: THREE.Object3D) => {
+      const aspect = mountEl.clientWidth / Math.max(mountEl.clientHeight, 1);
       const { fit, distance, frameBox } = refitPlayfieldCamera(
         camera,
         root,
@@ -564,6 +575,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         cameraTarget,
         camCorners,
         cameraDebugTuningRef.current,
+        aspect,
       );
       playfieldCamFit = { fit, camera, cameraTarget, distance };
       orbitControls?.target.copy(cameraTarget);
@@ -1088,10 +1100,12 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         cameraDirector.setViewMode(PLAYFIELD_VIEW_MODE);
         cameraDirector.setBosses(MAP_BOSSES);
         const camFrameBox = syncPlayfieldCamera(playfieldRoot);
-        const msz = camFrameBox.getSize(new THREE.Vector3());
-        camera.near = Math.max(0.001, Math.min(msz.length() * 0.004, 0.25));
-        camera.far = Math.max(80, msz.length() * 120);
-        camera.updateProjectionMatrix();
+        if (camera instanceof THREE.PerspectiveCamera) {
+          const msz = camFrameBox.getSize(new THREE.Vector3());
+          camera.near = Math.max(0.001, Math.min(msz.length() * 0.004, 0.25));
+          camera.far = Math.max(80, msz.length() * 120);
+          camera.updateProjectionMatrix();
+        }
         const restoreBossCamera = () => {
           cameraDirector?.restore();
         };
@@ -1808,17 +1822,24 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     const handleResize = () => {
       if (!mountEl) return;
       const { clientWidth: w, clientHeight: h } = mountEl;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      if (w < 1 || h < 1) return;
+      if (camera instanceof THREE.PerspectiveCamera) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
       if (playfieldRootRef) {
         syncPlayfieldCamera(playfieldRootRef);
       } else if (playfieldCamFit) {
-        camera.up.set(0, 1, 0);
+        camera.up.copy(playfieldCameraUpForMode(PLAYFIELD_VIEW_MODE));
         camera.lookAt(cameraTarget);
       }
       renderer.setSize(w, h);
     };
+    const resizeObserver = new ResizeObserver(() => handleResize());
+    resizeObserver.observe(mountEl);
     window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    requestAnimationFrame(handleResize);
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     return () => {
@@ -1826,6 +1847,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       cancelAnimationFrame(frameId);
       mapModule?.dispose();
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+      resizeObserver.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onBallDragDown);
       window.removeEventListener("pointermove", onBallDragMove);
       window.removeEventListener("pointerup", onBallDragUp);
@@ -1858,7 +1881,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const rootClassName = cabinetMode
     ? "flex min-h-[100dvh] w-full items-center justify-center bg-black text-zinc-100"
     : IS_PORTRAIT_FILL
-      ? "fixed inset-0 h-dvh w-dvw overflow-hidden bg-black text-zinc-100"
+      ? "fixed inset-0 overflow-hidden bg-black text-zinc-100"
       : "relative min-h-screen bg-black text-zinc-100";
 
   const frameClassName = cabinetMode
@@ -1882,7 +1905,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
   return (
     <div className={rootClassName}>
-      <div className={frameClassName} style={cabinetFrameStyle}>
+        <div className={frameClassName} style={cabinetFrameStyle}>
         <GameOverlay
           lives={lives}
           gameState={gameState}
