@@ -1,5 +1,11 @@
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
-import { GanondorfReveal, BossRevealOrchestrator, SacredRealmAtmosphere } from '../systems'
+import {
+  GanondorfReveal,
+  BossRevealOrchestrator,
+  SacredRealmAtmosphere,
+  ZeldaPortal,
+  ZeldaTransition,
+} from '../systems'
 
 // Module de comportement Zelda. Gère les compteurs, les milestones,
 // les événements boss et le système visuel Ganondorf.
@@ -18,6 +24,8 @@ export function createModule(): MapModule {
   let ganondorfReveal: GanondorfReveal | null = null
   let bossReveals: BossRevealOrchestrator | null = null
   let sacredRealm: SacredRealmAtmosphere | null = null
+  let portal: ZeldaPortal | null = null
+  let transition: ZeldaTransition | null = null
 
   return {
     setup(ctx: MapContext): void {
@@ -48,6 +56,19 @@ export function createModule(): MapModule {
           fill: ctx.lighting.fill,
         },
       })
+
+      // Portail Sacred Realm : sensor Rapier + ouverture immédiate.
+      portal = new ZeldaPortal()
+      portal.setup({
+        world: ctx.physics.world,
+        colliderMap: ctx.colliderMap,
+        layout: ctx.layout,
+        onOpenChange: (open) => ctx.setPortalGateOpen(open),
+      })
+
+      // Transition (flash violet → callback émettant PORTAL_TRANSITION_END).
+      transition = new ZeldaTransition()
+      transition.setup({ root: ctx.root })
     },
 
     async preload(): Promise<void> {
@@ -84,7 +105,7 @@ export function createModule(): MapModule {
         ctx.screenShake(0.4)
       }
 
-      // Entrée Sacred Realm confirmée.
+      // Entrée Sacred Realm confirmée (fin de transition).
       if (e.type === 'PORTAL_TRANSITION_END') {
         ctx.resetPortalTrigger()
         ctx.enterAlternateWorld()
@@ -146,40 +167,55 @@ export function createModule(): MapModule {
         }
       }
 
-      // Portail → Sacred Realm.
+      // ── Entrée Sacred Realm ───────────────────────────────────────────────
       if (e.type === 'PORTAL_ENTER') {
         portals += 1
         ctx.setMapState({ portals })
         const ball = ctx.ball
         const mesh = ctx.ballMesh
-        // TODO: déclencher la transition d'atmosphère Sacred Realm.
-        if (ball && mesh) {
+        if (ball && mesh && transition && !transition.isActive()) {
+          // Téléporte + fige la balle avant le flash (même pattern que ST).
           ball.holdAtAlternateWorldSpawn()
           ball.syncToMesh(mesh)
-        }
-      }
-      if (e.type === 'RETURN_PORTAL_ENTER') {
-        const ball = ctx.ball
-        const mesh = ctx.ballMesh
-        if (ball && mesh) {
-          ball.holdAtNormalReturnSpawn()
-          ball.syncToMesh(mesh)
-          ctx.completeWorldCycle()
-          ctx.resetStuck()
-          ball.syncToMesh(mesh)
-          mesh.visible = true
-          mesh.scale.setScalar(1)
-          ctx.emitGameEvent({ type: 'WORLD_CYCLE_COMPLETE' })
-          ctx.emitGameEvent({ type: 'RETURN_PORTAL_TRANSITION_END' })
+          transition.start({ ballMesh: mesh }, () => {
+            // Appelé depuis update() — hors drain Rapier, mutations sûres.
+            ball.spawnFromAlternateWorld()
+            ctx.resetPortalTrigger()
+            ctx.resetStuck()
+            ball.syncToMesh(mesh)
+            mesh.visible = true
+            mesh.scale.setScalar(1)
+            ctx.emitGameEvent({ type: 'PORTAL_TRANSITION_END' })
+          })
         }
       }
 
-      // TODO: réconciliation des marqueurs de nid (nestMarker + bossGateContext).
+      // ── Retour monde normal ───────────────────────────────────────────────
+      if (e.type === 'RETURN_PORTAL_ENTER') {
+        const ball = ctx.ball
+        const mesh = ctx.ballMesh
+        if (ball && mesh && transition && !transition.isActive()) {
+          ball.holdAtNormalReturnSpawn()
+          ball.syncToMesh(mesh)
+          transition.start({ ballMesh: mesh }, () => {
+            // Appelé depuis update() — hors drain Rapier, mutations sûres.
+            ball.spawnFromNormalReturn()
+            ctx.completeWorldCycle()
+            ctx.resetStuck()
+            ball.syncToMesh(mesh)
+            mesh.visible = true
+            mesh.scale.setScalar(1)
+            ctx.emitGameEvent({ type: 'WORLD_CYCLE_COMPLETE' })
+            ctx.emitGameEvent({ type: 'RETURN_PORTAL_TRANSITION_END' })
+          })
+        }
+      }
     },
 
     update(dt: number): void {
       bossReveals?.update(dt)
       sacredRealm?.update(dt)
+      transition?.update(dt)
 
       const ctx = ctxRef
       if (!ctx) return
@@ -236,6 +272,10 @@ export function createModule(): MapModule {
       ganondorfReveal = null
       sacredRealm?.dispose()
       sacredRealm = null
+      portal?.dispose()
+      portal = null
+      transition?.dispose()
+      transition = null
       ctxRef = null
     },
   }
