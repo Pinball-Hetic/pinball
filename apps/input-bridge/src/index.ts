@@ -1,7 +1,5 @@
-import { ReadlineParser } from '@serialport/parser-readline';
-import { SerialPortStream } from '@serialport/stream';
-import { MockBinding } from '@serialport/binding-mock';
-import { autoDetect } from '@serialport/bindings-cpp';
+import { createReadStream } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { io, type Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
@@ -11,17 +9,17 @@ import type {
 } from '@pinball/shared-types';
 import { CABINET_BUTTONS } from '@pinball/shared-types';
 
+// Lecture série en fs brut + stty (pas de @serialport) : le binding natif
+// serialport appelle uv_default_loop, non supporté par Bun (SIGILL au runtime).
+// On lit donc le device comme un fichier après l'avoir mis en mode raw, exactement
+// comme le bridge de référence Fliphetic. Bun supporte node:fs/child_process.
+
 const MODE = process.env.INPUT_BRIDGE_MODE === 'serial' ? 'serial' : 'mock';
-const SERIAL_PATH = process.env.SERIAL_PATH ?? '/dev/MOCK_ESP32';
-const SERIAL_BAUD = Number(process.env.SERIAL_BAUD ?? '115200');
+const SERIAL_PATH = process.env.SERIAL_PATH ?? '/dev/ttyUSB0';
+const SERIAL_BAUD = process.env.SERIAL_BAUD ?? '115200';
 const SERVER_URL = process.env.SERVER_URL ?? 'http://server:3001';
 
 const VALID_BUTTON_IDS: readonly ButtonId[] = CABINET_BUTTONS.map((b) => b.id);
-
-// Référence module-level vers le port ouvert, assignée dans main(). Le handler
-// `dev:simulate-button` (déclaré tôt) la lit paresseusement pour injecter du
-// texte protocolaire dans le port mock virtuel.
-let activePort: SerialPortStream | null = null;
 
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
   transports: ['websocket'],
@@ -33,22 +31,16 @@ socket.on('connect', () => console.log('[bridge] socket connected to', SERVER_UR
 socket.on('disconnect', (reason) => console.log('[bridge] socket disconnected:', reason));
 socket.on('connect_error', (err) => console.log('[bridge] connect_error:', err.message));
 
-// Mode dev `simulate-esp32` côté playfield : le server route l'event ciblé
-// vers nous (room `input-bridge`). On injecte la ligne protocolaire dans le
-// port mock — notre propre parser la relira et émettra `input:button` au
-// server comme si un vrai ESP32 l'avait envoyée.
+// Mode dev `simulate-esp32` côté playfield : le server route l'event ciblé vers
+// nous (room `input-bridge`). On rejoue la ligne protocolaire directement dans
+// le parser — chemin identique à une ligne reçue d'un vrai ESP32.
 socket.on('dev:simulate-button', (data) => {
   if (MODE !== 'mock') {
     console.warn('[bridge] dev:simulate-button ignored (serial mode, use real ESP32):', data);
     return;
   }
-  if (!activePort || !activePort.port) {
-    console.warn('[bridge] dev:simulate-button port not ready, ignoring', data);
-    return;
-  }
-  const line = `BTN:${data.id}:${data.action}\n`;
-  activePort.port.emitData(Buffer.from(line));
-  console.log('[bridge] dev:simulate-button injected as', line.trim());
+  handleLine(`BTN:${data.id}:${data.action}`);
+  console.log('[bridge] dev:simulate-button replayed as', `BTN:${data.id}:${data.action}`);
 });
 
 function isButtonId(value: string): value is ButtonId {
@@ -101,81 +93,67 @@ function handleLine(raw: string) {
     emitSensor(parts[1], value);
     return;
   }
-  console.error('[bridge] parse: unknown line:', JSON.stringify(line));
-}
-
-// Crée un port série virtuel pour les tests. N'émet aucune donnée par défaut —
-// utilisé en combinaison avec le mode `simulate-esp32` côté playfield, qui
-// envoie un event Socket.io que le server route ici ; on écrit alors la ligne
-// protocolaire sur ce port mock et notre propre parser la relit.
-async function openMockPort(): Promise<SerialPortStream> {
-  MockBinding.createPort(SERIAL_PATH, { echo: false, record: false });
-  const port = new SerialPortStream({
-    binding: MockBinding,
-    path: SERIAL_PATH,
-    baudRate: SERIAL_BAUD,
-  });
-  await new Promise<void>((resolve, reject) => {
-    port.once('open', () => resolve());
-    port.once('error', reject);
-  });
-  console.log('[bridge] mock port opened', SERIAL_PATH);
-  return port;
-}
-
-async function openSerialPort(): Promise<SerialPortStream> {
-  const binding = autoDetect();
-  for (let i = 1; i <= 60; i++) {
-    try {
-      const port = new SerialPortStream({
-        binding,
-        path: SERIAL_PATH,
-        baudRate: SERIAL_BAUD,
-      });
-      await new Promise<void>((resolve, reject) => {
-        port.once('open', () => resolve());
-        port.once('error', reject);
-      });
-      console.log('[bridge] serial port opened', SERIAL_PATH, 'attempt', i);
-      return port;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (i === 1 || i % 10 === 0) {
-        console.log(`[bridge] serial open attempt ${i}/60 failed: ${msg}`);
-      }
-      await new Promise((r) => setTimeout(r, 500));
-    }
+  // Lignes non reconnues (bruit de boot ESP32, etc.) — ignorées hors debug pour
+  // ne pas noyer les logs au démarrage du chip.
+  if (process.env.INPUT_BRIDGE_VERBOSE) {
+    console.error('[bridge] parse: unknown line:', JSON.stringify(line));
   }
-  throw new Error(`could not open ${SERIAL_PATH} after 60 attempts`);
 }
 
-async function main() {
+// Ouvre le device série : passe la tty en mode raw au bon baud (busybox stty),
+// puis lit le flux ligne par ligne. Si le device est absent (ESP non branché /
+// pas encore énuméré), retente toutes les 3 s — tolère le reboot USB après flash.
+function openSerial() {
+  try {
+    execFileSync('stty', [
+      '-F', SERIAL_PATH, SERIAL_BAUD, 'raw', '-echo', 'cs8', '-parenb', '-cstopb',
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log('[bridge] device not ready, retry in 3s:', SERIAL_PATH, '-', msg);
+    setTimeout(openSerial, 3000);
+    return;
+  }
+
+  const stream = createReadStream(SERIAL_PATH);
+  let buf = '';
+  console.log('[bridge] serial port opened', SERIAL_PATH, '@', SERIAL_BAUD);
+
+  stream.on('data', (chunk: string | Buffer) => {
+    buf += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+    let nl: number;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl);
+      buf = buf.slice(nl + 1);
+      handleLine(line);
+    }
+    if (buf.length > 8192) buf = ''; // garde-fou contre une ligne sans newline
+  });
+
+  const reopen = (label: string) => {
+    console.log('[bridge] serial', label, '— reopening in 3s');
+    stream.destroy();
+    setTimeout(openSerial, 3000);
+  };
+  stream.once('error', (err) => reopen('error: ' + err.message));
+  stream.once('close', () => reopen('closed'));
+}
+
+function main() {
   console.log('[bridge] start mode=', MODE, 'serverUrl=', SERVER_URL, 'path=', SERIAL_PATH);
-  const port = MODE === 'serial' ? await openSerialPort() : await openMockPort();
-  activePort = port;
-  const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
-  parser.on('data', (chunk: string | Buffer) => handleLine(chunk.toString()));
-  port.on('error', (err) => console.error('[bridge] port error', err.message));
+  if (MODE === 'serial') {
+    openSerial();
+  } else {
+    console.log('[bridge] mock mode — waiting for dev:simulate-button events');
+  }
 
   const shutdown = (signal: string) => {
     console.log('[bridge] received', signal, '— shutting down');
-    try {
-      port.close(() => {
-        activePort = null;
-        socket.disconnect();
-        process.exit(0);
-      });
-    } catch {
-      activePort = null;
-      socket.disconnect();
-      process.exit(0);
-    }
+    socket.disconnect();
+    process.exit(0);
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-main().catch((err) => {
-  console.error('[bridge] fatal:', err);
-  process.exit(1);
-});
+main();

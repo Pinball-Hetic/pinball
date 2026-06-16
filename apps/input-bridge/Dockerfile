@@ -2,8 +2,8 @@ FROM oven/bun:1.2-alpine AS base
 
 WORKDIR /app
 
-# Bindings natifs serialport (compilés au moment de bun install)
-RUN apk add --no-cache python3 make g++ linux-headers
+# Plus de binding natif : la lecture série passe par node:fs + busybox `stty`
+# (présent dans l'image alpine). Aucun toolchain de compilation requis.
 
 # Copie tout le monorepo pour que les workspaces Bun résolvent correctement
 COPY . .
