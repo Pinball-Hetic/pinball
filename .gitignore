@@ -58,3 +58,6 @@ backups/
 skills-lock.json
 # Assets de map synchronisés au build (cf. scripts/sync-map-assets.sh)
 apps/*/public/maps/
+
+# Firmware ESP32 — artefacts PlatformIO (build/ reste trackable pour le .bin CI)
+firmware/.pio/
