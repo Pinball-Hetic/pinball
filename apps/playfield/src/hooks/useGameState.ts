@@ -39,6 +39,7 @@ export interface ScoringCallbacks {
     newMultiplier: number;
   }) => void;
   onLifeLost?: (livesRemaining: number) => void;
+  onLifeGained?: (lives: number) => void;
   onGameOver?: (finalScore: number, stats: GameStats) => void;
   onGameStart?: () => void;
   onIdleReset?: () => void;
@@ -268,6 +269,13 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     if (nextMult !== prevMult) setMultiplier(nextMult);
     return { prevCombo, prevMult };
   };
+
+  const addLife = useCallback(() => {
+    const next = livesRef.current + 1;
+    livesRef.current = next;
+    setLives(next);
+    callbacks?.onLifeGained?.(next);
+  }, [callbacks]);
 
   const handleDrain = (hideBall: () => void) => {
     const newLives = livesRef.current - 1;
@@ -561,6 +569,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     isFeverActive,
     startFever,
     clearAlternateWorldSession,
+    addLife,
     resetGame,
     buildEmit,
   };
