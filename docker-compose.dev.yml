@@ -135,6 +135,7 @@ services:
     build:
       context: .
       dockerfile: apps/input-bridge/Dockerfile
+      target: build
     container_name: pinball-input-bridge-dev
     working_dir: /app/apps/input-bridge
     restart: unless-stopped
