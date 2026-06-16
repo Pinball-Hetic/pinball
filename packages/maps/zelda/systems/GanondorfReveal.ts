@@ -16,17 +16,12 @@ const RESTORE = 0.3;
 const VICTORY = 0.65;
 
 const STROBE_HZ_INTRO = 4;
-const FIGHT_SHADE = 0.36;
-const FIGHT_SHADE_BREATHE = 0.04;
-const FIGHT_SHADE_SPEED = 1.4;
 const FIGHT_FLICKER_HZ = 3;
-const FIGHT_FLICKER_DIP = 0.07;
-const FIGHT_FLICKER_LIFT = 0.04;
 const FIGHT_FLASH_MIX = 0.45;
 const FLASH_INTENSITY = 1.5;
 
-// Flash orange Ganondorf (vs rouge Demogorgon).
-const FLASH_COLOR = 0xff6600;
+// Flash violet Ganondorf.
+const FLASH_COLOR = 0x9900ff;
 
 type Phase = 'idle' | 'blackout' | 'reveal' | 'flicker' | 'victory' | 'restore';
 
@@ -157,7 +152,8 @@ export class GanondorfReveal implements BossRevealController {
       : 1;
 
     if (this.phase === 'blackout') {
-      this.cinematicStrobe.apply(on, false, darkMix * easeOut(Math.min(1, this.elapsed / BLACKOUT)));
+      // Flash violet sans voile noir.
+      this.cinematicStrobe.applyFlashOnly(on, darkMix * easeOut(Math.min(1, this.elapsed / BLACKOUT)));
       if (this.elapsed >= BLACKOUT) {
         this.phase = 'reveal';
         this.elapsed = 0;
@@ -166,7 +162,7 @@ export class GanondorfReveal implements BossRevealController {
     }
 
     if (this.phase === 'reveal') {
-      this.cinematicStrobe.apply(on, false, 1);
+      this.cinematicStrobe.applyFlashOnly(on, 1);
       if (this.elapsed >= REVEAL) {
         this.phase = 'flicker';
         this.elapsed = 0;
@@ -177,14 +173,9 @@ export class GanondorfReveal implements BossRevealController {
     }
 
     if (this.phase === 'flicker') {
-      const breathe = Math.sin(this.pulseT * FIGHT_SHADE_SPEED) * FIGHT_SHADE_BREATHE;
+      // Pas de shade, seulement le flash violet au rythme du flicker.
       const blink = strobeOn(this.strobeT, FIGHT_FLICKER_HZ);
-      const shade = THREE.MathUtils.clamp(
-        FIGHT_SHADE + breathe + (blink ? -FIGHT_FLICKER_LIFT : FIGHT_FLICKER_DIP),
-        0.18,
-        0.52,
-      );
-      this.cinematicStrobe.applyFightFlicker(shade, blink ? FIGHT_FLASH_MIX : 0);
+      this.cinematicStrobe.applyFightFlicker(0, blink ? FIGHT_FLASH_MIX : 0);
       return;
     }
 
@@ -203,7 +194,8 @@ export class GanondorfReveal implements BossRevealController {
         this.resetAtmosphere();
         return;
       }
-      this.cinematicStrobe.applyHoldShade(FIGHT_SHADE * darkMix);
+      // Pas de shade pendant la restauration.
+      this.cinematicStrobe.stop();
     }
   }
 
