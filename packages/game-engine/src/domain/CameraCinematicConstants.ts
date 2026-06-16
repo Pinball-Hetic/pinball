@@ -4,9 +4,13 @@ export type BossCameraFocus = {
   z: number;
 };
 
+export type BossCameraPanEasing = 'linear' | 'easeInOut';
+
 export type BossCameraCinematicConfig = {
   lookAtLift: number;
   panFrom?: BossCameraFocus;
+  faceDirToCamera?: BossCameraFocus;
+  panEasing?: BossCameraPanEasing;
   zoomInDuration: number;
   holdDuration: number;
   zoomOutDuration: number;

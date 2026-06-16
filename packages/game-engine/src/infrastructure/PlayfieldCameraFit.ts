@@ -9,15 +9,22 @@ import {
 import { findObjectByNormalizedName } from './GltfNodeNames';
 import type { PlayfieldViewMode } from '../domain/PlayfieldViewMode';
 import { DEFAULT_PLAYFIELD_VIEW_MODE } from '../domain/PlayfieldViewMode';
+import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
 export const PLAYFIELD_VIEW_DIR = new THREE.Vector3(0, 0.48, 0.88).normalize();
-export const PLAYFIELD_PORTRAIT_VIEW_DIR = new THREE.Vector3(0, 0.65, 0.75).normalize();
+export const PLAYFIELD_PORTRAIT_VIEW_DIR = new THREE.Vector3(0, 0.98, 0.15).normalize();
+export const PLAYFIELD_PORTRAIT_CAMERA_UP = new THREE.Vector3(0, 0, -1);
+const LEGACY_CAMERA_UP = new THREE.Vector3(0, 1, 0);
 export const PLAYFIELD_VIEW_NDC_MARGIN = 0.78;
 export const PLAYFIELD_CAM_DISTANCE_SCALE = 1.05;
 export const PLAYFIELD_PORTRAIT_NDC_X = 1;
 export const PLAYFIELD_PORTRAIT_NDC_Y = 1;
-export const PLAYFIELD_PORTRAIT_LOOK_Z_BIAS = 0.24;
-export const PLAYFIELD_PORTRAIT_LOOK_Y_BIAS = 0.32;
+export const PLAYFIELD_PORTRAIT_DISTANCE_SCALE = 1;
+export const PLAYFIELD_ORTHO_EYE_LIFT = 2;
+export const PLAYFIELD_PORTRAIT_HALF_WIDTH =
+  (WALL_RIGHT_X - WALL_LEFT_X) * 0.5;
+export const PLAYFIELD_PORTRAIT_LOOK_Z_BIAS = 0;
+export const PLAYFIELD_PORTRAIT_LOOK_Y_BIAS = 0;
 
 const _clipMatrix = new THREE.Matrix4();
 const _ndcPoint = new THREE.Vector4();
@@ -25,9 +32,12 @@ const _camPosScratch = new THREE.Vector3();
 
 type NdcAxis = 'x' | 'y';
 
+export type PlayfieldCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera;
+
 export type PlayfieldCamFit = {
   target: THREE.Vector3;
   dirToCamera: THREE.Vector3;
+  cameraUp: THREE.Vector3;
   corners: THREE.Vector3[];
 };
 
@@ -42,13 +52,13 @@ export type PlayfieldCameraDebugTuning = {
 };
 
 export const DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING: PlayfieldCameraDebugTuning = {
-  dirY: 0.65,
-  dirZ: 0.75,
+  dirY: 0.98,
+  dirZ: 0.15,
   lookYBias: PLAYFIELD_PORTRAIT_LOOK_Y_BIAS,
   lookZBias: PLAYFIELD_PORTRAIT_LOOK_Z_BIAS,
   portraitNdcX: PLAYFIELD_PORTRAIT_NDC_X,
   portraitNdcY: PLAYFIELD_PORTRAIT_NDC_Y,
-  distanceScale: 1,
+  distanceScale: PLAYFIELD_PORTRAIT_DISTANCE_SCALE,
 };
 
 export type PlayfieldCameraFitOptions = {
@@ -65,19 +75,38 @@ export function playfieldViewDirForMode(viewMode: PlayfieldViewMode): THREE.Vect
   }
 }
 
+export function playfieldCameraUpForMode(viewMode: PlayfieldViewMode): THREE.Vector3 {
+  switch (viewMode) {
+    case 'portrait-fill':
+      return PLAYFIELD_PORTRAIT_CAMERA_UP;
+    case 'legacy':
+      return LEGACY_CAMERA_UP;
+  }
+}
+
 export function playfieldCameraTargetForMode(
   viewMode: PlayfieldViewMode,
   frameBox: THREE.Box3,
   out: THREE.Vector3,
   debugTuning?: PlayfieldCameraDebugTuning | null,
 ): THREE.Vector3 {
-  frameBox.getCenter(out);
-  if (viewMode !== 'portrait-fill') return out;
+  if (viewMode !== 'portrait-fill') {
+    frameBox.getCenter(out);
+    return out;
+  }
+
+  out.x = (frameBox.min.x + frameBox.max.x) * 0.5;
+  out.z = (frameBox.min.z + frameBox.max.z) * 0.5;
+  out.y = surfaceYAtZ(out.z);
 
   const lookY = debugTuning?.lookYBias ?? PLAYFIELD_PORTRAIT_LOOK_Y_BIAS;
   const lookZ = debugTuning?.lookZBias ?? PLAYFIELD_PORTRAIT_LOOK_Z_BIAS;
-  out.y = THREE.MathUtils.lerp(out.y, PLAYFIELD_SURFACE_Y, lookY);
-  out.z = THREE.MathUtils.lerp(out.z, frameBox.max.z, lookZ);
+  if (lookY > 0) {
+    out.y = THREE.MathUtils.lerp(out.y, PLAYFIELD_SURFACE_Y, lookY);
+  }
+  if (lookZ > 0) {
+    out.z = THREE.MathUtils.lerp(out.z, frameBox.max.z, lookZ);
+  }
   return out;
 }
 
@@ -101,12 +130,51 @@ export function fillPlayfieldBoxCorners(box: THREE.Box3, reuse: THREE.Vector3[])
   return reuse;
 }
 
+export function fillPlayfieldTopDownCorners(box: THREE.Box3, reuse: THREE.Vector3[]): THREE.Vector3[] {
+  reuse.length = 0;
+  const { min, max } = box;
+  const y = (min.y + max.y) * 0.5;
+  for (const x of [min.x, max.x] as const) {
+    for (const z of [min.z, max.z] as const) {
+      reuse.push(new THREE.Vector3(x, y, z));
+    }
+  }
+  return reuse;
+}
+
+export function boundingBoxPlayfieldWallFootprint(padXZ = 0): THREE.Box3 {
+  const box = new THREE.Box3();
+  for (const x of [WALL_LEFT_X, WALL_RIGHT_X] as const) {
+    for (const z of [WALL_TOP_Z, WALL_BOTTOM_Z] as const) {
+      box.expandByPoint(new THREE.Vector3(x, surfaceYAtZ(z), z));
+    }
+  }
+  if (padXZ > 0) {
+    box.min.x -= padXZ;
+    box.max.x += padXZ;
+    box.min.z -= padXZ;
+    box.max.z += padXZ;
+  }
+  return box;
+}
+
+export function fillPlayfieldWallFootprintCorners(reuse: THREE.Vector3[]): THREE.Vector3[] {
+  reuse.length = 0;
+  for (const x of [WALL_LEFT_X, WALL_RIGHT_X] as const) {
+    for (const z of [WALL_TOP_Z, WALL_BOTTOM_Z] as const) {
+      reuse.push(new THREE.Vector3(x, surfaceYAtZ(z), z));
+    }
+  }
+  return reuse;
+}
+
 function withCameraAt(
   camera: THREE.PerspectiveCamera,
   target: THREE.Vector3,
   camPos: THREE.Vector3,
+  cameraUp: THREE.Vector3,
 ): THREE.Matrix4 {
-  camera.up.set(0, 1, 0);
+  camera.up.copy(cameraUp);
   camera.position.copy(camPos);
   camera.lookAt(target);
   camera.updateMatrixWorld(true);
@@ -115,14 +183,13 @@ function withCameraAt(
 
 function playfieldNdcMaxAbsAxis(
   camera: THREE.PerspectiveCamera,
-  target: THREE.Vector3,
+  fit: PlayfieldCamFit,
   camPos: THREE.Vector3,
-  corners: readonly THREE.Vector3[],
   axis: NdcAxis,
 ): number {
-  const clip = withCameraAt(camera, target, camPos);
+  const clip = withCameraAt(camera, fit.target, camPos, fit.cameraUp);
   let maxAbs = 0;
-  for (const c of corners) {
+  for (const c of fit.corners) {
     _ndcPoint.set(c.x, c.y, c.z, 1).applyMatrix4(clip);
     const w = Math.abs(_ndcPoint.w);
     if (w < 1e-7) continue;
@@ -134,13 +201,12 @@ function playfieldNdcMaxAbsAxis(
 
 function playfieldCornersInView(
   camera: THREE.PerspectiveCamera,
-  target: THREE.Vector3,
+  fit: PlayfieldCamFit,
   camPos: THREE.Vector3,
-  corners: readonly THREE.Vector3[],
   ndcMargin: number,
 ): boolean {
-  const clip = withCameraAt(camera, target, camPos);
-  for (const c of corners) {
+  const clip = withCameraAt(camera, fit.target, camPos, fit.cameraUp);
+  for (const c of fit.corners) {
     _ndcPoint.set(c.x, c.y, c.z, 1).applyMatrix4(clip);
     const w = Math.abs(_ndcPoint.w);
     if (w < 1e-7) return false;
@@ -153,22 +219,32 @@ function playfieldCornersInView(
 
 function playfieldNdcXWithinLimit(
   camera: THREE.PerspectiveCamera,
-  target: THREE.Vector3,
+  fit: PlayfieldCamFit,
   camPos: THREE.Vector3,
-  corners: readonly THREE.Vector3[],
   ndcXLimit: number,
 ): boolean {
-  return playfieldNdcMaxAbsAxis(camera, target, camPos, corners, 'x') <= ndcXLimit;
+  return playfieldNdcMaxAbsAxis(camera, fit, camPos, 'x') <= ndcXLimit;
 }
 
 function playfieldNdcYWithinLimit(
   camera: THREE.PerspectiveCamera,
-  target: THREE.Vector3,
+  fit: PlayfieldCamFit,
   camPos: THREE.Vector3,
-  corners: readonly THREE.Vector3[],
   ndcYLimit: number,
 ): boolean {
-  return playfieldNdcMaxAbsAxis(camera, target, camPos, corners, 'y') <= ndcYLimit;
+  return playfieldNdcMaxAbsAxis(camera, fit, camPos, 'y') <= ndcYLimit;
+}
+
+function playfieldNdcCoversViewport(
+  camera: THREE.PerspectiveCamera,
+  fit: PlayfieldCamFit,
+  camPos: THREE.Vector3,
+  fillX: number,
+  fillY: number,
+): boolean {
+  const maxX = playfieldNdcMaxAbsAxis(camera, fit, camPos, 'x');
+  const maxY = playfieldNdcMaxAbsAxis(camera, fit, camPos, 'y');
+  return maxX >= fillX && maxY >= fillY;
 }
 
 function distanceForCameraFit(
@@ -200,9 +276,8 @@ function distanceForPortraitWidthFirstView(
   fit: PlayfieldCamFit,
   ndcXLimit: number,
 ): number {
-  const { target, corners } = fit;
   return distanceForCameraFit(camera, fit, (camPos) =>
-    playfieldNdcXWithinLimit(camera, target, camPos, corners, ndcXLimit),
+    playfieldNdcXWithinLimit(camera, fit, camPos, ndcXLimit),
   );
 }
 
@@ -211,10 +286,45 @@ function distanceForPortraitHeightContainView(
   fit: PlayfieldCamFit,
   ndcYLimit: number,
 ): number {
-  const { target, corners } = fit;
   return distanceForCameraFit(camera, fit, (camPos) =>
-    playfieldNdcYWithinLimit(camera, target, camPos, corners, ndcYLimit),
+    playfieldNdcYWithinLimit(camera, fit, camPos, ndcYLimit),
   );
+}
+
+function distanceForPortraitCoverView(
+  camera: THREE.PerspectiveCamera,
+  fit: PlayfieldCamFit,
+  fillX: number,
+  fillY: number,
+): number {
+  const { target: mc, dirToCamera } = fit;
+  const pos = _camPosScratch;
+  let lo = 0.03;
+  let hi = 0.5;
+
+  while (
+    !playfieldNdcCoversViewport(camera, fit, pos.copy(mc).addScaledVector(dirToCamera, lo), fillX, fillY) &&
+    lo > 0.004
+  ) {
+    lo *= 0.65;
+  }
+  while (
+    playfieldNdcCoversViewport(camera, fit, pos.copy(mc).addScaledVector(dirToCamera, hi), fillX, fillY) &&
+    hi < 80
+  ) {
+    hi *= 1.6;
+  }
+
+  for (let i = 0; i < 32; i++) {
+    const mid = (lo + hi) / 2;
+    pos.copy(mc).addScaledVector(dirToCamera, mid);
+    if (playfieldNdcCoversViewport(camera, fit, pos, fillX, fillY)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
 }
 
 function distanceForTiltedPlayfieldView(
@@ -222,9 +332,8 @@ function distanceForTiltedPlayfieldView(
   fit: PlayfieldCamFit,
   ndcMargin: number,
 ): number {
-  const { target, corners } = fit;
   return distanceForCameraFit(camera, fit, (camPos) =>
-    playfieldCornersInView(camera, target, camPos, corners, ndcMargin),
+    playfieldCornersInView(camera, fit, camPos, ndcMargin),
   );
 }
 
@@ -233,10 +342,43 @@ export function applyPlayfieldCamera(
   target: THREE.Vector3,
   dirToCamera: THREE.Vector3,
   distance: number,
+  cameraUp: THREE.Vector3,
 ): void {
-  camera.up.set(0, 1, 0);
+  camera.up.copy(cameraUp);
   camera.position.copy(target).addScaledVector(dirToCamera, distance);
   camera.lookAt(target);
+}
+
+export function applyPlayfieldOrthoTopDown(
+  camera: THREE.OrthographicCamera,
+  target: THREE.Vector3,
+  aspect: number,
+  halfWidth: number,
+  cameraUp: THREE.Vector3,
+): void {
+  const halfHeight = halfWidth / Math.max(aspect, 1e-6);
+  camera.left = -halfWidth;
+  camera.right = halfWidth;
+  camera.top = halfHeight;
+  camera.bottom = -halfHeight;
+  camera.up.copy(cameraUp);
+  camera.position.set(target.x, target.y + PLAYFIELD_ORTHO_EYE_LIFT, target.z);
+  camera.lookAt(target);
+  camera.updateProjectionMatrix();
+}
+
+export function portraitOrthoHalfWidth(
+  aspect: number,
+  debugTuning?: PlayfieldCameraDebugTuning | null,
+): number {
+  const ndcX = debugTuning?.portraitNdcX ?? PLAYFIELD_PORTRAIT_NDC_X;
+  const ndcY = debugTuning?.portraitNdcY ?? PLAYFIELD_PORTRAIT_NDC_Y;
+  const scale = debugTuning?.distanceScale ?? PLAYFIELD_PORTRAIT_DISTANCE_SCALE;
+  const ndc = Math.max(Math.min(ndcX, ndcY), 1e-6);
+  const halfDepth = (WALL_BOTTOM_Z - WALL_TOP_Z) * 0.5;
+  const forWidth = PLAYFIELD_PORTRAIT_HALF_WIDTH / ndc;
+  const forHeight = (halfDepth / ndc) * Math.max(aspect, 1e-6);
+  return Math.max(forWidth, forHeight) * scale;
 }
 
 export function boundingBoxPlayfieldSurface(playfieldRoot: THREE.Object3D): THREE.Box3 {
@@ -245,6 +387,7 @@ export function boundingBoxPlayfieldSurface(playfieldRoot: THREE.Object3D): THRE
     findObjectByNormalizedName(
       playfieldRoot,
       'playfield',
+      'floor_main',
       'pf_playfield',
       'coll_playfield',
     ) ?? null;
@@ -319,11 +462,36 @@ export function boundingBoxPlayableArea(playfieldRoot: THREE.Object3D): THREE.Bo
   return meshBox.union(wallBox);
 }
 
+function fillPlayfieldFrameFootprintCorners(box: THREE.Box3, reuse: THREE.Vector3[]): THREE.Vector3[] {
+  reuse.length = 0;
+  const { min, max } = box;
+  for (const x of [min.x, max.x] as const) {
+    for (const z of [min.z, max.z] as const) {
+      reuse.push(new THREE.Vector3(x, surfaceYAtZ(z), z));
+    }
+  }
+  return reuse;
+}
+
+export function boundingBoxPortraitFrame(playfieldRoot: THREE.Object3D): THREE.Box3 {
+  const meshBox = boundingBoxPlayfieldSurface(playfieldRoot);
+  if (!meshBox.isEmpty()) {
+    const box = meshBox.clone();
+    box.min.x -= 0.008;
+    box.max.x += 0.008;
+    box.min.z -= 0.01;
+    box.max.z += 0.01;
+    return box;
+  }
+  return boundingBoxPlayfieldWallFootprint(0.01);
+}
+
 export function fitPlayfieldCamera(
-  camera: THREE.PerspectiveCamera,
+  camera: PlayfieldCamera,
   fit: PlayfieldCamFit,
   target: THREE.Vector3,
   options?: PlayfieldCameraFitOptions,
+  aspect = 1,
 ): number {
   return fitPlayfieldCameraForMode(
     options?.viewMode ?? DEFAULT_PLAYFIELD_VIEW_MODE,
@@ -331,6 +499,7 @@ export function fitPlayfieldCamera(
     fit,
     target,
     options,
+    aspect,
   );
 }
 
@@ -341,16 +510,24 @@ export type PlayfieldCameraRefit = {
 };
 
 export function refitPlayfieldCamera(
-  camera: THREE.PerspectiveCamera,
+  camera: PlayfieldCamera,
   playfieldRoot: THREE.Object3D,
   viewMode: PlayfieldViewMode,
   target: THREE.Vector3,
   corners: THREE.Vector3[],
   debugTuning?: PlayfieldCameraDebugTuning | null,
+  aspect = 1,
 ): PlayfieldCameraRefit {
-  const frameBox = boundingBoxPlayableArea(playfieldRoot);
+  const frameBox =
+    viewMode === 'portrait-fill'
+      ? boundingBoxPortraitFrame(playfieldRoot)
+      : boundingBoxPlayableArea(playfieldRoot);
   playfieldCameraTargetForMode(viewMode, frameBox, target, debugTuning);
-  fillPlayfieldBoxCorners(frameBox, corners);
+  if (viewMode === 'portrait-fill') {
+    fillPlayfieldFrameFootprintCorners(frameBox, corners);
+  } else {
+    fillPlayfieldBoxCorners(frameBox, corners);
+  }
   const dirToCamera =
     viewMode === 'portrait-fill'
       ? portraitViewDirFromTuning(debugTuning)
@@ -358,40 +535,52 @@ export function refitPlayfieldCamera(
   const fit: PlayfieldCamFit = {
     target,
     dirToCamera,
+    cameraUp: playfieldCameraUpForMode(viewMode).clone(),
     corners,
   };
-  const distance = fitPlayfieldCamera(camera, fit, target, { viewMode, debugTuning });
+  const distance = fitPlayfieldCamera(camera, fit, target, { viewMode, debugTuning }, aspect);
   return { fit, distance, frameBox };
 }
 
 function fitPlayfieldCameraForMode(
   viewMode: PlayfieldViewMode,
-  camera: THREE.PerspectiveCamera,
+  camera: PlayfieldCamera,
   fit: PlayfieldCamFit,
   target: THREE.Vector3,
   options?: PlayfieldCameraFitOptions,
+  aspect = 1,
 ): number {
   switch (viewMode) {
     case 'portrait-fill':
-      return fitPlayfieldCameraPortraitFill(camera, fit, target, options?.debugTuning);
+      return fitPlayfieldCameraPortraitFill(camera, fit, target, aspect, options?.debugTuning);
     case 'legacy':
+      if (!(camera instanceof THREE.PerspectiveCamera)) {
+        throw new Error('legacy playfield view requires PerspectiveCamera');
+      }
       return fitPlayfieldCameraLegacy(camera, fit, target);
   }
 }
 
 function fitPlayfieldCameraPortraitFill(
-  camera: THREE.PerspectiveCamera,
+  camera: PlayfieldCamera,
   fit: PlayfieldCamFit,
   target: THREE.Vector3,
+  aspect: number,
   debugTuning?: PlayfieldCameraDebugTuning | null,
 ): number {
+  if (camera instanceof THREE.OrthographicCamera) {
+    const halfWidth = portraitOrthoHalfWidth(aspect, debugTuning);
+    applyPlayfieldOrthoTopDown(camera, target, aspect, halfWidth, fit.cameraUp);
+    return halfWidth;
+  }
+  if (!(camera instanceof THREE.PerspectiveCamera)) {
+    throw new Error('portrait-fill perspective fallback requires PerspectiveCamera');
+  }
   const ndcX = debugTuning?.portraitNdcX ?? PLAYFIELD_PORTRAIT_NDC_X;
   const ndcY = debugTuning?.portraitNdcY ?? PLAYFIELD_PORTRAIT_NDC_Y;
-  const scale = debugTuning?.distanceScale ?? 1;
-  const dWidth = distanceForPortraitWidthFirstView(camera, fit, ndcX);
-  const dHeight = distanceForPortraitHeightContainView(camera, fit, ndcY);
-  const dist = Math.max(dWidth, dHeight) * scale;
-  applyPlayfieldCamera(camera, target, fit.dirToCamera, dist);
+  const scale = debugTuning?.distanceScale ?? PLAYFIELD_PORTRAIT_DISTANCE_SCALE;
+  const dist = distanceForPortraitCoverView(camera, fit, ndcX, ndcY) * scale;
+  applyPlayfieldCamera(camera, target, fit.dirToCamera, dist, fit.cameraUp);
   return dist;
 }
 
@@ -403,6 +592,6 @@ function fitPlayfieldCameraLegacy(
   const dist =
     distanceForTiltedPlayfieldView(camera, fit, PLAYFIELD_VIEW_NDC_MARGIN) *
     PLAYFIELD_CAM_DISTANCE_SCALE;
-  applyPlayfieldCamera(camera, target, fit.dirToCamera, dist);
+  applyPlayfieldCamera(camera, target, fit.dirToCamera, dist, fit.cameraUp);
   return dist;
 }

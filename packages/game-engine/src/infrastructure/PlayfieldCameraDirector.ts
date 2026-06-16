@@ -8,34 +8,41 @@ import {
 import type { PlayfieldViewMode } from '../domain/PlayfieldViewMode';
 import { DEFAULT_PLAYFIELD_VIEW_MODE } from '../domain/PlayfieldViewMode';
 import { easeInOut, easeOut } from './CinematicEasing';
+import { applyPlayfieldOrthoTopDown } from './PlayfieldCameraFit';
 
 type Phase = 'idle' | 'zoomIn' | 'hold' | 'zoomOut';
 
 type BaseView = {
   target: THREE.Vector3;
   dirToCamera: THREE.Vector3;
+  cameraUp: THREE.Vector3;
   distance: number;
+  aspect: number;
 };
 
 export type PlayfieldCameraCapture = {
-  camera: THREE.PerspectiveCamera;
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
   target: THREE.Vector3;
   dirToCamera: THREE.Vector3;
+  cameraUp: THREE.Vector3;
   distance: number;
+  aspect: number;
 };
 
 export class PlayfieldCameraDirector {
   private bosses: BossDefinition[] = [];
-  private camera: THREE.PerspectiveCamera | null = null;
+  private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null = null;
   private base: BaseView | null = null;
   private config: BossCameraCinematicConfig | null = null;
   private viewMode: PlayfieldViewMode = DEFAULT_PLAYFIELD_VIEW_MODE;
   private phase: Phase = 'idle';
   private elapsed = 0;
   private zoomedDistance = 0;
+  private faceDir: THREE.Vector3 | null = null;
   private readonly lookAt = new THREE.Vector3();
   private readonly panFrom = new THREE.Vector3();
   private readonly bossFocus = new THREE.Vector3();
+  private readonly dirScratch = new THREE.Vector3();
 
   setBosses(bosses: BossDefinition[]): void {
     this.bosses = bosses;
@@ -50,7 +57,9 @@ export class PlayfieldCameraDirector {
     this.base = {
       target: capture.target.clone(),
       dirToCamera: capture.dirToCamera.clone().normalize(),
+      cameraUp: capture.cameraUp.clone(),
       distance: capture.distance,
+      aspect: capture.aspect,
     };
     this.applyView(this.base.target, this.base.distance);
   }
@@ -74,12 +83,10 @@ export class PlayfieldCameraDirector {
 
     if (this.phase === 'zoomIn') {
       const t = Math.min(1, this.elapsed / this.config.zoomInDuration);
-      const e = easeInOut(t);
+      const e = this.config.panEasing === 'linear' ? t : easeInOut(t);
       this.lookAt.lerpVectors(this.panFrom, this.bossFocus, e);
-      this.applyView(
-        this.lookAt,
-        THREE.MathUtils.lerp(this.base.distance, this.zoomedDistance, e),
-      );
+      const dist = THREE.MathUtils.lerp(this.base.distance, this.zoomedDistance, e);
+      this.applyView(this.lookAt, dist, this.lerpViewDir(e));
       if (t >= 1) {
         this.phase = 'hold';
         this.elapsed = 0;
@@ -88,7 +95,7 @@ export class PlayfieldCameraDirector {
     }
 
     if (this.phase === 'hold') {
-      this.applyView(this.bossFocus, this.zoomedDistance);
+      this.applyView(this.bossFocus, this.zoomedDistance, this.faceDir ?? undefined);
       if (this.elapsed >= this.config.holdDuration) {
         this.phase = 'zoomOut';
         this.elapsed = 0;
@@ -100,10 +107,8 @@ export class PlayfieldCameraDirector {
       const t = Math.min(1, this.elapsed / this.config.zoomOutDuration);
       const e = easeOut(t);
       this.lookAt.lerpVectors(this.bossFocus, this.base.target, e);
-      this.applyView(
-        this.lookAt,
-        THREE.MathUtils.lerp(this.zoomedDistance, this.base.distance, e),
-      );
+      const dist = THREE.MathUtils.lerp(this.zoomedDistance, this.base.distance, e);
+      this.applyView(this.lookAt, dist, this.lerpViewDir(1 - e));
       if (t >= 1) this.finish();
     }
   }
@@ -150,6 +155,15 @@ export class PlayfieldCameraDirector {
       cinematic.distanceScale,
       this.viewMode === 'portrait-fill',
     );
+    if (cinematic.faceDirToCamera) {
+      this.faceDir = new THREE.Vector3(
+        cinematic.faceDirToCamera.x,
+        cinematic.faceDirToCamera.y,
+        cinematic.faceDirToCamera.z,
+      ).normalize();
+    } else {
+      this.faceDir = null;
+    }
     this.phase = 'zoomIn';
     this.elapsed = 0;
   }
@@ -165,12 +179,34 @@ export class PlayfieldCameraDirector {
     this.phase = 'idle';
     this.elapsed = 0;
     this.config = null;
+    this.faceDir = null;
   }
 
-  private applyView(lookAt: THREE.Vector3, distance: number): void {
+  private lerpViewDir(t: number): THREE.Vector3 | undefined {
+    if (!this.base || !this.faceDir || t <= 0) return undefined;
+    if (t >= 1) return this.faceDir;
+    return this.dirScratch.copy(this.base.dirToCamera).lerp(this.faceDir, t).normalize();
+  }
+
+  private applyView(
+    lookAt: THREE.Vector3,
+    distance: number,
+    dirToCamera?: THREE.Vector3,
+  ): void {
     if (!this.camera || !this.base) return;
-    this.camera.up.set(0, 1, 0);
-    this.camera.position.copy(lookAt).addScaledVector(this.base.dirToCamera, distance);
+    const dir = dirToCamera ?? this.base.dirToCamera;
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      applyPlayfieldOrthoTopDown(
+        this.camera,
+        lookAt,
+        this.base.aspect,
+        distance,
+        this.base.cameraUp,
+      );
+      return;
+    }
+    this.camera.up.copy(this.base.cameraUp);
+    this.camera.position.copy(lookAt).addScaledVector(dir, distance);
     this.camera.lookAt(lookAt);
   }
 }
