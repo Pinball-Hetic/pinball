@@ -52,6 +52,12 @@ export class PlayfieldCinematicStrobe {
     this.setFlash(on && !fullMap ? this.flashIntensity * mix : 0);
   }
 
+  /** Flash sans shade overlay — pour les maps Zelda qui ne veulent pas de voile noir. */
+  applyFlashOnly(on: boolean, mix: number): void {
+    this.shade.setOpacity(0);
+    this.setFlash(on ? this.flashIntensity * mix : 0);
+  }
+
   setShadeOpacity(opacity: number): void {
     this.shade.setOpacity(opacity);
   }
