@@ -91,6 +91,13 @@ export type BossDefinition = {
   latePhaseHitThreshold?: number;
   /** Après BOSS_FIGHT_END, conserve revealSoundUrl jusqu'au BOSS_REVEAL de ce boss. */
   keepMusicUntilBossReveal?: BossId;
+  /**
+   * À la victoire (BOSS_FIGHT_END), conserve la musique en cours jusqu'à la fin
+   * de la cinématique retour portail (RETURN_PORTAL_TRANSITION_END) au lieu de
+   * la couper immédiatement. Utile quand une musique de fin doit accompagner la
+   * cinématique de sortie. Data-driven : aucune logique boss en dur côté apps.
+   */
+  keepMusicUntilReturnPortal?: boolean;
   assist?: { id: string };
 };
 
