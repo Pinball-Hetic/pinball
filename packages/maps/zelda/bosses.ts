@@ -1,4 +1,5 @@
 import type { BossDefinition, BossId } from '@pinball/game-engine'
+import { mapAsset } from './manifest'
 
 // Définitions de boss Zelda.
 // Ganondorf : monde normal, cible centrale.
@@ -31,6 +32,8 @@ export const bossDefinitions: BossDefinition[] = [
     },
     unlocksPortal: true,
     unlocksReturnPortal: false,
+    revealSoundUrl: mapAsset('audio/spawnGanondorf.mp3'),
+    revealSoundVolume: 100,
     targetMeshTheme: {
       ring: {
         color: 0xff6600,
