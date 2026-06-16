@@ -25,7 +25,10 @@ export const manifest: MapManifest = {
     milestone_big: 'milestone',
   },
   // Assets préchargés par la page playfield.
-  preload: [],
+  preload: [mapAsset('playfield/ganondorf.glb')],
+  // Musique ambiante Zelda — remplace /audio/early-sound.mp3 (ST) pour cette map.
+  // Fichier à déposer dans assets/audio/ambient.mp3 puis sync-map-assets.sh
+  ambientMusic: mapAsset('audio/ambient.mp3'),
   // Sons d'event de la map.
   sounds: {
     sacred_realm_appear: { url: mapAsset('audio/sacredRealm.mp3'), volume: 280 },
