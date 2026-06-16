@@ -38,22 +38,6 @@ export class BossFightMusicController {
     }
   }
 
-  startSync(url: string, volume: number): void {
-    this.samples.ensureContext();
-    void this.samples.resumeContext();
-    if (this.activeUrl && this.activeUrl !== url) {
-      this.stopInstant();
-    }
-    if (!this.samples.isGaplessLoopReady(url)) {
-      void this.start(url, volume);
-      return;
-    }
-    const started = this.samples.playGaplessLoopInGesture(url, volume);
-    if (started) {
-      this.activeUrl = url;
-    }
-  }
-
   /** Arrêt immédiat — pas de fade. */
   stopInstant(): void {
     if (!this.activeUrl) return;
