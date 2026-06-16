@@ -22,8 +22,8 @@ type CameraSliderSpec = {
 };
 
 const CAMERA_SLIDERS: CameraSliderSpec[] = [
-  { key: "dirY", label: "Dir Y", min: 0.2, max: 1, step: 0.01, digits: 2 },
-  { key: "dirZ", label: "Dir Z", min: 0.2, max: 1, step: 0.01, digits: 2 },
+  { key: "dirY", label: "Dir Y", min: 0.92, max: 1, step: 0.005, digits: 3 },
+  { key: "dirZ", label: "Dir Z", min: 0, max: 0.25, step: 0.005, digits: 3 },
   { key: "lookYBias", label: "Look Y", min: 0, max: 1, step: 0.01, digits: 2 },
   { key: "lookZBias", label: "Look Z", min: 0, max: 1, step: 0.01, digits: 2 },
   { key: "portraitNdcX", label: "NDC X", min: 0.85, max: 1.05, step: 0.005, digits: 3 },
