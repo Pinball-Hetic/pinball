@@ -35,6 +35,10 @@ export interface MapManifest {
   overlayFiles?: Record<string, string>
   /** Sons d'event de la map par id (joués via ctx.playSound(id)). */
   sounds?: Record<string, { url: string; volume?: number }>
+  /** Musique ambiante en boucle (attract + in-game). Fallback : /audio/early-sound.mp3 */
+  ambientMusic?: string
+  /** Son game over. Fallback : /audio/sound-lost.mp3 */
+  gameOverSound?: string
   /** Libellés des compteurs (GameStats.counters) par id, pour le recap backglass. */
   counterLabels?: Record<string, string>
   /** Clés de mapState pilotables par l'outil de debug (dev). Permet au debug
