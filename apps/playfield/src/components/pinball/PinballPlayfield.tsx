@@ -336,6 +336,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     isFeverActive,
     startFever,
     clearAlternateWorldSession,
+    addLife,
     resetGame,
     buildEmit,
   } = useGameState({
@@ -375,8 +376,19 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       };
       dmd.emitScoreSnapshot(snap);
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
-      // Dernière vie engagée → respiration 1.2s (pas de gel : bille déjà drainée).
       if (livesRemaining === 1) playCinematic('last_chance');
+    },
+    onLifeGained: (livesRemaining) => {
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: comboRef.current,
+        multiplier: multiplierRef.current,
+        lives: livesRemaining,
+        mapState: buildMapState(),
+      };
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushScore(snap);
     },
     onGameOver: (finalScore, stats) => {
       setFinalScore(finalScore); // le QR arrive ensuite via le callback (async)
@@ -911,6 +923,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
               collisionProcessor?.isBossTriggered(bossId as BossId) ?? false,
             addScore: (points, label) =>
               emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
+            addLife: () => addLife(),
             setMapState: (patch) => {
               Object.assign(mapStateExtraRef.current, patch);
             },
