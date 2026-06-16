@@ -2,6 +2,30 @@
 
 Frontend Next.js — écran principal du flipper (3D Three.js + Rapier).
 
+## Mode affichage
+
+Le playfield cible par défaut un **écran portrait plein écran** (largeur du
+tapis = largeur écran, vue légèrement plongeante). Variable build-time
+`NEXT_PUBLIC_PLAYFIELD_VIEW_MODE` :
+
+| Mode | Comportement |
+| --- | --- |
+| `portrait-fill` (défaut) | Tout le tapis visible : largeur plein écran si possible, sinon recul pour tenir en hauteur. |
+| `legacy` | Ancienne vue cabine avec marges NDC autour du tapis. |
+
+Pour forcer l'ancien cadrage en dev :
+
+```yaml
+playfield:
+  environment:
+    NEXT_PUBLIC_PLAYFIELD_VIEW_MODE: "legacy"
+```
+
+Puis `docker compose -f docker-compose.dev.yml up --force-recreate playfield`.
+
+En mode `portrait-fill`, `[J]` affiche le debug balle et les sliders de réglage
+caméra (direction, look-at, marges NDC). `[H]` reste le toggle colliders Rapier.
+
 ## Modes clavier (dev)
 
 Sélectionnés par la variable d'env `NEXT_PUBLIC_KEYBOARD_MODE` (build-time
@@ -49,6 +73,7 @@ Vérifier dans la console navigateur :
 | `ArrowRight` ou `D` | `RIGHT` | down/up |
 | `Space` | `PLUNGER` | down = charge, up = release |
 | `H` | (debug colliders) | jamais réseau, toujours local |
+| `J` | (debug balle + caméra) | portrait-fill : overlay diagnostics + sliders caméra |
 
 `START` n'est pas mappé au clavier — sera émis uniquement par le vrai
 ESP32 (specs HETIC en attente).
@@ -57,6 +82,7 @@ ESP32 (specs HETIC en attente).
 
 | Var | Défaut | Rôle |
 | --- | --- | --- |
+| `NEXT_PUBLIC_PLAYFIELD_VIEW_MODE` | `portrait-fill` | Cadrage caméra et layout (`legacy` pour l'ancienne vue cabine). |
 | `NEXT_PUBLIC_KEYBOARD_MODE` | `direct` | Voir tableau ci-dessus. |
 | `NEXT_PUBLIC_SOCKET_URL` | (vide) | URL Socket.io directe (dev avec port serveur exposé). Vide en prod Fliphetic → polling same-origin via rewrite Next.js. |
 | `SERVER_INTERNAL_URL` | `http://server:3001` | Cible des rewrites `/api/*` et `/socket.io/*` (DNS Docker). |

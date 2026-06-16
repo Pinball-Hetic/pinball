@@ -61,6 +61,7 @@ export type BossHudConfig = {
   assistLabel?: string;
   victoryClearMs: number;
   nestHintLabel?: string;
+  healthBar?: boolean;
 };
 
 export type BossRevealConfig = {

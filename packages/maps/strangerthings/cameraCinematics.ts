@@ -5,13 +5,15 @@ import {
   VECNA_WALK_SETTLE_FACING,
 } from './systems/VecnaConstants'
 
+const BOSS_FACE_DIR = { x: -0.52, y: 0.2, z: 0.83 }
+
 export const DEMOGORGON_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
-  lookAtLift: 0.028,
-  panFrom: { x: -0.0195, y: 1.012, z: -0.269 },
-  zoomInDuration: 1.75,
-  holdDuration: 1.1,
-  zoomOutDuration: 1.05,
-  distanceScale: 0.58,
+  lookAtLift: 0.06,
+  zoomInDuration: 1.55,
+  faceDirToCamera: BOSS_FACE_DIR,
+  holdDuration: 1.25,
+  zoomOutDuration: 1.1,
+  distanceScale: 0.54,
 }
 
 export const DEMOGORGON_VICTORY_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
@@ -23,12 +25,14 @@ export const DEMOGORGON_VICTORY_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
 }
 
 export const VECNA_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
-  lookAtLift: 0.035,
+  lookAtLift: 0.06,
   panFrom: { x: VECNA_SPAWN.x, y: 1.012, z: VECNA_SPAWN.z },
-  zoomInDuration: VECNA_WALK_DURATION + VECNA_WALK_SETTLE_FACING + 0.35,
-  holdDuration: 1.0,
-  zoomOutDuration: 1.05,
-  distanceScale: 0.58,
+  zoomInDuration: VECNA_WALK_DURATION,
+  holdDuration: VECNA_WALK_SETTLE_FACING + 0.5,
+  zoomOutDuration: 1.1,
+  distanceScale: 0.54,
+  faceDirToCamera: BOSS_FACE_DIR,
+  panEasing: 'linear',
 }
 
 export const VECNA_VICTORY_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
