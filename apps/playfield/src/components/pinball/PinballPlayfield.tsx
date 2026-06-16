@@ -91,6 +91,12 @@ const MAP_SOUND_URLS: string[] = [
   ...MAP_BOSSES.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
   ...Object.values(RESOLVED_MAP?.manifest.sounds ?? {}).map((s) => s.url),
 ];
+// Brancher la musique ambiante + le game-over de la map active dès le chargement
+// du module (avant tout rendu). Fallback automatique si non défini dans le manifest.
+setMapAudioUrls(
+  RESOLVED_MAP?.manifest.ambientMusic,
+  RESOLVED_MAP?.manifest.gameOverSound,
+);
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -147,6 +153,7 @@ import {
   warmMapSounds,
   resetPinballAudioForNewGame,
   unlockPinballAudio,
+  setMapAudioUrls,
 } from "@/audio/pinballAudio";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import CinematicOverlay from "./CinematicOverlay";
