@@ -30,6 +30,7 @@ interface GameOverlayProps {
   plungerAnchor?: { x: number; y: number };
   onAttractInteract?: () => void;
   gameOverClaimUrl?: string | null;
+  gameOverCode?: string | null;
   gameOverScore?: number;
   mapTheme?: CSSProperties;
   outro?: MapManifest["outro"];
@@ -132,6 +133,7 @@ export default function GameOverlay({
   plungerAnchor,
   onAttractInteract,
   gameOverClaimUrl = null,
+  gameOverCode = null,
   gameOverScore = 0,
   mapTheme,
   outro,
@@ -391,6 +393,20 @@ export default function GameOverlay({
               </div>
             )}
           </div>
+
+          {gameOverCode && (
+            <p
+              className="text-sm font-bold uppercase tracking-[0.5em]"
+              style={{
+                fontFamily: "var(--st-font, monospace)",
+                color: "var(--foreground, #ede4d3)",
+                textShadow: `0 0 8px ${glow}`,
+              }}
+            >
+              <span className="opacity-60">CODE</span>{" "}
+              {gameOverCode.split("").join(" ")}
+            </p>
+          )}
 
           <p
             className="max-w-xs text-center font-mono text-xs uppercase tracking-[0.18em]"
