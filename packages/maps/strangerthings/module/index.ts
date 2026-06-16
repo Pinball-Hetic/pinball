@@ -11,6 +11,7 @@ import {
 } from '../systems'
 import { bossThresholdMet } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
+import { grantExtraLife } from './lifeBonus'
 
 // Module de comportement Stranger Things. Possède tous ses systèmes en
 // closure ; n'expose que le contrat MapModule (aucun bridge vers le
@@ -111,6 +112,7 @@ export function createModule(): MapModule {
       if (e.type === 'BOSS_TARGET_HIT' && ctx) {
         const boss = ctx.layout.bosses.find((b) => b.id === e.bossId)
         if (boss && e.hitCount >= boss.targetHits) {
+          grantExtraLife(ctx)
           portal?.notifyBossDefeated(e.bossId, ctx.bossGateContext().alternateWorldActive)
         }
       }
@@ -128,6 +130,7 @@ export function createModule(): MapModule {
         portal?.setUpsideDownActive(true)
         ctx.resetPortalTrigger()
         ctx.enterAlternateWorld()
+        grantExtraLife(ctx)
         nestMarker?.setUpsideDown(true)
       }
       // Game over en drainant : fin de tous les combats boss.
