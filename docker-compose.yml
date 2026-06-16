@@ -95,29 +95,20 @@ services:
       dockerfile: apps/input-bridge/Dockerfile
     restart: unless-stopped
     environment:
-      # Mode mock tant que le firmware ESP32 n'existe pas. Passer à `serial`
-      # uniquement après avoir décommenté `devices:` et fourni un chemin
-      # réel /dev/serial/by-id/usb-... (cf. instructions ci-dessous).
-      INPUT_BRIDGE_MODE: mock
-      SERIAL_PATH: /dev/MOCK_ESP32
+      # ESP32 réel : device borne = /dev/ttyUSB0 (CP2102), flashé par Fliphetic
+      # AVANT le compose up (cf. cycle de chargement, CLAUDE.md).
+      INPUT_BRIDGE_MODE: serial
+      SERIAL_PATH: /dev/ttyUSB0
       SERIAL_BAUD: "115200"
       SERVER_URL: http://server:3001
     depends_on:
       server:
         condition: service_healthy
-    # ──────────────────────────────────────────────────────────────────────
-    # Mode serial (ESP32 USB-CDC) — décommenter quand le firmware existe.
-    #
-    # 1. Brancher l'ESP32 sur la borne. Vérifier le chemin stable :
-    #      ls /dev/serial/by-id/
-    # 2. Décommenter `devices:` ci-dessous, remplacer le chemin source par le
-    #    bon /dev/serial/by-id/usb-... .
-    # 3. Passer `INPUT_BRIDGE_MODE=serial` (via .env ou override compose).
-    # 4. Vérifier les logs : "serial port opened" attendu.
-    #
-    # devices:
-    #   - "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_XX-if00:/dev/MOCK_ESP32"
-    # ──────────────────────────────────────────────────────────────────────
+    # Mapping DUR du port série hôte → conteneur. Sur la borne, Fliphetic flashe
+    # l'ESP32 → /dev/ttyUSB0 présent avant `compose up`. Sur un poste SANS ESP32,
+    # `compose up` de ce fichier échoue à créer ce conteneur (attendu : prod = borne).
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
 
 volumes:
   postgres_data:
