@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { BALL_RADIUS } from '../domain/Ball';
+import { getBallRadius } from '../domain/Ball';
 import { FLIPPER_RESTITUTION } from '../domain/FlipperConstants';
 
 export class FlipperPhysics {
@@ -12,9 +12,10 @@ export class FlipperPhysics {
       RAPIER.RigidBodyDesc.kinematicPositionBased()
         .setTranslation(center.x, center.y, center.z),
     );
-    const halfY = Math.max(size.y / 2, BALL_RADIUS * 3);
+    const r = getBallRadius();
+    const halfY = Math.max(size.y / 2, r * 3);
     world.createCollider(
-      RAPIER.ColliderDesc.cuboid(size.x / 2, halfY, size.z / 2 + BALL_RADIUS)
+      RAPIER.ColliderDesc.cuboid(size.x / 2, halfY, size.z / 2 + r)
         .setRestitution(FLIPPER_RESTITUTION)
         .setFriction(0.28)
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
