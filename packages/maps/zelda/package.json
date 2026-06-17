@@ -1,0 +1,28 @@
+{
+  "name": "@pinball/map-zelda",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./dmd": "./dmd/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --ext .ts,.tsx",
+    "build": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@pinball/shared-types": "workspace:*",
+    "@pinball/game-engine": "workspace:*",
+    "@pinball/dmd-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "react": "^19.2.4"
+  }
+}

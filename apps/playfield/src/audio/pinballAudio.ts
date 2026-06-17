@@ -4,9 +4,11 @@ import { installAudioBootstrap } from "./AudioBootstrap";
 import { BossFightMusicController } from "./BossFightMusicController";
 import { EarlySoundController } from "./EarlySoundController";
 import {
-  EARLY_SOUND_URL,
-  GAME_OVER_URL,
+  getEarlySoundUrl,
+  getGameOverUrl,
+  setMapAudioUrls,
 } from "./pinballAudioConfig";
+export { setMapAudioUrls };
 import { PlayfieldMusicDirector } from "./PlayfieldMusicDirector";
 import { soundLevel, percentToGain } from "./pinballAudioVolumes";
 import { SamplePlayer } from "./SamplePlayer";
@@ -26,8 +28,10 @@ let assetsWarmed = false;
 function warmAssets(): void {
   if (assetsWarmed) return;
   assetsWarmed = true;
-  void samples.prepareGaplessLoop(EARLY_SOUND_URL);
-  void samples.preloadBuffer(GAME_OVER_URL);
+  void samples.prepareGaplessLoop(getEarlySoundUrl());
+  void samples.preloadBuffer(getGameOverUrl());
+  // Sons spécifiques à la map (reveal boss, ambiance) : préchargés via
+  // warmMapSounds(urls) depuis le playfield (URLs fournies par la map).
 }
 
 // Préchargement des sons de la map (musique boss en boucle gapless).
@@ -62,7 +66,7 @@ function tryStartEarlySound(sync: boolean): void {
 
 function requestEarlySoundStart(sync = false): void {
   void earlySound.arm().then(() => tryStartEarlySound(sync));
-  if (samples.isGaplessLoopReady(EARLY_SOUND_URL)) {
+  if (samples.isGaplessLoopReady(getEarlySoundUrl())) {
     tryStartEarlySound(sync);
   }
 }
@@ -122,7 +126,7 @@ export function onMusicGameOver(): void {
   wantsEarlySound = true;
   musicDirector.setWantsEarly(true);
   musicDirector.onGameOverSting();
-  void samples.playOneShotBuffer(GAME_OVER_URL, soundLevel("gameOver"));
+  void samples.playOneShotBuffer(getGameOverUrl(), soundLevel("gameOver"));
 }
 
 /** @deprecated Utiliser onMusicGameOver — conservé pour compatibilité interne. */

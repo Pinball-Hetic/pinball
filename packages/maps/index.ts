@@ -5,6 +5,11 @@ import {
   layout as stLayout,
   createModule as stCreateModule,
 } from '@pinball/map-strangerthings'
+import {
+  mapPackage as zeldaPackage,
+  layout as zeldaLayout,
+  createModule as zeldaCreateModule,
+} from '@pinball/map-zelda'
 
 // Le layout + le module (types game-engine) ne peuvent pas vivre sur
 // MapPackage (shared-types ne dépend pas de game-engine). Le registry — qui,
@@ -21,6 +26,8 @@ export function getMapPackage(id: string): ResolvedMap | null {
   switch (id) {
     case 'strangerthings':
       return { ...stPackage, layout: stLayout, module: stCreateModule }
+    case 'zelda':
+      return { ...zeldaPackage, layout: zeldaLayout, module: zeldaCreateModule }
     default:
       return null
   }
