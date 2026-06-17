@@ -6,6 +6,7 @@ import type {
   LeaderboardEntry,
   GlobalStats,
 } from '@pinball/shared-types'
+import { DEFAULT_MAP_ID } from '@pinball/shared-types'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
@@ -16,11 +17,14 @@ const EMPTY_STATS: GlobalStats = {
   bestToday: null,
 }
 
+const FORCED_MAP_ID = process.env.NEXT_PUBLIC_MAP_ID
+
 export function useBackglassData() {
   const socketRef = useRef<PinballSocket | null>(null)
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [stats, setStats] = useState<GlobalStats>(EMPTY_STATS)
   const [connected, setConnected] = useState(false)
+  const [mapId, setMapId] = useState<string>(FORCED_MAP_ID ?? DEFAULT_MAP_ID)
 
   useEffect(() => {
     // Kiosk : une réponse d'erreur (JSON {error}, 5xx HTML, déconnexion)
@@ -69,6 +73,11 @@ export function useBackglassData() {
     socket.on('game:over', () => {
       fetchStats()
     })
+    // Synchro map active (émis à la connexion + à chaque changement).
+    // Ignoré si NEXT_PUBLIC_MAP_ID est forcé (prod Fliphetic mono-map).
+    socket.on('map:selected', ({ mapId: id }) => {
+      if (!FORCED_MAP_ID) setMapId(id)
+    })
 
     // Les claims arrivent async (téléphone, après la partie, depuis n'importe
     // quelle borne) : poll périodique pour faire apparaître les pseudos
@@ -84,5 +93,5 @@ export function useBackglassData() {
     }
   }, [])
 
-  return { entries, stats, connected }
+  return { entries, stats, connected, mapId }
 }
