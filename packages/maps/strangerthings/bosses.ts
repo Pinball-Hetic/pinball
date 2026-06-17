@@ -1,4 +1,10 @@
 import type { BossDefinition, BossId } from '@pinball/game-engine'
+import {
+  DEMOGORGON_CAMERA_CINEMATIC,
+  DEMOGORGON_VICTORY_CAMERA_CINEMATIC,
+  VECNA_CAMERA_CINEMATIC,
+  VECNA_VICTORY_CAMERA_CINEMATIC,
+} from './cameraCinematics'
 import { mapAsset } from './manifest'
 
 // Définitions de boss Stranger Things (déplacées de game-engine/BossRegistry).
@@ -29,11 +35,15 @@ export const bossDefinitions: BossDefinition[] = [
       assistLabel: 'Eleven +100',
       victoryClearMs: 1400,
       nestHintLabel: 'LE DEMOGORGON SOMMEILLE PRES DES BUMPERS',
+      healthBar: true,
     },
     unlocksPortal: true,
     unlocksReturnPortal: false,
+    cameraCinematic: DEMOGORGON_CAMERA_CINEMATIC,
+    victoryCameraCinematic: DEMOGORGON_VICTORY_CAMERA_CINEMATIC,
     revealSoundUrl: mapAsset('audio/spawnDG.mp3'),
     revealSoundVolume: 100,
+    keepMusicUntilBossReveal: 'vecna',
     // Eleven aide pendant le fight (cf. DemogorgonReveal émet ASSIST id 'eleven').
     assist: { id: 'eleven' },
     targetMeshTheme: {
@@ -91,9 +101,19 @@ export const bossDefinitions: BossDefinition[] = [
       hitsClass: 'text-violet-400 drop-shadow-[0_0_10px_rgba(160,80,255,0.7)]',
       victoryClass: 'text-violet-200 drop-shadow-[0_0_20px_rgba(160,80,255,0.9)]',
       victoryClearMs: 1600,
+      healthBar: true,
     },
     unlocksPortal: false,
     unlocksReturnPortal: true,
+    cameraCinematic: VECNA_CAMERA_CINEMATIC,
+    victoryCameraCinematic: VECNA_VICTORY_CAMERA_CINEMATIC,
+    revealSoundUrl: mapAsset('audio/vecnaTheme.mp3'),
+    revealSoundVolume: 100,
+    latePhaseSoundUrl: mapAsset('audio/win-music.mp3'),
+    latePhaseSoundVolume: 100,
+    latePhaseHitThreshold: 7,
+    // win-music continue pendant la cinématique retour portail (photo fin Vecna).
+    keepMusicUntilReturnPortal: true,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,

@@ -1,7 +1,7 @@
 import {
   EARLY_SOUND_FADE_OUT_S,
   EARLY_SOUND_LOOP_SILENCE_THRESHOLD,
-  EARLY_SOUND_URL,
+  getEarlySoundUrl,
 } from "./pinballAudioConfig";
 import { soundLevel } from "./pinballAudioVolumes";
 import type { SamplePlayer } from "./SamplePlayer";
@@ -10,7 +10,8 @@ export type EarlySoundPhase = "off" | "armed" | "playing" | "released";
 
 export class EarlySoundController {
   private phase: EarlySoundPhase = "off";
-  private revealConsumed = false;
+  /** Bloque toute reprise tant que le boss tient la piste musique. */
+  private handoffBlocked = false;
 
   constructor(private readonly samples: SamplePlayer) {}
 
@@ -19,31 +20,33 @@ export class EarlySoundController {
   }
 
   arm(): Promise<void> {
-    if (this.revealConsumed) return Promise.resolve();
+    if (this.handoffBlocked) return Promise.resolve();
     this.phase = "armed";
     return this.samples
-      .prepareGaplessLoop(EARLY_SOUND_URL, EARLY_SOUND_LOOP_SILENCE_THRESHOLD)
+      .prepareGaplessLoop(getEarlySoundUrl(), EARLY_SOUND_LOOP_SILENCE_THRESHOLD)
       .then(() => undefined);
   }
 
   async engage(): Promise<void> {
-    if (this.revealConsumed) return;
-    if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
+    if (this.handoffBlocked) return;
+    const url = getEarlySoundUrl();
+    if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(url)) {
       this.phase = "playing";
       return;
     }
     if (this.phase !== "armed" && this.phase !== "off") return;
 
     await this.samples.resumeContext();
-    const started = await this.samples.playGaplessLoop(EARLY_SOUND_URL, soundLevel("earlySound"));
+    const started = await this.samples.playGaplessLoop(url, soundLevel("earlySound"));
     if (started) {
       this.phase = "playing";
     }
   }
 
   engageSync(): void {
-    if (this.revealConsumed) return;
-    if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
+    if (this.handoffBlocked) return;
+    const url = getEarlySoundUrl();
+    if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(url)) {
       this.phase = "playing";
       return;
     }
@@ -51,11 +54,11 @@ export class EarlySoundController {
 
     this.samples.ensureContext();
     void this.samples.resumeContext();
-    if (!this.samples.isGaplessLoopReady(EARLY_SOUND_URL)) {
+    if (!this.samples.isGaplessLoopReady(url)) {
       void this.engage();
       return;
     }
-    const started = this.samples.playGaplessLoopInGesture(EARLY_SOUND_URL, soundLevel("earlySound"));
+    const started = this.samples.playGaplessLoopInGesture(url, soundLevel("earlySound"));
     if (started) {
       this.phase = "playing";
     }
@@ -63,20 +66,24 @@ export class EarlySoundController {
 
   release(): void {
     if (this.phase === "off") return;
-    this.samples.fadeOutGaplessLoop(EARLY_SOUND_URL, EARLY_SOUND_FADE_OUT_S);
+    this.samples.fadeOutGaplessLoop(getEarlySoundUrl(), EARLY_SOUND_FADE_OUT_S);
     this.phase = "released";
   }
 
-  consumeOnBossReveal(): void {
-    this.revealConsumed = true;
-    // Stop immédiat (pas de fade) pour que spawnDG ne soit pas masqué par la musique.
-    this.samples.stopGaplessLoop(EARLY_SOUND_URL);
-    this.phase = "released";
+  /** Arrêt immédiat — pas de fade (handoff vers musique boss). */
+  stopInstant(): void {
+    this.handoffBlocked = true;
+    this.samples.stopGaplessLoop(getEarlySoundUrl());
+    this.phase = "off";
+  }
+
+  clearHandoffBlock(): void {
+    this.handoffBlocked = false;
   }
 
   resetForNewGame(): void {
-    this.revealConsumed = false;
-    this.samples.stopGaplessLoop(EARLY_SOUND_URL);
+    this.handoffBlocked = false;
+    this.samples.stopGaplessLoop(getEarlySoundUrl());
     this.phase = "off";
   }
 

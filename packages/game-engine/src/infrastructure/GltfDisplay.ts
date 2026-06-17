@@ -27,7 +27,7 @@ function shouldDarkenMapMaterial(mesh: THREE.Mesh): boolean {
   const n = canonicalGltfName(mesh.name);
   if (/^bumper_ring/.test(n) || /^bumper-\d+$/.test(n)) return false;
 
-  if (n === 'playfield' || /^table(\.\d+)?$/.test(n) || n === 'pinballmap') return true;
+  if (n === 'playfield' || n === 'floor_main' || /^table(\.\d+)?$/.test(n) || n === 'pinballmap') return true;
 
   if (
     n === 'playfield_sides'

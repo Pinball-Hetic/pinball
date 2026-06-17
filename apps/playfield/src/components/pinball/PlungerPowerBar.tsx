@@ -1,18 +1,53 @@
+import type { CSSProperties } from "react";
+
+type ScreenAnchor = {
+  x: number;
+  y: number;
+};
+
 interface PlungerPowerBarProps {
-  /** Progression de charge normalisée [0, 1]. */
   charge: number;
+  portraitFill?: boolean;
+  anchor?: ScreenAnchor;
 }
 
-/**
- * Jauge verticale de puissance du plongeur (couloir droit de l'écran).
- */
-export default function PlungerPowerBar({ charge }: PlungerPowerBarProps) {
+type BarLayout = {
+  className: string;
+  trackClassName: string;
+  style?: CSSProperties;
+};
+
+function barLayout(portraitFill: boolean, anchor?: ScreenAnchor): BarLayout {
+  if (portraitFill && anchor) {
+    return {
+      className:
+        "pointer-events-none absolute z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5",
+      trackClassName:
+        "relative h-36 w-3.5 overflow-hidden rounded-full border border-zinc-700/80 bg-black/60 shadow-[inset_0_0_8px_rgba(0,0,0,0.8)]",
+      style: { left: `${anchor.x}%`, top: `${anchor.y}%` },
+    };
+  }
+  return {
+    className:
+      "pointer-events-none absolute right-4 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-2 sm:right-6",
+    trackClassName:
+      "relative h-40 w-3 overflow-hidden rounded-full border border-zinc-700/80 bg-black/60 shadow-[inset_0_0_8px_rgba(0,0,0,0.8)] sm:h-48 sm:w-3.5",
+  };
+}
+
+export default function PlungerPowerBar({
+  charge,
+  portraitFill = false,
+  anchor,
+}: PlungerPowerBarProps) {
   const pct = Math.round(charge * 100);
   const full = charge >= 0.995;
+  const layout = barLayout(portraitFill, anchor);
 
   return (
     <div
-      className="pointer-events-none absolute right-4 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-2 sm:right-6"
+      className={layout.className}
+      style={layout.style}
       aria-label={`Puissance du lancement ${pct} pourcent`}
       role="meter"
       aria-valuemin={0}
@@ -23,7 +58,7 @@ export default function PlungerPowerBar({ charge }: PlungerPowerBarProps) {
         Puissance
       </span>
 
-      <div className="relative h-40 w-3 overflow-hidden rounded-full border border-zinc-700/80 bg-black/60 shadow-[inset_0_0_8px_rgba(0,0,0,0.8)] sm:h-48 sm:w-3.5">
+      <div className={layout.trackClassName}>
         <div
           className={`absolute inset-x-0 bottom-0 rounded-full transition-[height] duration-75 ease-out ${
             full
@@ -32,7 +67,6 @@ export default function PlungerPowerBar({ charge }: PlungerPowerBarProps) {
           }`}
           style={{ height: `${Math.max(charge * 100, 2)}%` }}
         />
-        {/* Repères 25 / 50 / 75 % */}
         {[25, 50, 75].map((mark) => (
           <div
             key={mark}

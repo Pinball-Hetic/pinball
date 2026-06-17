@@ -12,6 +12,8 @@ export interface ServerToClientEvents {
   'dmd:display': (data: DmdDisplay) => void
   // Page /debug → injecte un GameEvent dans le playfield (chaîne complète).
   'dev:trigger-game-event': (data: DevGameEventTrigger) => void
+  // Émis au seul socket émetteur du game:over (pas un broadcast).
+  'game:registered': (data: GameRegistered) => void
 }
 
 export interface ClientToServerEvents {
@@ -125,6 +127,15 @@ export interface GameOver {
   debug?: boolean
 }
 
+export interface GameRegistered {
+  code: string // token de claim
+  claimUrl: string // URL encodée dans le QR (rendu client-side)
+}
+
+// Limite d'affichage du pseudo (tronqué par les écrans). Le max réel de
+// saisie sera défini côté API globale.
+export const PSEUDO_MAX_DISPLAY = 12
+
 export interface LeaderboardEntry {
   rank: number
   name: string
@@ -141,7 +152,16 @@ export interface GlobalStats {
   bestToday: { score: number; player: string } | null
 }
 
-export type ButtonId = 'LEFT' | 'RIGHT' | 'PLUNGER' | 'START'
+export type ButtonId =
+  | 'BLACK_LEFT'
+  | 'WHITE_LEFT'
+  | 'FRONT_LEFT_GREEN'
+  | 'FRONT_LEFT_YELLOW'
+  | 'FRONT_LEFT_RED'
+  | 'BLACK_RIGHT'
+  | 'WHITE_RIGHT'
+  | 'FRONT_WHITE'
+  | 'PLUNGER'
 export type ButtonAction = 'DOWN' | 'UP'
 
 export interface ButtonInput {

@@ -40,10 +40,11 @@ packages/
 > `mapAssetUrl(id, rel)` → `/maps/<id>/…`, depuis `manifest.id` (zéro littéral).
 >
 > **Id par défaut** : `DEFAULT_MAP_ID` (shared-types) — pas de sélecteur,
-> `NEXT_PUBLIC_MAP_ID` non défini → cette map. **Anti-fuite** : `task
-> check:leaks` (bloquant en CI) interdit les termes `manifest.forbiddenInCore`
-> hors `packages/maps/` (whitelist étroite documentée). Conventions GLB +
-> authoring : `docs/MAP_AUTHORING.md`.
+> `NEXT_PUBLIC_MAP_ID` non défini → cette map. **Étanchéité map** : la règle
+> ESLint `no-restricted-imports` interdit d'importer `@pinball/map-*` hors du
+> registry ; la convention « pas de contenu ST dans le core/apps » est vérifiée
+> à la revue (plus de guard automatique). Conventions GLB + authoring :
+> `docs/MAP_AUTHORING.md`.
 
 ### `packages/game-engine` — Physics, game logic, no React
 Clean architecture: domain / infrastructure / use-cases.
@@ -169,7 +170,8 @@ Cette app est packagée pour [Fliphetic](https://pandormedia.github.io/fliphetic
 
 1. `git fetch` + checkout de la branche `[deploy].ref` (= `dev`).
 2. `docker compose down` de l'app précédente.
-3. Flash ESP32 (désactivé tant que le firmware n'existe pas).
+3. Flash ESP32 (`firmware/build/firmware.bin`, device `esp32`, baud 115200 —
+   cf. `firmware/README.md`).
 4. `docker compose up` + attente des healthchecks (`ready_timeout = 120`).
 5. Résolution des écrans via `docker compose port` → chaque kiosque
    Chromium pointe sur `http://<host>:<port_dynamique>/`.
@@ -218,7 +220,7 @@ puissent ouvrir une Socket.io vers lui :
 **USB-Serial CDC**, texte UTF-8 ligne par ligne, baud 115200.
 
 ```
-BTN:<ID>:<DOWN|UP>        # boutons (LEFT/RIGHT/PLUNGER/START/...)
+BTN:<ID>:<DOWN|UP>        # ID = bouton physique (WHITE_LEFT/PLUNGER/...)
 TILT:TRIGGERED            # capteur tilt
 SENSOR:<ID>:<VALUE>       # capteur générique
 ```
@@ -233,7 +235,7 @@ Fliphetic (l'`input-bridge` retente l'ouverture 60×500 ms).
 
 ```
 ESP32 firmware (ou clavier en mode simulate-esp32)
-  → port série USB-CDC (texte ex. "BTN:LEFT:DOWN\n")
+  → port série USB-CDC (texte ex. "BTN:WHITE_LEFT:DOWN\n")
     → apps/input-bridge
         parse ligne + emit Socket.io 'input:button'/'input:tilt'/'input:sensor'
       → apps/server
@@ -259,6 +261,13 @@ Types et noms d'events centralisés dans
 `ButtonInput`, `TiltInput`, `SensorInput`, `'input:*'`,
 `'dev:simulate-button'`).
 
+`ButtonId` = **9 boutons physiques** UPPER_SNAKE (`BLACK_LEFT`, `WHITE_LEFT`,
+`FRONT_LEFT_GREEN`, `FRONT_LEFT_YELLOW`, `FRONT_LEFT_RED`, `BLACK_RIGHT`,
+`WHITE_RIGHT`, `FRONT_WHITE`, `PLUNGER`). Source de vérité unique :
+`packages/shared-types/src/cabinet-buttons.ts` (`CABINET_BUTTONS` = id/gpio/
+activeLow/action ; `BUTTON_ACTION` = seul traducteur `ButtonId → GameAction`).
+Le firmware n'émet que l'**id physique** ; le mapping action vit côté TS.
+
 ### Identification des clients Socket.io
 
 Le server distingue les rôles via `socket.handshake.auth.role` :
@@ -271,15 +280,17 @@ Le server distingue les rôles via `socket.handshake.auth.role` :
 Pas de validation cryptographique (réseau Tailscale privé, contexte
 projet étudiant).
 
-### Duplication clavier ↔ physique (assumée)
+### Source unique des effets clavier ↔ physique
 
-Le callback `physicalInputsRef.current.onButton` est la **source de
-vérité unique** des effets sur le game loop (flippers, plunger, reset).
-Il est appelé soit par les events réseau `input:button`, soit
-localement par `dispatchButton(...)` en mode clavier `direct`. Pas de
-duplication d'effet dans `onKeyDown`/`onKeyUp` — ils ne font que router
-vers `dispatchButton`. Refacto plus poussée (extraire des helpers
-nommés `pressLeft/releaseLeft/...`) reste en TODO.
+`applyAction(action: GameAction, ...)` (closure de `PinballPlayfield.tsx`) est la
+**source de vérité unique** des effets sur le game loop (flippers, plunger,
+reset). Il est keyé sur l'**action jeu** (`FLIP_LEFT`/`FLIP_RIGHT`/`PLUNGE`/
+`START`), pas sur l'id physique. `onButton` est un adaptateur fin : traduit
+`ButtonId → GameAction` via `BUTTON_ACTION` (drop si non mappé) puis appelle
+`applyAction`. Appelé soit par les events réseau `input:button`, soit localement
+par `dispatchButton(...)` en mode clavier `direct`. `onKeyDown`/`onKeyUp` ne font
+que router vers `dispatchButton` (ids dérivés de `CABINET_BUTTONS` via
+`idForAction`). TODO DRY résolu — plus de helpers `pressLeft/...` à extraire.
 
 ### Modes clavier (dev)
 
@@ -291,7 +302,7 @@ sélectionnés par `NEXT_PUBLIC_KEYBOARD_MODE` (build-time Next.js) :
 - **`simulate-esp32`** : `dispatchButton` émet `dev:simulate-button` au
   server. Le server **route uniquement vers la room `input-bridge`**
   (identification par `socket.handshake.auth.role === 'input-bridge'`).
-  L'input-bridge injecte la ligne protocolaire (`BTN:LEFT:DOWN\n`) sur
+  L'input-bridge injecte la ligne protocolaire (`BTN:WHITE_LEFT:DOWN\n`) sur
   son port mock virtuel ; son propre parser relit et émet `input:button`
   au server, qui broadcast à tous les frontends via `io.emit`. Le
   playfield émetteur reçoit son propre event en retour. **Chemin
@@ -319,16 +330,6 @@ Détails dans `apps/playfield/README.md`.
 
 ### TODO Fliphetic (hors session courante)
 
-- **Firmware ESP32** : tant que les specs hardware HETIC ne sont pas
-  reçues (variante ESP32, câblage boutons/LEDs/vibreur, nombre de
-  boutons, bandeau LED adressable), ne pas écrire de firmware.
-- **`.github/workflows/firmware.yml`** : build PlatformIO + `esptool
-  merge_bin` + commit du `.bin`. À faire en même temps que le firmware.
-- **Activer `[esp32.buttons]`** dans `fliphetic.toml` (décommenter)
-  quand le firmware existe + nom du device confirmé côté admin borne.
-- **Activer `devices:`** du service `input-bridge` quand un chemin
-  `/dev/serial/by-id/...` stable sera disponible. Passer
-  `INPUT_BRIDGE_MODE=serial`.
 - **Pré-build images Docker GHCR** : les builds Next.js prennent
   plusieurs minutes au chargement Fliphetic. Optimisation perf à faire
   en session dédiée (cf. Recette 4 de la doc Fliphetic).
@@ -336,12 +337,12 @@ Détails dans `apps/playfield/README.md`.
 - **`fliphetic validate .`** en local (nécessite le CLI Fliphetic).
 - **Supprimer le scénario démo mock** d'`apps/input-bridge/src/index.ts`
   dès qu'un firmware réel émet des events.
-- **Refacto inputs DRY** : extraire helpers `pressLeft/releaseLeft/
-  chargePlunger/releasePlunger` partagés entre clavier et physique
-  (`PinballPlayfield.tsx` + `usePhysicalInputs`).
 - **Logique tilt** : pénalité, désactivation flippers temporaire,
   cooldown. Pour l'instant l'event est seulement loggé côté playfield.
 - **Logique sensor analogique plunger** : force = valeur capteur au lieu
   de timing manuel. Touche `LaunchBall` + UI plunger.
-- **Renommer `ButtonId`** (`LEFT/RIGHT/PLUNGER/START`) selon les vrais
-  boutons HETIC quand les specs sont reçues.
+- **Mapper les 4 boutons restants** (`BLACK_LEFT`, `FRONT_LEFT_GREEN/
+  YELLOW/RED`, `BLACK_RIGHT`) à des actions : ajouter `action` dans
+  `CABINET_BUTTONS` (`cabinet-buttons.ts`) — aujourd'hui non mappés.
+- **Valider le firmware sur la borne** puis passer `required = true` dans
+  `fliphetic.toml` (`[esp32.esp32]`).

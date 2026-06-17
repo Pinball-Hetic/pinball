@@ -1,3 +1,10 @@
+import { mapAsset } from '../manifest';
+
+/** Cinématique entrée Upside Down (premier passage portail). */
+export const PORTAL_ENTER_TEXTURE_URL = mapAsset('playfield/upsidedown.jpg');
+/** Cinématique retour après victoire Vecna (passage balle dans le trou). */
+export const RETURN_PORTAL_TEXTURE_URL = mapAsset('playfield/fin_combat_vecna.png');
+
 export const UPSIDE_DOWN_TRANSITION_DURATION = 4;
 export const UPSIDE_DOWN_TRANSITION_BLACKOUT = 0.12;
 export const UPSIDE_DOWN_TRANSITION_REVEAL = 0.55;
@@ -10,7 +17,14 @@ export const UPSIDE_DOWN_TRANSITION_HOLD =
   - UPSIDE_DOWN_TRANSITION_REVEAL
   - UPSIDE_DOWN_TRANSITION_RESTORE;
 
+export const UPSIDE_DOWN_PORTAL_REVEAL_DELAY = 3;
+export const UPSIDE_DOWN_PORTAL_OPEN_DURATION = 2.5;
 export const UPSIDE_DOWN_PORTAL_OPEN_POLISH = 0.2;
+export const UPSIDE_DOWN_PORTAL_ANCHOR_NAMES = [
+  'portal_upsidedown',
+  'vis_demogorgon_portal_demog_portal_ref_skeleton',
+  'demogorgon_portal_demog_portal_ref_skeleton',
+] as const;
 export const UPSIDE_DOWN_PORTAL_PULSE_SPEED = 2.4;
 export const UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED = 1.6;
 export const UPSIDE_DOWN_PORTAL_VINE_COUNT = 5;

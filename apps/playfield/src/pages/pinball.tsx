@@ -2,6 +2,7 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useState } from 'react';
 import { getMapPackage, AVAILABLE_MAPS } from '@pinball/maps';
+import { parsePlayfieldViewMode } from '@pinball/game-engine';
 import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { MapSelectorScreen } from '@/components/pinball/MapSelectorScreen';
 import '@/audio/pinballAudio';
@@ -11,6 +12,10 @@ const PinballPlayfield = dynamic(
   { ssr: false },
 );
 
+const PORTRAIT_FILL =
+  parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE) === 'portrait-fill';
+const PORTRAIT_VIEWPORT =
+  'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover';
 // Type de ressource <link rel=preload> inféré depuis l'extension.
 function preloadAs(path: string): string {
   if (/\.(glb|gltf|bin)$/i.test(path)) return 'fetch';
@@ -40,6 +45,10 @@ export default function PinballPage() {
   return (
     <>
       <Head>
+        <meta
+          name="viewport"
+          content={PORTRAIT_FILL ? PORTRAIT_VIEWPORT : 'width=device-width, initial-scale=1'}
+        />
         <link rel="preload" href="/audio/early-sound.mp3" as="audio" type="audio/mpeg" />
         {preload.map((p) => (
           <link key={p} rel="preload" href={p} as={preloadAs(p)} />

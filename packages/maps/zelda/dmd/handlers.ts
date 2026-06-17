@@ -101,7 +101,7 @@ export const cinematicHandlers: Record<string, ClipHandler> = {
   hetic_letter: (grid, clockMs, ctx) => clipHeticLetter(grid, ctx.value || 1, clockMs),
   hetic_complete: (grid, clockMs) => clipHeticComplete(grid, clockMs),
   // sacred_realm : TODO — ajouter un clip dot-art du portail / Triforce.
-  last_chance: (grid, _clockMs) => {
+  last_chance: (grid) => {
     drawCentered(grid, 'DERNIERE VIE', 25, FONT_5X7, DOT.lives)
   },
 }

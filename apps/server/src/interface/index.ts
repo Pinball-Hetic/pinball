@@ -5,8 +5,8 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@pinball/shared-types';
-import { topTen, globalStats } from '../use-cases/Leaderboard';
-import { recordGame } from '../use-cases/RecordGame';
+import { worldTopTen, globalStats } from '../use-cases/Leaderboard';
+import { registerScore } from '../use-cases/RegisterScore';
 
 const app = express();
 const httpServer = createServer(app);
@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const mapId = typeof req.query.mapId === 'string' ? req.query.mapId : undefined;
-    res.json(await topTen(mapId));
+    res.json(await worldTopTen(mapId));
   } catch (err) {
     console.error('[server] /api/leaderboard failed:', err);
     res.status(500).json({ error: 'leaderboard unavailable' });
@@ -91,8 +91,9 @@ io.on('connection', (socket) => {
       return;
     }
     try {
-      await recordGame(data);
-      io.emit('leaderboard:refresh', await topTen());
+      const registered = await registerScore(data);
+      socket.emit('game:registered', registered); // au seul émetteur → QR
+      io.emit('leaderboard:refresh', await worldTopTen()); // backglass (board mondial)
     } catch (err) {
       // le jeu continue — la persistence ne doit JAMAIS bloquer le relay
       console.error('[server] game:over persist failed:', err);

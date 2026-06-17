@@ -15,6 +15,21 @@ export const manifest: MapManifest = {
   name: 'Stranger Things',
   version: 1,
   attractTagline: 'Hawkins National Laboratory',
+  // Tokens CSS consommés par l'overlay playfield (outro). Une map sans theme
+  // → overlay garde ses défauts neutres.
+  theme: {
+    '--glow': '#ff2d2d',
+    '--glow-alt': '#b14dff', // monde inversé
+    '--st-font': "'Times New Roman', Georgia, serif",
+    '--vignette': '#2a0606',
+    '--foreground': '#ede4d3',
+  },
+  outro: {
+    title: 'FIN DE PARTIE',
+    scanLabel: 'Scanne pour graver ton nom au classement',
+    replayLabel: 'START — Rejouer',
+    qrLogo: mapAsset('playfield/demogorgon.png'),
+  },
   // Familles de cinématique (overlay fallback générique). Non listé → 'other'.
   clipFamilies: {
     demogorgon_rises: 'boss',
@@ -29,7 +44,11 @@ export const manifest: MapManifest = {
     milestone_big: 'milestone',
   },
   // Assets préchargés par la page playfield (URL publique /maps/<id>/…).
-  preload: [mapAsset('playfield/demogorgon.glb'), mapAsset('playfield/demogorgon.png')],
+  preload: [
+    mapAsset('playfield/demogorgon.glb'),
+    mapAsset('playfield/demogorgon.png'),
+    mapAsset('playfield/fin_combat_vecna.png'),
+  ],
   // Sons d'event de la map (joués via ctx.playSound(id)).
   sounds: {
     upside_down_appear: { url: mapAsset('audio/apparitionUpsideDown.mp3'), volume: 280 },
@@ -42,7 +61,7 @@ export const manifest: MapManifest = {
   clips: {
     demogorgon_rises: { showMs: 10_000, freezeMs: 6_000 }, // 6s gel + 4s célébration
     portal_swallow: { showMs: 4_000, freezeMs: 4_000 },
-    demogorgon_slain: { showMs: 15_000, freezeMs: 8_000 }, // 8s gel + 7s célébration
+    demogorgon_slain: { showMs: 15_000, freezeMs: 2_600 },
     last_chance: { showMs: 2_000, freezeMs: 0 },
     hall_of_fame: { showMs: 25_000, freezeMs: 0 },
     milestone_5k: { showMs: 4_000, freezeMs: 0 },
@@ -122,5 +141,8 @@ export const manifest: MapManifest = {
       dir:     { color: 0xffffff, intensity: 2.8, x: 0, y: 0.48, z: 0.88 },
       fill:    { color: 0xffffff, intensity: 0,   x: 0, y: 1,    z: -1   },
     },
+  },
+  meshAliases: {
+    portal_upsidedown: 'vis_demogorgon_portal_demog_portal_ref_skeleton',
   },
 }
