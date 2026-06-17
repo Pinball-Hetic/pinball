@@ -6,7 +6,8 @@
   "types": "index.ts",
   "exports": {
     ".": "./index.ts",
-    "./dmd": "./dmd/index.ts"
+    "./dmd": "./dmd/index.ts",
+    "./backglass": "./backglass/index.ts"
   },
   "scripts": {
     "lint": "eslint . --ext .ts,.tsx",
