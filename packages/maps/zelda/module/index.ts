@@ -7,7 +7,6 @@ import {
   ZeldaPortal,
   ZeldaTransition,
 } from '../systems'
-import { layout } from '../layout'
 
 // Unité : force par (distance²) — même ordre de grandeur que ST.
 
