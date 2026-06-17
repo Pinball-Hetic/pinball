@@ -3,7 +3,6 @@ import Head from 'next/head';
 import { useState } from 'react';
 import { getMapPackage, AVAILABLE_MAPS } from '@pinball/maps';
 import { parsePlayfieldViewMode } from '@pinball/game-engine';
-import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { MapSelectorScreen } from '@/components/pinball/MapSelectorScreen';
 import '@/audio/pinballAudio';
 

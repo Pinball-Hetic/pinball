@@ -53,7 +53,6 @@ import {
   CinematicDirector,
   ScreenShake,
   PlayfieldCameraDirector,
-  playfieldViewDirForMode,
   playfieldCameraUpForMode,
   parsePlayfieldViewMode,
   refitPlayfieldCamera,
@@ -172,7 +171,6 @@ const KEYBOARD_MODE: KeyboardMode =
   (process.env.NEXT_PUBLIC_KEYBOARD_MODE as KeyboardMode) || "direct";
 
 const PLAYFIELD_VIEW_MODE = parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE);
-const PLAYFIELD_VIEW_DIR = playfieldViewDirForMode(PLAYFIELD_VIEW_MODE);
 const IS_PORTRAIT_FILL = PLAYFIELD_VIEW_MODE === 'portrait-fill';
 
 type PinballPlayfieldProps = {
