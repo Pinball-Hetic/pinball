@@ -806,6 +806,22 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         hidePinballmapDecorNodes(playfieldRoot);
         prepareGltfMaterialsForDisplay(playfieldRoot);
 
+        playfieldRoot.traverse((obj) => {
+          if (!(obj instanceof THREE.Mesh)) return;
+          if (obj.name === 'floor_main') {
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            for (const m of mats) {
+              if (m instanceof THREE.MeshStandardMaterial) {
+                m.metalness = 0;
+                m.roughness = 1;
+              }
+            }
+          }
+          if (obj.name.includes('stangerthing_plate')) {
+            obj.visible = false;
+          }
+        });
+
         // garlands + bumperVisuals créés par le module de map (cluster visuals),
         // récupérés après mapModule.setup (plus bas, après le monde physique).
         // nestMarker + reveals boss + bossReveals : créés/possédés
