@@ -6,12 +6,21 @@ import { layout } from '../layout';
 // ── Timings ────────────────────────────────────────────────────────────────
 /** Durée du flash violet montant (entrée Sacred Realm). */
 const BLACKOUT_DURATION = 0.45; // s
-/** Durée du fade-out avant de rendre le contrôle au callback. */
+/** Durée du fade-out avant la phase tremor. */
 const RESTORE_DURATION  = 0.55; // s
+/** Durée du tremor (secousses caméra + playfield). */
+const TREMOR_DURATION   = 0.55; // s
 /** Fréquence du strobe pendant le flash. */
 const STROBE_HZ = 6;
 
-type Phase = 'idle' | 'blackout' | 'restore';
+type Phase = 'idle' | 'blackout' | 'restore' | 'tremor';
+
+type SetupConfig = {
+  /** Racine de la scène (playfield root) — secouée pendant le tremor. */
+  root: THREE.Object3D;
+  /** Caméra — secouée pendant le tremor. */
+  camera: THREE.Camera;
+};
 
 type StartConfig = {
   /** Mesh de la bille — masqué pendant la transition. */
@@ -21,25 +30,35 @@ type StartConfig = {
 /**
  * Transition Sacred Realm (Zelda) — aller ET retour.
  *
- * Séquence : flash violet (blackout) → fade (restore) → callback.
+ * Séquence : flash violet (blackout) → fade (restore) → tremor → callback.
  * Le module appelle `onComplete` pour téléporter la balle et émettre
  * `PORTAL_TRANSITION_END` ou `RETURN_PORTAL_TRANSITION_END`.
  *
- * Pas de billboard (pas d'image "Sacred Realm") — l'atmosphère est gérée
- * par `SacredRealmAtmosphere` qui démarre sur `PORTAL_TRANSITION_END`.
+ * Le tremor (secousses de caméra + playfield) suit la restauration de l'écran,
+ * avant de rendre la balle visible — même pattern que UpsideDownTransition ST.
  */
 export class ZeldaTransition {
   private cinematicStrobe = new PlayfieldCinematicStrobe();
 
-  private phase: Phase = 'idle';
+  private phase:    Phase = 'idle';
   private elapsed   = 0;
   private strobeT   = 0;
   private active    = false;
   private ballMesh: THREE.Object3D | null = null;
   private onComplete: (() => void) | null = null;
 
-  setup(config: { root: THREE.Object3D }): void {
+  // Références pour le tremor.
+  private camera:        THREE.Camera | null       = null;
+  private playfieldRoot: THREE.Object3D | null     = null;
+  private baseCamPos     = new THREE.Vector3();
+  private baseRootPos    = new THREE.Vector3();
+  private baseRootRot    = new THREE.Euler();
+
+  setup(config: SetupConfig): void {
     this.dispose();
+    this.camera        = config.camera;
+    this.playfieldRoot = config.root;
+
     this.cinematicStrobe.mount(config.root, {
       flashColor:     0x9900ff,
       flashIntensity: 2.2,
@@ -59,8 +78,7 @@ export class ZeldaTransition {
   /**
    * Démarre la transition.
    * Appelé depuis `onGameEvent(PORTAL_ENTER | RETURN_PORTAL_ENTER)`.
-   * La balle doit déjà être tenue (holdAtAlternateWorldSpawn / holdAtNormalReturnSpawn)
-   * avant l'appel — on se contente de masquer le mesh ici.
+   * La balle doit déjà être tenue avant l'appel.
    */
   start(config: StartConfig, onComplete: () => void): void {
     this.active     = true;
@@ -70,7 +88,6 @@ export class ZeldaTransition {
     this.ballMesh   = config.ballMesh;
     this.onComplete = onComplete;
 
-    // Masque la bille pendant la transition.
     if (this.ballMesh) {
       this.ballMesh.visible = false;
       this.ballMesh.scale.setScalar(1);
@@ -100,8 +117,56 @@ export class ZeldaTransition {
       this.cinematicStrobe.applyFlashOnly(on, darkMix);
       if (darkMix <= 0) {
         this.cinematicStrobe.stop();
+        this.phase   = 'tremor';
+        this.elapsed = 0;
+        this.captureShakeBases();
+      }
+      return;
+    }
+
+    if (this.phase === 'tremor') {
+      this.applyTremor();
+      if (this.elapsed >= TREMOR_DURATION) {
+        this.restoreShakeBases();
         this.finish();
       }
+    }
+  }
+
+  private applyTremor(): void {
+    const t   = this.elapsed;
+    const ramp = Math.min(1, t / 0.3);
+    const amp  = 0.003 * ramp;
+
+    if (this.camera) {
+      this.camera.position.set(
+        this.baseCamPos.x + Math.sin(t * 41) * amp,
+        this.baseCamPos.y + Math.sin(t * 53 + 0.8) * amp,
+        this.baseCamPos.z + Math.sin(t * 37 + 1.6) * amp,
+      );
+    }
+
+    if (this.playfieldRoot) {
+      this.playfieldRoot.rotation.x =
+        this.baseRootRot.x + Math.sin(t * 44) * amp * 0.4;
+      this.playfieldRoot.rotation.z =
+        this.baseRootRot.z + Math.sin(t * 39 + 1.1) * amp * 0.5;
+    }
+  }
+
+  private captureShakeBases(): void {
+    if (this.camera) this.baseCamPos.copy(this.camera.position);
+    if (this.playfieldRoot) {
+      this.baseRootPos.copy(this.playfieldRoot.position);
+      this.baseRootRot.copy(this.playfieldRoot.rotation);
+    }
+  }
+
+  private restoreShakeBases(): void {
+    if (this.camera) this.camera.position.copy(this.baseCamPos);
+    if (this.playfieldRoot) {
+      this.playfieldRoot.position.copy(this.baseRootPos);
+      this.playfieldRoot.rotation.copy(this.baseRootRot);
     }
   }
 
@@ -112,9 +177,6 @@ export class ZeldaTransition {
     this.active  = false;
     this.cinematicStrobe.stop();
 
-    // Le callback (fourni par le module) fait la téléportation de balle
-    // et l'émission des events de fin de transition — on est hors du drain
-    // Rapier ici (appelé depuis update()), donc les mutations de corps sont sûres.
     const cb = this.onComplete;
     this.onComplete = null;
     this.ballMesh   = null;
@@ -122,6 +184,7 @@ export class ZeldaTransition {
   }
 
   dispose(): void {
+    this.restoreShakeBases();
     this.cinematicStrobe.dispose();
     this.cinematicStrobe = new PlayfieldCinematicStrobe();
     this.active     = false;
@@ -130,5 +193,7 @@ export class ZeldaTransition {
     this.strobeT    = 0;
     this.onComplete = null;
     this.ballMesh   = null;
+    this.camera     = null;
+    this.playfieldRoot = null;
   }
 }
