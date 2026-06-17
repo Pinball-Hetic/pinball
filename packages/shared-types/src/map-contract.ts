@@ -106,6 +106,13 @@ export interface MapManifest {
   ambientMusic?: string
   /** Son game over. Fallback : /audio/sound-lost.mp3 */
   gameOverSound?: string
+  /**
+   * Musique en boucle jouée dans le monde alternatif (entre PORTAL_TRANSITION_END
+   * et BOSS_REVEAL du boss alternatif). S'arrête dès que la musique de combat prend
+   * le relais, ou à WORLD_CYCLE_COMPLETE si aucun boss n'a été reveal.
+   */
+  alternateWorldMusicUrl?: string
+  alternateWorldMusicVolume?: number
   /** Libellés des compteurs (GameStats.counters) par id, pour le recap backglass. */
   counterLabels?: Record<string, string>
   /** Clés de mapState pilotables par l'outil de debug (dev). Permet au debug
