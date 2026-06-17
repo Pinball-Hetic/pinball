@@ -1,5 +1,5 @@
 import type { GameOver, LeaderboardEntry } from '@pinball/shared-types'
-import { renderMapTakeover } from '@/map/content'
+import { useMapContent } from '@/map/content'
 import VhsGlitch from '../VhsGlitch'
 import HighScoreTakeover from './HighScoreTakeover'
 import RecapTakeover from './RecapTakeover'
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default function CinematicTakeover({ clip, payload }: Props) {
+  const { renderMapTakeover } = useMapContent()
   // hall_of_fame : clip CORE — le backglass connaît le rang, fanfare seulement
   // si mérité.
   if (clip === 'hall_of_fame') {
