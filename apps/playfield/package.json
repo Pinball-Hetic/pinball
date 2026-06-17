@@ -6,7 +6,8 @@
     "dev": "bun run sync-assets && next dev",
     "build": "bun run sync-assets && next build",
     "start": "next start",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "bun test src/audio"
   },
   "dependencies": {
     "@pinball/game-engine": "workspace:*",

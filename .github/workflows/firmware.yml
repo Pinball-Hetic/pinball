@@ -1,0 +1,46 @@
+name: firmware
+
+on:
+  push:
+    branches: [dev]
+    paths: ["firmware/**", "!firmware/build/**"]
+  pull_request:
+    paths: ["firmware/**", "!firmware/build/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install --upgrade platformio esptool
+
+      - name: Compile
+        run: pio run --project-dir firmware
+
+      - name: Merge image (dev only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: |
+          mkdir -p firmware/build
+          B=firmware/.pio/build/esp32dev
+          esptool --chip esp32 merge_bin -o firmware/build/firmware.bin \
+            0x1000  $B/bootloader.bin \
+            0x8000  $B/partitions.bin \
+            0x10000 $B/firmware.bin
+
+      - name: Commit bin (dev only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add firmware/build/firmware.bin
+          git diff --staged --quiet || git commit -m "chore(firmware): build firmware.bin [skip ci]"
+          git push

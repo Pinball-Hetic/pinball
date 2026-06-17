@@ -58,3 +58,10 @@ backups/
 skills-lock.json
 # Assets de map synchronisés au build (cf. scripts/sync-map-assets.sh)
 apps/*/public/maps/
+
+# Firmware ESP32 — artefacts PlatformIO ignorés, mais le binaire fusionné
+# firmware/build/firmware.bin DOIT être tracké (la borne le flashe au load).
+# La règle générique `build/` ci-dessus l'attraperait → on le ré-inclut.
+firmware/.pio/
+!firmware/build/
+!firmware/build/firmware.bin

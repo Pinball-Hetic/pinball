@@ -6,6 +6,11 @@ type GaplessLoopHandle = {
   baseVolume: number;
 };
 
+type OneShotHandle = {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+};
+
 type LoopBounds = {
   start: number;
   end: number;
@@ -21,6 +26,7 @@ export class SamplePlayer {
   private readonly bufferCache = new Map<string, AudioBuffer>();
   private readonly bufferLoads = new Map<string, Promise<AudioBuffer | null>>();
   private readonly gaplessPrepareLoads = new Map<string, Promise<void>>();
+  private readonly activeOneShots = new Set<OneShotHandle>();
 
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -207,6 +213,38 @@ export class SamplePlayer {
     }, fadeOutS * 1000 + 100);
   }
 
+  private trackOneShot(source: AudioBufferSourceNode, gain: GainNode): void {
+    const handle: OneShotHandle = { source, gain };
+    this.activeOneShots.add(handle);
+    source.onended = () => {
+      this.activeOneShots.delete(handle);
+      try {
+        source.disconnect();
+        gain.disconnect();
+      } catch {
+        // already disconnected
+      }
+    };
+  }
+
+  /** Coupe les pistes cinématiques/boss encore en lecture (ex. spawnDG). */
+  stopActiveOneShots(): void {
+    for (const { source, gain } of this.activeOneShots) {
+      try {
+        source.stop();
+      } catch {
+        // already stopped
+      }
+      try {
+        source.disconnect();
+        gain.disconnect();
+      } catch {
+        // already disconnected
+      }
+    }
+    this.activeOneShots.clear();
+  }
+
   playOneShotCached(url: string, volume: number): boolean {
     const ctx = this.ensureContext();
     const cinematicBus = this.cinematicBus;
@@ -222,6 +260,7 @@ export class SamplePlayer {
     source.connect(g);
     g.connect(cinematicBus);
     source.start();
+    this.trackOneShot(source, g);
     return true;
   }
 

@@ -9,6 +9,7 @@ import {
   VecnaReveal,
   BossRevealOrchestrator,
 } from '../systems'
+import { RETURN_PORTAL_TEXTURE_URL } from '../systems/UpsideDownConstants'
 import { bossThresholdMet } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 import { grantExtraLife } from './lifeBonus'
@@ -82,7 +83,10 @@ export function createModule(): MapModule {
         camera: ctx.camera,
         garlandLights: garlands,
         bumperVisuals,
-        onFightEnd: () => ctx.setBossFightActive('demogorgon', false),
+        onFightEnd: () => {
+          ctx.setBossFightActive('demogorgon', false);
+          ctx.emitGameEvent({ type: 'BOSS_FIGHT_END', bossId: 'demogorgon' });
+        },
         onTargetReady: () => ctx.setBossTargetArmed('demogorgon', true),
       })
       demogorgonReveal.setEmit(ctx.emitGameEvent)
@@ -92,7 +96,10 @@ export function createModule(): MapModule {
         camera: ctx.camera,
         garlandLights: garlands,
         bumperVisuals,
-        onFightEnd: () => ctx.setBossFightActive('vecna', false),
+        onFightEnd: () => {
+          ctx.setBossFightActive('vecna', false);
+          ctx.emitGameEvent({ type: 'BOSS_FIGHT_END', bossId: 'vecna' });
+        },
         onTargetReady: () => ctx.setBossTargetArmed('vecna', true),
       })
       bossReveals = new BossRevealOrchestrator()
@@ -225,6 +232,7 @@ export function createModule(): MapModule {
         const ball = ctx.ball
         const mesh = ctx.ballMesh
         if (ball && mesh && transition && !transition.isActive()) {
+          bossReveals?.endAllFights()
           portal?.hideForCinematic()
           ball.holdAtNormalReturnSpawn()
           ball.syncToMesh(mesh)
@@ -232,7 +240,7 @@ export function createModule(): MapModule {
             {
               ballMesh: mesh,
               ballBody: ball.body,
-              onRevealStart: () => ctx.playSound('upside_down_appear'),
+              textureUrl: RETURN_PORTAL_TEXTURE_URL,
               onTremorStart: () => ctx.emitGameEvent({ type: 'PORTAL_TREMOR' }),
             },
             () => {

@@ -55,6 +55,7 @@ import {
   playfieldCameraUpForMode,
   parsePlayfieldViewMode,
   refitPlayfieldCamera,
+  configureSurfaceCoefficients,
   type PlayfieldCamFit,
   type PlayfieldCamera,
   DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING,
@@ -79,19 +80,26 @@ import type {
   ButtonId,
   CinematicClip,
   DevGameEventTrigger,
+  GameAction,
 } from "@pinball/shared-types";
-import { clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
+import { BUTTON_ACTION, CABINET_BUTTONS, clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
 
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 // Résolu au niveau module (MAP_ID = constante build-time) → permet un garde
 // NO SIGNAL en 1ère ligne du composant, avant tout hook.
 const RESOLVED_MAP = getMapPackage(MAP_ID);
+// Courbe de surface du tapis = celle de la map (spawns, colliders, cadrage
+// caméra en dérivent). Sans ça, surfaceYAtZ resterait sur la courbe ST par
+// défaut → balle qui flotte/s'enfonce sur une map de hauteur/tilt différent.
+if (RESOLVED_MAP) configureSurfaceCoefficients(RESOLVED_MAP.layout.geometry.coefficients);
 // Définitions de boss de la map active (point de composition unique).
 const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
 const MAP_CLIPS = RESOLVED_MAP?.manifest.clips;
 // URLs de sons spécifiques à la map (reveal boss + sons d'event) à précharger.
 const MAP_SOUND_URLS: string[] = [
-  ...MAP_BOSSES.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
+  ...MAP_BOSSES.flatMap((b) =>
+    [b.revealSoundUrl, b.latePhaseSoundUrl].filter((u): u is string => !!u),
+  ),
   ...Object.values(RESOLVED_MAP?.manifest.sounds ?? {}).map((s) => s.url),
 ];
 
@@ -1295,33 +1303,34 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         // `simulate-esp32` n'appelle PAS ce callback directement — il émet sur
         // le réseau et c'est le broadcast server qui rappelle ce même
         // callback via socket.on('input:button').
-        physicalInputsRef.current = {
-          onButton: (data) => {
-            if (!sessionStartedRef.current) {
-              if (
-                data.action === "DOWN"
-                && physicsReadyRef.current
-                && (data.id === "PLUNGER" || data.id === "START")
-              ) {
-                beginSessionRef.current();
-                if (data.id === "PLUNGER" && gameStateRef.current === "idle") {
-                  plunger.startCharge(performance.now());
-                  isChargingPlunger = true;
-                  chargeStartTime = performance.now();
-                }
+        // Cœur métier : ferme sur les `let` leftTarget/rightTarget (~L600), donc
+        // doit vivre dans cette closure (non hoistable). Reçoit l'ACTION jeu
+        // (résolue depuis le bouton physique via BUTTON_ACTION), pas l'id brut.
+        const applyAction = (action: GameAction, btnAction: ButtonAction) => {
+          if (!sessionStartedRef.current) {
+            if (
+              btnAction === "DOWN"
+              && physicsReadyRef.current
+              && (action === "PLUNGE" || action === "START")
+            ) {
+              beginSessionRef.current();
+              if (action === "PLUNGE" && gameStateRef.current === "idle") {
+                plunger.startCharge(performance.now());
+                isChargingPlunger = true;
+                chargeStartTime = performance.now();
               }
-              return;
             }
-            if (data.id === "LEFT") {
-              leftTarget = data.action === "DOWN" ? 1 : 0;
-              return;
-            }
-            if (data.id === "RIGHT") {
-              rightTarget = data.action === "DOWN" ? 1 : 0;
-              return;
-            }
-            if (data.id === "PLUNGER") {
-              if (data.action === "DOWN") {
+            return;
+          }
+          switch (action) {
+            case "FLIP_LEFT":
+              leftTarget = btnAction === "DOWN" ? 1 : 0;
+              break;
+            case "FLIP_RIGHT":
+              rightTarget = btnAction === "DOWN" ? 1 : 0;
+              break;
+            case "PLUNGE": {
+              if (btnAction === "DOWN") {
                 debugLog(
                   `[Plunger] DOWN — gameState=${gameStateRef.current} physicsReady=${physicsReady} charging=${isChargingPlunger}`,
                 );
@@ -1358,10 +1367,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
                     `charging=${isChargingPlunger} gameState=${gameStateRef.current}`,
                 );
               }
-              return;
+              break;
             }
-            if (data.id === "START") {
-              if (data.action === "DOWN" && gameStateRef.current === "game_over") {
+            case "START":
+              if (btnAction === "DOWN" && gameStateRef.current === "game_over") {
                 resetGame();
                 restoreBossCamera();
                 collisionProcessor?.resetAllBossFights();
@@ -1369,7 +1378,15 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
                 mapModule?.resetWorld?.();
                 if (ballMesh) ballMesh.visible = true;
               }
-            }
+              break;
+          }
+        };
+
+        physicalInputsRef.current = {
+          onButton: (data) => {
+            const action = BUTTON_ACTION[data.id];
+            if (!action) return; // bouton physique non mappé → ignoré
+            applyAction(action, data.action);
           },
           onTilt: (data) => {
             console.log("[playfield] tilt reçu:", data, "— logique non implémentée");
@@ -1399,6 +1416,14 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           }
           physicalInputsRef.current.onButton?.({ id, action });
         };
+
+        // Clavier dev : dérive les ids physiques depuis l'action (DRY, survit à
+        // un futur remap GPIO). Pas de littéral 'WHITE_LEFT' codé en dur ici.
+        const idForAction = (a: GameAction): ButtonId =>
+          CABINET_BUTTONS.find((b) => b.action === a)!.id;
+        const KEY_LEFT = idForAction("FLIP_LEFT"); // WHITE_LEFT
+        const KEY_RIGHT = idForAction("FLIP_RIGHT"); // WHITE_RIGHT
+        const KEY_PLUNGE = idForAction("PLUNGE"); // PLUNGER
 
         const onKeyDown = (e: KeyboardEvent) => {
           if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
@@ -1443,16 +1468,16 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             resetBallRef.current?.();
             return;
           }
-          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton("LEFT", "DOWN");
-          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton("RIGHT", "DOWN");
-          if (e.key === " ") dispatchButton("PLUNGER", "DOWN");
+          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton(KEY_LEFT, "DOWN");
+          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton(KEY_RIGHT, "DOWN");
+          if (e.key === " ") dispatchButton(KEY_PLUNGE, "DOWN");
         };
 
         const onKeyUp = (e: KeyboardEvent) => {
           if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
-          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton("LEFT", "UP");
-          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton("RIGHT", "UP");
-          if (e.key === " ") dispatchButton("PLUNGER", "UP");
+          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton(KEY_LEFT, "UP");
+          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton(KEY_RIGHT, "UP");
+          if (e.key === " ") dispatchButton(KEY_PLUNGE, "UP");
         };
 
         onSessionStartRef.current = () => {

@@ -3,3 +3,4 @@
 // `export type {…}` + `export {…}` le faisait considérer le module sans export).
 export * from './socket-events'
 export * from './map-contract'
+export * from './cabinet-buttons'

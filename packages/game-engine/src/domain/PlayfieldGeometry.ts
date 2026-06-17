@@ -6,9 +6,37 @@ import {
   BALL_RADIUS,
 } from './Ball';
 import { FLIPPER_Z_MAX } from './FlipperConstants';
+import type { SurfaceCoefficients } from './MapLayout';
+
+// Courbe de surface du tapis incliné, paramétrée par la map (cf.
+// layout.geometry.coefficients). Défaut = valeurs Stranger Things → comportement
+// identique tant qu'aucune map n'appelle configureSurfaceCoefficients().
+const DEFAULT_SURFACE_COEFFICIENTS: SurfaceCoefficients = {
+  base: 1.068,
+  zOffset: 0.552,
+  zSpan: 0.970,
+  yDrop: 0.110,
+};
+
+let surfaceCoefficients: SurfaceCoefficients = DEFAULT_SURFACE_COEFFICIENTS;
+
+/**
+ * Configure la courbe de surface depuis le layout de la map. À appeler une fois
+ * au chargement, AVANT tout setup physique/caméra (les spawns, colliders et le
+ * cadrage caméra dérivent tous de surfaceYAtZ).
+ */
+export function configureSurfaceCoefficients(coefficients: SurfaceCoefficients): void {
+  surfaceCoefficients = coefficients;
+}
+
+/** Réinitialise la courbe au défaut (Stranger Things). Surtout pour les tests. */
+export function resetSurfaceCoefficients(): void {
+  surfaceCoefficients = DEFAULT_SURFACE_COEFFICIENTS;
+}
 
 export function surfaceYAtZ(z: number): number {
-  return 1.068 - ((z + 0.552) / 0.970) * 0.110;
+  const { base, zOffset, zSpan, yDrop } = surfaceCoefficients;
+  return base - ((z + zOffset) / zSpan) * yDrop;
 }
 
 /** Centre de la sphère posé sur le tapis incliné à l'abscisse Z donnée. */

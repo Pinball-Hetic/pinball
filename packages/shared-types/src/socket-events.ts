@@ -152,7 +152,16 @@ export interface GlobalStats {
   bestToday: { score: number; player: string } | null
 }
 
-export type ButtonId = 'LEFT' | 'RIGHT' | 'PLUNGER' | 'START'
+export type ButtonId =
+  | 'BLACK_LEFT'
+  | 'WHITE_LEFT'
+  | 'FRONT_LEFT_GREEN'
+  | 'FRONT_LEFT_YELLOW'
+  | 'FRONT_LEFT_RED'
+  | 'BLACK_RIGHT'
+  | 'WHITE_RIGHT'
+  | 'FRONT_WHITE'
+  | 'PLUNGER'
 export type ButtonAction = 'DOWN' | 'UP'
 
 export interface ButtonInput {

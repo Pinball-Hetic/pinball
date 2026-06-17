@@ -10,7 +10,8 @@ export type EarlySoundPhase = "off" | "armed" | "playing" | "released";
 
 export class EarlySoundController {
   private phase: EarlySoundPhase = "off";
-  private revealConsumed = false;
+  /** Bloque toute reprise tant que le boss tient la piste musique. */
+  private handoffBlocked = false;
 
   constructor(private readonly samples: SamplePlayer) {}
 
@@ -19,7 +20,6 @@ export class EarlySoundController {
   }
 
   arm(): Promise<void> {
-    if (this.revealConsumed) return Promise.resolve();
     this.phase = "armed";
     return this.samples
       .prepareGaplessLoop(EARLY_SOUND_URL, EARLY_SOUND_LOOP_SILENCE_THRESHOLD)
@@ -27,7 +27,7 @@ export class EarlySoundController {
   }
 
   async engage(): Promise<void> {
-    if (this.revealConsumed) return;
+    if (this.handoffBlocked) return;
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
       this.phase = "playing";
       return;
@@ -42,7 +42,7 @@ export class EarlySoundController {
   }
 
   engageSync(): void {
-    if (this.revealConsumed) return;
+    if (this.handoffBlocked) return;
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
       this.phase = "playing";
       return;
@@ -67,22 +67,20 @@ export class EarlySoundController {
     this.phase = "released";
   }
 
-  consumeOnBossReveal(): void {
-    this.revealConsumed = true;
-    // Stop immédiat (pas de fade) pour que spawnDG ne soit pas masqué par la musique.
-    this.samples.stopGaplessLoop(EARLY_SOUND_URL);
-    this.phase = "released";
-  }
-
-  resetForNewGame(): void {
-    this.revealConsumed = false;
+  /** Arrêt immédiat — pas de fade (handoff vers musique boss). */
+  stopInstant(): void {
+    this.handoffBlocked = true;
     this.samples.stopGaplessLoop(EARLY_SOUND_URL);
     this.phase = "off";
   }
 
-  /** Clears armed state only — intentionally does not stop an active loop. */
-  disarm(): void {
-    if (this.phase === "playing") return;
+  clearHandoffBlock(): void {
+    this.handoffBlocked = false;
+  }
+
+  resetForNewGame(): void {
+    this.handoffBlocked = false;
+    this.samples.stopGaplessLoop(EARLY_SOUND_URL);
     this.phase = "off";
   }
 }
