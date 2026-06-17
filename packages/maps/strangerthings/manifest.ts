@@ -105,6 +105,8 @@ export const manifest: MapManifest = {
     floor_main: { physics: 'analytic' }, // ex-Mesh_0 : sol analytique lisse
     wall_main: { singleSided: 1, restitution: 0.35, friction: 0.12 }, // ex-Mesh_1
     wall_slingshot: { restitution: 0, friction: 0.1 }, // ex no-bounce (Cylinder.008)
+    slingshot_left:  { restitution: 0.8, friction: 0.05 }, // hypoténuse rebondissante
+    slingshot_right: { restitution: 0.8, friction: 0.05 }, // hypoténuse rebondissante
     wall_bottom: { restitution: 0, friction: 0.1 }, // ex no-bounce (Plane.008)
     wall_top: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.001)
     wall_under_top: { restitution: 0.35, friction: 0.12 }, // rail (Circle.034)
