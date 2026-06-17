@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback, type CSSProperties } from "re
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import {
   PhysicsWorld,
@@ -98,15 +97,11 @@ const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
 const MAP_CLIPS = RESOLVED_MAP?.manifest.clips;
 // URLs de sons spécifiques à la map (reveal boss + sons d'event) à précharger.
 const MAP_SOUND_URLS: string[] = [
-  ...MAP_BOSSES.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
+  ...MAP_BOSSES.flatMap((b) =>
+    [b.revealSoundUrl, b.latePhaseSoundUrl].filter((u): u is string => !!u),
+  ),
   ...Object.values(RESOLVED_MAP?.manifest.sounds ?? {}).map((s) => s.url),
 ];
-// Brancher la musique ambiante + le game-over de la map active dès le chargement
-// du module (avant tout rendu). Fallback automatique si non défini dans le manifest.
-setMapAudioUrls(
-  RESOLVED_MAP?.manifest.ambientMusic,
-  RESOLVED_MAP?.manifest.gameOverSound,
-);
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
 function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
@@ -164,7 +159,6 @@ import {
   warmMapSounds,
   resetPinballAudioForNewGame,
   unlockPinballAudio,
-  setMapAudioUrls,
 } from "@/audio/pinballAudio";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import CinematicOverlay from "./CinematicOverlay";
@@ -522,14 +516,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     configureGltfRenderer(renderer);
-
-    // Environment map neutre — indispensable pour les matériaux métalliques/
-    // glossy (or, gemmes, chrome). Sans envmap, metalness=1 → rendu noir.
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    pmrem.compileEquirectangularShader();
-    // blur=0.01 → reflets nets (moins de flou environment) → gemmes/or plus vifs.
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.01).texture;
-    pmrem.dispose();
     // Démarrage à 1.5 (HiDPI plafonné) ; le QualityGovernor ajuste ensuite
     // selon le frame time (1.5 → 1.25 → 1.0 → 1.0 + trail réduit/spores off).
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -540,19 +526,19 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     renderer.shadowMap.enabled = false;
     mountEl.appendChild(renderer.domElement);
 
-    // Ambiante faible → zones sombres restent sombres (contraste fort).
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.22);
+    // Lumière ambiante minimale pour éviter les noirs purs dans les ombres
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
     scene.add(ambientLight);
-    // HemiLight — faible, contribution uniquement pour déboucher le bas du modèle.
-    const hemiLight = new THREE.HemisphereLight(0xfff8e8, 0x111108, 0.15);
+    // HemiLight à 0 — conservé uniquement pour la compatibilité UpsideDownAtmosphere
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
     scene.add(hemiLight);
     const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
     dirLight.position.copy(PLAYFIELD_VIEW_DIR);
     dirLight.castShadow = false;
     scene.add(dirLight);
-    // Fill contre-jour léger depuis la caméra (z+) → évite les zones noires totales.
-    const fillLight = new THREE.DirectionalLight(0xfff0dd, 0.5);
-    fillLight.position.set(0, 0.3, 1.0);
+    // FillLight à 0 — conservé pour UpsideDownAtmosphere
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0);
+    fillLight.position.set(0, 1, -1);
     scene.add(fillLight);
 
     const modelRoot = new THREE.Group();
@@ -1266,6 +1252,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           drainBallUC,
           bottomOutBallUC,
           emit,
+          ballPhysicsInst,
         );
 
         // upsideDownPortal créé/possédé par le module de map (récupéré plus
@@ -1571,11 +1558,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         if (leftFlipperPivot)  applyFlipperSwing(leftFlipperPivot,  leftSwing);
         if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
 
-        // Guard : si Rapier a paniqué, on ne touche plus aux corps physiques.
-        if (physicsWorld?.isAlive) {
-          syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftFlipperBodyOffset);
-          syncFlipperBody(rightFlipperBody, rightFlipperObj, rightFlipperBodyOffset);
-        }
+        syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftFlipperBodyOffset);
+        syncFlipperBody(rightFlipperBody, rightFlipperObj, rightFlipperBodyOffset);
 
         // Décroissance + application du hit-flash flippers.
         if (leftFlash > 0) leftFlash = Math.max(0, leftFlash - dt);
@@ -1658,8 +1642,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         mapModule?.applyBallMagnet?.();
       }
 
-      // Ball sync — guard : si Rapier a paniqué, ne plus toucher aux corps.
-      if (ballMesh?.visible && ballPhysicsInst && physicsWorld?.isAlive) {
+      // Ball sync
+      if (ballMesh?.visible && ballPhysicsInst) {
         if (bossIntroActive && gameStateRef.current === "playing") {
           ballPhysicsInst.body.setTranslation(
             { x: bossIntroBallPos.x, y: bossIntroBallPos.y, z: bossIntroBallPos.z },

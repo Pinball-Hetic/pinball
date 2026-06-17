@@ -1,5 +1,5 @@
-// Bille — GLB ball size=[0.0269] → radius 0.01345. Réduite à 0.01200 (~24 mm Ø).
-export const BALL_RADIUS          = 0.01200;
+// Bille — GLB ball size=[0.0269] → radius 0.01345. Réduite à 0.010 (~20 mm Ø).
+export const BALL_RADIUS          = 0.01374;
 export const BALL_MASS            = 0.08;   // 80 g — standard officiel
 export const BALL_RESTITUTION     = 0.4;    // acier sur bois verni : rebond faible
 export const BALL_FRICTION        = 0.05;   // acier poli, très glissant
@@ -60,7 +60,8 @@ export const ASSIST_INTERVAL = 3.2;
 export const BUMP_EJECT_SCALE     = 0.45;  // 45 % de la force d'un pop bumper
 // Anti rebond multiple : un même mèche ne re-déclenche pas avant ce délai
 // (la balle collée/qui vibre ne farme pas score + impulsion).
-export const BUMP_HIT_COOLDOWN_MS = 60;
+export const BUMP_HIT_COOLDOWN_MS      = 60;
+export const SLINGSHOT_HIT_COOLDOWN_MS = 80;
 
 export const BUMPER_RADIUS       = 0.038;
 export const BUMPER_RESTITUTION  = 0.20;  // réduit de 0.30 (−33%) — rebond collider moins violent
