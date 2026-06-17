@@ -99,6 +99,13 @@ export type BossDefinition = {
    * cinématique de sortie. Data-driven : aucune logique boss en dur côté apps.
    */
   keepMusicUntilReturnPortal?: boolean;
+  /**
+   * Musique jouée dès la victoire sur ce boss (BOSS_FIGHT_END), en remplacement
+   * de la musique de combat en cours. Requiert keepMusicUntilReturnPortal:true pour
+   * que la musique survive jusqu'à RETURN_PORTAL_TRANSITION_END.
+   */
+  victoryMusicUrl?: string;
+  victoryMusicVolume?: number;
   assist?: { id: string };
 };
 
