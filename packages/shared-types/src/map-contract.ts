@@ -107,6 +107,8 @@ export interface MapManifest {
   /** Clés de mapState pilotables par l'outil de debug (dev). Permet au debug
    *  d'éditer le mapState d'une map sans clés en dur. */
   debugMapState?: { numbers?: string[]; flags?: string[] }
+  /** Rayon de la balle (m). Absent = DEFAULT_BALL_RADIUS (ST : 0.01374). */
+  ballRadius?: number
   glb: string // relatif au dossier assets/ du package
   scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
   rules: {
