@@ -1,6 +1,7 @@
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { io } from 'socket.io-client';
 import { getMapPackage, AVAILABLE_MAPS } from '@pinball/maps';
 import { parsePlayfieldViewMode } from '@pinball/game-engine';
 import { MapSelectorScreen } from '@/components/pinball/MapSelectorScreen';
@@ -32,13 +33,26 @@ export default function PinballPage() {
     FORCED_MAP_ID ?? null,
   );
 
+  // Émet map:select au server (→ broadcast aux DMD/backglass) puis met à jour
+  // l'état local. Connexion socket éphémère : crée, émet, déconnecte.
+  const handleSelect = useCallback((mapId: string) => {
+    const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
+    const transports: ('websocket' | 'polling')[] = url ? ['websocket'] : ['polling'];
+    const socket = io(url, { transports });
+    socket.once('connect', () => {
+      socket.emit('map:select', { mapId });
+      socket.disconnect();
+    });
+    setSelectedMapId(mapId);
+  }, []);
+
   const preload = selectedMapId
     ? (getMapPackage(selectedMapId)?.manifest.preload ?? [])
     : [];
 
   // Sélecteur de map — affiché si aucune map forcée et aucune map choisie.
   if (!selectedMapId) {
-    return <MapSelectorScreen maps={AVAILABLE_MAPS} onSelect={setSelectedMapId} />;
+    return <MapSelectorScreen maps={AVAILABLE_MAPS} onSelect={handleSelect} />;
   }
 
   return (
