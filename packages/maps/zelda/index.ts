@@ -4,12 +4,11 @@ import { manifest } from './manifest'
 export { layout } from './layout'
 export { createModule } from './module'
 
-// Paquet de la map Zelda. Le contenu DMD est exposé via le sous-chemin
-// '@pinball/map-zelda/dmd'. Pas de backglass dédié pour l'instant
-// (hasBackglass: false → l'app affiche le moteur générique / NO SIGNAL).
+// Paquet de la map Zelda. Contenu DMD via '@pinball/map-zelda/dmd',
+// contenu backglass via '@pinball/map-zelda/backglass'.
 export const mapPackage: MapPackage = {
   manifest,
   hasModule: true,
   hasDmd: true,
-  hasBackglass: false,
+  hasBackglass: true,
 }
