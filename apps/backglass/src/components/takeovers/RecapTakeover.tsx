@@ -1,5 +1,5 @@
 import type { GameOver } from '@pinball/shared-types'
-import { counterLabels } from '@/map/content'
+import { useMapContent } from '@/map/content'
 import VhsGlitch from '../VhsGlitch'
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
 }
 
 export default function RecapTakeover({ payload }: Props) {
+  const { counterLabels } = useMapContent()
   const s = payload.stats
   const qualifying = payload.rank <= 10
 
