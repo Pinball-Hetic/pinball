@@ -140,7 +140,6 @@ export function createModule(): MapModule {
         portal?.setUpsideDownActive(true)
         ctx.resetPortalTrigger()
         ctx.enterAlternateWorld()
-        grantExtraLife(ctx)
         nestMarker?.setUpsideDown(true)
       }
       // Game over en drainant : fin de tous les combats boss.
