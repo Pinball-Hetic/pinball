@@ -14,6 +14,10 @@ export interface ServerToClientEvents {
   'dev:trigger-game-event': (data: DevGameEventTrigger) => void
   // Émis au seul socket émetteur du game:over (pas un broadcast).
   'game:registered': (data: GameRegistered) => void
+  // Broadcast à tous les clients quand la map active change (sélecteur de map
+  // → DMD + backglass basculent dynamiquement). Aussi émis en unicast à chaque
+  // nouveau connecté pour lui communiquer la map courante.
+  'map:selected': (data: { mapId: string }) => void
 }
 
 export interface ClientToServerEvents {
@@ -29,6 +33,9 @@ export interface ClientToServerEvents {
   'dev:simulate-button': (data: ButtonInput) => void
   'dmd:display': (data: DmdDisplay) => void
   'dev:trigger-game-event': (data: DevGameEventTrigger) => void
+  // Émis par le playfield quand l'utilisateur valide une map dans le sélecteur.
+  // Le server met à jour son état et broadcast `map:selected` à tous.
+  'map:select': (data: { mapId: string }) => void
 }
 
 // Sous-ensemble injectable de GameEvent (sérialisé simple) — émis par /debug.
