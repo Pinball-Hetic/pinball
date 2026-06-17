@@ -544,7 +544,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     // HemiLight à 0 — conservé uniquement pour la compatibilité UpsideDownAtmosphere
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
     scene.add(hemiLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.copy(PLAYFIELD_VIEW_DIR);
     dirLight.castShadow = false;
     scene.add(dirLight);
