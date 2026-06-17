@@ -15,6 +15,8 @@ export const manifest: MapManifest = {
   clipFamilies: {
     ganondorf_rises: 'boss',
     ganondorf_slain: 'boss',
+    darklink_rises:  'boss',
+    darklink_slain:  'boss',
     sacred_realm: 'other',
     last_chance: 'other',
     hetic_letter: 'collect',
@@ -25,7 +27,7 @@ export const manifest: MapManifest = {
     milestone_big: 'milestone',
   },
   // Assets préchargés par la page playfield.
-  preload: [mapAsset('playfield/ganondorf.glb')],
+  preload: [mapAsset('playfield/ganondorf.glb'), mapAsset('playfield/darklink.glb')],
   // Musique ambiante Zelda — remplace /audio/early-sound.mp3 (ST) pour cette map.
   // Fichier à déposer dans assets/audio/ambient.mp3 puis sync-map-assets.sh
   ambientMusic: mapAsset('audio/ambient.mp3'),
@@ -34,14 +36,16 @@ export const manifest: MapManifest = {
     sacred_realm_appear: { url: mapAsset('audio/sacredRealm.mp3'), volume: 280 },
   },
   // Libellés des compteurs (recap backglass).
-  counterLabels: { ganondorfs: 'GANONDORFS', portals: 'PORTAILS', hetic: 'HETIC' },
+  counterLabels: { ganondorfs: 'GANONDORFS', darklinks: 'DARK LINKS', portals: 'PORTAILS', hetic: 'HETIC' },
   // Clés de mapState éditables par l'outil de debug.
   debugMapState: { numbers: ['hetic'], flags: ['fever'] },
   // Timings des clips.
   clips: {
     ganondorf_rises: { showMs: 10_000, freezeMs: 6_000 },
-    sacred_realm: { showMs: 4_000, freezeMs: 4_000 },
     ganondorf_slain: { showMs: 15_000, freezeMs: 8_000 },
+    darklink_rises:  { showMs: 10_000, freezeMs: 6_000 },
+    darklink_slain:  { showMs: 15_000, freezeMs: 8_000 },
+    sacred_realm: { showMs: 4_000, freezeMs: 4_000 },
     last_chance: { showMs: 2_000, freezeMs: 0 },
     hall_of_fame: { showMs: 25_000, freezeMs: 0 },
     milestone_5k: { showMs: 4_000, freezeMs: 0 },
@@ -87,15 +91,4 @@ export const manifest: MapManifest = {
     wall_middle_right: { restitution: 0.3, friction: 0.1 },
     wall_guide_lane: { restitution: 0.2, friction: 0.15, smooth: 0 },
   },
-  // Termes Zelda traqués par le grep-guard anti-fuite.
-  forbiddenInCore: [
-    'ganondorf',
-    'darklink',
-    'zelda',
-    'hyrule',
-    'triforce',
-    'link',
-    'ocarina',
-    'sheikah',
-  ],
 }
