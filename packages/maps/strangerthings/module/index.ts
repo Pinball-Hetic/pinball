@@ -1,4 +1,3 @@
-import * as THREE from 'three'
 import {
   GarlandLights,
   BumperVisuals,
@@ -108,12 +107,7 @@ export function createModule(): MapModule {
       vecnaReveal.bindUpsideDownAtmosphere(atmosphere)
 
       ctx.root.traverse((obj) => {
-        if (!(obj instanceof THREE.Mesh)) return
-        if (!obj.name.includes('stangerthing_plate')) return
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
-        for (const m of mats) {
-          if (m instanceof THREE.MeshStandardMaterial) m.emissiveIntensity = 0.15
-        }
+        if (obj.name.includes('stangerthing_plate')) obj.visible = false
       })
     },
     async preload(): Promise<void> {
