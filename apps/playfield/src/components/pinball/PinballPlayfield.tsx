@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, type CSSProperties } from "re
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import {
   PhysicsWorld,
@@ -13,7 +14,7 @@ import {
   DrainBall,
   BottomOutBall,
   DetectBottomOut,
-  BALL_RADIUS,
+  getBallRadius,
   BALL_MAX_SPEED,
   bottomOutLaneSepX,
   INITIAL_LIVES,
@@ -57,6 +58,8 @@ import {
   parsePlayfieldViewMode,
   refitPlayfieldCamera,
   configureSurfaceCoefficients,
+  configureBallRadius,
+  DEFAULT_BALL_RADIUS,
   type PlayfieldCamFit,
   type PlayfieldCamera,
   DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING,
@@ -488,6 +491,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const mountEl = mountRef.current;
     if (!mountEl) return;
 
+    // ── Config par-map — doit précéder tout setup physique / caméra ─────────
+    configureSurfaceCoefficients(resolvedMap.layout.geometry.coefficients);
+    configureBallRadius(mapManifest.ballRadius ?? DEFAULT_BALL_RADIUS);
+
     // ── Three.js setup ───────────────────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#000000");
@@ -823,7 +830,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         ballTrail.mount(scene);
 
         // ── Ball mesh ────────────────────────────────────────────────────────
-        const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
+        const ballGeo = new THREE.SphereGeometry(getBallRadius(), 24, 24);
         const ballMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d4, metalness: 0.95, roughness: 0.08 });
         const ballSphere = new THREE.Mesh(ballGeo, ballMat);
         ballSphere.castShadow = true;
@@ -866,7 +873,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         // Zones de garantie de lancement dérivées des bbox mesh (pose de repos).
         if (leftFlipperObj && rightFlipperObj) {
-          flipperZones = computeFlipperZones(leftFlipperObj, rightFlipperObj, BALL_RADIUS);
+          flipperZones = computeFlipperZones(leftFlipperObj, rightFlipperObj, getBallRadius());
         }
 
         // ── Physics ──────────────────────────────────────────────────────────
@@ -1127,7 +1134,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         modelRoot.updateMatrixWorld(true);
         cameraDirector = new PlayfieldCameraDirector();
         cameraDirector.setViewMode(PLAYFIELD_VIEW_MODE);
-        cameraDirector.setBosses(MAP_BOSSES);
+        cameraDirector.setBosses(mapBosses);
         const camFrameBox = syncPlayfieldCamera(playfieldRoot);
         if (camera instanceof THREE.PerspectiveCamera) {
           const msz = camFrameBox.getSize(new THREE.Vector3());
@@ -1201,7 +1208,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             cameraDirector?.play(event.bossId);
           }
           if (event.type === "BOSS_TARGET_HIT") {
-            const boss = getBossById(MAP_BOSSES, event.bossId);
+            const boss = getBossById(mapBosses, event.bossId);
             if (boss && event.hitCount >= boss.targetHits) {
               cameraDirector?.playVictory(event.bossId);
             }
