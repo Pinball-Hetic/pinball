@@ -294,7 +294,7 @@ export function createModule(): MapModule {
       // Pas de magnétisme sur la map Zelda.
     },
 
-    setSporesEnabled(_enabled: boolean): void {
+    setSporesEnabled(): void {
       // Pas de spores dans la map Zelda (réservé à l'Upside Down ST).
     },
 
