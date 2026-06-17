@@ -8,7 +8,10 @@ import {
   getGameOverUrl,
   setMapAudioUrls,
 } from "./pinballAudioConfig";
+<<<<<<< HEAD
 export { setMapAudioUrls };
+=======
+>>>>>>> origin/dev
 import { PlayfieldMusicDirector } from "./PlayfieldMusicDirector";
 import { soundLevel, percentToGain } from "./pinballAudioVolumes";
 import { SamplePlayer } from "./SamplePlayer";
@@ -28,10 +31,15 @@ let assetsWarmed = false;
 function warmAssets(): void {
   if (assetsWarmed) return;
   assetsWarmed = true;
+<<<<<<< HEAD
   void samples.prepareGaplessLoop(getEarlySoundUrl());
   void samples.preloadBuffer(getGameOverUrl());
   // Sons spécifiques à la map (reveal boss, ambiance) : préchargés via
   // warmMapSounds(urls) depuis le playfield (URLs fournies par la map).
+=======
+  void samples.prepareGaplessLoop(EARLY_SOUND_URL);
+  void samples.preloadBuffer(GAME_OVER_URL);
+>>>>>>> origin/dev
 }
 
 // Préchargement des sons de la map (musique boss en boucle gapless).
@@ -126,7 +134,16 @@ export function onMusicGameOver(): void {
   wantsEarlySound = true;
   musicDirector.setWantsEarly(true);
   musicDirector.onGameOverSting();
+<<<<<<< HEAD
   void samples.playOneShotBuffer(getGameOverUrl(), soundLevel("gameOver"));
+}
+
+/** @deprecated Utiliser onMusicGameOver — conservé pour compatibilité interne. */
+export function playGameOverSound(): void {
+  onMusicGameOver();
+=======
+  void samples.playOneShotBuffer(GAME_OVER_URL, soundLevel("gameOver"));
+>>>>>>> origin/dev
 }
 
 /** @deprecated Utiliser onMusicGameOver — conservé pour compatibilité interne. */
@@ -164,7 +181,10 @@ export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition
       sfx.playAssist();
       break;
     case "PORTAL_ENTER":
+<<<<<<< HEAD
       // Son d'event de la map joué via ctx.playSound (manifest.sounds).
+=======
+>>>>>>> origin/dev
       break;
     case "PORTAL_TREMOR":
       sfx.playPortalTremor();

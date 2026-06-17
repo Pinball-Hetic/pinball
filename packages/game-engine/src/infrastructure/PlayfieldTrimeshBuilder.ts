@@ -261,7 +261,8 @@ export class PlayfieldTrimeshBuilder {
    * son rôle (MeshRoleResolver, via la hiérarchie) :
    *  - wall_ / lane_ → trimesh solide (matière depuis elements[nom])
    *  - floor_        → trimesh, SAUF si elements.physics === 'analytic'
-   *  - flipper_/bumper_/slingshot_/target_/sensor_/vis_ → ignorés ici
+   *  - slingshot_ → trimesh solide (restitution haute, kick actif via sensor séparé)
+   *  - flipper_/bumper_/target_/sensor_/vis_ → ignorés ici
    *    (gérés analytiquement par PlayfieldColliderFactory, ou sans physique).
    * Les meshes d'un même nom conventionné (ex. wall_top = Mesh_2/3/4) sont
    * fusionnés en un seul collider.
@@ -280,7 +281,7 @@ export class PlayfieldTrimeshBuilder {
       const resolved = resolver.resolveFromAncestry(ancestryNames(child));
       if (!resolved) return;
       const { role, id } = resolved;
-      if (role !== 'wall' && role !== 'lane' && role !== 'floor') return;
+      if (role !== 'wall' && role !== 'lane' && role !== 'floor' && role !== 'slingshot') return;
       const key = `${role}_${id}`;
       if (role === 'floor' && elements[key]?.physics === 'analytic') return;
       if (!groups.has(key)) groups.set(key, { geos: [], role });

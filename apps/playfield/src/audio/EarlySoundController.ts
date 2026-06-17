@@ -20,7 +20,10 @@ export class EarlySoundController {
   }
 
   arm(): Promise<void> {
+<<<<<<< HEAD
     if (this.handoffBlocked) return Promise.resolve();
+=======
+>>>>>>> origin/dev
     this.phase = "armed";
     return this.samples
       .prepareGaplessLoop(getEarlySoundUrl(), EARLY_SOUND_LOOP_SILENCE_THRESHOLD)
@@ -29,8 +32,12 @@ export class EarlySoundController {
 
   async engage(): Promise<void> {
     if (this.handoffBlocked) return;
+<<<<<<< HEAD
     const url = getEarlySoundUrl();
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(url)) {
+=======
+    if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
+>>>>>>> origin/dev
       this.phase = "playing";
       return;
     }
@@ -45,8 +52,12 @@ export class EarlySoundController {
 
   engageSync(): void {
     if (this.handoffBlocked) return;
+<<<<<<< HEAD
     const url = getEarlySoundUrl();
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(url)) {
+=======
+    if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(EARLY_SOUND_URL)) {
+>>>>>>> origin/dev
       this.phase = "playing";
       return;
     }
@@ -73,28 +84,33 @@ export class EarlySoundController {
   /** Arrêt immédiat — pas de fade (handoff vers musique boss). */
   stopInstant(): void {
     this.handoffBlocked = true;
+<<<<<<< HEAD
     this.samples.stopGaplessLoop(getEarlySoundUrl());
+=======
+    this.samples.stopGaplessLoop(EARLY_SOUND_URL);
+>>>>>>> origin/dev
     this.phase = "off";
   }
 
   clearHandoffBlock(): void {
     this.handoffBlocked = false;
+<<<<<<< HEAD
   }
 
   /** @deprecated Utiliser stopInstant() via PlayfieldMusicDirector. */
   consumeOnBossReveal(): void {
     this.stopInstant();
+=======
+>>>>>>> origin/dev
   }
 
   resetForNewGame(): void {
     this.handoffBlocked = false;
+<<<<<<< HEAD
     this.samples.stopGaplessLoop(getEarlySoundUrl());
-    this.phase = "off";
-  }
-
-  /** Clears armed state only — intentionally does not stop an active loop. */
-  disarm(): void {
-    if (this.phase === "playing") return;
+=======
+    this.samples.stopGaplessLoop(EARLY_SOUND_URL);
+>>>>>>> origin/dev
     this.phase = "off";
   }
 }

@@ -44,7 +44,11 @@ export const manifest: MapManifest = {
     milestone_big: 'milestone',
   },
   // Assets préchargés par la page playfield (URL publique /maps/<id>/…).
-  preload: [mapAsset('playfield/demogorgon.glb'), mapAsset('playfield/demogorgon.png')],
+  preload: [
+    mapAsset('playfield/demogorgon.glb'),
+    mapAsset('playfield/demogorgon.png'),
+    mapAsset('playfield/fin_combat_vecna.png'),
+  ],
   // Sons d'event de la map (joués via ctx.playSound(id)).
   sounds: {
     upside_down_appear: { url: mapAsset('audio/apparitionUpsideDown.mp3'), volume: 280 },
@@ -101,6 +105,8 @@ export const manifest: MapManifest = {
     floor_main: { physics: 'analytic' }, // ex-Mesh_0 : sol analytique lisse
     wall_main: { singleSided: 1, restitution: 0.35, friction: 0.12 }, // ex-Mesh_1
     wall_slingshot: { restitution: 0, friction: 0.1 }, // ex no-bounce (Cylinder.008)
+    slingshot_left:  { restitution: 0.8, friction: 0.05 }, // hypoténuse rebondissante
+    slingshot_right: { restitution: 0.8, friction: 0.05 }, // hypoténuse rebondissante
     wall_bottom: { restitution: 0, friction: 0.1 }, // ex no-bounce (Plane.008)
     wall_top: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.001)
     wall_under_top: { restitution: 0.35, friction: 0.12 }, // rail (Circle.034)

@@ -43,6 +43,7 @@ export const bossDefinitions: BossDefinition[] = [
     victoryCameraCinematic: DEMOGORGON_VICTORY_CAMERA_CINEMATIC,
     revealSoundUrl: mapAsset('audio/spawnDG.mp3'),
     revealSoundVolume: 100,
+    keepMusicUntilBossReveal: 'vecna',
     // Eleven aide pendant le fight (cf. DemogorgonReveal émet ASSIST id 'eleven').
     assist: { id: 'eleven' },
     targetMeshTheme: {
@@ -106,6 +107,13 @@ export const bossDefinitions: BossDefinition[] = [
     unlocksReturnPortal: true,
     cameraCinematic: VECNA_CAMERA_CINEMATIC,
     victoryCameraCinematic: VECNA_VICTORY_CAMERA_CINEMATIC,
+    revealSoundUrl: mapAsset('audio/vecnaTheme.mp3'),
+    revealSoundVolume: 100,
+    latePhaseSoundUrl: mapAsset('audio/win-music.mp3'),
+    latePhaseSoundVolume: 100,
+    latePhaseHitThreshold: 7,
+    // win-music continue pendant la cinématique retour portail (photo fin Vecna).
+    keepMusicUntilReturnPortal: true,
     targetMeshTheme: {
       ring: {
         color: 0x6622aa,
