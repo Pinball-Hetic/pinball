@@ -10,7 +10,8 @@ export type EarlySoundPhase = "off" | "armed" | "playing" | "released";
 
 export class EarlySoundController {
   private phase: EarlySoundPhase = "off";
-  private revealConsumed = false;
+  /** Bloque toute reprise tant que le boss tient la piste musique. */
+  private handoffBlocked = false;
 
   constructor(private readonly samples: SamplePlayer) {}
 
@@ -19,7 +20,7 @@ export class EarlySoundController {
   }
 
   arm(): Promise<void> {
-    if (this.revealConsumed) return Promise.resolve();
+    if (this.handoffBlocked) return Promise.resolve();
     this.phase = "armed";
     return this.samples
       .prepareGaplessLoop(getEarlySoundUrl(), EARLY_SOUND_LOOP_SILENCE_THRESHOLD)
@@ -27,7 +28,7 @@ export class EarlySoundController {
   }
 
   async engage(): Promise<void> {
-    if (this.revealConsumed) return;
+    if (this.handoffBlocked) return;
     const url = getEarlySoundUrl();
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(url)) {
       this.phase = "playing";
@@ -43,7 +44,7 @@ export class EarlySoundController {
   }
 
   engageSync(): void {
-    if (this.revealConsumed) return;
+    if (this.handoffBlocked) return;
     const url = getEarlySoundUrl();
     if (this.phase === "playing" || this.samples.isGaplessLoopPlaying(url)) {
       this.phase = "playing";
@@ -69,14 +70,24 @@ export class EarlySoundController {
     this.phase = "released";
   }
 
-  consumeOnBossReveal(): void {
-    this.revealConsumed = true;
+  /** Arrêt immédiat — pas de fade (handoff vers musique boss). */
+  stopInstant(): void {
+    this.handoffBlocked = true;
     this.samples.stopGaplessLoop(getEarlySoundUrl());
-    this.phase = "released";
+    this.phase = "off";
+  }
+
+  clearHandoffBlock(): void {
+    this.handoffBlocked = false;
+  }
+
+  /** @deprecated Utiliser stopInstant() via PlayfieldMusicDirector. */
+  consumeOnBossReveal(): void {
+    this.stopInstant();
   }
 
   resetForNewGame(): void {
-    this.revealConsumed = false;
+    this.handoffBlocked = false;
     this.samples.stopGaplessLoop(getEarlySoundUrl());
     this.phase = "off";
   }
