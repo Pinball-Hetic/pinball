@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
-  BALL_RADIUS,
+  getBallRadius,
   SLINGSHOT_LEFT_CENTER,
   SLINGSHOT_RIGHT_CENTER,
 } from '../domain/Ball';
@@ -330,7 +330,7 @@ export class PlayfieldColliderFactory {
     const WALL_T = 0.015;
     const HH = WALL_H / 2;
     const HT = WALL_T / 2;
-    const laneSepX = layout.spawns.ball.x - BALL_RADIUS * 2;
+    const laneSepX = layout.spawns.ball.x - getBallRadius() * 2;
 
     const walls = [
       { hx: HT, hy: HH, hz: 0.485, px: -0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
