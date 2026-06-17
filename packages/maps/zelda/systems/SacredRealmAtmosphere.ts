@@ -9,31 +9,31 @@ import { PlayfieldShadeOverlay } from '@pinball/game-engine';
 const BLEND_DURATION = 2.0;
 
 // Background & tinte matériaux
-const SACRED_BG              = 0x08000f;   // quasi-noir violet
-const SACRED_MAT_TINT        = 0x180028;   // violet profond sur tous les matériaux
-const SACRED_MAT_EMISSIVE    = 0x1a0033;   // lueur émissive sombre
+const SACRED_BG              = 0x12002e;   // violet sombre mais visible
+const SACRED_MAT_TINT        = 0x200040;   // teinte violette douce
+const SACRED_MAT_EMISSIVE    = 0x1a0033;   // lueur émissive
 
-// Intensités de lumière Sacred Realm (très réduites → très sombre)
-const SACRED_AMBIENT_INTENSITY = 0.26;
-const SACRED_HEMI_INTENSITY    = 0.20;
-const SACRED_DIR_INTENSITY     = 0.44;
-const SACRED_FILL_INTENSITY    = 0.22;
+// Intensités de lumière Sacred Realm — sombre mais lisible
+const SACRED_AMBIENT_INTENSITY = 0.62;
+const SACRED_HEMI_INTENSITY    = 0.52;
+const SACRED_DIR_INTENSITY     = 0.82;
+const SACRED_FILL_INTENSITY    = 0.54;
 
 // Exposure target
-const SACRED_EXPOSURE = 0.98;
+const SACRED_EXPOSURE = 1.18;
 
-// Shade overlay
-const SACRED_SHADE_COLOR   = 0x06000e;
-const SACRED_SHADE_OPACITY = 0.38;
+// Shade overlay (voile violet léger)
+const SACRED_SHADE_COLOR   = 0x08001a;
+const SACRED_SHADE_OPACITY = 0.18;
 
-// Brouillard
+// Brouillard — densité faible : FogExp2 @ 0.5 sur une map < 1 m = brume légère
 const SACRED_FOG_COLOR   = 0x0c001a;
-const SACRED_FOG_DENSITY = 3.0;
+const SACRED_FOG_DENSITY = 0.5;
 
 // Pulse (exposition lente quand pleinement actif)
 const SACRED_PULSE_SPEED   = 0.55;
-const SACRED_PULSE_EXP_MIN = 0.95;
-const SACRED_PULSE_EXP_MAX = 1.06;
+const SACRED_PULSE_EXP_MIN = 1.12;
+const SACRED_PULSE_EXP_MAX = 1.28;
 
 // ── Types internes ────────────────────────────────────────────────────────────
 
@@ -212,8 +212,8 @@ export class SacredRealmAtmosphere {
     for (const entry of this.materials) {
       entry.material.color.copy(entry.color);
       _c.set(SACRED_MAT_TINT);
-      entry.material.color.lerp(_c, ease * 0.52);
-      entry.material.color.multiplyScalar(1 - ease * 0.46);
+      entry.material.color.lerp(_c, ease * 0.35);
+      entry.material.color.multiplyScalar(1 - ease * 0.18);
 
       entry.material.emissive.copy(entry.emissive);
       _c.set(SACRED_MAT_EMISSIVE);
