@@ -15,7 +15,17 @@ describe('bossDefinitions', () => {
     expect(ganondorf.reveal.requiresAlternateWorld).toBe(false)
     expect(ganondorf.unlocksPortal).toBe(true)
     expect(ganondorf.unlocksReturnPortal).toBe(false)
-    expect(ganondorf.revealSoundUrl).toContain('spawnGanondorf.mp3')
+    // Ganondorf joue sa fanfare en one-shot via manifest.sounds (pas de revealSoundUrl).
+    expect(ganondorf.revealSoundUrl).toBeUndefined()
+  })
+
+  test('darklink has full audio fight sequence', () => {
+    const darklink = getBossDefinition('darklink')
+    expect(darklink.revealSoundUrl).toContain('second-boss.mp3')
+    expect(darklink.latePhaseSoundUrl).toContain('last-pv-second-boss.mp3')
+    expect(darklink.latePhaseHitThreshold).toBe(7)
+    expect(darklink.victoryMusicUrl).toContain('win.mp3')
+    expect(darklink.keepMusicUntilReturnPortal).toBe(true)
   })
 
   test('darklink is in the sacred realm and unlocks the return portal', () => {

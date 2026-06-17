@@ -152,6 +152,8 @@ export function createModule(): MapModule {
 
       // ── Cinématiques boss Ganondorf ──────────────────────────────────────
       if (e.type === 'BOSS_REVEAL' && e.bossId === 'ganondorf') {
+        // Fanfare one-shot (~5s) via manifest.sounds → ambient reprend après.
+        ctx.playSound('ganondorf_appear')
         ctx.playCinematic('ganondorf_rises', { once: true })
       }
       if (e.type === 'BOSS_TARGET_HIT' && e.bossId === 'ganondorf') {

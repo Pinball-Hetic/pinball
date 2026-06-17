@@ -28,12 +28,19 @@ export const manifest: MapManifest = {
   },
   // Assets préchargés par la page playfield.
   preload: [mapAsset('playfield/ganondorf.glb'), mapAsset('playfield/darklink.glb')],
-  // Musique ambiante Zelda — remplace /audio/early-sound.mp3 (ST) pour cette map.
-  // Fichier à déposer dans assets/audio/ambient.mp3 puis sync-map-assets.sh
+  // Musique ambiante Zelda — boucle en attract + pendant la partie jusqu'au boss.
   ambientMusic: mapAsset('audio/ambient.mp3'),
+  // Son game over Zelda.
+  gameOverSound: mapAsset('audio/game-over.mp3'),
+  // Musique du monde alternatif (Sacred Realm) — boucle entre le portail et
+  // l'apparition de Dark Link.
+  alternateWorldMusicUrl: mapAsset('audio/sacred-realm.mp3'),
   // Sons d'event de la map.
   sounds: {
-    sacred_realm_appear: { url: mapAsset('audio/sacredRealm.mp3'), volume: 280 },
+    // Fanfare one-shot à l'apparition de Ganondorf (puis l'ambient reprend).
+    ganondorf_appear: { url: mapAsset('audio/spawnGanondorf.mp3'), volume: 100 },
+    // SFX joué au moment où la balle passe le portail Sacred Realm.
+    sacred_realm_appear: { url: mapAsset('audio/transition-portal.mp3'), volume: 280 },
   },
   // Libellés des compteurs (recap backglass).
   counterLabels: { ganondorfs: 'GANONDORFS', darklinks: 'DARK LINKS', portals: 'PORTAILS', hetic: 'HETIC' },

@@ -6,6 +6,8 @@ import { EarlySoundController } from "./EarlySoundController";
 import {
   getEarlySoundUrl,
   getGameOverUrl,
+  getAlternateWorldMusicUrl,
+  getAlternateWorldMusicVolume,
   setMapAudioUrls,
 } from "./pinballAudioConfig";
 export { setMapAudioUrls };
@@ -168,12 +170,21 @@ export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition
     case "PORTAL_TREMOR":
       sfx.playPortalTremor();
       break;
-    case "PORTAL_TRANSITION_END":
+    case "PORTAL_TRANSITION_END": {
       sfx.playPortalTransitionEnd();
+      const altUrl = getAlternateWorldMusicUrl();
+      if (altUrl) {
+        const altVol = percentToGain(getAlternateWorldMusicVolume());
+        musicDirector.onAlternateWorldEnter(altUrl, altVol);
+      }
       break;
+    }
     case "RETURN_PORTAL_TRANSITION_END":
       musicDirector.onReturnPortalTransitionEnd();
       sfx.playPortalTransitionEnd();
+      break;
+    case "WORLD_CYCLE_COMPLETE":
+      musicDirector.onAlternateWorldExit();
       break;
     case "BOTTOM_OUT":
       sfx.playBottomOut();
