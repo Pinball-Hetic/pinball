@@ -3,15 +3,26 @@ const DEFAULT_GAME_OVER_URL   = "/audio/sound-lost.mp3";
 
 let _earlySoundUrl = DEFAULT_EARLY_SOUND_URL;
 let _gameOverUrl   = DEFAULT_GAME_OVER_URL;
+let _alternateWorldMusicUrl: string | undefined;
+let _alternateWorldMusicVolume = 100;
 
 /** Appelé par PinballPlayfield au montage pour brancher les sons de la map active. */
-export function setMapAudioUrls(ambientMusic?: string, gameOverSound?: string): void {
-  _earlySoundUrl = ambientMusic  ?? DEFAULT_EARLY_SOUND_URL;
-  _gameOverUrl   = gameOverSound ?? DEFAULT_GAME_OVER_URL;
+export function setMapAudioUrls(
+  ambientMusic?: string,
+  gameOverSound?: string,
+  alternateWorldMusic?: string,
+  alternateWorldMusicVolume?: number,
+): void {
+  _earlySoundUrl             = ambientMusic            ?? DEFAULT_EARLY_SOUND_URL;
+  _gameOverUrl               = gameOverSound            ?? DEFAULT_GAME_OVER_URL;
+  _alternateWorldMusicUrl    = alternateWorldMusic;
+  _alternateWorldMusicVolume = alternateWorldMusicVolume ?? 100;
 }
 
 export function getEarlySoundUrl(): string { return _earlySoundUrl; }
 export function getGameOverUrl():   string { return _gameOverUrl;   }
+export function getAlternateWorldMusicUrl(): string | undefined { return _alternateWorldMusicUrl; }
+export function getAlternateWorldMusicVolume(): number { return _alternateWorldMusicVolume; }
 
 // Alias pour la compatibilité avec les imports existants
 /** @deprecated Utiliser getEarlySoundUrl() */
