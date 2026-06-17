@@ -3,7 +3,8 @@ import { NoSignal } from '@pinball/ui'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
-import { JoyceWall, SideArt, backglassTheme, backglassThemeAlternate, hasMapContent, MAP_ID } from '@/map/content'
+import { MapContentProvider, useMapContent } from '@/map/content'
+import { getBackglassContent } from '@pinball/maps/backglass'
 import HallOfFame from '@/components/HallOfFame'
 import StatsBanner from '@/components/StatsBanner'
 import ReactorFx from '@/components/ReactorFx'
@@ -12,22 +13,38 @@ import RecapTakeover from '@/components/takeovers/RecapTakeover'
 import AttractScene from '@/components/takeovers/AttractScene'
 import CinematicTakeover from '@/components/takeovers/CinematicTakeover'
 
-// Garde NO SIGNAL : map sans contenu backglass → écran de veille (pas de
-// crash). Wrapper sans hook → le Stage (tous les hooks + art de la map) n'est
-// monté que si le contenu existe.
+// BackglassPage : appelé à la racine, gère le cycle de vie du mapId.
+// La sélection de map arrive via le socket (useBackglassData) et provoque un
+// remontage propre du Stage (key={mapId}) avec le bon contenu de map.
 export default function BackglassPage() {
-  if (!hasMapContent) {
+  const { entries, stats, connected, mapId } = useBackglassData()
+  const content = getBackglassContent(mapId) ?? null
+
+  if (!content) {
     return (
       <div style={{ position: 'absolute', inset: 0 }}>
-        <NoSignal reason={`BACKGLASS — MAP "${MAP_ID}" INTROUVABLE`} />
+        <NoSignal reason={`BACKGLASS — MAP "${mapId}" INTROUVABLE`} />
       </div>
     )
   }
-  return <BackglassStage />
+
+  return (
+    <MapContentProvider value={content}>
+      {/* key={mapId} : remonte le Stage complet (hooks, socket takeover, art)
+          à chaque changement de map → pas d'état résiduel de la map précédente. */}
+      <BackglassStage key={mapId} entries={entries} stats={stats} connected={connected} />
+    </MapContentProvider>
+  )
 }
 
-function BackglassStage() {
-  const { entries, stats, connected } = useBackglassData()
+interface StageProps {
+  entries: ReturnType<typeof useBackglassData>['entries']
+  stats: ReturnType<typeof useBackglassData>['stats']
+  connected: boolean
+}
+
+function BackglassStage({ entries, stats, connected }: StageProps) {
+  const { JoyceWall, SideArt, backglassTheme, backglassThemeAlternate } = useMapContent()
   const { takeover, alternateWorld, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
     useBackglassTakeover(entries)
   const stageRef = useRef<HTMLDivElement>(null)
