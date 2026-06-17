@@ -3,6 +3,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import {
   PhysicsWorld,
   BallPhysics,
@@ -526,16 +527,30 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     renderer.shadowMap.enabled = false;
     mountEl.appendChild(renderer.domElement);
 
+    // IBL : sans scene.environment, envMapIntensity des matériaux est mort et le
+    // métal ne réfléchit que la dirLight dure (rond spéculaire + stries d'arêtes).
+    // RoomEnvironment fournit un reflet doux neutre via PMREM.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envTexture;
+    scene.environmentIntensity = 0.0;
+
     // Lumière ambiante minimale pour éviter les noirs purs dans les ombres
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
     scene.add(ambientLight);
     // HemiLight à 0 — conservé uniquement pour la compatibilité UpsideDownAtmosphere
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
     scene.add(hemiLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.8);
-    dirLight.position.copy(PLAYFIELD_VIEW_DIR);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.54);
+    dirLight.position.set(1.08, 1.5, 0.27);
     dirLight.castShadow = false;
     scene.add(dirLight);
+    // Second soleil, côté opposé → double éclairage, débouche l'ombre du
+    // premier. Dédié (PAS fillLight, hijacké par UpsideDownAtmosphere).
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 5.05);
+    dirLight2.position.set(-1.21, 1.5, 0.55);
+    dirLight2.castShadow = false;
+    scene.add(dirLight2);
     // FillLight à 0 — conservé pour UpsideDownAtmosphere
     const fillLight = new THREE.DirectionalLight(0xffffff, 0);
     fillLight.position.set(0, 1, -1);
@@ -1892,6 +1907,8 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       refitCameraRef.current = null;
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
+      envTexture.dispose();
+      pmrem.dispose();
       renderer.dispose();
     };
   }, []);
