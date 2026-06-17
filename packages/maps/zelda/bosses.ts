@@ -1,5 +1,11 @@
 import type { BossDefinition, BossId } from '@pinball/game-engine'
 import { mapAsset } from './manifest'
+import {
+  GANONDORF_CAMERA_CINEMATIC,
+  GANONDORF_VICTORY_CAMERA_CINEMATIC,
+  DARK_LINK_CAMERA_CINEMATIC,
+  DARK_LINK_VICTORY_CAMERA_CINEMATIC,
+} from './cameraCinematics'
 
 // Définitions de boss Zelda.
 // Ganondorf : monde normal, cible centrale.
@@ -32,6 +38,8 @@ export const bossDefinitions: BossDefinition[] = [
     },
     unlocksPortal: true,
     unlocksReturnPortal: false,
+    cameraCinematic: GANONDORF_CAMERA_CINEMATIC,
+    victoryCameraCinematic: GANONDORF_VICTORY_CAMERA_CINEMATIC,
     revealSoundUrl: mapAsset('audio/spawnGanondorf.mp3'),
     revealSoundVolume: 100,
     targetMeshTheme: {
@@ -92,6 +100,8 @@ export const bossDefinitions: BossDefinition[] = [
     },
     unlocksPortal: false,
     unlocksReturnPortal: true,
+    cameraCinematic: DARK_LINK_CAMERA_CINEMATIC,
+    victoryCameraCinematic: DARK_LINK_VICTORY_CAMERA_CINEMATIC,
     targetMeshTheme: {
       ring: {
         color: 0x004422,
