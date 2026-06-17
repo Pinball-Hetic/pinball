@@ -79,6 +79,14 @@ export function prepareGltfMaterialsForDisplay(
       // Assombrissement sélectif des surfaces de plateau.
       if (shouldDarkenMapMaterial(obj)) {
         material.color.multiplyScalar(colorDarken);
+        // Surfaces imprimées (sol/plastique/stickers) = diffuses, pas miroir.
+        // roughness haut + metalness 0 + envMapIntensity quasi nul : même au
+        // ras (fresnel rasant), le sol ne renvoie plus les panneaux de
+        // RoomEnvironment. NE PAS retomber dans le boost ci-dessous.
+        material.roughness = Math.max(material.roughness, 0.85);
+        material.metalness = 0;
+        material.envMapIntensity = 0.05;
+        continue;
       }
 
       // envMapIntensity selon metalness — clé du rendu PBR vivid.

@@ -138,8 +138,11 @@ export const manifest: MapManifest = {
     lights: {
       ambient: { color: 0xffffff, intensity: 0.25 },
       hemi:    { sky: 0xffffff, ground: 0x111111, intensity: 0 },
-      dir:     { color: 0xffffff, intensity: 2.8, x: 0, y: 0.48, z: 0.88 },
-      fill:    { color: 0xffffff, intensity: 0,   x: 0, y: 1,    z: -1   },
+      // Double soleil latéral opposé (réglé à l'œil) : pas de highlight
+      // spéculaire dans l'axe caméra, sol débouché des deux côtés.
+      dir:     { color: 0xffffff, intensity: 2.54, x: 1.08,  y: 1.5, z: 0.27 },
+      dir2:    { color: 0xffffff, intensity: 5.05, x: -1.21, y: 1.5, z: 0.55 },
+      fill:    { color: 0xffffff, intensity: 0,    x: 0,     y: 1,   z: -1   },
     },
   },
   meshAliases: {

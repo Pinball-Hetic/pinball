@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, useCallback, type CSSProperties } from "re
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import {
   PhysicsWorld,
   BallPhysics,
@@ -559,6 +559,16 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     dirLight.position.set(rl?.dir.x ?? 0, rl?.dir.y ?? 0.48, rl?.dir.z ?? 0.88);
     dirLight.castShadow = false;
     scene.add(dirLight);
+
+    // Second soleil optionnel (rl.dir2), côté opposé → double éclairage qui
+    // débouche l'ombre du principal. Distinct du fill (réservé à
+    // UpsideDownAtmosphere). Absent dans la config → un seul soleil.
+    if (rl?.dir2) {
+      const dirLight2 = new THREE.DirectionalLight(rl.dir2.color, rl.dir2.intensity);
+      dirLight2.position.set(rl.dir2.x, rl.dir2.y, rl.dir2.z);
+      dirLight2.castShadow = false;
+      scene.add(dirLight2);
+    }
 
     const fillLight = new THREE.DirectionalLight(
       rl?.fill.color    ?? 0xffeedd,

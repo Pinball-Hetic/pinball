@@ -70,6 +70,10 @@ export interface MapRenderingConfig {
     hemi: MapHemiLightConfig;
     /** Directionnel principal — source du contraste et des ombres portées. */
     dir: MapDirLightConfig;
+    /** Second directionnel optionnel, côté opposé au principal → double
+     *  éclairage qui débouche l'ombre du `dir` sans le fill (réservé à
+     *  UpsideDownAtmosphere). Absent → un seul soleil. */
+    dir2?: MapDirLightConfig;
     /** Fill léger — débouche les zones d'ombre sans écraser le contraste. */
     fill: MapDirLightConfig;
   };
