@@ -32,3 +32,30 @@ export function getMapPackage(id: string): ResolvedMap | null {
       return null
   }
 }
+
+/** Métadonnées légères pour le sélecteur de map (pas de layout ni module). */
+export interface MapMeta {
+  id: string
+  name: string
+  tagline: string
+  accentColor: string
+  /** URL publique de la vidéo de prévisualisation (loop dans la card). */
+  previewVideo?: string
+}
+
+export const AVAILABLE_MAPS: MapMeta[] = [
+  {
+    id: 'strangerthings',
+    name: 'Stranger Things',
+    tagline: 'Hawkins, Indiana',
+    accentColor: '#e53935',
+    previewVideo: '/map-previews/strangerthings.mp4',
+  },
+  {
+    id: 'zelda',
+    name: 'The Legend of Zelda',
+    tagline: 'Hyrule Kingdom',
+    accentColor: '#FFD700',
+    previewVideo: '/map-previews/zelda.mp4',
+  },
+]

@@ -3,7 +3,8 @@ import {
   WALL_TOP_Z,
   WALL_LEFT_X,
   WALL_RIGHT_X,
-  BALL_RADIUS,
+  DEFAULT_BALL_RADIUS,
+  getBallRadius,
 } from './Ball';
 import { FLIPPER_Z_MAX } from './FlipperConstants';
 import type { SurfaceCoefficients } from './MapLayout';
@@ -41,17 +42,17 @@ export function surfaceYAtZ(z: number): number {
 
 /** Centre de la sphère posé sur le tapis incliné à l'abscisse Z donnée. */
 export function ballCenterOnSurface(z: number, margin = 0.002): number {
-  return surfaceYAtZ(z) + BALL_RADIUS + margin;
+  return surfaceYAtZ(z) + getBallRadius() + margin;
 }
 
-export const DRAIN_Z_THRESHOLD = WALL_BOTTOM_Z + BALL_RADIUS * 2;
+export const DRAIN_Z_THRESHOLD = WALL_BOTTOM_Z + DEFAULT_BALL_RADIUS * 2;
 
 export const BOTTOM_OUT_Z = FLIPPER_Z_MAX + 0.025;
 
 // Séparateur X de la zone bottom-out : dérivé du spawn (paramétré, plus de
 // constante map dans le domain). laneSepX = spawnX - 2·rayon balle.
 export function bottomOutLaneSepX(spawnX: number): number {
-  return spawnX - BALL_RADIUS * 2;
+  return spawnX - getBallRadius() * 2;
 }
 
 export function isInBottomOutZone(x: number, z: number, laneSepX: number): boolean {

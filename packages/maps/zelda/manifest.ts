@@ -57,6 +57,7 @@ export const manifest: MapManifest = {
     skill_shot: { showMs: 5_000, freezeMs: 2_000 },
   },
   // TODO: remplacer par le vrai GLB Zelda quand disponible.
+  ballRadius: 0.012,
   glb: mapAsset('playfield/zelda.glb'),
   // Points par rôle.
   scoring: {
@@ -90,5 +91,37 @@ export const manifest: MapManifest = {
     wall_middle_left: { restitution: 0.3, friction: 0.1 },
     wall_middle_right: { restitution: 0.3, friction: 0.1 },
     wall_guide_lane: { restitution: 0.2, friction: 0.15, smooth: 0 },
+  },
+  // Termes Zelda traqués par le grep-guard anti-fuite.
+  forbiddenInCore: [
+    'ganondorf',
+    'darklink',
+    'zelda',
+    'hyrule',
+    'triforce',
+    'link',
+    'ocarina',
+    'sheikah',
+  ],
+  // ─── Rendu Three.js — spécifique Zelda ────────────────────────────────────
+  // Esthétique Hyrule : marbre noir profond, or et gemmes vifs.
+  // envIntensityMetallic élevé → les matériaux métalliques (triforce, couronnes
+  // bumpers, gemmes) reflètent fortement l'environment → aspect Vectary.
+  // dirLight overhead (y fort) → éclaire les surfaces horizontales (logo, couronnes).
+  // ambient faible → zones d'ombre très sombres = contraste dramatique.
+  rendering: {
+    useEnvironment: true,
+    toneMappingExposure: 1.3,
+    colorDarken: 0.9,
+    environmentBlur: 0.01,       // reflets nets = highlights crisp sur l'or
+    envIntensityMetallic: 2.8,   // or/gemmes/chrome très réfléchissants
+    envIntensitySemi: 1.8,
+    envIntensityBase: 1.1,
+    lights: {
+      ambient: { color: 0xffffff, intensity: 0.22 },   // zones sombres restent sombres
+      hemi:    { sky: 0xfff8e8, ground: 0x111108, intensity: 0.15 },
+      dir:     { color: 0xffffff, intensity: 2.8, x: 0, y: 1.0, z: 0.6 },  // overhead → logo Hyrule
+      fill:    { color: 0xfff0dd, intensity: 0.5,  x: 0, y: 0.3, z: 1.0 }, // fill caméra
+    },
   },
 }
