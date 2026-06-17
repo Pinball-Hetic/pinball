@@ -148,6 +148,7 @@ import {
   warmMapSounds,
   resetPinballAudioForNewGame,
   unlockPinballAudio,
+  setMapAudioUrls,
 } from "@/audio/pinballAudio";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import CinematicOverlay from "./CinematicOverlay";
@@ -193,8 +194,18 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   // Boss, clips et sons dérivés de la map sélectionnée (prop — change au remount).
   const mapBosses = resolvedMap.layout.bosses ?? [];
   const mapClips = resolvedMap.manifest.clips;
+  // Brancher les URLs audio de la map dès le montage du composant.
+  setMapAudioUrls(
+    resolvedMap.manifest.ambientMusic,
+    resolvedMap.manifest.gameOverSound,
+    resolvedMap.manifest.alternateWorldMusicUrl,
+    resolvedMap.manifest.alternateWorldMusicVolume,
+  );
   const mapSoundUrls: string[] = [
     ...mapBosses.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
+    ...mapBosses.map((b) => b.latePhaseSoundUrl).filter((u): u is string => !!u),
+    ...mapBosses.map((b) => b.victoryMusicUrl).filter((u): u is string => !!u),
+    ...(resolvedMap.manifest.alternateWorldMusicUrl ? [resolvedMap.manifest.alternateWorldMusicUrl] : []),
     ...Object.values(resolvedMap.manifest.sounds ?? {}).map((s) => s.url),
   ];
   const mountRef = useRef<HTMLDivElement | null>(null);
