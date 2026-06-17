@@ -14,7 +14,7 @@ import {
   DrainBall,
   BottomOutBall,
   DetectBottomOut,
-  BALL_RADIUS,
+  getBallRadius,
   BALL_MAX_SPEED,
   bottomOutLaneSepX,
   INITIAL_LIVES,
@@ -45,6 +45,7 @@ import {
   hidePinballmapDecorNodes,
   prepareGltfMaterialsForDisplay,
   configureGltfRenderer,
+  getEnvironmentBlur,
   createGltfLoader,
   ballCenterOnSurface,
   PlungerPhysics,
@@ -52,11 +53,12 @@ import {
   CinematicDirector,
   ScreenShake,
   PlayfieldCameraDirector,
-  playfieldViewDirForMode,
   playfieldCameraUpForMode,
   parsePlayfieldViewMode,
   refitPlayfieldCamera,
   configureSurfaceCoefficients,
+  configureBallRadius,
+  DEFAULT_BALL_RADIUS,
   type PlayfieldCamFit,
   type PlayfieldCamera,
   DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING,
@@ -86,26 +88,12 @@ import type {
 import { BUTTON_ACTION, CABINET_BUTTONS, clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
 
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
-// Résolu au niveau module (MAP_ID = constante build-time) → permet un garde
-// NO SIGNAL en 1ère ligne du composant, avant tout hook.
-const RESOLVED_MAP = getMapPackage(MAP_ID);
-// Courbe de surface du tapis = celle de la map (spawns, colliders, cadrage
-// caméra en dérivent). Sans ça, surfaceYAtZ resterait sur la courbe ST par
-// défaut → balle qui flotte/s'enfonce sur une map de hauteur/tilt différent.
-if (RESOLVED_MAP) configureSurfaceCoefficients(RESOLVED_MAP.layout.geometry.coefficients);
-// Définitions de boss de la map active (point de composition unique).
-const MAP_BOSSES = RESOLVED_MAP?.layout.bosses ?? [];
-const MAP_CLIPS = RESOLVED_MAP?.manifest.clips;
-// URLs de sons spécifiques à la map (reveal boss + sons d'event) à précharger.
-const MAP_SOUND_URLS: string[] = [
-  ...MAP_BOSSES.flatMap((b) =>
-    [b.revealSoundUrl, b.latePhaseSoundUrl].filter((u): u is string => !!u),
-  ),
-  ...Object.values(RESOLVED_MAP?.manifest.sounds ?? {}).map((s) => s.url),
-];
+// Résolu au niveau module (MAP_ID = constante build-time) — utilisé comme
+// fallback si aucun mapId n'est fourni en prop.
+const DEFAULT_RESOLVED_MAP = getMapPackage(MAP_ID);
 
 // Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
-function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
+function toGameEvent(d: DevGameEventTrigger, mapBosses: ResolvedMap['layout']['bosses']): GameEvent | null {
   switch (d.type) {
     case "BUMPER_HIT":
       return { type: "BUMPER_HIT", bumperIndex: 0, scoreIncrement: SCORE_BUMPER };
@@ -116,20 +104,20 @@ function toGameEvent(d: DevGameEventTrigger): GameEvent | null {
     case "DROP_TARGET_COMPLETE":
       return { type: "DROP_TARGET_COMPLETE", side: "left", scoreIncrement: SCORE_DROP_COMPLETE };
     case "BOSS_REVEAL": {
-      const bossId = d.bossId ?? MAP_BOSSES[0]?.id ?? "";
+      const bossId = d.bossId ?? mapBosses[0]?.id ?? "";
       return {
         type: "BOSS_REVEAL",
         bossId,
-        scoreIncrement: getBossById(MAP_BOSSES, bossId)?.reveal.scoreIncrement ?? 150,
+        scoreIncrement: getBossById(mapBosses, bossId)?.reveal.scoreIncrement ?? 150,
       };
     }
     case "BOSS_TARGET_HIT": {
-      const bossId = d.bossId ?? MAP_BOSSES[0]?.id ?? "";
+      const bossId = d.bossId ?? mapBosses[0]?.id ?? "";
       return {
         type: "BOSS_TARGET_HIT",
         bossId,
         hitCount: d.hitCount ?? 1,
-        scoreIncrement: getBossById(MAP_BOSSES, bossId)?.scoreTargetHit ?? 250,
+        scoreIncrement: getBossById(mapBosses, bossId)?.scoreTargetHit ?? 250,
       };
     }
     case "PORTAL_ENTER":
@@ -183,23 +171,32 @@ const KEYBOARD_MODE: KeyboardMode =
   (process.env.NEXT_PUBLIC_KEYBOARD_MODE as KeyboardMode) || "direct";
 
 const PLAYFIELD_VIEW_MODE = parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE);
-const PLAYFIELD_VIEW_DIR = playfieldViewDirForMode(PLAYFIELD_VIEW_MODE);
 const IS_PORTRAIT_FILL = PLAYFIELD_VIEW_MODE === 'portrait-fill';
 
 type PinballPlayfieldProps = {
   /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
   cabinetMode?: boolean;
+  /** Id de la map à charger. Si absent → NEXT_PUBLIC_MAP_ID ou DEFAULT_MAP_ID. */
+  mapId?: string;
 };
 
 // Garde NO SIGNAL : map introuvable → écran de veille plein écran (pas de
 // crash). Wrapper sans hook → l'Inner (tous les hooks) n'est monté que si la
 // map existe.
 export default function PinballPlayfield(props: PinballPlayfieldProps) {
-  if (!RESOLVED_MAP) return <NoSignal reason={`MAP "${MAP_ID}" INTROUVABLE`} />;
-  return <PinballPlayfieldInner {...props} />;
+  const resolvedMap = props.mapId ? getMapPackage(props.mapId) : DEFAULT_RESOLVED_MAP;
+  if (!resolvedMap) return <NoSignal reason={`MAP "${props.mapId ?? MAP_ID}" INTROUVABLE`} />;
+  return <PinballPlayfieldInner {...props} resolvedMap={resolvedMap} />;
 }
 
-function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
+function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlayfieldProps & { resolvedMap: ResolvedMap }) {
+  // Boss, clips et sons dérivés de la map sélectionnée (prop — change au remount).
+  const mapBosses = resolvedMap.layout.bosses ?? [];
+  const mapClips = resolvedMap.manifest.clips;
+  const mapSoundUrls: string[] = [
+    ...mapBosses.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
+    ...Object.values(resolvedMap.manifest.sounds ?? {}).map((s) => s.url),
+  ];
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -275,7 +272,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     notifyBootPhase(bootPhase);
   }, [bootPhase]);
 
-  const dmd = useDmdOrchestrator(MAP_CLIPS, (d) => {
+  const dmd = useDmdOrchestrator(mapClips, (d) => {
     setGameOverClaimUrl(d.claimUrl);
     setGameOverCode(d.code);
   });
@@ -287,7 +284,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
   const cinematics = cinematicsRef.current;
 
   // Map résolue (garantie non-null par le garde NO SIGNAL du wrapper).
-  const mapPackageRef = useRef<ResolvedMap>(RESOLVED_MAP!);
+  const mapPackageRef = useRef<ResolvedMap>(resolvedMap);
   // Ref vers le module (accessible depuis les callbacks render-scope, ex. reset).
   const mapModuleRef = useRef<MapModule | null>(null);
   // emit (défini dans l'effet) exposé aux callbacks useGameState render-scope.
@@ -364,7 +361,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       // Chaque event fait switcher l'affichage. Exclusif, par priorité
       // décroissante : event labellisé → EVENT ; nouveau multiplier →
       // MULTI ; sinon combo en cours → COMBO.
-      const label = eventLabel(event, MAP_BOSSES);
+      const label = eventLabel(event, mapBosses);
       if (label) {
         dmd.pushEvent(label, finalPoints, snap);
       } else if (previousMultiplier !== newMultiplier) {
@@ -455,7 +452,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     portalAnchor: mapLayout.sensors.portal,
     bumperAnchors: mapLayout.bumpers,
     atmosphereHintMs: mapLayout.atmosphere.hintMs,
-    bosses: MAP_BOSSES,
+    bosses: mapBosses,
   });
 
   // Patches de mapState poussés par le module de map (ctx.setMapState). Fusionnés
@@ -492,6 +489,10 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     const mountEl = mountRef.current;
     if (!mountEl) return;
 
+    // ── Config par-map — doit précéder tout setup physique / caméra ─────────
+    configureSurfaceCoefficients(resolvedMap.layout.geometry.coefficients);
+    configureBallRadius(mapManifest.ballRadius ?? DEFAULT_BALL_RADIUS);
+
     // ── Three.js setup ───────────────────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#000000");
@@ -516,44 +517,64 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     let orbitControls: OrbitControls | null = null;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    configureGltfRenderer(renderer);
-    // Démarrage à 1.5 (HiDPI plafonné) ; le QualityGovernor ajuste ensuite
-    // selon le frame time (1.5 → 1.25 → 1.0 → 1.0 + trail réduit/spores off).
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.7));
+    // Expose + tonemapping depuis la config de la map (pas de valeur globale).
+    const rendering = mapManifest.rendering;
+    configureGltfRenderer(renderer, rendering);
+
+    // Environment map — uniquement pour les maps qui en ont besoin (rendering.useEnvironment).
+    // ST original : pas d'envmap → matériaux sans reflets ambiants (état git d'origine).
+    // Zelda : envmap active → or et gemmes très réfléchissants (effet Vectary).
+    if (rendering?.useEnvironment) {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), getEnvironmentBlur(rendering)).texture;
+      pmrem.dispose();
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(clientWidth, clientHeight);
-    // Shadows désactivées : avec 13+ PointLights (lumières décor + bumpers) dans
-    // le shader, chaque pixel paie déjà lourd. La shadow map (cast + receive
-    // sur tous les meshes GLB) ajoutait un pass de rendu entier + lookups PCF.
     renderer.shadowMap.enabled = false;
     mountEl.appendChild(renderer.domElement);
 
-    // IBL : sans scene.environment, envMapIntensity des matériaux est mort et le
-    // métal ne réfléchit que la dirLight dure (rond spéculaire + stries d'arêtes).
-    // RoomEnvironment fournit un reflet doux neutre via PMREM.
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environment = envTexture;
-    scene.environmentIntensity = 0.0;
-
-    // Lumière ambiante minimale pour éviter les noirs purs dans les ombres
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+    // ─── Lumières — lues depuis manifest.rendering ─────────────────────────
+    // Chaque map contrôle entièrement son setup d'éclairage. Pas de valeur
+    // partagée ici : ST (froide/cinéma) et Zelda (chaude/overhead) divergent.
+    const rl = rendering?.lights;
+    const ambientLight = new THREE.AmbientLight(
+      rl?.ambient.color    ?? 0xffffff,
+      rl?.ambient.intensity ?? 0.35,
+    );
     scene.add(ambientLight);
-    // HemiLight à 0 — conservé uniquement pour la compatibilité UpsideDownAtmosphere
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111111, 0);
+
+    const hemiLight = new THREE.HemisphereLight(
+      rl?.hemi.sky       ?? 0xfff8e8,
+      rl?.hemi.ground    ?? 0x111108,
+      rl?.hemi.intensity ?? 0.2,
+    );
     scene.add(hemiLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.54);
-    dirLight.position.set(1.08, 1.5, 0.27);
+
+    const dirLight = new THREE.DirectionalLight(
+      rl?.dir.color    ?? 0xffffff,
+      rl?.dir.intensity ?? 2.5,
+    );
+    dirLight.position.set(rl?.dir.x ?? 0, rl?.dir.y ?? 0.48, rl?.dir.z ?? 0.88);
     dirLight.castShadow = false;
     scene.add(dirLight);
-    // Second soleil, côté opposé → double éclairage, débouche l'ombre du
-    // premier. Dédié (PAS fillLight, hijacké par UpsideDownAtmosphere).
-    const dirLight2 = new THREE.DirectionalLight(0xffffff, 5.05);
-    dirLight2.position.set(-1.21, 1.5, 0.55);
-    dirLight2.castShadow = false;
-    scene.add(dirLight2);
-    // FillLight à 0 — conservé pour UpsideDownAtmosphere
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0);
-    fillLight.position.set(0, 1, -1);
+
+    // Second soleil optionnel (rl.dir2), côté opposé → double éclairage qui
+    // débouche l'ombre du principal. Distinct du fill (réservé à
+    // UpsideDownAtmosphere). Absent dans la config → un seul soleil.
+    if (rl?.dir2) {
+      const dirLight2 = new THREE.DirectionalLight(rl.dir2.color, rl.dir2.intensity);
+      dirLight2.position.set(rl.dir2.x, rl.dir2.y, rl.dir2.z);
+      dirLight2.castShadow = false;
+      scene.add(dirLight2);
+    }
+
+    const fillLight = new THREE.DirectionalLight(
+      rl?.fill.color    ?? 0xffeedd,
+      rl?.fill.intensity ?? 0.15,
+    );
+    fillLight.position.set(rl?.fill.x ?? -0.5, rl?.fill.y ?? 1, rl?.fill.z ?? -1);
     scene.add(fillLight);
 
     const modelRoot = new THREE.Group();
@@ -807,7 +828,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         modelRoot.add(playfieldRoot);
         removePinballmapUnusedMeshes(playfieldRoot);
         hidePinballmapDecorNodes(playfieldRoot);
-        prepareGltfMaterialsForDisplay(playfieldRoot);
+        prepareGltfMaterialsForDisplay(playfieldRoot, rendering);
 
         // garlands + bumperVisuals créés par le module de map (cluster visuals),
         // récupérés après mapModule.setup (plus bas, après le monde physique).
@@ -817,7 +838,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         ballTrail.mount(scene);
 
         // ── Ball mesh ────────────────────────────────────────────────────────
-        const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 24);
+        const ballGeo = new THREE.SphereGeometry(getBallRadius(), 24, 24);
         const ballMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d4, metalness: 0.95, roughness: 0.08 });
         const ballSphere = new THREE.Mesh(ballGeo, ballMat);
         ballSphere.castShadow = true;
@@ -860,7 +881,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
 
         // Zones de garantie de lancement dérivées des bbox mesh (pose de repos).
         if (leftFlipperObj && rightFlipperObj) {
-          flipperZones = computeFlipperZones(leftFlipperObj, rightFlipperObj, BALL_RADIUS);
+          flipperZones = computeFlipperZones(leftFlipperObj, rightFlipperObj, getBallRadius());
         }
 
         // ── Physics ──────────────────────────────────────────────────────────
@@ -1121,7 +1142,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         modelRoot.updateMatrixWorld(true);
         cameraDirector = new PlayfieldCameraDirector();
         cameraDirector.setViewMode(PLAYFIELD_VIEW_MODE);
-        cameraDirector.setBosses(MAP_BOSSES);
+        cameraDirector.setBosses(mapBosses);
         const camFrameBox = syncPlayfieldCamera(playfieldRoot);
         if (camera instanceof THREE.PerspectiveCamera) {
           const msz = camFrameBox.getSize(new THREE.Vector3());
@@ -1195,7 +1216,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             cameraDirector?.play(event.bossId);
           }
           if (event.type === "BOSS_TARGET_HIT") {
-            const boss = getBossById(MAP_BOSSES, event.bossId);
+            const boss = getBossById(mapBosses, event.bossId);
             if (boss && event.hitCount >= boss.targetHits) {
               cameraDirector?.playVictory(event.bossId);
             }
@@ -1398,7 +1419,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
             // Injecte dans le emit wrapper EXISTANT → chaîne complète
             // (cinématiques, gel, DMD, backglass). DRAIN/BOTTOM_OUT
             // appellent les vrais use-cases → la bille reset réellement.
-            const ev = toGameEvent(d);
+            const ev = toGameEvent(d, mapBosses);
             if (ev) emit(ev);
           },
         };
@@ -1497,7 +1518,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
         physicsReadyRef.current = true;
         setPhysicsReady(true);
         onPlayfieldReady();
-        warmMapSounds(MAP_SOUND_URLS);
+        warmMapSounds(mapSoundUrls);
         debugLog("[PinballPlayfield] physicsReady = true (plateau chargé, en attente START)");
       } catch (err) {
         console.error("[Playfield] Erreur chargement :", err);
@@ -1907,8 +1928,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
       refitCameraRef.current = null;
       disposableGeos.forEach((g) => g.dispose());
       disposableMats.forEach((m) => m.dispose());
-      envTexture.dispose();
-      pmrem.dispose();
       renderer.dispose();
     };
   }, []);
@@ -1962,7 +1981,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           atmosphereBannerLabel={mapLayout.atmosphere.bannerLabel}
           atmosphereHintLabel={mapLayout.atmosphere.hintLabel}
           attractTagline={mapManifest.attractTagline ?? mapManifest.name}
-          bosses={MAP_BOSSES}
+          bosses={mapBosses}
           cabinetMode={cabinetMode}
           portraitFill={IS_PORTRAIT_FILL}
           plungerAnchor={plungerAnchor}

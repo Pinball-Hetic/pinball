@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
-  BALL_RADIUS,
+  getBallRadius,
   BALL_MASS,
   BALL_RESTITUTION,
   BALL_FRICTION,
@@ -37,8 +37,9 @@ export class BallPhysics implements IBallPhysics, IBumperEject {
       .setCcdEnabled(true);
     this.body = world.createRigidBody(bodyDesc);
 
-    const density = BALL_MASS / ((4 / 3) * Math.PI * BALL_RADIUS ** 3);
-    const colliderDesc = RAPIER.ColliderDesc.ball(BALL_RADIUS)
+    const r = getBallRadius();
+    const density = BALL_MASS / ((4 / 3) * Math.PI * r ** 3);
+    const colliderDesc = RAPIER.ColliderDesc.ball(r)
       .setRestitution(BALL_RESTITUTION)
       .setFriction(BALL_FRICTION)
       .setDensity(density)

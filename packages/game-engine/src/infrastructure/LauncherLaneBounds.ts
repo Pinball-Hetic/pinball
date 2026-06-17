@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALL_RADIUS, WALL_BOTTOM_Z } from '../domain/Ball';
+import { getBallRadius, WALL_BOTTOM_Z } from '../domain/Ball';
 import { canonicalGltfName, normalizeGltfName } from './GltfNodeNames';
 
 const LAUNCHER_LANE_MESH_NAMES = new Set([
@@ -28,8 +28,9 @@ export function computeLauncherLaneZBounds(playfieldRoot: THREE.Object3D): {
   if (!found || box.isEmpty()) {
     return { minZ: 0.03, maxZ: 0.42 };
   }
+  const r = getBallRadius();
   return {
-    minZ: Math.max(-0.05, box.min.z - BALL_RADIUS),
-    maxZ: Math.min(WALL_BOTTOM_Z, box.max.z + BALL_RADIUS * 0.5),
+    minZ: Math.max(-0.05, box.min.z - r),
+    maxZ: Math.min(WALL_BOTTOM_Z, box.max.z + r * 0.5),
   };
 }

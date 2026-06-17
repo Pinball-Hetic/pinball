@@ -112,6 +112,39 @@ export const manifest: MapManifest = {
     wall_middle_right: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.018)
     wall_guide_lane: { restitution: 0.2, friction: 0.15, smooth: 0 }, // ex-Fix-Start
   },
+  // Termes ST traqués par le grep-guard anti-fuite (phase 2.6).
+  forbiddenInCore: [
+    'demogorgon',
+    'vecna',
+    'hetic',
+    'strangerthings',
+    'upside',
+    'guirlande',
+    'eleven',
+    'hawkins',
+  ],
+  // ─── Rendu Three.js — éclairage original ST (état avant toute modification) ─
+  // Valeurs extraites du git avant les itérations de tuning Zelda.
+  // hemi et fill à intensity 0 : conservées pour UpsideDownAtmosphere qui les
+  // réanime (elle écrase les intensités via les refs lumières).
+  rendering: {
+    useEnvironment: false,
+    toneMappingExposure: 1.38,
+    colorDarken: 0.9,
+    environmentBlur: 0.04,
+    envIntensityMetallic: 1.0,
+    envIntensitySemi: 1.0,
+    envIntensityBase: 1.0,
+    lights: {
+      ambient: { color: 0xffffff, intensity: 0.25 },
+      hemi:    { sky: 0xffffff, ground: 0x111111, intensity: 0 },
+      // Double soleil latéral opposé (réglé à l'œil) : pas de highlight
+      // spéculaire dans l'axe caméra, sol débouché des deux côtés.
+      dir:     { color: 0xffffff, intensity: 2.54, x: 1.08,  y: 1.5, z: 0.27 },
+      dir2:    { color: 0xffffff, intensity: 5.05, x: -1.21, y: 1.5, z: 0.55 },
+      fill:    { color: 0xffffff, intensity: 0,    x: 0,     y: 1,   z: -1   },
+    },
+  },
   meshAliases: {
     portal_upsidedown: 'vis_demogorgon_portal_demog_portal_ref_skeleton',
   },

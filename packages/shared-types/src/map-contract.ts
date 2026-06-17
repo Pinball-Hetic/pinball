@@ -19,6 +19,66 @@ export function mapAssetUrl(mapId: string, relPath: string): string {
   return `/maps/${mapId}/${relPath.replace(/^\/+/, '')}`
 }
 
+// ─── Rendering per-map ────────────────────────────────────────────────────────
+// Tous les paramètres visuels qui varient d'une map à l'autre. Le moteur
+// (game-engine + PinballPlayfield) lira ces valeurs au lieu de constantes
+// globales. Aucune dépendance Three.js ici : couleurs = hex numbers.
+
+export interface MapLightConfig {
+  /** Couleur de la lumière en hex (ex. 0xffffff). */
+  color: number;
+  intensity: number;
+}
+
+export interface MapDirLightConfig extends MapLightConfig {
+  /** Position normalisée (magnitude indifférente, direction compte). */
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface MapHemiLightConfig {
+  sky: number;    // hex
+  ground: number; // hex
+  intensity: number;
+}
+
+export interface MapRenderingConfig {
+  /** Active l'environment map (RoomEnvironment + PMREMGenerator).
+   *  Nécessaire pour les matériaux métalliques vifs (or, gemmes).
+   *  false = pas de scene.environment → matériaux sans reflets ambiants (état original ST). */
+  useEnvironment: boolean;
+  /** renderer.toneMappingExposure — luminosité globale post tone-mapping. */
+  toneMappingExposure: number;
+  /** Facteur de darken appliqué aux matériaux de surface (table, murs, plastic).
+   *  1.0 = aucun changement, 0.9 = légère assombrissement. */
+  colorDarken: number;
+  /** Flou de l'environment RoomEnvironment.
+   *  0 = reflets ultra-nets, 0.04 = reflets doux (défaut Three.js). */
+  environmentBlur: number;
+  /** envMapIntensity pour matériaux très métalliques (metalness ≥ 0.5).
+   *  1.0 = standard, 2–3 = reflets vifs type or/gemmes Zelda. */
+  envIntensityMetallic: number;
+  /** envMapIntensity pour matériaux semi-métalliques (metalness 0.2–0.5). */
+  envIntensitySemi: number;
+  /** envMapIntensity de base pour matériaux non-métalliques (metalness < 0.2). */
+  envIntensityBase: number;
+  lights: {
+    /** Lumière ambiante omnidirectionnelle — dose minimale pour les zones d'ombre. */
+    ambient: MapLightConfig;
+    /** HemisphereLight ciel/sol — teinte chaude/froide depuis le volume. */
+    hemi: MapHemiLightConfig;
+    /** Directionnel principal — source du contraste et des ombres portées. */
+    dir: MapDirLightConfig;
+    /** Second directionnel optionnel, côté opposé au principal → double
+     *  éclairage qui débouche l'ombre du `dir` sans le fill (réservé à
+     *  UpsideDownAtmosphere). Absent → un seul soleil. */
+    dir2?: MapDirLightConfig;
+    /** Fill léger — débouche les zones d'ombre sans écraser le contraste. */
+    fill: MapDirLightConfig;
+  };
+}
+
 export interface MapManifest {
   id: string
   name: string
@@ -51,6 +111,8 @@ export interface MapManifest {
   /** Clés de mapState pilotables par l'outil de debug (dev). Permet au debug
    *  d'éditer le mapState d'une map sans clés en dur. */
   debugMapState?: { numbers?: string[]; flags?: string[] }
+  /** Rayon de la balle (m). Absent = DEFAULT_BALL_RADIUS (ST : 0.01374). */
+  ballRadius?: number
   glb: string // relatif au dossier assets/ du package
   scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
   rules: {
@@ -63,6 +125,10 @@ export interface MapManifest {
   elements?: Record<string, Record<string, number | string>> // tuning par id d'élément
   meshAliases?: Record<string, string> // nom GLB legacy → nom conventionnel
   clips?: Record<ClipId, ClipTimings> // timings des clips de la map
+  forbiddenInCore?: string[] // termes pour le grep-guard anti-fuite
+  /** Configuration de rendu Three.js spécifique à la map.
+   *  Absent → le moteur utilise ses propres valeurs par défaut. */
+  rendering?: MapRenderingConfig
 }
 
 // Paquet de map résolu par la composition root (packages/maps/index.ts).
