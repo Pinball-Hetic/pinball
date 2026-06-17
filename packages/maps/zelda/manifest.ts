@@ -57,6 +57,7 @@ export const manifest: MapManifest = {
     skill_shot: { showMs: 5_000, freezeMs: 2_000 },
   },
   // TODO: remplacer par le vrai GLB Zelda quand disponible.
+  ballRadius: 0.012,
   glb: mapAsset('playfield/zelda.glb'),
   // Points par rôle.
   scoring: {
