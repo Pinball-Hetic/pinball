@@ -1252,7 +1252,6 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
           drainBallUC,
           bottomOutBallUC,
           emit,
-          ballPhysicsInst,
         );
 
         // upsideDownPortal créé/possédé par le module de map (récupéré plus

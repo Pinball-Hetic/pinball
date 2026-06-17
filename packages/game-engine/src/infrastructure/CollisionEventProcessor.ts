@@ -8,11 +8,8 @@ import type { GameEventListener } from '../domain/GameEvents';
 import {
   BUMP_EJECT_SCALE,
   BUMP_HIT_COOLDOWN_MS,
-  SLINGSHOT_HIT_COOLDOWN_MS,
   RETURN_PORTAL_ENTER_SCORE,
   PORTAL_ENTER_SCORE,
-  SLINGSHOT_LEFT_CENTER,
-  SLINGSHOT_RIGHT_CENTER,
 } from '../domain/Ball';
 import type { MapLayout } from '../domain/MapLayout';
 import {
@@ -22,7 +19,7 @@ import {
   SCORE_DROP_TARGET,
   SCORE_DROP_COMPLETE,
 } from '../domain/ScoringConstants';
-import type { BumperHit, IBumperEject } from '../use-cases/BumperHit';
+import type { BumperHit } from '../use-cases/BumperHit';
 import type { BumpHit } from '../use-cases/BumpHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
@@ -33,7 +30,6 @@ export class CollisionEventProcessor {
   private readonly bossFights: BossFightManager;
   private readonly bossByRole = new Map<string, BossDefinition>();
   private bumpLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
-  private slingshotLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
   private portalOpen = false;
   private portalTriggered = false;
   private alternateWorldActive = false;
@@ -141,7 +137,6 @@ export class CollisionEventProcessor {
     private readonly drainBallUC: DrainBall,
     private readonly bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
-    private readonly slingshotEject: IBumperEject,
   ) {
     this.bossFights = new BossFightManager(emit, layout.bosses);
     for (const b of layout.bosses) this.bossByRole.set(b.colliderRole, b);
@@ -231,13 +226,7 @@ export class CollisionEventProcessor {
 
       if ((role === 'slingshot_left' || role === 'slingshot_right') && gameState === 'playing') {
         const side = role === 'slingshot_left' ? 'left' as const : 'right' as const;
-        const now = performance.now();
-        if (now - this.slingshotLastHitMs[side] >= SLINGSHOT_HIT_COOLDOWN_MS) {
-          this.slingshotLastHitMs[side] = now;
-          const center = side === 'left' ? SLINGSHOT_LEFT_CENTER : SLINGSHOT_RIGHT_CENTER;
-          this.pendingPhysics.push(() => this.slingshotEject.applyEjectionForce(center));
-          this.emit({ type: 'SLINGSHOT_HIT', side, scoreIncrement: SCORE_SLINGSHOT });
-        }
+        this.emit({ type: 'SLINGSHOT_HIT', side, scoreIncrement: SCORE_SLINGSHOT });
       }
 
       if (role.startsWith('pop_zone_') && gameState === 'playing') {

@@ -60,8 +60,7 @@ export const ASSIST_INTERVAL = 3.2;
 export const BUMP_EJECT_SCALE     = 0.45;  // 45 % de la force d'un pop bumper
 // Anti rebond multiple : un même mèche ne re-déclenche pas avant ce délai
 // (la balle collée/qui vibre ne farme pas score + impulsion).
-export const BUMP_HIT_COOLDOWN_MS      = 60;
-export const SLINGSHOT_HIT_COOLDOWN_MS = 80;
+export const BUMP_HIT_COOLDOWN_MS = 60;
 
 export const BUMPER_RADIUS       = 0.038;
 export const BUMPER_RESTITUTION  = 0.20;  // réduit de 0.30 (−33%) — rebond collider moins violent
