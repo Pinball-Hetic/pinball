@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import {
   GarlandLights,
   BumperVisuals,
@@ -105,6 +106,15 @@ export function createModule(): MapModule {
       bossReveals = new BossRevealOrchestrator()
       bossReveals.register(demogorgonReveal).register(vecnaReveal)
       vecnaReveal.bindUpsideDownAtmosphere(atmosphere)
+
+      ctx.root.traverse((obj) => {
+        if (!(obj instanceof THREE.Mesh)) return
+        if (!obj.name.includes('stangerthing_plate')) return
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+        for (const m of mats) {
+          if (m instanceof THREE.MeshStandardMaterial) m.emissiveIntensity = 0.15
+        }
+      })
     },
     async preload(): Promise<void> {
       const ctx = ctxRef
