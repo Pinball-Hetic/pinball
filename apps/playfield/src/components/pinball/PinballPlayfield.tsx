@@ -518,7 +518,7 @@ function PinballPlayfieldInner({ cabinetMode = false }: PinballPlayfieldProps) {
     configureGltfRenderer(renderer);
     // Démarrage à 1.5 (HiDPI plafonné) ; le QualityGovernor ajuste ensuite
     // selon le frame time (1.5 → 1.25 → 1.0 → 1.0 + trail réduit/spores off).
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.7));
     renderer.setSize(clientWidth, clientHeight);
     // Shadows désactivées : avec 13+ PointLights (lumières décor + bumpers) dans
     // le shader, chaque pixel paie déjà lourd. La shadow map (cast + receive
