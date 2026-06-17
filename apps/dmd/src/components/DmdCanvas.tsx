@@ -1,18 +1,18 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { DmdDisplay } from '@pinball/shared-types'
+import type { DmdMapContent } from '@pinball/dmd-core'
 import { DmdRenderer, GRID_W, GRID_H, applyGlitch, MatrixRain, PALETTE_NORMAL, makeLayouts } from '@pinball/dmd-core'
-import { mapDmdContent } from '@/dmd/mapContent'
 
 const GLITCH_MS = 350
-// Contenu DMD de la map résolu au chargement (constante module).
-const LAYOUTS = makeLayouts(mapDmdContent)
-const ALTERNATE_PALETTE = mapDmdContent.paletteAlternateWorld ?? PALETTE_NORMAL
-const BURST_MS = mapDmdContent.alternateWorldBurstMs ?? 1200
 
 interface Props {
   display: DmdDisplay
   alternateWorld: boolean
+  /** Contenu DMD de la map active (fourni par la page, dérivé du mapId). Le
+   *  composant est monté avec key={mapId} : les constantes LAYOUTS/PALETTE/BURST
+   *  sont recalculées à chaque remontage, jamais en cours de vie du composant. */
+  mapDmdContent: DmdMapContent
 }
 
 const canvasStyle: CSSProperties = {
@@ -23,8 +23,14 @@ const canvasStyle: CSSProperties = {
 }
 
 // Boucle rAF qui lit des refs : ZÉRO re-render par frame (règle projet —
-// un re-render démonterait/remonterait le canvas).
-export default function DmdCanvas({ display, alternateWorld }: Props) {
+// un re-render démonterait/remonterait le canvas). Les constantes LAYOUTS,
+// ALTERNATE_PALETTE, BURST_MS sont calculées une fois par montage (la page
+// utilise key={mapId} pour forcer un remontage propre à chaque changement de map).
+export default function DmdCanvas({ display, alternateWorld, mapDmdContent }: Props) {
+  const LAYOUTS = makeLayouts(mapDmdContent)
+  const NORMAL_PALETTE = mapDmdContent.paletteNormal ?? PALETTE_NORMAL
+  const ALTERNATE_PALETTE = mapDmdContent.paletteAlternateWorld ?? PALETTE_NORMAL
+  const BURST_MS = mapDmdContent.alternateWorldBurstMs ?? 1200
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const displayRef = useRef(display)
   const alternateWorldRef = useRef(alternateWorld)
@@ -68,7 +74,7 @@ export default function DmdCanvas({ display, alternateWorld }: Props) {
       // CINEMATIC : horloge relative à l'arrivée du mode (frames du clip).
       const clock = cinematic ? now - modeStartedAt : now
 
-      renderer.setPalette(alternateWorldRef.current ? ALTERNATE_PALETTE : PALETTE_NORMAL)
+      renderer.setPalette(alternateWorldRef.current ? ALTERNATE_PALETTE : NORMAL_PALETTE)
       renderer.clearGrid()
       LAYOUTS[d.mode](renderer.grid, d, clock)
       if (alternateWorldRef.current) rain.drawBackground(renderer.grid)
