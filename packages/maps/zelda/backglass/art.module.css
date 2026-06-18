@@ -1,0 +1,365 @@
+/* Styles des composants backglass Zelda — Ocarina of Time.
+   CSS Module SCOPÉ : les composants accèdent aux classes via styles['nom'].
+   Classes structurelles de l'app (tk-center, glitch-text, vhs*, tk-confetti,
+   tk-kicker, tk-score, tabular-nums) restent globales.
+   Tokens de thème (--glow, --st-font, --heat, --pulse-dur, --art-glow) posés
+   par l'app sur le conteneur. */
+
+/* ---------- Zelda header (remplace le Joyce wall alphabet ST) ---------- */
+.zelda-header {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--header-bg);
+  border-bottom: 3px solid #1a1400;
+  box-shadow: inset 0 -30px 60px #000;
+  position: relative;
+  overflow: hidden;
+}
+/* Halo doré d'ambiance derrière le titre */
+.zelda-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 55%, rgba(255, 215, 0, 0.07) 0%, transparent 68%);
+  pointer-events: none;
+}
+/* Triforce décorative */
+.logo-triforce {
+  width: 52px;
+  height: 45px;
+  flex-shrink: 0;
+  animation: triforce-header-pulse 3s ease-in-out infinite;
+}
+@keyframes triforce-header-pulse {
+  0%, 100% { opacity: 0.7; filter: drop-shadow(0 0 4px #FFD700); }
+  50%       { opacity: 1;   filter: drop-shadow(0 0 14px #FFD700) drop-shadow(0 0 28px #b87800); }
+}
+/* Titre principal */
+.zelda-title {
+  font-family: var(--st-font);
+  font-size: 72px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #FFD700;
+  text-shadow: 0 0 18px #FFD700, 0 0 40px #b87800, 0 2px 0 #7a5000;
+  white-space: nowrap;
+  line-height: 1;
+}
+/* Sous-titre de message (nom de joueur, event…) */
+.zelda-message {
+  font-family: var(--st-font);
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: #c8e8a8;
+  text-shadow: none;
+  opacity: 0;
+  transition: opacity 0.4s ease, text-shadow 0.4s ease;
+  min-height: 1.2em;
+  text-align: center;
+}
+.zelda-message-glow {
+  opacity: 1;
+  color: #c8e8a8;
+  text-shadow: 0 0 12px #22cc44, 0 0 28px #0f6620;
+}
+
+/* ---------- Side art (Triforce + Sacred Realm) ---------- */
+.side-art {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.side-art-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--art-glow) 35%, transparent));
+}
+/* Triforce : pulse lent */
+.triforce {
+  animation: triforce-pulse calc(var(--pulse-dur, 3s) * 1.2) ease-in-out infinite;
+  transform-origin: 160px 305px;
+}
+@keyframes triforce-pulse {
+  0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 6px var(--art-glow)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 16px var(--art-glow)); }
+}
+/* Anneaux concentriques qui pulsent */
+.ring-pulse {
+  animation: ring-expand var(--pulse-dur, 3s) ease-out infinite;
+}
+@keyframes ring-expand {
+  0% { transform: scale(0.92); opacity: 0.15; }
+  50% { opacity: 0.08; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+
+/* RAMP : rayon lumineux doré */
+.ramp-beam {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 6px;
+  transform: translateX(-50%) scaleY(0);
+  background: linear-gradient(180deg, transparent, #fff, #FFD700, transparent);
+  filter: blur(1px) drop-shadow(0 0 12px #FFD700);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.ramp-beam-on {
+  animation: ramp-beam 0.5s ease-out;
+}
+@keyframes ramp-beam {
+  0% { opacity: 0; transform: translateX(-50%) scaleY(0); }
+  30% { opacity: 1; transform: translateX(-50%) scaleY(1); }
+  100% { opacity: 0; transform: translateX(-50%) scaleY(1); }
+}
+
+/* ===================== Ganondorf takeover ===================== */
+.tk-ganondorf { background: #0a0900; }
+.gano-flash {
+  position: absolute;
+  inset: 0;
+  background: #FFD700;
+  animation: gano-flash 0.5s ease-out forwards;
+}
+@keyframes gano-flash {
+  0% { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+.gano-giant {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 40px #FFD700) drop-shadow(0 0 80px #b87800);
+  animation: gano-loom 3s ease-out;
+}
+@keyframes gano-loom {
+  0% { transform: scale(1.4); opacity: 0.1; }
+  30% { opacity: 0.95; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+.gano-text { gap: 10px; }
+.gano-text :global(.glitch-text) {
+  font-family: var(--st-font);
+  font-size: 80px;
+  font-weight: 900;
+  color: #FFD700;
+  text-shadow: 0 0 30px #FFD700, 0 0 60px #b87800;
+}
+.gano-points {
+  font-size: 80px;
+  font-weight: 900;
+  color: #22cc44;
+  text-shadow: 0 0 30px #22cc44;
+}
+
+/* ===================== Cinematic takeovers ===================== */
+.cine-blackout {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  animation: cine-blackout 2.5s ease-out;
+}
+@keyframes cine-blackout {
+  0% { opacity: 1; }
+  12% { opacity: 1; }
+  30% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* --- Ganondorf rises --- */
+.tk-cine-rises {
+  background: radial-gradient(ellipse at 50% 45%, #1c1400 0%, #080600 70%, #000 100%);
+}
+.cine-giant-side {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 60px #FFD700);
+  animation: cine-loom 2.5s ease-out;
+}
+.cine-giant-side > * { width: 70%; height: 100%; }
+@keyframes cine-loom {
+  0% { transform: scale(1.5); opacity: 0; }
+  35% { opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+.cine-rises-text {
+  font-family: var(--st-font);
+  font-size: 180px;
+  font-weight: 900;
+  color: #FFD700;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 40px #FFD700, 0 0 80px #b87800;
+  animation: cine-surge 0.3s steps(2) infinite;
+}
+@keyframes cine-surge {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(2px, -1px); }
+}
+
+/* --- Dark Link rises --- */
+.tk-cine-dark {
+  background: radial-gradient(ellipse at 50% 45%, #0a0a0f 0%, #03030a 70%, #000 100%);
+}
+.cine-dark-text {
+  font-family: var(--st-font);
+  font-size: 160px;
+  font-weight: 900;
+  color: #4a80ff;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 40px #4a80ff, 0 0 80px #1a3a9a;
+  animation: cine-surge 0.4s steps(2) infinite;
+}
+
+/* --- Sacred Realm portal --- */
+.tk-cine-portal { background: #060400; }
+.cine-portal-wave {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 215, 0, 0.85) 0%, rgba(180, 130, 0, 0.4) 28%, transparent 65%);
+  animation: cine-portal 4s ease-in;
+}
+@keyframes cine-portal {
+  0% { transform: scale(0); opacity: 0.2; }
+  60% { opacity: 1; }
+  100% { transform: scale(3.2); opacity: 0.75; }
+}
+
+/* --- Boss vaincu count --- */
+.cine-boss-count {
+  position: absolute;
+  bottom: 80px;
+  left: 0;
+  right: 0;
+  z-index: 55;
+  text-align: center;
+  font-family: var(--st-font);
+  font-size: 64px;
+  font-weight: 900;
+  color: #FFD700;
+  text-shadow: 0 0 30px #b87800;
+  animation: slide-in 0.6s ease;
+}
+
+/* --- Dark Link slain --- */
+.tk-cine-darklink-slain {
+  background: radial-gradient(ellipse at 50% 45%, #080a14 0%, #030408 70%, #000 100%);
+}
+.cine-slain-text {
+  font-family: var(--st-font);
+  font-size: 80px;
+  font-weight: 900;
+  color: #4a80ff;
+  text-shadow: 0 0 30px #4a80ff;
+}
+.boss-points {
+  font-size: 80px;
+  font-weight: 900;
+  color: #22cc44;
+  text-shadow: 0 0 30px #22cc44;
+}
+
+/* --- Last chance --- */
+.tk-cine-last { background: #000; }
+.cine-last-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 25%, rgba(34, 204, 68, 0.6) 120%);
+  animation: cine-last 1.2s ease-in-out;
+}
+@keyframes cine-last {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 1; }
+}
+.cine-last-text {
+  color: #22cc44;
+  text-shadow: 0 0 30px #22cc44;
+  animation: pulse-soft 0.6s ease-in-out infinite;
+}
+
+/* --- Milestone 30k : Triforce qui s'allume --- */
+.tk-cine-milestone {
+  background: radial-gradient(ellipse at 50% 60%, #1c1400, #080600 70%, #000);
+}
+.cine-triforce {
+  position: absolute;
+  inset: 0;
+  background:
+    conic-gradient(from 180deg at 50% 50%, transparent 0deg, rgba(255, 215, 0, 0.12) 60deg, transparent 120deg),
+    radial-gradient(ellipse at 50% 50%, rgba(255, 215, 0, 0.08) 0%, transparent 70%);
+  animation: cine-triforce-glow 4s ease-in-out;
+}
+@keyframes cine-triforce-glow {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* --- milestone_big : réutilise .tk-confetti / .confetti-dot (globales app). --- */
+.tk-cine-fireworks {
+  background: radial-gradient(ellipse at 50% 45%, #0e1a08, #050a04 70%, #000);
+}
+
+/* --- hetic_complete --- */
+.tk-cine-hetic {
+  background: radial-gradient(ellipse at 50% 45%, #122208, #060c04 70%, #000);
+}
+.cine-hetic-letters {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+}
+.cine-hetic-letters span {
+  font-family: var(--st-font);
+  font-size: 200px;
+  font-weight: 900;
+  color: #FFD700;
+  text-shadow: 0 0 40px #FFD700, 0 0 80px #b87800;
+  animation: hetic-pop 0.5s ease-out both;
+}
+@keyframes hetic-pop {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.cine-fever-text {
+  color: #22cc44 !important;
+  text-shadow: 0 0 40px #22cc44, 0 0 80px #0f6620;
+  animation: pulse-soft 0.4s ease-in-out infinite;
+}
+
+/* --- Event: Dark Link slain overlay --- */
+.tk-event-darklink {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, #080a14, #03040a 70%, #000);
+}
+
+/* Copies locales des keyframes génériques utilisées ci-dessus. */
+@keyframes slide-in {
+  0% { opacity: 0; transform: translateX(40px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}

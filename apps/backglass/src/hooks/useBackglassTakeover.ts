@@ -7,7 +7,7 @@ import type {
   GameOver,
 } from '@pinball/shared-types'
 import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
-import { clipBehavior, eventTakeovers, clips } from '@/map/content'
+import { useMapContent } from '@/map/content'
 
 type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
@@ -86,6 +86,17 @@ function agitationAt(elapsed: number): number {
 }
 
 export function useBackglassTakeover(entries: LeaderboardEntry[]) {
+  const { clipBehavior, eventTakeovers, clips } = useMapContent()
+  // Refs sur les données map : la closure du useEffect([], []) lit toujours les
+  // valeurs courantes sans se recréer. key={mapId} sur le Stage force un
+  // remontage complet quand la map change → refs réinitialisées proprement.
+  const clipBehaviorRef = useRef(clipBehavior)
+  clipBehaviorRef.current = clipBehavior
+  const eventTakeoversRef = useRef(eventTakeovers)
+  eventTakeoversRef.current = eventTakeovers
+  const clipsRef = useRef(clips)
+  clipsRef.current = clips
+
   const entriesRef = useRef(entries)
   entriesRef.current = entries
 
@@ -191,20 +202,20 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
           })
         // Dispatch data-driven fourni par la map (joyce/onde/fever/takeover).
         // hall_of_fame + clips inconnus : takeover générique via clipShowMs.
-        const b = clipBehavior[clip]
+        const b = clipBehaviorRef.current[clip]
         if (b?.goldWave) goldWaveRef.current += 1
         // fever démarre dès le clip : pendant le CINEMATIC aucun display SCORE
         // (porteur de fever) n'arrive, on l'active donc ici sans retard.
         if (b?.fever) feverRef.current = true
         if (b?.joyce) pushJoyce(typeof b.joyce === 'function' ? b.joyce(d.value) : b.joyce)
-        if (!b?.noTakeover) pushTk(b?.takeoverMs ?? clipShowMs(clips, clip))
+        if (!b?.noTakeover) pushTk(b?.takeoverMs ?? clipShowMs(clipsRef.current, clip))
         return
       }
       if (d.mode === 'EVENT') {
         markActivity()
         agitationStartRef.current = performance.now()
         // Event → takeover de map (label → scène), data-driven.
-        const ev = d.label ? eventTakeovers[d.label] : undefined
+        const ev = d.label ? eventTakeoversRef.current[d.label] : undefined
         if (ev) {
           stackRef.current.push({
             scene: 'MAP_EVENT',
@@ -281,7 +292,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       // Clip qui retarde le flip 3D du hall of fame (ex. portal_swallow) —
       // déclaré par la map via clipBehavior.holdsHallFlip.
       const portalActive = stackRef.current.some(
-        (e) => e.scene === 'CINEMATIC' && e.clip != null && clipBehavior[e.clip]?.holdsHallFlip,
+        (e) => e.scene === 'CINEMATIC' && e.clip != null && clipBehaviorRef.current[e.clip]?.holdsHallFlip,
       )
 
       setState({

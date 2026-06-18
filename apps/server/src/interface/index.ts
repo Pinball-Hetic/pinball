@@ -5,6 +5,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@pinball/shared-types';
+import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { worldTopTen, globalStats } from '../use-cases/Leaderboard';
 import { registerScore } from '../use-cases/RegisterScore';
 
@@ -15,6 +16,10 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer);
 const PORT = process.env.PORT || 3001;
 
 const INPUT_BRIDGE_ROOM = 'input-bridge';
+
+// Map active côté server : mise à jour via 'map:select' (playfield → sélecteur).
+// Communiqué à chaque nouveau connecté + broadcasté à tous quand ça change.
+let currentMapId: string = DEFAULT_MAP_ID;
 
 app.get('/', (req, res) => {
   res.send('Pinball Server is running');
@@ -48,6 +53,17 @@ io.on('connection', (socket) => {
     socket.join(INPUT_BRIDGE_ROOM);
     console.log('[server] input-bridge joined room');
   }
+
+  // Informer le nouveau connecté de la map courante (DMD/backglass synchro au
+  // démarrage, même si aucun `map:select` n'a encore été émis).
+  socket.emit('map:selected', { mapId: currentMapId });
+
+  socket.on('map:select', ({ mapId }) => {
+    if (typeof mapId !== 'string' || mapId === currentMapId) return;
+    console.log('[server] map:select', mapId, '→ broadcast map:selected');
+    currentMapId = mapId;
+    io.emit('map:selected', { mapId });
+  });
 
   socket.on('input:button', (data) => {
     console.log('[server] input:button', data.id, data.action, '→ broadcast');
