@@ -12,3 +12,12 @@ export const GANONDORF_ANIM_IDLE             = 'Idle'
 export const GANONDORF_ANIM_HIT              = 'hit'
 export const GANONDORF_ANIM_VICTORY          = 'death'
 export const GANONDORF_ANIM_VICTORY_FALLBACK = 'death'
+
+// FPS du projet Blender (Output Properties > Frame Rate).
+export const GANONDORF_ANIM_FPS = 24
+// Plages de frames exactes (Manual Frame Range de chaque Action dans Blender).
+// Nécessaire car le GLB exporte les keyframes en temps absolu — sans subclip,
+// Three.js jouerait les frames depuis t=0 au lieu du bon intervalle.
+export const GANONDORF_ANIM_IDLE_FRAMES    = { start: 1,  end: 89 } as const
+export const GANONDORF_ANIM_HIT_FRAMES     = { start: 40, end: 70 } as const
+export const GANONDORF_ANIM_VICTORY_FRAMES = { start: 20, end: 50 } as const
