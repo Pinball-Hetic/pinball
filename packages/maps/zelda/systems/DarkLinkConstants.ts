@@ -13,6 +13,14 @@ export const DARK_LINK_ANIM_IDLE    = 'idle'
 export const DARK_LINK_ANIM_HIT     = 'hit'
 export const DARK_LINK_ANIM_DEAD    = 'dead'
 
+// FPS du projet Blender (Output Properties > Frame Rate).
+export const DARK_LINK_ANIM_FPS = 24
+// Plages de frames exactes (Manual Frame Range de chaque Action dans Blender).
+export const DARK_LINK_ANIM_WALK_FRAMES = { start: 1,  end: 25 } as const
+export const DARK_LINK_ANIM_IDLE_FRAMES = { start: 1,  end: 89 } as const
+export const DARK_LINK_ANIM_HIT_FRAMES  = { start: 40, end: 70 } as const
+export const DARK_LINK_ANIM_DEAD_FRAMES = { start: 20, end: 50 } as const
+
 // Marche : durée approximative d'un cycle × nb de cycles
 export const DARK_LINK_WALK_CLIP_DURATION = 1.0   // secondes
 export const DARK_LINK_WALK_CYCLES        = 2.2

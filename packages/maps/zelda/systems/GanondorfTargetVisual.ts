@@ -5,6 +5,10 @@ import {
   GANONDORF_ANIM_IDLE,
   GANONDORF_ANIM_VICTORY,
   GANONDORF_ANIM_VICTORY_FALLBACK,
+  GANONDORF_ANIM_FPS,
+  GANONDORF_ANIM_IDLE_FRAMES,
+  GANONDORF_ANIM_HIT_FRAMES,
+  GANONDORF_ANIM_VICTORY_FRAMES,
   GANONDORF_MODEL_FIT_FRAMES,
   GANONDORF_MODEL_FLOOR_CLEARANCE,
   GANONDORF_MODEL_HEIGHT,
@@ -262,11 +266,25 @@ export class GanondorfTargetVisual {
     });
 
     this.mixer = new THREE.AnimationMixer(model);
-    const idleClip = findGltfAnimationClip(clips, GANONDORF_ANIM_IDLE);
-    const hitClip = findGltfAnimationClip(clips, GANONDORF_ANIM_HIT);
-    const victoryClip =
+
+    // Recadrage des clips sur leur plage Blender (Manual Frame Range).
+    // Sans subclip, le GLB exporte les keyframes en temps absolu et Three.js
+    // joue depuis t=0, ce qui fait jouer la mauvaise partie de l'animation.
+    const rawIdleClip = findGltfAnimationClip(clips, GANONDORF_ANIM_IDLE);
+    const rawHitClip = findGltfAnimationClip(clips, GANONDORF_ANIM_HIT);
+    const rawVictoryClip =
       findGltfAnimationClip(clips, GANONDORF_ANIM_VICTORY) ??
       findGltfAnimationClip(clips, GANONDORF_ANIM_VICTORY_FALLBACK);
+
+    const idleClip = rawIdleClip
+      ? THREE.AnimationUtils.subclip(rawIdleClip, GANONDORF_ANIM_IDLE, GANONDORF_ANIM_IDLE_FRAMES.start, GANONDORF_ANIM_IDLE_FRAMES.end, GANONDORF_ANIM_FPS)
+      : undefined;
+    const hitClip = rawHitClip
+      ? THREE.AnimationUtils.subclip(rawHitClip, GANONDORF_ANIM_HIT, GANONDORF_ANIM_HIT_FRAMES.start, GANONDORF_ANIM_HIT_FRAMES.end, GANONDORF_ANIM_FPS)
+      : undefined;
+    const victoryClip = rawVictoryClip
+      ? THREE.AnimationUtils.subclip(rawVictoryClip, GANONDORF_ANIM_VICTORY, GANONDORF_ANIM_VICTORY_FRAMES.start, GANONDORF_ANIM_VICTORY_FRAMES.end, GANONDORF_ANIM_FPS)
+      : undefined;
 
     if (idleClip) {
       this.idleAction = this.mixer.clipAction(idleClip);

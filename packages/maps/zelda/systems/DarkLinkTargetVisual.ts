@@ -5,6 +5,11 @@ import {
   DARK_LINK_ANIM_IDLE,
   DARK_LINK_ANIM_HIT,
   DARK_LINK_ANIM_DEAD,
+  DARK_LINK_ANIM_FPS,
+  DARK_LINK_ANIM_WALK_FRAMES,
+  DARK_LINK_ANIM_IDLE_FRAMES,
+  DARK_LINK_ANIM_HIT_FRAMES,
+  DARK_LINK_ANIM_DEAD_FRAMES,
   DARK_LINK_MODEL_FIT_FRAMES,
   DARK_LINK_MODEL_FLOOR_CLEARANCE,
   DARK_LINK_MODEL_HEIGHT,
@@ -342,10 +347,26 @@ export class DarkLinkTargetVisual {
 
     this.mixer = new THREE.AnimationMixer(model);
 
-    const walkClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_WALK);
-    const idleClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_IDLE);
-    const hitClip  = findGltfAnimationClip(clips, DARK_LINK_ANIM_HIT);
-    const deadClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_DEAD);
+    // Recadrage des clips sur leur plage Blender (Manual Frame Range).
+    // Sans subclip, le GLB exporte les keyframes en temps absolu et Three.js
+    // joue depuis t=0, ce qui fait jouer la mauvaise partie de l'animation.
+    const rawWalkClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_WALK);
+    const rawIdleClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_IDLE);
+    const rawHitClip  = findGltfAnimationClip(clips, DARK_LINK_ANIM_HIT);
+    const rawDeadClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_DEAD);
+
+    const walkClip = rawWalkClip
+      ? THREE.AnimationUtils.subclip(rawWalkClip, DARK_LINK_ANIM_WALK, DARK_LINK_ANIM_WALK_FRAMES.start, DARK_LINK_ANIM_WALK_FRAMES.end, DARK_LINK_ANIM_FPS)
+      : undefined;
+    const idleClip = rawIdleClip
+      ? THREE.AnimationUtils.subclip(rawIdleClip, DARK_LINK_ANIM_IDLE, DARK_LINK_ANIM_IDLE_FRAMES.start, DARK_LINK_ANIM_IDLE_FRAMES.end, DARK_LINK_ANIM_FPS)
+      : undefined;
+    const hitClip = rawHitClip
+      ? THREE.AnimationUtils.subclip(rawHitClip, DARK_LINK_ANIM_HIT, DARK_LINK_ANIM_HIT_FRAMES.start, DARK_LINK_ANIM_HIT_FRAMES.end, DARK_LINK_ANIM_FPS)
+      : undefined;
+    const deadClip = rawDeadClip
+      ? THREE.AnimationUtils.subclip(rawDeadClip, DARK_LINK_ANIM_DEAD, DARK_LINK_ANIM_DEAD_FRAMES.start, DARK_LINK_ANIM_DEAD_FRAMES.end, DARK_LINK_ANIM_FPS)
+      : undefined;
 
     if (walkClip) {
       this.walkAction = this.mixer.clipAction(walkClip);
