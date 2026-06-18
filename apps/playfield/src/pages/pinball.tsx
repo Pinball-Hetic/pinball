@@ -72,7 +72,11 @@ export default function PinballPage() {
         de map (ex: retour menu + nouvelle sélection). Garantit que le moteur
         physique, les loaders Three.js et les refs internes repartent à zéro.
       */}
-      <PinballPlayfield key={selectedMapId} mapId={selectedMapId} />
+      <PinballPlayfield
+        key={selectedMapId}
+        mapId={selectedMapId}
+        onReturnToSelector={() => setSelectedMapId(null)}
+      />
     </>
   );
 }

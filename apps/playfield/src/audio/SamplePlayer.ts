@@ -62,6 +62,12 @@ export class SamplePlayer {
     this.sfxBus.gain.value = percentToGain(AUDIO_VOLUME.sfx);
   }
 
+  /** Durée en secondes du buffer en cache, null si pas encore chargé. */
+  getBufferDuration(url: string): number | null {
+    const buf = this.bufferCache.get(url);
+    return buf ? buf.duration : null;
+  }
+
   getMaster(): GainNode | null {
     this.ensureContext();
     return this.master;

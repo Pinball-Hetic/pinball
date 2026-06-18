@@ -136,6 +136,15 @@ export function playGameOverSound(): void {
   onMusicGameOver();
 }
 
+/**
+ * Durée du son game-over en ms (depuis le buffer mis en cache par warmAssets).
+ * Retourne 4 000 ms par défaut si le buffer n'est pas encore disponible.
+ */
+export function getGameOverSoundDurationMs(): number {
+  const dur = samples.getBufferDuration(getGameOverUrl());
+  return dur != null ? dur * 1000 : 4_000;
+}
+
 export function handlePinballSoundEvent(event: GameEvent, bosses: BossDefinition[]): void {
   switch (event.type) {
     case "BALL_LAUNCHED":

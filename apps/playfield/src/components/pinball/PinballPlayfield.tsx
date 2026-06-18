@@ -149,6 +149,7 @@ import {
   resetPinballAudioForNewGame,
   unlockPinballAudio,
   setMapAudioUrls,
+  getGameOverSoundDurationMs,
 } from "@/audio/pinballAudio";
 import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
 import CinematicOverlay from "./CinematicOverlay";
@@ -179,6 +180,11 @@ type PinballPlayfieldProps = {
   cabinetMode?: boolean;
   /** Id de la map à charger. Si absent → NEXT_PUBLIC_MAP_ID ou DEFAULT_MAP_ID. */
   mapId?: string;
+  /**
+   * Appelé après la fin du son game-over : retourne au sélecteur de map.
+   * Si absent, l'auto-redirect est désactivé (comportement legacy).
+   */
+  onReturnToSelector?: () => void;
 };
 
 // Garde NO SIGNAL : map introuvable → écran de veille plein écran (pas de
@@ -190,7 +196,7 @@ export default function PinballPlayfield(props: PinballPlayfieldProps) {
   return <PinballPlayfieldInner {...props} resolvedMap={resolvedMap} />;
 }
 
-function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlayfieldProps & { resolvedMap: ResolvedMap }) {
+function PinballPlayfieldInner({ cabinetMode = false, resolvedMap, onReturnToSelector }: PinballPlayfieldProps & { resolvedMap: ResolvedMap }) {
   // Boss, clips et sons dérivés de la map sélectionnée (prop — change au remount).
   const mapBosses = resolvedMap.layout.bosses ?? [];
   const mapClips = resolvedMap.manifest.clips;
@@ -250,6 +256,11 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   const sessionStartedRef = useRef(false);
   /** Appelé depuis le game loop quand la session démarre (affiche la balle). */
   const onSessionStartRef = useRef<(() => void) | null>(null);
+  /** Ref stable vers onReturnToSelector (évite les re-renders dans les closures). */
+  const onReturnToSelectorRef = useRef(onReturnToSelector);
+  onReturnToSelectorRef.current = onReturnToSelector;
+  /** Timer auto-redirect post-game-over (annulable si le joueur appuie sur un bouton). */
+  const gameOverRedirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCameraTuningChange = useCallback((next: PlayfieldCameraDebugTuning) => {
     setCameraDebugTuning(next);
@@ -409,6 +420,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // Clip poussé à CHAQUE game over ; DMD/backglass décident de
       // l'ampleur (le backglass connaît le rang → fanfare ou recap).
       dmd.pushCinematic('hall_of_fame');
+      // Auto-redirect : retour au sélecteur de map à la fin du son game-over.
+      if (onReturnToSelectorRef.current) {
+        const durationMs = getGameOverSoundDurationMs();
+        if (gameOverRedirectTimerRef.current != null) clearTimeout(gameOverRedirectTimerRef.current);
+        gameOverRedirectTimerRef.current = setTimeout(() => {
+          gameOverRedirectTimerRef.current = null;
+          onReturnToSelectorRef.current?.();
+        }, durationMs + 300);
+      }
     },
     onGameStart: () => {
       setGameOverClaimUrl(null); // évite un QR périmé qui flashe sur la partie suivante
@@ -1376,12 +1396,18 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
                   `[Plunger] DOWN — gameState=${gameStateRef.current} physicsReady=${physicsReady} charging=${isChargingPlunger}`,
                 );
                 if (gameStateRef.current === "game_over") {
-                  resetGame();
-                  restoreBossCamera();
-                  collisionProcessor?.resetAllBossFights();
-                  collisionProcessor?.resetScoreBaselines();
-                  mapModule?.resetWorld?.();
-                  if (ballMesh) ballMesh.visible = true;
+                  if (onReturnToSelectorRef.current) {
+                    if (gameOverRedirectTimerRef.current != null) clearTimeout(gameOverRedirectTimerRef.current);
+                    gameOverRedirectTimerRef.current = null;
+                    onReturnToSelectorRef.current();
+                  } else {
+                    resetGame();
+                    restoreBossCamera();
+                    collisionProcessor?.resetAllBossFights();
+                    collisionProcessor?.resetScoreBaselines();
+                    mapModule?.resetWorld?.();
+                    if (ballMesh) ballMesh.visible = true;
+                  }
                   return;
                 }
                 if (gameStateRef.current === "idle" && physicsReadyRef.current) {
@@ -1412,12 +1438,18 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             }
             case "START":
               if (btnAction === "DOWN" && gameStateRef.current === "game_over") {
-                resetGame();
-                restoreBossCamera();
-                collisionProcessor?.resetAllBossFights();
-                collisionProcessor?.resetScoreBaselines();
-                mapModule?.resetWorld?.();
-                if (ballMesh) ballMesh.visible = true;
+                if (onReturnToSelectorRef.current) {
+                  if (gameOverRedirectTimerRef.current != null) clearTimeout(gameOverRedirectTimerRef.current);
+                  gameOverRedirectTimerRef.current = null;
+                  onReturnToSelectorRef.current();
+                } else {
+                  resetGame();
+                  restoreBossCamera();
+                  collisionProcessor?.resetAllBossFights();
+                  collisionProcessor?.resetScoreBaselines();
+                  mapModule?.resetWorld?.();
+                  if (ballMesh) ballMesh.visible = true;
+                }
               }
               break;
           }
