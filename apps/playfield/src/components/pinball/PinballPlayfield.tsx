@@ -532,9 +532,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const rendering = mapManifest.rendering;
     configureGltfRenderer(renderer, rendering);
 
-    // Environment map — uniquement pour les maps qui en ont besoin (rendering.useEnvironment).
-    // ST original : pas d'envmap → matériaux sans reflets ambiants (état git d'origine).
-    // Zelda : envmap active → or et gemmes très réfléchissants (effet Vectary).
+    // Environment map — par map (rendering.useEnvironment). ST : off → métal
+    // éclairé par les directionnels + rim (pas de reflets ambiants). Zelda :
+    // on → or/gemmes très réfléchissants (effet Vectary).
     if (rendering?.useEnvironment) {
       const pmrem = new THREE.PMREMGenerator(renderer);
       pmrem.compileEquirectangularShader();
@@ -579,6 +579,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       dirLight2.position.set(rl.dir2.x, rl.dir2.y, rl.dir2.z);
       dirLight2.castShadow = false;
       scene.add(dirLight2);
+    }
+
+    // Contre-jour optionnel (rl.rim) fond de table → liseré métal vers la
+    // caméra. Coût quasi nul. Absent dans la config → pas de rim.
+    if (rl?.rim) {
+      const rimLight = new THREE.DirectionalLight(rl.rim.color, rl.rim.intensity);
+      rimLight.position.set(rl.rim.x, rl.rim.y, rl.rim.z);
+      rimLight.castShadow = false;
+      scene.add(rimLight);
     }
 
     const fillLight = new THREE.DirectionalLight(
