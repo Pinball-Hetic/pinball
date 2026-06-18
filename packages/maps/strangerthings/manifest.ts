@@ -129,7 +129,7 @@ export const manifest: MapManifest = {
   // réanime (elle écrase les intensités via les refs lumières).
   rendering: {
     useEnvironment: false,
-    toneMappingExposure: 1.38,
+    toneMappingExposure: 1.12,
     colorDarken: 0.9,
     environmentBlur: 0.04,
     envIntensityMetallic: 1.0,
@@ -140,9 +140,11 @@ export const manifest: MapManifest = {
       hemi:    { sky: 0xffffff, ground: 0x111111, intensity: 0 },
       // Double soleil latéral opposé (réglé à l'œil) : pas de highlight
       // spéculaire dans l'axe caméra, sol débouché des deux côtés.
-      dir:     { color: 0xffffff, intensity: 2.54, x: 1.08,  y: 1.5, z: 0.27 },
-      dir2:    { color: 0xffffff, intensity: 5.05, x: -1.21, y: 1.5, z: 0.55 },
-      fill:    { color: 0xffffff, intensity: 0,    x: 0,     y: 1,   z: -1   },
+      dir:     { color: 0xffffff, intensity: 2.54, x: 1.08,  y: 1.5,  z: 0.27 },
+      dir2:    { color: 0xffffff, intensity: 5.05, x: -1.21, y: 1.5,  z: 0.55 },
+      // Contre-jour : liseré métal vers la caméra (réglé à l'œil).
+      rim:     { color: 0xffffff, intensity: 1.1,  x: 0,     y: 1.3,  z: -1.2 },
+      fill:    { color: 0xffffff, intensity: 0,    x: 0,     y: 1,    z: -1   },
     },
   },
   meshAliases: {

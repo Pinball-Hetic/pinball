@@ -74,6 +74,9 @@ export interface MapRenderingConfig {
      *  éclairage qui débouche l'ombre du `dir` sans le fill (réservé à
      *  UpsideDownAtmosphere). Absent → un seul soleil. */
     dir2?: MapDirLightConfig;
+    /** Contre-jour optionnel (fond de table, vers la caméra) → liseré sur les
+     *  bords métal. Absent → pas de rim. */
+    rim?: MapDirLightConfig;
     /** Fill léger — débouche les zones d'ombre sans écraser le contraste. */
     fill: MapDirLightConfig;
   };
