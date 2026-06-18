@@ -4,10 +4,10 @@ import type { MapLayout } from '@pinball/game-engine';
 import { easeOut } from '@pinball/game-engine';
 
 // ── Dimensions ─────────────────────────────────────────────────────────────
-const PORTAL_SENSOR_RADIUS = 0.042;
-const PORTAL_OUTER_R       = 0.056;
-const PORTAL_INNER_R       = 0.040;
-const PORTAL_TUBE_R        = 0.0042;
+const PORTAL_SENSOR_RADIUS = 0.014;
+const PORTAL_OUTER_R       = 0.01867;
+const PORTAL_INNER_R       = 0.01333;
+const PORTAL_TUBE_R        = 0.0014;
 const OPEN_DURATION        = 1.1;
 const PARTICLE_COUNT       = 28;
 
@@ -70,7 +70,7 @@ export class ZeldaPortal {
 
     // Visuel Three.js — masqué au départ. Sensor PAS encore créé.
     this.portalGroup = this.buildVisual();
-    this.portalGroup.position.set(pos.x, pos.y + 0.006, pos.z);
+    this.portalGroup.position.set(pos.x, pos.y + 0.020, pos.z);
     this.portalGroup.rotation.x = 96 * Math.PI / 180;  // à plat sur le plateau
     this.portalGroup.visible = false;
     config.root.add(this.portalGroup);

@@ -14,7 +14,7 @@ export const bossDefinitions: BossDefinition[] = [
   {
     id: 'ganondorf',
     colliderRole: 'ganondorf_target',
-    target: { x: 0, y: 1.012, z: -0.02 },
+    target: { x: -0.0249, y: 1.01222, z: -0.0740 },
     targetHits: 5,
     scoreTargetHit: 250,
     reveal: {
@@ -78,7 +78,7 @@ export const bossDefinitions: BossDefinition[] = [
   {
     id: 'darklink',
     colliderRole: 'darklink_target',
-    target: { x: 0, y: 1.012, z: -0.067 },
+    target: { x: -0.0249, y: 1.01222, z: -0.0740 },
     targetHits: 10,
     scoreTargetHit: 300,
     reveal: {
