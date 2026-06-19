@@ -26,6 +26,24 @@ export const BOSS_HEALTH_BAR_THEMES = {
     fillClass:
       "h-full rounded-full bg-gradient-to-r from-violet-700 to-violet-400 shadow-[0_0_12px_rgba(160,80,255,0.6)] transition-[width] duration-300 ease-out",
   },
+  ganondorf: {
+    shellClass:
+      "min-w-52 rounded border border-orange-500/40 bg-black/70 px-4 py-2.5 backdrop-blur-sm",
+    labelClass: "text-[10px] uppercase tracking-[0.35em] text-orange-300/90",
+    trackClass:
+      "mt-2 h-2.5 w-full overflow-hidden rounded-full bg-orange-950/80 ring-1 ring-orange-500/25",
+    fillClass:
+      "h-full rounded-full bg-gradient-to-r from-orange-700 to-orange-400 shadow-[0_0_12px_rgba(255,140,0,0.65)] transition-[width] duration-300 ease-out",
+  },
+  darklink: {
+    shellClass:
+      "min-w-52 rounded border border-red-500/45 bg-black/70 px-4 py-2.5 backdrop-blur-sm",
+    labelClass: "text-[10px] uppercase tracking-[0.35em] text-red-300/90",
+    trackClass:
+      "mt-2 h-2.5 w-full overflow-hidden rounded-full bg-red-950/80 ring-1 ring-red-500/30",
+    fillClass:
+      "h-full rounded-full bg-gradient-to-r from-red-700 to-red-400 shadow-[0_0_12px_rgba(255,60,60,0.6)] transition-[width] duration-300 ease-out",
+  },
 } satisfies Record<string, BossHealthBarTheme>;
 
 export type BossHealthBarId = keyof typeof BOSS_HEALTH_BAR_THEMES;
