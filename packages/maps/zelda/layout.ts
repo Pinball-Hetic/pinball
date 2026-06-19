@@ -17,9 +17,10 @@ import {
 // Zelda si les positions de meshes changent.
 export const layout: MapLayout = {
   bumpers: [
-    { x: -0.020586, y: 1.0482, z: -0.1967 },
-    { x: -0.097406, y: 1.0621, z: -0.30509 },
-    { x: 0.059483, y: 1.0621, z: -0.30509 },
+    // Positions exactes extraites du node GLB zelda.glb (via dump-glb-meshes)
+    { x: -0.02561, y: 1.02870, z: -0.19060 }, // bumper_3 (centre bas)
+    { x: -0.09967, y: 1.04850, z: -0.32417 }, // bumper_2 (gauche haut)
+    { x: 0.05183,  y: 1.04850, z: -0.32417 }, // bumper_1 (droite haut)
   ],
   dropTargets: [
     { id: 'drop_left_1', x: -0.209, y: 1.022, z: -0.019, side: 'left' },
@@ -36,7 +37,7 @@ export const layout: MapLayout = {
     ],
     rocket: { x: 0.193, y: 1.021, z: -0.13 },
     bossReveal: { x: -0.0195, y: 1.0575, z: -0.269 },
-    portal: { x: -0.000751, y: 1.015191, z: -0.064818 },
+    portal: { x: -0.0249, y: 1.01379, z: -0.0740 },
   },
   spawns: {
     ball: { x: 0.2355, y: 1.01, z: 0.161 },
