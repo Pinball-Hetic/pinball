@@ -6,7 +6,7 @@ import {
   SLINGSHOT_RIGHT_CENTER,
 } from '../domain/Ball';
 import type { MapLayout } from '../domain/MapLayout';
-import { surfaceYAtZ, bottomOutLaneSepX, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
+import { surfaceYAtZ, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
 import { hasPinballmapRoot } from './GltfNodeNames';
 
@@ -474,15 +474,16 @@ export class PlayfieldColliderFactory {
     layout: MapLayout,
     colliderMap: Map<number, string>,
   ): void {
-    const leftX = layout.geometry.bounds.leftX;
-    const laneSepX = bottomOutLaneSepX(layout.spawns.ball.x);
-    const centerX = (leftX + laneSepX) / 2;
-    const halfX = (laneSepX - leftX) / 2;
+    const leftX  = layout.geometry.bounds.leftX;
+    const rightX = layout.geometry.bounds.rightX; // pleine largeur (0.265)
+    const centerX = (leftX + rightX) / 2;
+    const halfX   = (rightX - leftX) / 2;
+    const sensorZ = BOTTOM_OUT_Z + 0.03; // décalé vers le bas sans toucher BOTTOM_OUT_Z
     const body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(centerX, surfaceYAtZ(BOTTOM_OUT_Z), BOTTOM_OUT_Z),
+      RAPIER.RigidBodyDesc.fixed().setTranslation(centerX, surfaceYAtZ(sensorZ), sensorZ),
     );
     const col = world.createCollider(
-      RAPIER.ColliderDesc.cuboid(halfX, 0.03, 0.01)
+      RAPIER.ColliderDesc.cuboid(halfX, 0.03, 0.06)
         .setSensor(true)
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
       body,

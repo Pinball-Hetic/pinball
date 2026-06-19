@@ -55,7 +55,7 @@ export function bottomOutLaneSepX(spawnX: number): number {
   return spawnX - getBallRadius() * 2;
 }
 
-export function isInBottomOutZone(x: number, z: number, laneSepX: number): boolean {
+export function isInBottomOutZone(x: number, z: number, laneSepX: number = WALL_RIGHT_X): boolean {
   return z >= BOTTOM_OUT_Z && x <= laneSepX;
 }
 
