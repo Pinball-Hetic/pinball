@@ -8,3 +8,4 @@ export { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 export { SacredRealmAtmosphere } from './SacredRealmAtmosphere';
 export { ZeldaPortal } from './ZeldaPortal';
 export { ZeldaTransition } from './ZeldaTransition';
+export { BumperVisuals } from './BumperVisuals';
