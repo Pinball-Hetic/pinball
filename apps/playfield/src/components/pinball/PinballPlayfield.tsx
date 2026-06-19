@@ -16,7 +16,6 @@ import {
   DetectBottomOut,
   getBallRadius,
   BALL_MAX_SPEED,
-  bottomOutLaneSepX,
   INITIAL_LIVES,
   PLUNGER_CHARGE_MS,
   plungerChargeProgress,
@@ -758,7 +757,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let debugCollidersOn = false;
 
     const stuckDetector = new StuckBallDetector();
-    const bottomOutDetector = new DetectBottomOut(bottomOutLaneSepX(mapLayout.spawns.ball.x));
+    const bottomOutDetector = new DetectBottomOut();
     const diag = new BallDiagnostics(mapLayout);
     let lastDebugPush = 0;
 
