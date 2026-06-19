@@ -110,6 +110,13 @@ export const manifest: MapManifest = {
     'ocarina',
     'sheikah',
   ],
+  // Wording de l'écran game-over (QR code de claim). Textes thématisés Zelda.
+  // qrLogo absent : pas de PNG disponible dans les assets (ajouter plus tard).
+  outro: {
+    title: 'LA LÉGENDE EST TERMINÉE',
+    scanLabel: 'Scanne pour graver ton nom au Temple du Temps',
+    replayLabel: 'START — Rejouer',
+  },
   // ─── Rendu Three.js — spécifique Zelda ────────────────────────────────────
   // Esthétique Hyrule : marbre noir profond, or et gemmes vifs.
   // envIntensityMetallic élevé → les matériaux métalliques (triforce, couronnes
