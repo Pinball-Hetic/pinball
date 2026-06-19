@@ -6,6 +6,7 @@ import {
   SacredRealmAtmosphere,
   ZeldaPortal,
   ZeldaTransition,
+  BumperVisuals,
 } from '../systems'
 
 // Unité : force par (distance²) — même ordre de grandeur que ST.
@@ -31,6 +32,7 @@ export function createModule(): MapModule {
   let sacredRealm:     SacredRealmAtmosphere  | null = null
   let portal:          ZeldaPortal     | null = null
   let transition:      ZeldaTransition | null = null
+  let bumperVisuals:   BumperVisuals   | null = null
 
   return {
     setup(ctx: MapContext): void {
@@ -93,6 +95,10 @@ export function createModule(): MapModule {
       // ── Transition (flash violet → tremor → callback) ────────────────────
       transition = new ZeldaTransition()
       transition.setup({ root: ctx.root, camera: ctx.camera })
+
+      // ── Animation punch des VIS bumpers ──────────────────────────────────
+      bumperVisuals = new BumperVisuals()
+      bumperVisuals.setup(ctx.root)
     },
 
     async preload(): Promise<void> {
@@ -106,6 +112,7 @@ export function createModule(): MapModule {
     onGameEvent(e: GameEvent): void {
       bossReveals?.onGameEvent(e)
       sacredRealm?.onGameEvent(e)
+      bumperVisuals?.onGameEvent(e)
 
       const ctx = ctxRef
       if (!ctx) return
@@ -269,6 +276,7 @@ export function createModule(): MapModule {
       sacredRealm?.update(dt)
       transition?.update(dt)
       portal?.update(dt)
+      bumperVisuals?.update(dt)
 
       const ctx = ctxRef
       if (!ctx) return
@@ -332,6 +340,8 @@ export function createModule(): MapModule {
       portal       = null
       transition?.dispose()
       transition   = null
+      bumperVisuals?.dispose()
+      bumperVisuals = null
       ctxRef       = null
     },
   }
