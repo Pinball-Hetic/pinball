@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
     try {
       const registered = await registerScore(data);
       socket.emit('game:registered', registered); // au seul émetteur → QR
-      io.emit('leaderboard:refresh', await worldTopTen()); // backglass (board mondial)
+      io.emit('leaderboard:refresh', await worldTopTen(data.mapId)); // backglass (board de la map jouée)
     } catch (err) {
       // le jeu continue — la persistence ne doit JAMAIS bloquer le relay
       console.error('[server] game:over persist failed:', err);

@@ -25,13 +25,16 @@ export function useBackglassData() {
   const [stats, setStats] = useState<GlobalStats>(EMPTY_STATS)
   const [connected, setConnected] = useState(false)
   const [mapId, setMapId] = useState<string>(FORCED_MAP_ID ?? DEFAULT_MAP_ID)
+  // Ref sur la map courante : les closures du useEffect([], []) lisent
+  // toujours la valeur à jour sans se recréer.
+  const mapIdRef = useRef<string>(FORCED_MAP_ID ?? DEFAULT_MAP_ID)
 
   useEffect(() => {
     // Kiosk : une réponse d'erreur (JSON {error}, 5xx HTML, déconnexion)
     // ne doit JAMAIS remplacer un état valide. On valide statut + forme,
     // sinon on garde les données précédentes (ou EMPTY_STATS).
     const fetchLeaderboard = () =>
-      fetch('/api/leaderboard')
+      fetch(`/api/leaderboard?mapId=${mapIdRef.current}`)
         .then((res) => {
           if (!res.ok) throw new Error(`leaderboard ${res.status}`)
           return res.json()
@@ -43,7 +46,7 @@ export function useBackglassData() {
         .catch(() => {})
 
     const fetchStats = () =>
-      fetch('/api/stats')
+      fetch(`/api/stats?mapId=${mapIdRef.current}`)
         .then((res) => {
           if (!res.ok) throw new Error(`stats ${res.status}`)
           return res.json()
@@ -64,10 +67,11 @@ export function useBackglassData() {
 
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
-    // Même garde que le fetch : un refresh socket malformé ne remplace
-    // pas un classement valide (entries doit toujours rester un tableau).
-    socket.on('leaderboard:refresh', (data) => {
-      if (Array.isArray(data)) setEntries(data)
+    // leaderboard:refresh arrive après un game:over sur n'importe quelle map.
+    // On re-fetch depuis l'API avec le mapId courant pour ne montrer que les
+    // scores de la map active (le payload de l'event est ignoré).
+    socket.on('leaderboard:refresh', () => {
+      fetchLeaderboard()
     })
     // les agrégats ont changé : on re-fetch /api/stats
     socket.on('game:over', () => {
@@ -76,7 +80,14 @@ export function useBackglassData() {
     // Synchro map active (émis à la connexion + à chaque changement).
     // Ignoré si NEXT_PUBLIC_MAP_ID est forcé (prod Fliphetic mono-map).
     socket.on('map:selected', ({ mapId: id }) => {
-      if (!FORCED_MAP_ID) setMapId(id)
+      if (!FORCED_MAP_ID) {
+        mapIdRef.current = id
+        setMapId(id)
+        // Re-fetch immédiat avec la nouvelle map : le board et les stats
+        // doivent basculer dès le changement, sans attendre le prochain poll.
+        fetchLeaderboard()
+        fetchStats()
+      }
     })
 
     // Les claims arrivent async (téléphone, après la partie, depuis n'importe
