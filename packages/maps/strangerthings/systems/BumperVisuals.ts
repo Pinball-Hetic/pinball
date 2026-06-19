@@ -5,7 +5,7 @@ import { layout } from '../layout';
 import { GlowSprite } from '@pinball/game-engine';
 
 const LEGACY_BUMPER = /^bumper-st-\d+$/;
-const GLTF_BUMPER = /^bumper-\d+$/;
+const GLTF_BUMPER = /^bumper[-_]\d+$/;
 const LEGACY_BASE = /bumper-strangerthings/;
 const LEGACY_RING = /^bumper_ring/;
 
@@ -26,8 +26,8 @@ const IDLE_PULSE_SPEED = 1.35;
 const IDLE_PULSE_AMP = 0.18;
 const HIT_FLASH_DURATION = 0.2;
 const HIT_FLASH_BOOST = 1.1;
-const PUNCH_DURATION = 0.15; // scale punch 1 → 1.22 → 1
-const PUNCH_PEAK = 0.22;
+const PUNCH_DURATION = 0.15; // durée du pop en secondes
+const PUNCH_PEAK = 0.20; // ampleur : 0.20 = grossit à 1.20×
 
 // easeOutBack : léger dépassement puis retour.
 function easeOutBack(t: number): number {
@@ -182,6 +182,16 @@ export class BumperVisuals {
         baseScale: obj.scale.clone(),
       });
     });
+
+    // Échoue bruyamment : si aucun mesh n'a matché (ex. convention de nommage
+    // GLB changée), tous les effets bumper sont silencieusement morts. On le
+    // signale plutôt que de laisser croire que l'animation est branchée.
+    if (this.parts.length === 0) {
+      console.warn(
+        '[BumperVisuals] aucun mesh bumper reconnu (GLTF_BUMPER/LEGACY_*) — ' +
+          'vérifier les noms de meshes du GLB.',
+      );
+    }
   }
 
   onGameEvent(event: GameEvent): void {
