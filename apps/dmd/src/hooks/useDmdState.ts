@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { createPinballSocket, type PinballSocket } from '@pinball/shared-types/src/socket-client';
 import type {
-  ServerToClientEvents,
-  ClientToServerEvents,
   DmdDisplay,
 } from '@pinball/shared-types';
 import { DEFAULT_MAP_ID } from '@pinball/shared-types';
-
-type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 const INTRO: DmdDisplay = { mode: 'INTRO', player: '—', alternateWorld: false };
 
@@ -23,9 +19,7 @@ export function useDmdState() {
   const [mapId, setMapId] = useState<string>(FORCED_MAP_ID ?? DEFAULT_MAP_ID);
 
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
-    const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling'];
-    const socket: PinballSocket = io(url, { transports });
+    const socket: PinballSocket = createPinballSocket();
     socketRef.current = socket;
 
     socket.on('connect', () => setConnected(true));

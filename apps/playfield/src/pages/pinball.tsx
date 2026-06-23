@@ -1,7 +1,7 @@
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useCallback, useState } from 'react';
-import { io } from 'socket.io-client';
+import { createPinballSocket } from '@pinball/shared-types/src/socket-client';
 import { getMapPackage, AVAILABLE_MAPS } from '@pinball/maps';
 import { parsePlayfieldViewMode } from '@pinball/game-engine';
 import { MapSelectorScreen } from '@/components/pinball/MapSelectorScreen';
@@ -36,9 +36,7 @@ export default function PinballPage() {
   // Émet map:select au server (→ broadcast aux DMD/backglass) puis met à jour
   // l'état local. Connexion socket éphémère : crée, émet, déconnecte.
   const handleSelect = useCallback((mapId: string) => {
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
-    const transports: ('websocket' | 'polling')[] = url ? ['websocket'] : ['polling'];
-    const socket = io(url, { transports });
+    const socket = createPinballSocket();
     socket.once('connect', () => {
       socket.emit('map:select', { mapId });
       socket.disconnect();
