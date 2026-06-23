@@ -4,7 +4,7 @@ import type { LeaderboardEntry, GameOver } from '@pinball/shared-types'
 import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
 import { useMapContent } from '@/map/content'
 import { TakeoverStack } from './takeoverStack'
-import type { Takeover, TakeoverScene } from './takeoverStack'
+import type { Takeover } from './takeoverStack'
 
 // Réexport pour compat des consommateurs existants (les types vivent désormais
 // dans takeoverStack.ts, avec la machine à états).
