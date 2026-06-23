@@ -1,48 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { io, Socket } from 'socket.io-client'
-import type {
-  ServerToClientEvents,
-  ClientToServerEvents,
-  LeaderboardEntry,
-  GameOver,
-} from '@pinball/shared-types'
+import { createPinballSocket } from '@pinball/shared-types/src/socket-client'
+import type { LeaderboardEntry, GameOver } from '@pinball/shared-types'
 import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
 import { useMapContent } from '@/map/content'
+import { TakeoverStack } from './takeoverStack'
+import type { Takeover } from './takeoverStack'
 
-type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
-
-export type TakeoverScene =
-  | 'HIGH_SCORE'
-  | 'RECAP'
-  | 'MAP_EVENT'
-  | 'ATTRACT'
-  | 'CINEMATIC'
-
-export interface Takeover {
-  scene: TakeoverScene
-  payload?: GameOver & { rank: number }
-  clip?: string
-}
-
-// Chaînage : la scène suivante n'est poussée qu'à l'expiration de la
-// courante (sa durée démarre alors). Le modèle pile-à-priorités préempte
-// mais ne séquence pas — followUp ajoute le séquençage.
-interface FollowUp {
-  scene: TakeoverScene
-  durationMs: number
-  priority?: number
-  payload?: GameOver & { rank: number }
-}
-
-interface StackEntry {
-  scene: TakeoverScene
-  priority: number
-  expiresAt: number
-  payload?: GameOver & { rank: number }
-  clip?: string
-  followUp?: FollowUp
-}
-
+// Réexport pour compat des consommateurs existants (les types vivent désormais
+// dans takeoverStack.ts, avec la machine à états).
+export type { Takeover, TakeoverScene } from './takeoverStack'
 
 interface JoyceSignal {
   text: string | null
@@ -63,11 +29,8 @@ interface TakeoverState {
 }
 
 const TICK_MS = 250
-const ATTRACT_IDLE_MS = 60_000
-const JOYCE_IDLE_MS = 90_000
 const HIGH_SCORE_MS = 5_000
 const RECAP_MS = 8_000
-const HIGHLIGHT_MS = 4_000
 const AGITATION_MS = 1_500
 
 function computeRank(entries: LeaderboardEntry[], finalScore: number): number {
@@ -100,15 +63,13 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
   const entriesRef = useRef(entries)
   entriesRef.current = entries
 
-  const stackRef = useRef<StackEntry[]>([])
-  const lastActivityRef = useRef(0)
-  const lastJoyceIdleRef = useRef(0)
+  // La machine à états (pile de scènes) — toute la logique de décision est là.
+  const stackRef = useRef(new TakeoverStack())
+  // Signaux dérivés gérés par le hook (hors responsabilité de la pile) : monde
+  // alternatif, agitation, Joyce wall, fever, onde dorée, dernier game:over.
   const alternateWorldRef = useRef(false)
-  const highlightUntilRef = useRef(0)
-  const highlightRankRef = useRef<number | undefined>(undefined)
   const agitationStartRef = useRef(-AGITATION_MS)
   const joyceRef = useRef<JoyceSignal>({ text: null, id: 0 })
-  const prevTopRef = useRef<TakeoverScene | null>(null)
   // Dernier game:over complet (avec stats + rang) — alimente le clip
   // hall_of_fame (HighScore/Recap), qui n'en reçoit pas via dmd:display.
   const lastGameOverRef = useRef<(GameOver & { rank: number }) | null>(null)
@@ -131,16 +92,13 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
   }
 
   useEffect(() => {
-    const now0 = performance.now()
-    lastActivityRef.current = now0
-    lastJoyceIdleRef.current = now0
+    const stack = stackRef.current
+    stack.start(performance.now())
 
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined
-    const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling']
-    const socket: PinballSocket = io(url, { transports })
+    const socket = createPinballSocket()
 
     const markActivity = () => {
-      lastActivityRef.current = performance.now()
+      stack.markActivity(performance.now())
     }
 
     socket.on('game:start', markActivity)
@@ -159,7 +117,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         // HIGH_SCORE puis RECAP CHAÎNÉ : le recap ne démarre qu'à
         // l'expiration du high score (followUp), pas en parallèle masqué.
         // Le payload (stats) voyage dans l'entry → pas écrasé par un event.
-        stackRef.current.push({
+        stack.push({
           scene: 'HIGH_SCORE',
           priority: 100,
           expiresAt: now + HIGH_SCORE_MS,
@@ -168,7 +126,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         })
         pushJoyce(data.player)
       } else {
-        stackRef.current.push({
+        stack.push({
           scene: 'RECAP',
           priority: 80,
           expiresAt: now + RECAP_MS,
@@ -191,7 +149,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         const clip = d.clip
         const isHall = clip === 'hall_of_fame'
         const pushTk = (durationMs: number) =>
-          stackRef.current.push({
+          stack.push({
             scene: 'CINEMATIC',
             priority: 110,
             expiresAt: now + durationMs,
@@ -217,7 +175,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         // Event → takeover de map (label → scène), data-driven.
         const ev = d.label ? eventTakeoversRef.current[d.label] : undefined
         if (ev) {
-          stackRef.current.push({
+          stack.push({
             scene: 'MAP_EVENT',
             priority: ev.priority,
             expiresAt: performance.now() + ev.durationMs,
@@ -233,77 +191,24 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
 
     const interval = window.setInterval(() => {
       const now = performance.now()
-      // purge des scènes expirées
-      const expiring = stackRef.current.filter((e) => e.expiresAt <= now)
-      stackRef.current = stackRef.current.filter((e) => e.expiresAt > now)
-
-      // Chaînage : une scène qui expire avec un followUp pousse la suivante
-      // MAINTENANT (sa durée démarre ici, plus de masquage).
-      for (const e of expiring) {
-        if (e.followUp) {
-          stackRef.current.push({
-            scene: e.followUp.scene,
-            priority: e.followUp.priority ?? 80,
-            expiresAt: now + e.followUp.durationMs,
-            payload: e.followUp.payload,
-          })
-        }
-      }
-
-      // un HIGH_SCORE qui vient d'expirer → surbrillance de la ligne. Si un
-      // followUp (RECAP) suit, on prolonge la surbrillance pour qu'elle
-      // survive au recap et reste visible sur la scène de base.
-      const highExpired = expiring.find((e) => e.scene === 'HIGH_SCORE')
-      if (highExpired?.payload) {
-        highlightRankRef.current = highExpired.payload.rank
-        const extra = highExpired.followUp ? highExpired.followUp.durationMs : 0
-        highlightUntilRef.current = now + extra + HIGHLIGHT_MS
-      }
-      if (highlightUntilRef.current && now > highlightUntilRef.current) {
-        highlightUntilRef.current = 0
-        highlightRankRef.current = undefined
-      }
-
-      // ATTRACT : aucune activité depuis 60s
-      const idle = now - lastActivityRef.current > ATTRACT_IDLE_MS
-      const hasReal = stackRef.current.some((e) => e.scene !== 'ATTRACT')
-      stackRef.current = stackRef.current.filter((e) => e.scene !== 'ATTRACT')
-      if (idle && !hasReal) {
-        stackRef.current.push({
-          scene: 'ATTRACT',
-          priority: 10,
-          expiresAt: Infinity,
-        })
-        // pseudo du n°1 sur le Joyce wall, périodiquement
-        if (now - lastJoyceIdleRef.current > JOYCE_IDLE_MS) {
-          lastJoyceIdleRef.current = now
-          const top = entriesRef.current.find((e) => e.rank === 1)
-          if (top) pushJoyce(top.name)
-        }
-      }
-
-      // takeover actif = plus haute priorité
-      const top = stackRef.current.reduce<StackEntry | null>(
-        (best, e) => (!best || e.priority > best.priority ? e : best),
-        null,
-      )
-      prevTopRef.current = top?.scene ?? null
-
-      // Clip qui retarde le flip 3D du hall of fame (ex. portal_swallow) —
-      // déclaré par la map via clipBehavior.holdsHallFlip.
-      const portalActive = stackRef.current.some(
-        (e) => e.scene === 'CINEMATIC' && e.clip != null && clipBehaviorRef.current[e.clip]?.holdsHallFlip,
-      )
+      // Toute la logique de décision (purge / chaînage / attract / priorité) est
+      // déléguée à la machine à états. Le hook ne fait que lui fournir le temps
+      // et quelques accès aux données map, puis projette le résultat en state.
+      const { top, highlightRank, holdHallFlip } = stack.tick(now, {
+        holdsHallFlip: (clip) => clipBehaviorRef.current[clip]?.holdsHallFlip ?? false,
+        attractJoyceName: () => entriesRef.current.find((e) => e.rank === 1)?.name ?? null,
+        onJoyce: pushJoyce,
+      })
 
       setState({
         takeover: top
           ? { scene: top.scene, payload: top.payload, clip: top.clip }
           : null,
         alternateWorld: alternateWorldRef.current,
-        highlightRank: highlightRankRef.current,
+        highlightRank,
         agitation: agitationAt(now - agitationStartRef.current),
         joyce: joyceRef.current,
-        holdHallFlip: portalActive,
+        holdHallFlip,
         fever: feverRef.current,
         goldWaveId: goldWaveRef.current,
       })

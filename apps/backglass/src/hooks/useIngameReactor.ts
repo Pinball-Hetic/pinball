@@ -1,8 +1,5 @@
 import { RefObject, useEffect, useRef } from 'react'
-import { io, Socket } from 'socket.io-client'
-import type { ServerToClientEvents, ClientToServerEvents } from '@pinball/shared-types'
-
-type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
+import { createPinballSocket } from '@pinball/shared-types/src/socket-client'
 
 export type Reaction =
   | { kind: 'gameStart'; player: string }
@@ -55,9 +52,7 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
       listenersRef.current.forEach((cb) => cb(r))
     }
 
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined
-    const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling']
-    const socket: PinballSocket = io(url, { transports })
+    const socket = createPinballSocket()
 
     socket.on('game:start', (d) => {
       lastScoreRef.current = null

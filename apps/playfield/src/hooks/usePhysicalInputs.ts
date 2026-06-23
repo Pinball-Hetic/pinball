@@ -1,11 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { createPinballSocket, type PinballSocket } from '@pinball/shared-types/src/socket-client';
 import type {
   ButtonInput,
-  ClientToServerEvents,
   DevGameEventTrigger,
   SensorInput,
-  ServerToClientEvents,
   TiltInput,
 } from '@pinball/shared-types';
 
@@ -16,8 +14,6 @@ export interface PhysicalInputCallbacks {
   // Injection d'un GameEvent depuis la page /debug (chaîne complète).
   onDevEvent?: (data: DevGameEventTrigger) => void;
 }
-
-type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 export interface UsePhysicalInputs {
   callbacksRef: React.MutableRefObject<PhysicalInputCallbacks>;
@@ -43,12 +39,7 @@ export function usePhysicalInputs(): UsePhysicalInputs {
   const socketRef = useRef<PinballSocket | null>(null);
 
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
-    // url défini (dev, port serveur exposé) → WS direct.
-    // url undefined (prod Fliphetic, same-origin via rewrite Next.js) → polling
-    // pur, car les rewrites ne proxient pas l'upgrade WebSocket.
-    const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling'];
-    const socket: PinballSocket = io(url, { transports });
+    const socket: PinballSocket = createPinballSocket();
     socketRef.current = socket;
 
     socket.on('connect', () => {

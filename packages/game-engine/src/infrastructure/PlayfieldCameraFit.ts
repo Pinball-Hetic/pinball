@@ -66,22 +66,18 @@ export type PlayfieldCameraFitOptions = {
   debugTuning?: PlayfieldCameraDebugTuning | null;
 };
 
+// ── API publique par mode : 100 % délégation à la table de stratégies ─────────
+// Plus aucun switch/if sur le mode ici. Toute la connaissance spécifique à un
+// mode vit dans PLAYFIELD_VIEW_MODE_STRATEGIES (défini plus bas). Conséquence :
+// ajouter un mode de vue = ajouter UNE entrée dans la table, sans modifier ces
+// fonctions ni refit/fit (Open/Closed : ouvert à l'extension, fermé à la modif).
+
 export function playfieldViewDirForMode(viewMode: PlayfieldViewMode): THREE.Vector3 {
-  switch (viewMode) {
-    case 'portrait-fill':
-      return PLAYFIELD_PORTRAIT_VIEW_DIR;
-    case 'legacy':
-      return PLAYFIELD_VIEW_DIR;
-  }
+  return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].viewDir();
 }
 
 export function playfieldCameraUpForMode(viewMode: PlayfieldViewMode): THREE.Vector3 {
-  switch (viewMode) {
-    case 'portrait-fill':
-      return PLAYFIELD_PORTRAIT_CAMERA_UP;
-    case 'legacy':
-      return LEGACY_CAMERA_UP;
-  }
+  return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].cameraUp();
 }
 
 export function playfieldCameraTargetForMode(
@@ -90,24 +86,7 @@ export function playfieldCameraTargetForMode(
   out: THREE.Vector3,
   debugTuning?: PlayfieldCameraDebugTuning | null,
 ): THREE.Vector3 {
-  if (viewMode !== 'portrait-fill') {
-    frameBox.getCenter(out);
-    return out;
-  }
-
-  out.x = (frameBox.min.x + frameBox.max.x) * 0.5;
-  out.z = (frameBox.min.z + frameBox.max.z) * 0.5;
-  out.y = surfaceYAtZ(out.z);
-
-  const lookY = debugTuning?.lookYBias ?? PLAYFIELD_PORTRAIT_LOOK_Y_BIAS;
-  const lookZ = debugTuning?.lookZBias ?? PLAYFIELD_PORTRAIT_LOOK_Z_BIAS;
-  if (lookY > 0) {
-    out.y = THREE.MathUtils.lerp(out.y, PLAYFIELD_SURFACE_Y, lookY);
-  }
-  if (lookZ > 0) {
-    out.z = THREE.MathUtils.lerp(out.z, frameBox.max.z, lookZ);
-  }
-  return out;
+  return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].computeTarget(frameBox, out, debugTuning);
 }
 
 function portraitViewDirFromTuning(debugTuning?: PlayfieldCameraDebugTuning | null): THREE.Vector3 {
@@ -448,6 +427,100 @@ export function boundingBoxPortraitFrame(playfieldRoot: THREE.Object3D): THREE.B
   return boundingBoxPlayfieldWallFootprint(0.01);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STRATÉGIES PAR MODE DE VUE — cœur du respect d'Open/Closed.
+//
+// Chaque mode de caméra (`legacy`, `portrait-fill`, …) est décrit par UN objet
+// qui implémente la même interface. Tout le code générique ci-dessous (fit /
+// refit) ne fait que LIRE cette table : il ne connaît aucun nom de mode.
+//
+// AJOUTER UN MODE = ajouter une entrée dans PLAYFIELD_VIEW_MODE_STRATEGIES.
+// Aucune fonction existante n'est modifiée (« fermé à la modification »), et le
+// `Record<PlayfieldViewMode, …>` force même TypeScript à exiger l'entrée à la
+// compilation. Avant, il fallait éditer 5 endroits (2 switch + 3 if).
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface PlayfieldViewModeStrategy {
+  /** Direction œil→cible (vecteur frais, normalisé). */
+  viewDir(debugTuning?: PlayfieldCameraDebugTuning | null): THREE.Vector3;
+  /** Vecteur « up » de la caméra (constante partagée — l'appelant clone si besoin). */
+  cameraUp(): THREE.Vector3;
+  /** Boîte englobante de cadrage propre au mode. */
+  frameBox(playfieldRoot: THREE.Object3D): THREE.Box3;
+  /** Calcule le point visé, l'écrit dans `out` et le renvoie. */
+  computeTarget(
+    frameBox: THREE.Box3,
+    out: THREE.Vector3,
+    debugTuning?: PlayfieldCameraDebugTuning | null,
+  ): THREE.Vector3;
+  /** Remplit les coins servant au calcul de distance. */
+  fillCorners(frameBox: THREE.Box3, corners: THREE.Vector3[]): void;
+  /** Positionne la caméra ; renvoie la distance (perspective) ou half-width (ortho). */
+  fit(
+    camera: PlayfieldCamera,
+    fit: PlayfieldCamFit,
+    target: THREE.Vector3,
+    aspect: number,
+    debugTuning?: PlayfieldCameraDebugTuning | null,
+  ): number;
+}
+
+// Cible « centre de la boîte » (mode legacy : caméra inclinée classique).
+function legacyCameraTarget(frameBox: THREE.Box3, out: THREE.Vector3): THREE.Vector3 {
+  return frameBox.getCenter(out);
+}
+
+// Cible spécifique au portrait : centre XZ posé sur la surface, avec biais
+// optionnels de debug (rapproche le regard de la surface / du bas du cadre).
+function portraitCameraTarget(
+  frameBox: THREE.Box3,
+  out: THREE.Vector3,
+  debugTuning?: PlayfieldCameraDebugTuning | null,
+): THREE.Vector3 {
+  out.x = (frameBox.min.x + frameBox.max.x) * 0.5;
+  out.z = (frameBox.min.z + frameBox.max.z) * 0.5;
+  out.y = surfaceYAtZ(out.z);
+
+  const lookY = debugTuning?.lookYBias ?? PLAYFIELD_PORTRAIT_LOOK_Y_BIAS;
+  const lookZ = debugTuning?.lookZBias ?? PLAYFIELD_PORTRAIT_LOOK_Z_BIAS;
+  if (lookY > 0) {
+    out.y = THREE.MathUtils.lerp(out.y, PLAYFIELD_SURFACE_Y, lookY);
+  }
+  if (lookZ > 0) {
+    out.z = THREE.MathUtils.lerp(out.z, frameBox.max.z, lookZ);
+  }
+  return out;
+}
+
+const PLAYFIELD_VIEW_MODE_STRATEGIES: Record<PlayfieldViewMode, PlayfieldViewModeStrategy> = {
+  'portrait-fill': {
+    viewDir: (debugTuning) => portraitViewDirFromTuning(debugTuning),
+    cameraUp: () => PLAYFIELD_PORTRAIT_CAMERA_UP,
+    frameBox: (playfieldRoot) => boundingBoxPortraitFrame(playfieldRoot),
+    computeTarget: (frameBox, out, debugTuning) => portraitCameraTarget(frameBox, out, debugTuning),
+    fillCorners: (frameBox, corners) => {
+      fillPlayfieldFrameFootprintCorners(frameBox, corners);
+    },
+    fit: (camera, fit, target, aspect, debugTuning) =>
+      fitPlayfieldCameraPortraitFill(camera, fit, target, aspect, debugTuning),
+  },
+  legacy: {
+    viewDir: () => PLAYFIELD_VIEW_DIR.clone(),
+    cameraUp: () => LEGACY_CAMERA_UP,
+    frameBox: (playfieldRoot) => boundingBoxPlayableArea(playfieldRoot),
+    computeTarget: (frameBox, out) => legacyCameraTarget(frameBox, out),
+    fillCorners: (frameBox, corners) => {
+      fillPlayfieldBoxCorners(frameBox, corners);
+    },
+    fit: (camera, fit, target) => {
+      if (!(camera instanceof THREE.PerspectiveCamera)) {
+        throw new Error('legacy playfield view requires PerspectiveCamera');
+      }
+      return fitPlayfieldCameraLegacy(camera, fit, target);
+    },
+  },
+};
+
 export function fitPlayfieldCamera(
   camera: PlayfieldCamera,
   fit: PlayfieldCamFit,
@@ -455,13 +528,13 @@ export function fitPlayfieldCamera(
   options?: PlayfieldCameraFitOptions,
   aspect = 1,
 ): number {
-  return fitPlayfieldCameraForMode(
-    options?.viewMode ?? DEFAULT_PLAYFIELD_VIEW_MODE,
+  const viewMode = options?.viewMode ?? DEFAULT_PLAYFIELD_VIEW_MODE;
+  return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].fit(
     camera,
     fit,
     target,
-    options,
     aspect,
+    options?.debugTuning,
   );
 }
 
@@ -480,47 +553,18 @@ export function refitPlayfieldCamera(
   debugTuning?: PlayfieldCameraDebugTuning | null,
   aspect = 1,
 ): PlayfieldCameraRefit {
-  const frameBox =
-    viewMode === 'portrait-fill'
-      ? boundingBoxPortraitFrame(playfieldRoot)
-      : boundingBoxPlayableArea(playfieldRoot);
-  playfieldCameraTargetForMode(viewMode, frameBox, target, debugTuning);
-  if (viewMode === 'portrait-fill') {
-    fillPlayfieldFrameFootprintCorners(frameBox, corners);
-  } else {
-    fillPlayfieldBoxCorners(frameBox, corners);
-  }
-  const dirToCamera =
-    viewMode === 'portrait-fill'
-      ? portraitViewDirFromTuning(debugTuning)
-      : playfieldViewDirForMode(viewMode).clone();
+  const strategy = PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode];
+  const frameBox = strategy.frameBox(playfieldRoot);
+  strategy.computeTarget(frameBox, target, debugTuning);
+  strategy.fillCorners(frameBox, corners);
   const fit: PlayfieldCamFit = {
     target,
-    dirToCamera,
-    cameraUp: playfieldCameraUpForMode(viewMode).clone(),
+    dirToCamera: strategy.viewDir(debugTuning),
+    cameraUp: strategy.cameraUp().clone(),
     corners,
   };
   const distance = fitPlayfieldCamera(camera, fit, target, { viewMode, debugTuning }, aspect);
   return { fit, distance, frameBox };
-}
-
-function fitPlayfieldCameraForMode(
-  viewMode: PlayfieldViewMode,
-  camera: PlayfieldCamera,
-  fit: PlayfieldCamFit,
-  target: THREE.Vector3,
-  options?: PlayfieldCameraFitOptions,
-  aspect = 1,
-): number {
-  switch (viewMode) {
-    case 'portrait-fill':
-      return fitPlayfieldCameraPortraitFill(camera, fit, target, aspect, options?.debugTuning);
-    case 'legacy':
-      if (!(camera instanceof THREE.PerspectiveCamera)) {
-        throw new Error('legacy playfield view requires PerspectiveCamera');
-      }
-      return fitPlayfieldCameraLegacy(camera, fit, target);
-  }
 }
 
 function fitPlayfieldCameraPortraitFill(

@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { createPinballSocket, type PinballSocket } from '@pinball/shared-types/src/socket-client';
 import type {
-  ServerToClientEvents,
-  ClientToServerEvents,
   DmdDisplay,
   ScoreUpdate,
   GameStats,
@@ -12,8 +10,6 @@ import type {
 import { clipShowMs, clipTakeoverMs, type ClipTimings } from '@pinball/shared-types';
 import type { GameEvent, BossDefinition } from '@pinball/game-engine';
 import { getBossById } from '@pinball/game-engine';
-
-type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 interface DisplayPushOpts {
   duration?: number;
@@ -118,9 +114,7 @@ export function useDmdOrchestrator(
   const lastSnapRef = useRef<{ player: string; score: number }>({ player: '', score: 0 });
 
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined;
-    const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling'];
-    socketRef.current = io(url, { transports });
+    socketRef.current = createPinballSocket();
 
     // game:registered → routé au callback (QR de fin de partie). Nettoyé au
     // disconnect du cleanup ci-dessous.
