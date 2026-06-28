@@ -3,8 +3,8 @@ import type { MapManifest, MapState } from '@pinball/shared-types';
 import type { GameEvent } from './GameEvents';
 import type { BossGateContext } from './BossRegistry';
 import type { MapLayout } from './MapLayout';
-import type { PhysicsWorld } from '../infrastructure/PhysicsWorld';
-import type { BallPhysics } from '../infrastructure/BallPhysics';
+import type { IPhysicsWorld } from './IPhysicsWorld';
+import type { IMapBallPhysics  } from './IBallPhysics';
 
 export interface CinematicOpts {
   once?: boolean;
@@ -30,14 +30,14 @@ export interface MapContext {
   /** Racine du GLB chargé (sous laquelle vivent les meshes de la map). */
   root: THREE.Object3D;
   camera: THREE.Camera;
-  physics: PhysicsWorld;
+  physics: IPhysicsWorld;
   layout: MapLayout;
   manifest: MapManifest;
   lighting: MapLighting;
   /** Map handle collider → rôle (pour créer des sensors taggés, ex. portail). */
   colliderMap: Map<number, string>;
   /** Physique de la bille (null tant qu'elle n'est pas créée — dispo en jeu). */
-  readonly ball: BallPhysics | null;
+  readonly ball: IMapBallPhysics | null;
   /** Mesh visuel de la bille (visibilité/scale pendant les transitions). */
   readonly ballMesh: THREE.Object3D | null;
 
