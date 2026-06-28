@@ -9,9 +9,9 @@ import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { worldTopTen, globalStats } from '../use-cases/Leaderboard';
 import { registerScore } from '../use-cases/RegisterScore';
 
-const app = express();
-const httpServer = createServer(app);
-const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer);
+export const app = express();
+export const httpServer = createServer(app);
+export const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer);
 
 const PORT = process.env.PORT || 3001;
 
@@ -45,7 +45,10 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-io.on('connection', (socket) => {
+type SocketLike = Parameters<Parameters<typeof io.on<'connection'>>[1]>[0];
+type IoLike = Pick<typeof io, 'emit' | 'to'>;
+
+export function handleConnection(io: IoLike, socket: SocketLike) {
   const role = (socket.handshake.auth as { role?: string } | undefined)?.role;
   console.log('[server] client connected:', socket.id, 'role=', role ?? 'frontend');
 
@@ -129,8 +132,12 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('[server] client disconnected:', socket.id);
   });
-});
+}
 
-httpServer.listen(PORT, () => {
-  console.log(`[server] listening on port ${PORT}`);
-});
+io.on('connection', (socket) => handleConnection(io, socket));
+
+if (import.meta.main) {
+  httpServer.listen(PORT, () => {
+    console.log(`[server] listening on port ${PORT}`);
+  });
+}
