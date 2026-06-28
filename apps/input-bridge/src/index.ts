@@ -7,7 +7,7 @@ import type {
   ButtonId,
   ButtonAction,
 } from '@pinball/shared-types';
-import { CABINET_BUTTONS } from '@pinball/shared-types';
+import { parseLine } from './parser';
 
 // Lecture série en fs brut + stty (pas de @serialport) : le binding natif
 // serialport appelle uv_default_loop, non supporté par Bun (SIGILL au runtime).
@@ -18,8 +18,6 @@ const MODE = process.env.INPUT_BRIDGE_MODE === 'serial' ? 'serial' : 'mock';
 const SERIAL_PATH = process.env.SERIAL_PATH ?? '/dev/ttyUSB0';
 const SERIAL_BAUD = process.env.SERIAL_BAUD ?? '115200';
 const SERVER_URL = process.env.SERVER_URL ?? 'http://server:3001';
-
-const VALID_BUTTON_IDS: readonly ButtonId[] = CABINET_BUTTONS.map((b) => b.id);
 
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
   transports: ['websocket'],
@@ -43,10 +41,6 @@ socket.on('dev:simulate-button', (data) => {
   console.log('[bridge] dev:simulate-button replayed as', `BTN:${data.id}:${data.action}`);
 });
 
-function isButtonId(value: string): value is ButtonId {
-  return (VALID_BUTTON_IDS as readonly string[]).includes(value);
-}
-
 function emitButton(id: ButtonId, action: ButtonAction) {
   socket.emit('input:button', { id, action });
   console.log('[bridge] emit input:button', id, action);
@@ -63,40 +57,25 @@ function emitSensor(id: string, value: number) {
 }
 
 function handleLine(raw: string) {
-  const line = raw.trim();
-  if (!line) return;
-  const parts = line.split(':');
-  if (parts[0] === 'BTN' && parts.length === 3) {
-    const id = parts[1];
-    const action = parts[2];
-    if (!isButtonId(id)) {
-      console.error('[bridge] parse: unknown button id:', JSON.stringify(line));
+  const parsed = parseLine(raw);
+  if (!parsed) return;
+  switch (parsed.kind) {
+    case 'button':
+      emitButton(parsed.id, parsed.action);
       return;
-    }
-    if (action !== 'DOWN' && action !== 'UP') {
-      console.error('[bridge] parse: invalid btn action:', JSON.stringify(line));
+    case 'tilt':
+      emitTilt();
       return;
-    }
-    emitButton(id, action);
-    return;
-  }
-  if (parts[0] === 'TILT' && parts[1] === 'TRIGGERED' && parts.length === 2) {
-    emitTilt();
-    return;
-  }
-  if (parts[0] === 'SENSOR' && parts.length === 3) {
-    const value = Number(parts[2]);
-    if (Number.isNaN(value)) {
-      console.error('[bridge] parse: invalid sensor value:', JSON.stringify(line));
+    case 'sensor':
+      emitSensor(parsed.id, parsed.value);
       return;
-    }
-    emitSensor(parts[1], value);
-    return;
-  }
-  // Lignes non reconnues (bruit de boot ESP32, etc.) — ignorées hors debug pour
-  // ne pas noyer les logs au démarrage du chip.
-  if (process.env.INPUT_BRIDGE_VERBOSE) {
-    console.error('[bridge] parse: unknown line:', JSON.stringify(line));
+    case 'unknown':
+      // Lignes non reconnues (bruit de boot ESP32, etc.) — ignorées hors debug
+      // pour ne pas noyer les logs au démarrage du chip.
+      if (process.env.INPUT_BRIDGE_VERBOSE) {
+        console.error('[bridge] parse: unknown line:', JSON.stringify(parsed.line));
+      }
+      return;
   }
 }
 
