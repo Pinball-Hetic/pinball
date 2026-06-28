@@ -5,7 +5,8 @@
     "build": "prisma generate && tsc",
     "dev": "bun --watch src/interface/index.ts",
     "lint": "eslint src/**/*.ts",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "test": "bun test src/infrastructure && bun test src/use-cases"
   },
   "dependencies": {
     "@pinball/shared-types": "workspace:*",

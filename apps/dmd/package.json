@@ -5,7 +5,8 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "bun test"
   },
   "dependencies": {
     "@pinball/dmd-core": "workspace:*",
