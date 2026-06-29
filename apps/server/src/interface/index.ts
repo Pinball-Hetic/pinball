@@ -100,18 +100,16 @@ io.on('connection', (socket) => {
 
   socket.on('game:over', async (data) => {
     console.log('[server] game:over', data.player, 'final=', data.finalScore);
-    io.emit('game:over', data); // relay to DMD and backglass
-    // Triggered from /debug: relay only, skip persistence.
+    io.emit('game:over', data);
     if (data.debug === true) {
-      console.log('[server] game:over [debug skip] — no persistence');
+      console.log('[server] game:over [debug skip]');
       return;
     }
     try {
       const registered = await registerScore(data);
-      socket.emit('game:registered', registered); // emit to sender only → QR code
-      io.emit('leaderboard:refresh', await worldTopTen(data.mapId)); // backglass leaderboard for the played map
+      socket.emit('game:registered', registered);
+      io.emit('leaderboard:refresh', await worldTopTen(data.mapId));
     } catch (err) {
-      // Persistence must never block the relay — the game keeps running.
       console.error('[server] game:over persist failed:', err);
     }
   });

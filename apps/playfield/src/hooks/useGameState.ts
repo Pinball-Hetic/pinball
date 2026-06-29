@@ -13,6 +13,12 @@ import {
   onMusicGameOver,
 } from "../audio/pinballAudio";
 import { playfieldToScreenPercent, jitterScreenPoint } from "../utils/playfieldScreen";
+import {
+  computeMultiplier,
+  nextMilestone,
+  generatePlayerName,
+  COMBO_DECAY_MS,
+} from "./gameStateUtils";
 
 export type GameState = "idle" | "playing" | "game_over";
 
@@ -48,45 +54,10 @@ export interface ScoringCallbacks {
   onIdleReset?: () => void;
   onAtmosphereChange?: (alternateWorldActive: boolean) => void;
   onMilestone?: (threshold: number) => void;
-  onBossArmed?: (bossId: BossId) => void; // palier franchi → le nid s'éveille (1×/partie)
+  onBossArmed?: (bossId: BossId) => void; // score threshold crossed → boss awakens (once per game)
   onFeverEnd?: () => void;
 }
 
-const COMBO_DECAY_MS = 2000;
-const MULTIPLIER_THRESHOLDS = [5, 10, 20, 40] as const;
-
-const MILESTONES = [5_000, 15_000, 30_000];
-const MILESTONE_REPEAT_EVERY = 25_000; // au-delà de 50k
-
-// Plus haut seuil de {5k,15k,30k,50k,75k,100k,…} franchi entre prev et next.
-// Marque TOUS les seuils franchis dans `passed` (sinon les seuils intermédiaires
-// non retournés re-déclencheraient au prochain event) et renvoie le plus haut.
-function nextMilestone(prev: number, next: number, passed: Set<number>): number | null {
-  let crossed: number | null = null;
-  const mark = (m: number) => {
-    if (m > prev && m <= next && !passed.has(m)) {
-      passed.add(m);
-      if (crossed === null || m > crossed) crossed = m;
-    }
-  };
-  for (const m of MILESTONES) mark(m);
-  // Répétition tous les 25k au-delà de 50k.
-  for (let m = 50_000; m <= next; m += MILESTONE_REPEAT_EVERY) mark(m);
-  return crossed;
-}
-
-function computeMultiplier(combo: number): number {
-  if (combo < MULTIPLIER_THRESHOLDS[0]) return 1;
-  if (combo < MULTIPLIER_THRESHOLDS[1]) return 2;
-  if (combo < MULTIPLIER_THRESHOLDS[2]) return 3;
-  if (combo < MULTIPLIER_THRESHOLDS[3]) return 4;
-  return 5;
-}
-
-function generatePlayerName(): string {
-  const n = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
-  return `PLAYER${n}`;
-}
 
 const initialBossHudEntry = (): BossHudEntry => ({
   active: false,
@@ -99,13 +70,13 @@ const initialBossHud = (bosses: BossDefinition[]): BossHudState =>
   Object.fromEntries(bosses.map((b) => [b.id, initialBossHudEntry()])) as BossHudState;
 
 export interface GameStateOptions {
-  /** Ancre écran des pop de score portail (depuis layout.sensors.portal). */
+  /** Screen anchor for portal score pops (from layout.sensors.portal). */
   portalAnchor?: { x: number; z: number };
-  /** Ancres écran des pop de score bumper (depuis layout.bumpers). */
+  /** Screen anchors for bumper score pops (from layout.bumpers). */
   bumperAnchors?: { x: number; z: number }[];
-  /** Délai avant le hint d'atmosphère (depuis layout.atmosphere.hintMs). */
+  /** Delay before the atmosphere hint disappears (from layout.atmosphere.hintMs). */
   atmosphereHintMs?: number;
-  /** Définitions de boss de la map active (layout.bosses). */
+  /** Boss definitions for the active map (layout.bosses). */
   bosses?: BossDefinition[];
 }
 
@@ -115,9 +86,9 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
   const atmosphereHintMs = opts?.atmosphereHintMs ?? 45_000;
   const bosses = opts?.bosses ?? [];
   const bossIds = bosses.map((b) => b.id);
-  // `callbacks` est un objet littéral recréé à chaque render → on le lit via
-  // un ref pour ne PAS remettre l'interval 250ms (decay combo + expiration
-  // fever) à zéro à chaque render (sinon il pourrait ne jamais se déclencher).
+  // `callbacks` is a literal object recreated on every render → read via a ref
+  // to avoid resetting the 250ms interval (combo decay + fever expiration)
+  // on every render, which could prevent it from ever firing.
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
 
@@ -147,8 +118,8 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
   const lastEventTimeRef = useRef(0);
   const playerRef = useRef(player);
   const victoryTimersRef = useRef<Partial<Record<BossId, number>>>({});
-  // Timer du flash d'assist (générique : le boss propriétaire est déduit de
-  // sa def via `assist`). Un seul assist actif à la fois.
+  // Assist flash timer (generic: the owning boss is derived from its def via `assist`).
+  // Only one assist can be active at a time.
   const assistTimerRef = useRef<number | null>(null);
   const scorePopIdRef = useRef(0);
   const scorePopTimersRef = useRef<Map<number, number>>(new Map());
@@ -173,7 +144,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         setCombo(0);
         setMultiplier(1);
       }
-      // Expiration du fever
+      // Fever expiration
       if (feverUntilRef.current && performance.now() > feverUntilRef.current) {
         feverUntilRef.current = 0;
         setFever(false);
@@ -223,7 +194,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       window.clearTimeout(timer);
       delete victoryTimersRef.current[id];
     }
-    // Annule le flash d'assist si CE boss en possède un (plus de nom en dur).
+    // Cancel the assist flash if this boss owns one (no hardcoded name).
     const def = getBossById(bosses, id);
     if (def?.assist && assistTimerRef.current !== null) {
       window.clearTimeout(assistTimerRef.current);
@@ -240,9 +211,9 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
 
   const clearAlternateWorldSession = useCallback(() => {
     clearAlternateWorldHint();
-    // Boss liés au monde alternatif (reveal gaté requiresAlternateWorld) : reset
-    // HUD + ré-armement, sans nom en dur. Ils se ré-annoncent à la prochaine
-    // entrée dans le monde alternatif.
+    // Bosses tied to the alternate world (reveal gated by requiresAlternateWorld):
+    // reset HUD + re-arm without hardcoded names. They re-announce on the next
+    // alternate world entry.
     for (const def of bosses) {
       if (!def.reveal.requiresAlternateWorld) continue;
       clearBossHud(def.id);
@@ -284,8 +255,8 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       const stats: GameStats = {
         maxCombo: maxComboRef.current,
         maxMultiplier: maxMultiplierRef.current,
-        // Counters remplis par PinballPlayfield depuis le mapState (alimenté par
-        // le module de map). useGameState ne compte plus rien de ST.
+        // Counters are filled by PinballPlayfield from mapState (fed by the map module).
+        // useGameState no longer tracks any map-specific counters.
         counters: {},
         durationS: gameStartRef.current
           ? Math.round((performance.now() - gameStartRef.current) / 1000)
@@ -342,8 +313,8 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
           maxMultiplierRef.current,
           multiplierRef.current,
         );
-        // En fever le multiplier effectif est forcé à 5 (combo continue
-        // de compter en arrière-plan).
+        // During fever the effective multiplier is forced to 5 (combo keeps
+        // counting in the background).
         const mult = isFeverActive() ? 5 : multiplierRef.current;
         const finalPoints = event.scoreIncrement * mult;
         const prevScore = scoreRef.current;
@@ -359,13 +330,13 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
           newMultiplier: multiplierRef.current,
         });
 
-        // Paliers de score (nextMilestone marque déjà tous les seuils franchis)
+        // Score milestones (nextMilestone already records all crossed thresholds)
         const crossed = nextMilestone(prevScore, scoreRef.current, milestonesPassedRef.current);
         if (crossed) callbacks?.onMilestone?.(crossed);
 
-        // Éveil du nid : palier de boss franchi → onBossArmed une fois par partie.
-        // Le set garde l'unicité ; le gate monde alternatif/baseline est porté par
-        // bossThresholdMet (générique pour tout boss, gate monde alternatif inclus).
+        // Boss awakening: threshold crossed → onBossArmed fires once per game.
+        // The set ensures uniqueness; the alternate-world/baseline gate is handled
+        // by bossThresholdMet (generic for all bosses, including world gate).
         for (const id of bossIds) {
           if (bossArmedFiredRef.current.has(id)) continue;
           const def = getBossById(bosses, id); if (!def) continue;
@@ -408,7 +379,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
           tone: "target",
         });
         const victory = event.hitCount >= def.targetHits;
-        // Compteur "boss vaincus" : tenu par le module de map (mapState).
+        // "Bosses defeated" counter: tracked by the map module (mapState).
         setBossHud((prev) => ({
           ...prev,
           [event.bossId]: {
@@ -450,7 +421,7 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         }));
       }
       if (event.type === "ASSIST") {
-        // Boss propriétaire de l'assist déduit de sa def (assist.id), pas en dur.
+        // Owning boss is derived from its def (assist.id), not hardcoded.
         const assistBoss = bosses.find((b) => b.assist?.id === event.assistId);
         if (assistBoss) {
           const bossId = assistBoss.id;
@@ -481,15 +452,14 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
           clearAllBossHud();
         }
       }
-      // DROP_TARGET_COMPLETE (compteur de collecte + cinématiques) : géré par
-      // le module de map.
+      // DROP_TARGET_COMPLETE (collection counter + cinematics): handled by the map module.
       if (event.type === "BALL_LAUNCHED") {
         if (gameStartRef.current === 0) gameStartRef.current = now;
         if (gameStateRef.current === "idle") callbacks?.onGameStart?.();
         updateGameState("playing");
       }
       if (event.type === "PORTAL_ENTER") {
-        // Compteur "portals" : tenu par le module de map (mapState).
+        // "Portals" counter: tracked by the map module (mapState).
         const point = jitterScreenPoint(
           playfieldToScreenPercent(portalAnchor.x, portalAnchor.z),
           3,
