@@ -17,8 +17,6 @@ const PORT = process.env.PORT || 3001;
 
 const INPUT_BRIDGE_ROOM = 'input-bridge';
 
-// SRP : l'état applicatif est encapsulé dans GameStateManager
-// au lieu d'un `let currentMapId` global mutable.
 const gameState = new GameStateManager();
 
 app.get('/', (req, res) => {
@@ -54,8 +52,8 @@ io.on('connection', (socket) => {
     console.log('[server] input-bridge joined room');
   }
 
-  // Informer le nouveau connecté de la map courante (DMD/backglass synchro au
-  // démarrage, même si aucun `map:select` n'a encore été émis).
+  // Sync the newly connected client with the current map so DMD/backglass
+  // are up to date even if no `map:select` has been emitted yet.
   socket.emit('map:selected', { mapId: gameState.getMapId() });
 
   socket.on('map:select', ({ mapId }) => {
@@ -80,9 +78,9 @@ io.on('connection', (socket) => {
     io.emit('input:sensor', data);
   });
 
-  // Mode dev `simulate-esp32` : route ciblé vers l'input-bridge. C'est
-  // l'input-bridge qui injectera le texte sur son port mock, son parser
-  // relira, et émettra `input:button` au server → broadcast à tous.
+  // Dev `simulate-esp32` mode: route the event to the input-bridge room only.
+  // The input-bridge injects the raw protocol line into its mock port, its parser
+  // re-reads it and emits `input:button` back to the server, which broadcasts to all.
   socket.on('dev:simulate-button', (data) => {
     console.log('[server] dev:simulate-button', data.id, data.action, '→ input-bridge');
     io.to(INPUT_BRIDGE_ROOM).emit('dev:simulate-button', data);
@@ -100,18 +98,18 @@ io.on('connection', (socket) => {
 
   socket.on('game:over', async (data) => {
     console.log('[server] game:over', data.player, 'final=', data.finalScore);
-    io.emit('game:over', data); // relay inchangé (DMD, backglass)
-    // Game over déclenché depuis /debug : relay seul, pas de persistence.
+    io.emit('game:over', data); // relay to DMD and backglass
+    // Triggered from /debug: relay only, skip persistence.
     if (data.debug === true) {
-      console.log('[server] game:over [debug skip] — pas de persistence');
+      console.log('[server] game:over [debug skip] — no persistence');
       return;
     }
     try {
       const registered = await registerScore(data);
-      socket.emit('game:registered', registered); // au seul émetteur → QR
-      io.emit('leaderboard:refresh', await worldTopTen(data.mapId)); // backglass (board de la map jouée)
+      socket.emit('game:registered', registered); // emit to sender only → QR code
+      io.emit('leaderboard:refresh', await worldTopTen(data.mapId)); // backglass leaderboard for played map
     } catch (err) {
-      // le jeu continue — la persistence ne doit JAMAIS bloquer le relay
+      // Persistence must never block the relay — the game keeps running.
       console.error('[server] game:over persist failed:', err);
     }
   });
