@@ -23,8 +23,13 @@ export type AttractRenderer = (
 ) => void;
 
 export interface DmdMapContent {
+  /** Palette normale de la map (remplace PALETTE_NORMAL du moteur si fournie).
+   *  Permet à chaque map d'avoir ses propres couleurs de dots par défaut. */
+  paletteNormal?: Record<DotColor, string>;
   /** Palette alternative appliquée quand display.alternateWorld. */
   paletteAlternateWorld?: Record<DotColor, string>;
+  /** Couleur du bandeau NeonBand (haut/bas de l'écran DMD). Défaut : rouge ST. */
+  neonColor?: string;
   /** Handlers de cinématiques par clipId (priment sur les défauts du moteur). */
   cinematicHandlers?: Record<string, ClipHandler>;
   /** Overlay dessiné par-dessus le mode SCORE (ex. rangée HETIC). */

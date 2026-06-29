@@ -37,6 +37,8 @@ export class PlayfieldMusicDirector {
   private suppressEarlyUntilReset = false;
 
   private postVictoryMusicHeld = false;
+  /** Musique monde alternatif en cours (sacred-realm, etc.) sur le bus boss. */
+  private alternateWorldMusicActive = false;
 
   constructor(
     private readonly early: EarlySoundController,
@@ -91,6 +93,7 @@ export class PlayfieldMusicDirector {
     this.bossFightEnded = true;
     this.latePhaseActivated = false;
     this.postVictoryMusicHeld = false;
+    this.alternateWorldMusicActive = false;
     this.clearBridge();
   }
 
@@ -103,13 +106,32 @@ export class PlayfieldMusicDirector {
     };
   }
 
+  /** Musique monde alternatif (boucle gapless sur le bus boss). */
+  onAlternateWorldEnter(url: string, volume: number): void {
+    this.early.stopInstant();
+    this.alternateWorldMusicActive = true;
+    void this.boss.start(url, volume);
+  }
+
+  /** Fin du monde alternatif sans combat boss — reprend l'early-sound. */
+  onAlternateWorldExit(): void {
+    if (!this.alternateWorldMusicActive) return;
+    this.alternateWorldMusicActive = false;
+    this.boss.stopInstant();
+    this.early.clearHandoffBlock();
+    this.requestEarly();
+  }
+
   onBossReveal(def: BossDefinition): void {
+    this.alternateWorldMusicActive = false; // boss music prend le relais
     this.clearBridge();
     this.bossFightEnded = false;
     this.latePhaseActivated = false;
-    this.haltEarlyForBossHandoff();
 
+    // Pas de musique de combat → early-sound continue pendant le fight.
     if (!def.revealSoundUrl) return;
+
+    this.haltEarlyForBossHandoff();
 
     const url = def.revealSoundUrl;
     const volume = percentToGain(def.revealSoundVolume ?? 100);
@@ -156,15 +178,17 @@ export class PlayfieldMusicDirector {
       return;
     }
 
-    // Boss déclarant keepMusicUntilReturnPortal : la musique en cours continue
-    // jusqu'à la fin de la cinématique retour portail (cf. contrat BossDefinition,
-    // déclaré côté map — aucun id de boss en dur ici).
-    if (
-      def?.keepMusicUntilReturnPortal &&
-      this.boss.isPlaying()
-    ) {
+    // Boss déclarant keepMusicUntilReturnPortal : la musique continue jusqu'à
+    // RETURN_PORTAL_TRANSITION_END. Si victoryMusicUrl est défini, on bascule
+    // vers cette musique dès la victoire au lieu de conserver la musique de combat.
+    if (def?.keepMusicUntilReturnPortal && this.boss.isPlaying()) {
       this.bossFightEnded = true;
       this.postVictoryMusicHeld = true;
+      if (def.victoryMusicUrl) {
+        const url    = def.victoryMusicUrl;
+        const volume = percentToGain(def.victoryMusicVolume ?? 100);
+        void this.boss.start(url, volume);
+      }
       return;
     }
 

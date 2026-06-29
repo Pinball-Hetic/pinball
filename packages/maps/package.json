@@ -18,7 +18,8 @@
     "@pinball/shared-types": "workspace:*",
     "@pinball/game-engine": "workspace:*",
     "@pinball/dmd-core": "workspace:*",
-    "@pinball/map-strangerthings": "workspace:*"
+    "@pinball/map-strangerthings": "workspace:*",
+    "@pinball/map-zelda": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.2.4"

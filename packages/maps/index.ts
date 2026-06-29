@@ -5,6 +5,11 @@ import {
   layout as stLayout,
   createModule as stCreateModule,
 } from '@pinball/map-strangerthings'
+import {
+  mapPackage as zeldaPackage,
+  layout as zeldaLayout,
+  createModule as zeldaCreateModule,
+} from '@pinball/map-zelda'
 
 // Le layout + le module (types game-engine) ne peuvent pas vivre sur
 // MapPackage (shared-types ne dépend pas de game-engine). Le registry — qui,
@@ -21,7 +26,36 @@ export function getMapPackage(id: string): ResolvedMap | null {
   switch (id) {
     case 'strangerthings':
       return { ...stPackage, layout: stLayout, module: stCreateModule }
+    case 'zelda':
+      return { ...zeldaPackage, layout: zeldaLayout, module: zeldaCreateModule }
     default:
       return null
   }
 }
+
+/** Métadonnées légères pour le sélecteur de map (pas de layout ni module). */
+export interface MapMeta {
+  id: string
+  name: string
+  tagline: string
+  accentColor: string
+  /** URL publique de la vidéo de prévisualisation (loop dans la card). */
+  previewVideo?: string
+}
+
+export const AVAILABLE_MAPS: MapMeta[] = [
+  {
+    id: 'strangerthings',
+    name: 'Stranger Things',
+    tagline: 'Hawkins, Indiana',
+    accentColor: '#e53935',
+    previewVideo: '/map-previews/strangerthings.mp4',
+  },
+  {
+    id: 'zelda',
+    name: 'The Legend of Zelda',
+    tagline: 'Hyrule Kingdom',
+    accentColor: '#FFD700',
+    previewVideo: '/map-previews/zelda.mp4',
+  },
+]

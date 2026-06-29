@@ -1,8 +1,10 @@
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
-import { getMapPackage } from '@pinball/maps';
+import { useCallback, useState } from 'react';
+import { createPinballSocket } from '@pinball/shared-types/src/socket-client';
+import { getMapPackage, AVAILABLE_MAPS } from '@pinball/maps';
 import { parsePlayfieldViewMode } from '@pinball/game-engine';
-import { DEFAULT_MAP_ID } from '@pinball/shared-types';
+import { MapSelectorScreen } from '@/components/pinball/MapSelectorScreen';
 import '@/audio/pinballAudio';
 
 const PinballPlayfield = dynamic(
@@ -10,13 +12,10 @@ const PinballPlayfield = dynamic(
   { ssr: false },
 );
 
-const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
-const PRELOAD = getMapPackage(MAP_ID)?.manifest.preload ?? [];
 const PORTRAIT_FILL =
   parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE) === 'portrait-fill';
 const PORTRAIT_VIEWPORT =
   'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover';
-
 // Type de ressource <link rel=preload> inféré depuis l'extension.
 function preloadAs(path: string): string {
   if (/\.(glb|gltf|bin)$/i.test(path)) return 'fetch';
@@ -25,7 +24,35 @@ function preloadAs(path: string): string {
   return 'fetch';
 }
 
+// Si NEXT_PUBLIC_MAP_ID est défini (ex: prod Fliphetic mono-map), on bypasse
+// le sélecteur et on charge directement cette map.
+const FORCED_MAP_ID = process.env.NEXT_PUBLIC_MAP_ID;
+
 export default function PinballPage() {
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(
+    FORCED_MAP_ID ?? null,
+  );
+
+  // Émet map:select au server (→ broadcast aux DMD/backglass) puis met à jour
+  // l'état local. Connexion socket éphémère : crée, émet, déconnecte.
+  const handleSelect = useCallback((mapId: string) => {
+    const socket = createPinballSocket();
+    socket.once('connect', () => {
+      socket.emit('map:select', { mapId });
+      socket.disconnect();
+    });
+    setSelectedMapId(mapId);
+  }, []);
+
+  const preload = selectedMapId
+    ? (getMapPackage(selectedMapId)?.manifest.preload ?? [])
+    : [];
+
+  // Sélecteur de map — affiché si aucune map forcée et aucune map choisie.
+  if (!selectedMapId) {
+    return <MapSelectorScreen maps={AVAILABLE_MAPS} onSelect={handleSelect} />;
+  }
+
   return (
     <>
       <Head>
@@ -34,11 +61,16 @@ export default function PinballPage() {
           content={PORTRAIT_FILL ? PORTRAIT_VIEWPORT : 'width=device-width, initial-scale=1'}
         />
         <link rel="preload" href="/audio/early-sound.mp3" as="audio" type="audio/mpeg" />
-        {PRELOAD.map((p) => (
+        {preload.map((p) => (
           <link key={p} rel="preload" href={p} as={preloadAs(p)} />
         ))}
       </Head>
-      <PinballPlayfield />
+      {/*
+        key={selectedMapId} → remonte complètement le composant si on change
+        de map (ex: retour menu + nouvelle sélection). Garantit que le moteur
+        physique, les loaders Three.js et les refs internes repartent à zéro.
+      */}
+      <PinballPlayfield key={selectedMapId} mapId={selectedMapId} />
     </>
   );
 }

@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { io, type Socket } from 'socket.io-client'
+import { createPinballSocket, type PinballSocket } from '@pinball/shared-types/src/socket-client'
 import type {
-  ClientToServerEvents,
-  ServerToClientEvents,
   DevGameEventTrigger,
   DmdDisplay,
   GameStats,
@@ -11,8 +9,6 @@ import type {
 } from '@pinball/shared-types'
 import { DEFAULT_MAP_ID } from '@pinball/shared-types'
 import { getMapPackage } from '@pinball/maps'
-
-type PinballSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
 // Map active : le debug est data-driven (boutons boss + clips depuis la map).
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID
@@ -54,9 +50,7 @@ export default function DebugPage() {
   udRef.current = ud
 
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || undefined
-    const transports: ('polling' | 'websocket')[] = url ? ['websocket'] : ['polling']
-    const socket: PinballSocket = io(url, { transports })
+    const socket: PinballSocket = createPinballSocket()
     socketRef.current = socket
     socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
