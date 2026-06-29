@@ -1,6 +1,8 @@
 import RAPIER from "@dimforge/rapier3d-compat";
+import type { IPhysicsWorld } from '../domain/IPhysicsWorld';
 
-export class PhysicsWorld {
+
+export class PhysicsWorld implements IPhysicsWorld {
   public readonly world: RAPIER.World;
   public readonly eventQueue: RAPIER.EventQueue;
 
