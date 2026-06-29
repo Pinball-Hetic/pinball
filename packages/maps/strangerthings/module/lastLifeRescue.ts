@@ -3,7 +3,23 @@ import { grantExtraLife } from './lifeBonus'
 
 export const LAST_LIFE_RESCUE_POINTS = 3000
 
-export function createLastLifeRescue() {
+export type RescueStatus = {
+  armed: boolean
+  pointsRemaining: number
+}
+
+export type LastLifeRescue = {
+  reset(): void
+  onGameEvent(ctx: MapContext, e: GameEvent): void
+  isArmed(): boolean
+  status(ctx: MapContext): RescueStatus
+}
+
+function isScoringEvent(e: GameEvent): e is GameEvent & { scoreIncrement: number } {
+  return 'scoreIncrement' in e && !!e.scoreIncrement
+}
+
+export function createLastLifeRescue(): LastLifeRescue {
   let active = false
   let scoreBaseline = 0
 
@@ -17,6 +33,13 @@ export function createLastLifeRescue() {
     scoreBaseline = ctx.totalScore()
     ctx.pushDmdEvent('3000 PTS = VIE', 0)
   }
+
+  const status = (ctx: MapContext): RescueStatus => ({
+    armed: active,
+    pointsRemaining: active
+      ? Math.max(0, LAST_LIFE_RESCUE_POINTS - (ctx.totalScore() - scoreBaseline))
+      : LAST_LIFE_RESCUE_POINTS,
+  })
 
   const onGameEvent = (ctx: MapContext, e: GameEvent) => {
     if (e.type === 'DRAIN' || e.type === 'BOTTOM_OUT') {
@@ -33,7 +56,7 @@ export function createLastLifeRescue() {
       return
     }
 
-    if (!('scoreIncrement' in e) || !e.scoreIncrement) return
+    if (!isScoringEvent(e)) return
 
     if (!active) arm(ctx)
 
@@ -43,5 +66,5 @@ export function createLastLifeRescue() {
     }
   }
 
-  return { reset: disarm, onGameEvent }
+  return { reset: disarm, onGameEvent, isArmed: () => active, status }
 }
