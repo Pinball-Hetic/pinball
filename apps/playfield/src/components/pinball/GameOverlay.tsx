@@ -174,7 +174,7 @@ export default function GameOverlay({
         <header className={layout.header}>
           <div className="font-mono space-y-1.5">
             <div className={`flex gap-1.5 ${layout.livesSize}`}>
-              {Array.from({ length: initialLives }).map((_, i) => (
+              {Array.from({ length: Math.max(lives, initialLives) }).map((_, i) => (
                 <span
                   key={i}
                   className="transition-opacity duration-300"

@@ -78,6 +78,10 @@ export interface MapContext {
 
   /** Ajoute du score (+ label DMD optionnel) via le scoring du jeu. */
   addScore(points: number, label?: string): void;
+  /** Accorde une vie supplémentaire (règles décidées par la map). */
+  addLife(): void;
+  lives(): number;
+  totalScore(): number;
 
   /** Patche le sac d'état de la map → propagé dans les snapshots. */
   setMapState(patch: MapState): void;

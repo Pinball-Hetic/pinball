@@ -18,7 +18,7 @@ export const bossDefinitions: BossDefinition[] = [
     targetHits: 5,
     scoreTargetHit: 250,
     reveal: {
-      scoreThreshold: 3000,
+      scoreThreshold: 8000,
       scoreIncrement: 150,
       requiresAlternateWorld: false,
     },
@@ -86,7 +86,7 @@ export const bossDefinitions: BossDefinition[] = [
     targetHits: 10,
     scoreTargetHit: 300,
     reveal: {
-      scoreThreshold: 3000,
+      scoreThreshold: 8000,
       scoreIncrement: 200,
       requiresAlternateWorld: true,
     },
