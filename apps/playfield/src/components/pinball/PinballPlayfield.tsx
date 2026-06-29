@@ -354,6 +354,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     clearAlternateWorldSession,
     resetGame,
     buildEmit,
+    addLife,
   } = useGameState({
     onScoreEvent: ({ event, finalPoints, previousMultiplier, newMultiplier }) => {
       const snap = {
@@ -974,6 +975,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
               collisionProcessor?.isBossTriggered(bossId as BossId) ?? false,
             addScore: (points, label) =>
               emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
+            addLife: () => addLife(),
+            lives: () => livesRef.current,
+            totalScore: () => scoreRef.current,
             setMapState: (patch) => {
               Object.assign(mapStateExtraRef.current, patch);
             },
