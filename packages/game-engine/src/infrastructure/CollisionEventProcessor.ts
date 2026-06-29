@@ -135,11 +135,16 @@ export class CollisionEventProcessor {
     private readonly emit: GameEventListener,
   ) {
     this.bossFights = new BossFightManager(emit, layout.bosses);
+
+    // Index des bosses par rôle de collider pour une lookup O(1) dans process().
     for (const b of layout.bosses) this.bossByRole.set(b.colliderRole, b);
 
+    // Handlers conservés en propriété car exposés publiquement (reset, état).
     this.dropTargetHandler = new DropTargetCollisionHandler(emit, layout);
     this.portalHandler = new PortalCollisionHandler(emit, () => this.alternateWorldActive);
 
+    // Registre de handlers — ordre de déclaration = priorité de dispatch.
+    // Le premier handler dont canHandle() retourne true prend en charge la collision.
     this.handlers = [
       new BumperCollisionHandler(this.pendingPhysics, bumperHitUC, layout),
       new BumpCollisionHandler(this.pendingPhysics, bumpHitUC),
@@ -163,9 +168,11 @@ export class CollisionEventProcessor {
 
   process(eventQueue: RAPIER.EventQueue, gameState: string): void {
     eventQueue.drainCollisionEvents((h1, h2, started) => {
+      // Résolution du rôle : l'un des deux handles de la paire est la balle.
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
 
+      // --- Gestion des bosses (prioritaire sur les handlers génériques) ---
       const boss = this.bossByRole.get(role);
       if (
         boss
@@ -176,6 +183,7 @@ export class CollisionEventProcessor {
       ) {
         const ctx = this.gateContext();
         if (!bossThresholdMet(boss, ctx)) {
+          // Anti-spam : on ne réémet pas BOSS_LOCKED_HIT plus d'une fois par 2 s.
           const now = performance.now();
           if (now - (this.lockedHitLastMs[boss.id] ?? 0) >= 2000) {
             this.lockedHitLastMs[boss.id] = now;
@@ -188,11 +196,12 @@ export class CollisionEventProcessor {
         }
       }
 
+      // Si le boss fight consomme l'événement, on court-circuite les handlers.
       if (this.bossFights.handleTargetCollision(role, started, gameState)) {
         return;
       }
 
-      // Toute la cascade de if remplacée par deux lignes
+      // Dispatch vers le handler enregistré pour ce rôle.
       const handler = this.handlers.find(h => h.canHandle(role));
       handler?.handle(role, gameState, started);
     });
