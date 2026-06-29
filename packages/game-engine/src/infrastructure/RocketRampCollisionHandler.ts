@@ -3,10 +3,10 @@ import { SCORE_RAMP } from '../domain/ScoringConstants';
 import type { CollisionHandler } from './CollisionHandler';
 
 /**
- * Gère la collision avec la rampe fusée (rôle : 'rocket_ramp').
+ * Handles the collision with the rocket ramp (role: 'rocket_ramp').
  *
- * Émet RAMP_HIT à chaque début de contact. La rampe n'a pas de cooldown
- * car sa géométrie ne génère qu'un seul événement 'started' par passage.
+ * Emits RAMP_HIT on each contact start. No cooldown is needed because
+ * the ramp geometry generates only one 'started' event per pass.
  */
 export class RocketRampCollisionHandler implements CollisionHandler {
   constructor(

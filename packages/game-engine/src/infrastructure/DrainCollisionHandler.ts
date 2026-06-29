@@ -2,11 +2,11 @@ import type { CollisionHandler } from './CollisionHandler';
 import type { DrainBall } from '../use-cases/DrainBall';
 
 /**
- * Gère la collision avec le drain (rôle : 'drain').
+ * Handles the collision with the drain (role: 'drain').
  *
- * Réinitialise les drop targets en même temps que la bille est drainée
- * pour remettre le terrain dans un état cohérent pour la prochaine bille.
- * L'exécution est différée dans pendingPhysics (interdit de modifier Rapier mid-step).
+ * Drop targets are reset alongside the ball drain to keep the playfield
+ * in a consistent state for the next ball.
+ * Execution is deferred via pendingPhysics (mutating Rapier mid-step is forbidden).
  */
 export class DrainCollisionHandler implements CollisionHandler {
   constructor(

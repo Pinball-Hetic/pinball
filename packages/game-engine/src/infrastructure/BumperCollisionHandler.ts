@@ -3,11 +3,10 @@ import type { BumperHit } from '../use-cases/BumperHit';
 import type { MapLayout } from '../domain/MapLayout';
 
 /**
- * Gère les collisions avec les bumpers (rôle : 'bumper_<index>').
+ * Handles collisions with bumpers (role: 'bumper_<index>').
  *
- * L'exécution du use-case est différée dans pendingPhysics pour éviter
- * de modifier l'état Rapier depuis un callback de drainCollisionEvents
- * (interdit mid-step).
+ * Use-case execution is deferred via pendingPhysics to avoid mutating
+ * Rapier state from inside a drainCollisionEvents callback (forbidden mid-step).
  */
 export class BumperCollisionHandler implements CollisionHandler {
   constructor(
@@ -22,7 +21,7 @@ export class BumperCollisionHandler implements CollisionHandler {
 
   handle(role: string, gameState: string, started: boolean): void {
     if (!started) return;
-    // L'index du bumper est encodé dans le rôle GLB (ex. 'bumper_2' → idx 2).
+    // The bumper index is encoded in the GLB role (e.g. 'bumper_2' → idx 2).
     const idx = parseInt(role.split('_')[1], 10);
     const pos = this.layout.bumpers[idx];
     if (pos) {

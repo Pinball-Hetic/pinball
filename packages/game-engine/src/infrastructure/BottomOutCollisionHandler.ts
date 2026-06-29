@@ -2,12 +2,12 @@ import type { CollisionHandler } from './CollisionHandler';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
 
 /**
- * Gère la collision avec le fond du terrain (rôle : 'bottom_out').
+ * Handles the collision with the playfield floor (role: 'bottom_out').
  *
- * Distinct du drain : bottom_out est déclenché quand la bille sort par le bas
- * sans passer par le couloir de drain (bille hors-terrain). Le use-case
- * BottomOutBall remet la bille en jeu sans décrémenter les vies.
- * L'exécution est différée dans pendingPhysics (interdit de modifier Rapier mid-step).
+ * Distinct from drain: bottom_out fires when the ball leaves the playfield
+ * without going through the drain channel (out-of-bounds ball).
+ * Unlike drain, BottomOutBall respawns the ball without decrementing lives.
+ * Execution is deferred via pendingPhysics (mutating Rapier mid-step is forbidden).
  */
 export class BottomOutCollisionHandler implements CollisionHandler {
   constructor(

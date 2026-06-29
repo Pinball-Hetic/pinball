@@ -3,13 +3,13 @@ import type { BumpHit } from '../use-cases/BumpHit';
 import { BUMP_HIT_COOLDOWN_MS, BUMP_EJECT_SCALE } from '../domain/Ball';
 
 /**
- * Gère les collisions avec les bumps latéraux (rôles : 'bump_left', 'bump_right').
+ * Handles collisions with side bumps (roles: 'bump_left', 'bump_right').
  *
- * Un cooldown par côté évite de déclencher plusieurs éjections consécutives
- * lors d'un même contact prolongé (Rapier peut émettre plusieurs événements start).
+ * A per-side cooldown prevents multiple consecutive ejections during a single
+ * prolonged contact (Rapier may emit several 'started' events in a row).
  */
 export class BumpCollisionHandler implements CollisionHandler {
-  // Timestamp du dernier hit par côté, pour le cooldown anti-spam.
+  // Timestamp of the last hit per side, used for the anti-spam cooldown.
   private bumpLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
 
   constructor(

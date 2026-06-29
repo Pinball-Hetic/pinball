@@ -4,19 +4,19 @@ import type { MapLayout } from '../domain/MapLayout';
 import { SCORE_DROP_TARGET, SCORE_DROP_COMPLETE } from '../domain/ScoringConstants';
 
 /**
- * Gère les collisions avec les drop targets (rôle : 'drop_<id>').
+ * Handles collisions with drop targets (role: 'drop_<id>').
  *
- * Machine à états simple par target :
- *   relevé (false) → abattu (true) après le premier contact.
+ * Simple per-target state machine:
+ *   up (false) → down (true) on first contact.
  *
- * Quand tous les targets d'un même côté sont abattus, émet DROP_TARGET_COMPLETE
- * et remet le côté à zéro (les targets se relèvent).
+ * When all targets on the same side are down, emits DROP_TARGET_COMPLETE
+ * and resets the side (targets come back up).
  *
- * Note : le préfixe 'drop_target' est réservé aux colliders visuels/GLB
- * (non interactifs) ; seuls les rôles 'drop_<id>' déclenchent des points.
+ * Note: the 'drop_target' prefix is reserved for visual/GLB colliders
+ * (non-interactive); only 'drop_<id>' roles award points.
  */
 export class DropTargetCollisionHandler implements CollisionHandler {
-  // État courant de chaque drop target : true = abattu, false = relevé.
+  // Current state of each drop target: true = down, false = up.
   private dropTargetDown: Record<string, boolean> = {};
 
   constructor(
@@ -29,19 +29,19 @@ export class DropTargetCollisionHandler implements CollisionHandler {
   }
 
   canHandle(role: string): boolean {
-    // Exclut 'drop_target*' (colliders GLB non interactifs).
+    // Exclude 'drop_target*' (non-interactive GLB colliders).
     return role.startsWith('drop_') && !role.startsWith('drop_target');
   }
 
   handle(role: string, gameState: string, started: boolean): void {
     if (!started || gameState !== 'playing') return;
-    // Idempotent : un target déjà abattu ne donne plus de points.
+    // Idempotent: an already-down target awards no further points.
     if (this.dropTargetDown[role]) return;
 
     this.dropTargetDown[role] = true;
     this.emit({ type: 'DROP_TARGET_HIT', targetId: role, scoreIncrement: SCORE_DROP_TARGET });
 
-    // Vérifie si tous les targets du même côté sont abattus.
+    // Check whether all targets on the same side are now down.
     const target = this.layout.dropTargets.find((t) => t.id === role);
     if (!target) return;
 
@@ -49,12 +49,12 @@ export class DropTargetCollisionHandler implements CollisionHandler {
     const allDown = sideTargets.every((t) => this.dropTargetDown[t.id]);
     if (!allDown) return;
 
-    // Combo complet : bonus + reset du côté.
+    // Full combo: award bonus and reset the side.
     this.emit({ type: 'DROP_TARGET_COMPLETE', side: target.side, scoreIncrement: SCORE_DROP_COMPLETE });
     for (const t of sideTargets) this.dropTargetDown[t.id] = false;
   }
 
-  /** Remet tous les drop targets à l'état relevé (appelé au drain/bottom_out). */
+  /** Resets all drop targets to the up state (called on drain / bottom_out). */
   resetDropTargets(): void {
     for (const dt of this.layout.dropTargets) this.dropTargetDown[dt.id] = false;
     this.emit({ type: 'DROP_TARGET_RESET' });

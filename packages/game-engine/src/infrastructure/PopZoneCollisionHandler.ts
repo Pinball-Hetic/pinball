@@ -3,11 +3,11 @@ import { SCORE_POP_ZONE } from '../domain/ScoringConstants';
 import type { CollisionHandler } from './CollisionHandler';
 
 /**
- * Gère les collisions avec les pop zones (rôle : 'pop_zone_<id>').
+ * Handles collisions with pop zones (role: 'pop_zone_<id>').
  *
- * Les pop zones sont des zones de scoring passives (pas d'impulsion physique).
- * Le rôle complet est transmis dans l'événement pour permettre à la map
- * de distinguer plusieurs zones différentes.
+ * Pop zones are passive scoring areas (no physics impulse).
+ * The full role string is forwarded in the event so the map can
+ * distinguish between multiple distinct zones.
  */
 export class PopZoneCollisionHandler implements CollisionHandler {
   constructor(

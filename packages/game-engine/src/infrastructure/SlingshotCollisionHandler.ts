@@ -3,11 +3,10 @@ import { SCORE_SLINGSHOT } from '../domain/ScoringConstants';
 import type { CollisionHandler } from './CollisionHandler';
 
 /**
- * Gère les collisions avec les slingshots (rôles : 'slingshot_left', 'slingshot_right').
+ * Handles collisions with slingshots (roles: 'slingshot_left', 'slingshot_right').
  *
- * Émet SLINGSHOT_HIT avec le côté touché. L'impulsion physique de rebond
- * est appliquée directement par Rapier via le collider ; ce handler se
- * limite à scorer et notifier.
+ * Emits SLINGSHOT_HIT with the side that was hit. The rebound impulse is applied
+ * directly by Rapier via the collider; this handler only scores and notifies.
  */
 export class SlingshotCollisionHandler implements CollisionHandler {
   constructor(

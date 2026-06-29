@@ -3,15 +3,15 @@ import type { GameEventListener } from '../domain/GameEvents';
 import { RETURN_PORTAL_ENTER_SCORE, PORTAL_ENTER_SCORE } from '../domain/Ball';
 
 /**
- * Gère la collision avec l'entrée du portail (rôle : 'portal_enter').
+ * Handles the collision with the portal entrance (role: 'portal_enter').
  *
- * Machine à états à deux flags :
- *   - portalOpen     : le portail est physiquement ouvert (activé par la map)
- *   - portalTriggered: déjà franchi pendant cette ouverture (évite le double déclenchement)
+ * Two-flag state machine:
+ *   - portalOpen      : the portal is physically open (activated by the map)
+ *   - portalTriggered : already crossed during this opening (prevents double-fire)
  *
- * L'événement émis dépend du monde courant :
- *   - monde normal → PORTAL_ENTER (transition vers le monde alternatif)
- *   - monde alternatif → RETURN_PORTAL_ENTER (retour au monde normal)
+ * The emitted event depends on the current world:
+ *   - normal world    → PORTAL_ENTER (transition to alternate world)
+ *   - alternate world → RETURN_PORTAL_ENTER (return to normal world)
  */
 export class PortalCollisionHandler implements CollisionHandler {
   private portalOpen = false;
@@ -19,17 +19,17 @@ export class PortalCollisionHandler implements CollisionHandler {
 
   constructor(
     private readonly emit: GameEventListener,
-    /** Getter injecté pour lire l'état du monde alternatif sans couplage direct. */
+    /** Injected getter to read alternate-world state without direct coupling. */
     private readonly getAlternateWorldActive: () => boolean,
   ) {}
 
-  /** Ouvre ou ferme le portail. Fermer réinitialise aussi le flag de déclenchement. */
+  /** Opens or closes the portal. Closing also resets the triggered flag. */
   setPortalOpen(open: boolean): void {
     this.portalOpen = open;
     if (!open) this.portalTriggered = false;
   }
 
-  /** Réinitialise le flag de déclenchement (ex. après un cycle de monde complet). */
+  /** Resets the triggered flag (e.g. after a full world cycle). */
   resetPortalTrigger(): void {
     this.portalTriggered = false;
   }
@@ -40,7 +40,7 @@ export class PortalCollisionHandler implements CollisionHandler {
 
   handle(role: string, gameState: string, started: boolean): void {
     if (!started || gameState !== 'playing') return;
-    // Ignorer si le portail est fermé ou déjà franchi lors de cette ouverture.
+    // Ignore if the portal is closed or has already been crossed this opening.
     if (!this.portalOpen || this.portalTriggered) return;
 
     this.portalTriggered = true;

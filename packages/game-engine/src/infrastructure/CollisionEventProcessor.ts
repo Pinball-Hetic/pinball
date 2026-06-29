@@ -136,15 +136,15 @@ export class CollisionEventProcessor {
   ) {
     this.bossFights = new BossFightManager(emit, layout.bosses);
 
-    // Index des bosses par rôle de collider pour une lookup O(1) dans process().
+    // Index bosses by collider role for O(1) lookup in process().
     for (const b of layout.bosses) this.bossByRole.set(b.colliderRole, b);
 
-    // Handlers conservés en propriété car exposés publiquement (reset, état).
+    // Kept as properties because they are exposed publicly (reset, state).
     this.dropTargetHandler = new DropTargetCollisionHandler(emit, layout);
     this.portalHandler = new PortalCollisionHandler(emit, () => this.alternateWorldActive);
 
-    // Registre de handlers — ordre de déclaration = priorité de dispatch.
-    // Le premier handler dont canHandle() retourne true prend en charge la collision.
+    // Handler registry — declaration order = dispatch priority.
+    // The first handler whose canHandle() returns true owns the collision.
     this.handlers = [
       new BumperCollisionHandler(this.pendingPhysics, bumperHitUC, layout),
       new BumpCollisionHandler(this.pendingPhysics, bumpHitUC),
@@ -168,11 +168,11 @@ export class CollisionEventProcessor {
 
   process(eventQueue: RAPIER.EventQueue, gameState: string): void {
     eventQueue.drainCollisionEvents((h1, h2, started) => {
-      // Résolution du rôle : l'un des deux handles de la paire est la balle.
+      // Role resolution: one of the two handles in the pair is the ball.
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
 
-      // --- Gestion des bosses (prioritaire sur les handlers génériques) ---
+      // --- Boss handling (takes priority over generic handlers) ---
       const boss = this.bossByRole.get(role);
       if (
         boss
@@ -183,7 +183,7 @@ export class CollisionEventProcessor {
       ) {
         const ctx = this.gateContext();
         if (!bossThresholdMet(boss, ctx)) {
-          // Anti-spam : on ne réémet pas BOSS_LOCKED_HIT plus d'une fois par 2 s.
+          // Anti-spam: do not re-emit BOSS_LOCKED_HIT more than once every 2s.
           const now = performance.now();
           if (now - (this.lockedHitLastMs[boss.id] ?? 0) >= 2000) {
             this.lockedHitLastMs[boss.id] = now;
@@ -196,12 +196,12 @@ export class CollisionEventProcessor {
         }
       }
 
-      // Si le boss fight consomme l'événement, on court-circuite les handlers.
+      // If the boss fight consumes the event, skip the generic handlers.
       if (this.bossFights.handleTargetCollision(role, started, gameState)) {
         return;
       }
 
-      // Dispatch vers le handler enregistré pour ce rôle.
+      // Dispatch to the registered handler for this role.
       const handler = this.handlers.find(h => h.canHandle(role));
       handler?.handle(role, gameState, started);
     });
