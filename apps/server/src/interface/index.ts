@@ -17,6 +17,8 @@ const PORT = process.env.PORT || 3001;
 
 const INPUT_BRIDGE_ROOM = 'input-bridge';
 
+// Active map on the server side: updated via 'map:select' (playfield → selector).
+// Sent to every newly connected client and broadcast to all when it changes.
 let currentMapId: string = DEFAULT_MAP_ID;
 
 app.get('/', (req, res) => {
@@ -52,6 +54,8 @@ io.on('connection', (socket) => {
     console.log('[server] input-bridge joined room');
   }
 
+  // Sync the newly connected client with the current map so DMD/backglass
+  // are up to date even if no `map:select` has been emitted yet.
   socket.emit('map:selected', { mapId: currentMapId });
 
   socket.on('map:select', ({ mapId }) => {
@@ -76,6 +80,9 @@ io.on('connection', (socket) => {
     io.emit('input:sensor', data);
   });
 
+  // Dev `simulate-esp32` mode: route the event to the input-bridge room only.
+  // The input-bridge injects the raw protocol line into its mock port, its parser
+  // re-reads it and emits `input:button` back to the server, which broadcasts to all.
   socket.on('dev:simulate-button', (data) => {
     console.log('[server] dev:simulate-button', data.id, data.action, '→ input-bridge');
     io.to(INPUT_BRIDGE_ROOM).emit('dev:simulate-button', data);
