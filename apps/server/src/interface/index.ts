@@ -5,9 +5,9 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@pinball/shared-types';
+import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { worldTopTen, globalStats } from '../use-cases/Leaderboard';
 import { registerScore } from '../use-cases/RegisterScore';
-import { GameStateManager } from '../infrastructure/GameStateManager';
 
 const app = express();
 const httpServer = createServer(app);
@@ -17,7 +17,9 @@ const PORT = process.env.PORT || 3001;
 
 const INPUT_BRIDGE_ROOM = 'input-bridge';
 
-const gameState = new GameStateManager();
+// Active map on the server side: updated via 'map:select' (playfield → selector).
+// Sent to every newly connected client and broadcast to all when it changes.
+let currentMapId: string = DEFAULT_MAP_ID;
 
 app.get('/', (req, res) => {
   res.send('Pinball Server is running');
@@ -54,12 +56,12 @@ io.on('connection', (socket) => {
 
   // Sync the newly connected client with the current map so DMD/backglass
   // are up to date even if no `map:select` has been emitted yet.
-  socket.emit('map:selected', { mapId: gameState.getMapId() });
+  socket.emit('map:selected', { mapId: currentMapId });
 
   socket.on('map:select', ({ mapId }) => {
-    if (typeof mapId !== 'string' || mapId === gameState.getMapId()) return;
+    if (typeof mapId !== 'string' || mapId === currentMapId) return;
     console.log('[server] map:select', mapId, '→ broadcast map:selected');
-    gameState.setMapId(mapId);
+    currentMapId = mapId;
     io.emit('map:selected', { mapId });
   });
 
@@ -107,7 +109,7 @@ io.on('connection', (socket) => {
     try {
       const registered = await registerScore(data);
       socket.emit('game:registered', registered); // emit to sender only → QR code
-      io.emit('leaderboard:refresh', await worldTopTen(data.mapId)); // backglass leaderboard for played map
+      io.emit('leaderboard:refresh', await worldTopTen(data.mapId)); // backglass leaderboard for the played map
     } catch (err) {
       // Persistence must never block the relay — the game keeps running.
       console.error('[server] game:over persist failed:', err);
