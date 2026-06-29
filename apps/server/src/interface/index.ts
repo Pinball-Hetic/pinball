@@ -17,8 +17,6 @@ const PORT = process.env.PORT || 3001;
 
 const INPUT_BRIDGE_ROOM = 'input-bridge';
 
-// Map active côté server : mise à jour via 'map:select' (playfield → sélecteur).
-// Communiqué à chaque nouveau connecté + broadcasté à tous quand ça change.
 let currentMapId: string = DEFAULT_MAP_ID;
 
 app.get('/', (req, res) => {
@@ -54,8 +52,6 @@ io.on('connection', (socket) => {
     console.log('[server] input-bridge joined room');
   }
 
-  // Informer le nouveau connecté de la map courante (DMD/backglass synchro au
-  // démarrage, même si aucun `map:select` n'a encore été émis).
   socket.emit('map:selected', { mapId: currentMapId });
 
   socket.on('map:select', ({ mapId }) => {
@@ -80,9 +76,6 @@ io.on('connection', (socket) => {
     io.emit('input:sensor', data);
   });
 
-  // Mode dev `simulate-esp32` : route ciblé vers l'input-bridge. C'est
-  // l'input-bridge qui injectera le texte sur son port mock, son parser
-  // relira, et émettra `input:button` au server → broadcast à tous.
   socket.on('dev:simulate-button', (data) => {
     console.log('[server] dev:simulate-button', data.id, data.action, '→ input-bridge');
     io.to(INPUT_BRIDGE_ROOM).emit('dev:simulate-button', data);
@@ -100,18 +93,16 @@ io.on('connection', (socket) => {
 
   socket.on('game:over', async (data) => {
     console.log('[server] game:over', data.player, 'final=', data.finalScore);
-    io.emit('game:over', data); // relay inchangé (DMD, backglass)
-    // Game over déclenché depuis /debug : relay seul, pas de persistence.
+    io.emit('game:over', data);
     if (data.debug === true) {
-      console.log('[server] game:over [debug skip] — pas de persistence');
+      console.log('[server] game:over [debug skip]');
       return;
     }
     try {
       const registered = await registerScore(data);
-      socket.emit('game:registered', registered); // au seul émetteur → QR
-      io.emit('leaderboard:refresh', await worldTopTen(data.mapId)); // backglass (board de la map jouée)
+      socket.emit('game:registered', registered);
+      io.emit('leaderboard:refresh', await worldTopTen(data.mapId));
     } catch (err) {
-      // le jeu continue — la persistence ne doit JAMAIS bloquer le relay
       console.error('[server] game:over persist failed:', err);
     }
   });
