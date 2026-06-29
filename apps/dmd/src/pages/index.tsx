@@ -5,6 +5,8 @@ import DmdCanvas from '@/components/DmdCanvas'
 import NeonBand from '@/components/NeonBand'
 import { NoSignal } from '@pinball/ui'
 import type { DmdDisplay } from '@pinball/shared-types'
+import { getDmdContent } from '@pinball/maps/dmd'
+import { AVAILABLE_MAPS } from '@pinball/maps'
 
 const TOTAL_LIVES = 3
 
@@ -110,7 +112,16 @@ const NO_SIGNAL_OVERLAY: CSSProperties = {
 
 export default function ScoreboardPage() {
   const router = useRouter()
-  const { display, alternateWorld, connected } = useDmdState()
+  const { display, alternateWorld, connected, mapId } = useDmdState()
+
+  // Nom affiché de la map active (bandeau supérieur). Fallback sur l'id en
+  // majuscules si la map n'est pas dans AVAILABLE_MAPS (map inconnue en dev).
+  const mapName =
+    AVAILABLE_MAPS.find((m) => m.id === mapId)?.name ?? mapId.toUpperCase()
+
+  // Contenu DMD de la map active. key={mapId} sur DmdCanvas force un remontage
+  // propre (ferme la boucle rAF précédente, recrée LAYOUTS/PALETTE/BURST).
+  const mapDmdContent = getDmdContent(mapId) ?? {}
 
   // ?flat : ancien rendu JSX plat (debug). Attendre router.isReady pour
   // éviter de monter le canvas puis de basculer en flat.
@@ -131,6 +142,8 @@ export default function ScoreboardPage() {
     )
   }
 
+  const neonColor = mapDmdContent.neonColor
+
   return (
     <main
       style={{
@@ -141,9 +154,14 @@ export default function ScoreboardPage() {
         alignItems: 'stretch',
       }}
     >
-      <NeonBand text="STRANGER THINGS" position="top" />
-      <DmdCanvas display={display} alternateWorld={alternateWorld} />
-      <NeonBand text="PINBALL HETIC" position="bottom" />
+      <NeonBand text={mapName} position="top" color={neonColor} />
+      <DmdCanvas
+        key={mapId}
+        display={display}
+        alternateWorld={alternateWorld}
+        mapDmdContent={mapDmdContent}
+      />
+      <NeonBand text="PINBALL HETIC" position="bottom" color={neonColor} />
       {!connected && (
         <div style={NO_SIGNAL_OVERLAY}>
           <NoSignal reason="DMD — PAS DE SIGNAL SERVEUR" />

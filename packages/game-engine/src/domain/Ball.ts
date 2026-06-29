@@ -1,5 +1,15 @@
 // Bille — GLB ball size=[0.0269] → radius 0.01345. Réduite à 0.010 (~20 mm Ø).
-export const BALL_RADIUS          = 0.01374;
+export const DEFAULT_BALL_RADIUS = 0.01374;
+// Rayon actif — surchargeable par map via configureBallRadius().
+let _ballRadius = DEFAULT_BALL_RADIUS;
+// Getter du rayon courant (dynamique, per-map).
+export function getBallRadius(): number { return _ballRadius; }
+// Configure le rayon pour la map courante. A appeler avant tout setup physique.
+export function configureBallRadius(r: number): void { _ballRadius = r; }
+// Reinitialise au rayon par defaut (ST). Surtout pour les tests.
+export function resetBallRadius(): void { _ballRadius = DEFAULT_BALL_RADIUS; }
+// Constante ST conservee pour compatibilite (valeur statique = DEFAULT_BALL_RADIUS).
+export const BALL_RADIUS = DEFAULT_BALL_RADIUS;
 export const BALL_MASS            = 0.08;   // 80 g — standard officiel
 export const BALL_RESTITUTION     = 0.4;    // acier sur bois verni : rebond faible
 export const BALL_FRICTION        = 0.05;   // acier poli, très glissant

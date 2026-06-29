@@ -34,6 +34,8 @@ export class PhysicsWorld implements IPhysicsWorld {
   private static readonly MAX_STEPS_PER_FRAME = 5;
   private accumulator = 0;
   private timeScale = 1;
+  /** true après une panique Rapier WASM (unreachable / unsafe aliasing). */
+  private crashed = false;
 
   /**
    * Échelle de temps (slow-mo). 1 = normal, 1/3 = ralenti. Implémenté en
@@ -76,6 +78,11 @@ export class PhysicsWorld implements IPhysicsWorld {
     return { steps, remainder: acc };
   }
 
+  /** true si le monde Rapier a paniqué et ne peut plus être utilisé. */
+  get isAlive(): boolean {
+    return !this.crashed;
+  }
+
   /**
    * @param dt Temps écoulé depuis la dernière frame en secondes (cappé à 0.05
    *           dans le render loop — protège contre les freezes d'onglet).
@@ -89,7 +96,16 @@ export class PhysicsWorld implements IPhysicsWorld {
     const { steps, remainder } = PhysicsWorld.planSteps(this.accumulator);
     this.accumulator = remainder;
     for (let i = 0; i < steps; i += 1) {
-      this.world.step(this.eventQueue);
+      try {
+        this.world.step(this.eventQueue);
+      } catch (e) {
+        // Rapier WASM panic (unreachable / unsafe aliasing). On marque le monde
+        // comme mort pour éviter que les appels suivants ne cascadent en erreurs.
+        // L'utilisateur devra recharger la page pour récupérer un monde sain.
+        this.crashed = true;
+        console.error('[Rapier] world.step() panic — physics halted:', e);
+        return;
+      }
       onStep?.();
     }
     onAfterSteps?.();
