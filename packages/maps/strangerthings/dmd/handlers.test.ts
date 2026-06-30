@@ -29,7 +29,7 @@ describe('cinematicHandlers registry', () => {
   })
 
   test('chaque handler écrit dans la grille sans déborder du buffer', () => {
-    for (const [name, handler] of Object.entries(cinematicHandlers)) {
+    for (const [, handler] of Object.entries(cinematicHandlers)) {
       const grid = newGrid()
       handler(grid, 500, ctx({ value: 3, score: 1000 }))
       expect(grid.length).toBe(GRID_W * GRID_H)

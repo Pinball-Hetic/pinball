@@ -35,6 +35,8 @@ export * from './infrastructure/FlipperSplitter';
 export * from './infrastructure/FlipperZones';
 export * from './infrastructure/CollisionEventProcessor';
 export * from './infrastructure/BossFightManager';
+export * from './infrastructure/BossRevealController';
+export * from './infrastructure/BossRevealOrchestrator';
 export * from './infrastructure/BossTargetPulse';
 export * from './infrastructure/BossTargetMesh';
 export * from './infrastructure/BallDiagnostics';
