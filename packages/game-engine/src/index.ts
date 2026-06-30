@@ -30,6 +30,7 @@ export * from './infrastructure/PlayfieldTrimeshBuilder';
 export * from './infrastructure/MeshRoleResolver';
 export * from './infrastructure/LayoutResolver';
 export * from './infrastructure/PlayfieldColliderFactory';
+export * from './infrastructure/ColliderSpecPlanner';
 export * from './infrastructure/LauncherLaneBounds';
 export * from './infrastructure/FlipperSplitter';
 export * from './infrastructure/FlipperZones';

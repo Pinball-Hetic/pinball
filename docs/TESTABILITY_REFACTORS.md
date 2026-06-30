@@ -133,10 +133,16 @@ cooldown bump) piégées derrière `RAPIER.EventQueue` + `performance.now()`.
 **Fix** : `routeCollision(role, started, gameState, now, state): Outcome[]` + injecter
 `now`. **Effort M · plus gros gain de couverture du package.**
 
-### G2. `PlayfieldColliderFactory` → planner `ColliderSpec[]` pur + applier
+### G2. `PlayfieldColliderFactory` → planner `ColliderSpec[]` pur + applier ✅ FAIT
 Chaque méthode mêle trig (translation/halfExtents/quaternion) et `world.createCollider`.
 **Fix** : `planShooterLane(layout): ColliderSpec[]` etc. (purs) + `applySpec(world, spec)`
 mince. **Effort M-L · sécurise le fichier le plus "tuné" (règle CLAUDE.md).**
+> **Livré** : `ColliderSpecPlanner.ts` (planners purs, zéro RAPIER) + `ColliderSpec`
+> discriminé (`cuboid`/`cylinder`/`ball`). La factory = `plan()` + `applyColliderSpec()`
+> mince. `ColliderSpecPlanner.test.ts` (29 tests) couvre translations/halfExtents/
+> quaternions/restitution/sensor/role par planner. Comportement identique.
+> **Smells résiduels notés en newBacklog** : G2.a (littéraux floor/walls), G2.b
+> (matières magiques par type de sensor).
 
 ### G3. `FlipperSplitter` → `partitionTrianglesByPlaneX()` pure
 Partition de triangles / remap d'indices (math pur, prone aux off-by-one) noyée dans
@@ -206,6 +212,15 @@ un test**. **Effort L (tranches S).**
 - **S5. Leaderboard** : exporter `anonName`/aggregation comme helpers purs. **S.**
 - **D2/B1** : `useBackglassData` effet trop large (fetch+validation+socket+poll) → extraire
   validateurs purs + `safeFetch` injectable. **S-M.**
+- **G2.a. `ColliderSpecPlanner` littéraux géométriques** : `planPlayfieldFloor`/`planLaneFloor`/
+  `planWalls` hardcodent encore les bounds (-0.552/0.418/0.270, 0.206/0.265, -0.067…) au lieu
+  de dériver de `layout.geometry.bounds`. Comportement préservé (valeurs = ST), mais ces
+  planners ne sont pas réellement map-agnostiques. Param par layout quand une 2e map les
+  exercera. **S.**
+- **G2.b. Matières « magiques » par type de sensor** : restitution/friction/halfExtents des
+  sensors (0.034 boss, 0.06×0.015×0.03 slingshot, 0.015×0.01×0.015 pop-zone…) sont des
+  constantes inline dans les planners. Les remonter en constantes nommées (ou dans le layout)
+  pour documenter l'intention et permettre le tuning par map. **S.**
 
 ---
 
