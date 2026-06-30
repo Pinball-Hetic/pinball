@@ -8,12 +8,14 @@ import {
 } from '@pinball/game-engine';
 import { layout } from '../layout';
 import { PLAYFIELD_TILT } from '@pinball/game-engine';
-import { easeIn, easeOut, strobeOn } from '@pinball/game-engine';
+import { easeIn, easeOut } from '@pinball/game-engine';
+import type { ElevenAssistFrame } from '@pinball/game-engine';
 import { CameraBillboardSprite } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
 import { createBossTargetMesh } from '@pinball/game-engine';
 import { BossTargetPulse } from '@pinball/game-engine';
+import { BlackoutFightPhaseMachine } from '@pinball/game-engine';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { DemogorgonTargetVisual } from './DemogorgonTargetVisual';
 import type { BossRevealController } from './BossRevealController';
@@ -37,8 +39,6 @@ const FIGHT_FLICKER_LIFT = 0.04;
 const FIGHT_FLASH_MIX = 0.45;
 const FIGHT_DECOR_STROBE = 0.22;
 const FLASH_INTENSITY = 1.5;
-
-type Phase = 'idle' | 'blackout' | 'reveal' | 'flicker' | 'victory' | 'restore';
 
 export type DemogorgonSetup = {
   root: THREE.Object3D;
@@ -78,13 +78,32 @@ export class DemogorgonReveal implements BossRevealController {
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
 
-  private phase: Phase = 'idle';
-  private elapsed = 0;
-  private strobeT = 0;
-  private pulseT = 0;
-  private assistNextIn = ELEVEN_ASSIST_FIRST;
-  private elevenAssistActive = false;
-  private elevenAssistT = 0;
+  private machine = new BlackoutFightPhaseMachine(
+    {
+      blackout: BLACKOUT,
+      reveal: REVEAL,
+      restore: RESTORE,
+      victory: VICTORY,
+      strobeHzIntro: STROBE_HZ_INTRO,
+      fightFlickerHz: FIGHT_FLICKER_HZ,
+      targetHits: getBossDefinition('demogorgon').targetHits,
+    },
+    {
+      base: FIGHT_SHADE,
+      breatheAmp: FIGHT_SHADE_BREATHE,
+      breatheSpeed: FIGHT_SHADE_SPEED,
+      dip: FIGHT_FLINKER_DIP,
+      lift: FIGHT_FLICKER_LIFT,
+      clampMin: 0.18,
+      clampMax: 0.52,
+    },
+    {
+      first: ELEVEN_ASSIST_FIRST,
+      interval: ASSIST_INTERVAL,
+      anim: ELEVEN_ASSIST_ANIM,
+      scoreIncrement: ASSIST_SCORE,
+    },
+  );
 
   setEmit(listener: GameEventListener): void {
     this.emit = listener;
@@ -187,23 +206,17 @@ export class DemogorgonReveal implements BossRevealController {
 
   onGameEvent(event: GameEvent): void {
     if (event.type === 'BOSS_REVEAL' && event.bossId === 'demogorgon') {
-      if (this.phase !== 'idle') return;
-      this.phase = 'blackout';
-      this.elapsed = 0;
-      this.strobeT = 0;
-      this.pulseT = 0;
-      this.assistNextIn = ELEVEN_ASSIST_FIRST;
-      this.elevenAssistActive = false;
-      this.elevenAssistT = 0;
+      if (!this.machine.onReveal()) return;
       this.billboard.show();
       if (this.targetGroup) this.targetGroup.visible = true;
       return;
     }
     if (event.type === 'BOSS_TARGET_HIT' && event.bossId === 'demogorgon') {
-      if (this.phase === 'idle' || this.phase === 'restore' || this.phase === 'victory') return;
+      const res = this.machine.onHit(event.hitCount);
+      if (!res.accepted) return;
       this.targetPulse?.flashHit();
       this.demogorgonVisual.playHit();
-      if (event.hitCount >= getBossDefinition('demogorgon').targetHits) {
+      if (res.victory) {
         this.beginVictory();
       }
       return;
@@ -220,49 +233,31 @@ export class DemogorgonReveal implements BossRevealController {
 
   update(dt: number): void {
     this.demogorgonVisual.update(dt);
-    // Advance the shade-breathe clock read in the flicker phase. The target
-    // pulse moved into BossTargetPulse (its own clock); this drives only the
-    // atmosphere breathe term and must keep ticking or breathe stays at 0.
-    this.pulseT += dt;
     this.billboard.sync();
     this.targetPulse?.update(
       dt,
       this.targetGroup?.visible ?? false,
-      this.phase === 'victory',
+      this.machine.isVictory(),
     );
 
-    if (this.phase === 'idle') {
+    const d = this.machine.tick(dt);
+
+    if (d.phase === 'idle') {
       this.garlandLights?.setStrobe(false, false);
       this.bumperVisuals?.setStrobe(false, false);
       return;
     }
 
-    this.elapsed += dt;
-    this.strobeT += dt;
-
-    const on = strobeOn(this.strobeT, STROBE_HZ_INTRO);
-    const darkMix = this.phase === 'restore'
-      ? 1 - easeIn(Math.min(1, this.elapsed / RESTORE))
-      : 1;
-
-    if (this.phase === 'blackout') {
-      this.cinematicStrobe.apply(on, false, darkMix * easeOut(Math.min(1, this.elapsed / BLACKOUT)));
+    if (d.phase === 'blackout') {
+      this.cinematicStrobe.apply(d.on, false, d.blackoutMix);
       this.billboard.setOpacity(0);
-      if (this.elapsed >= BLACKOUT) {
-        this.phase = 'reveal';
-        this.elapsed = 0;
-      }
       return;
     }
 
-    if (this.phase === 'reveal') {
-      const t = Math.min(1, this.elapsed / REVEAL);
-      this.cinematicStrobe.apply(on, false, 1);
-      this.billboard.setOpacity(this.billboard.isReady() ? easeOut(t) * 0.95 : 0);
-      if (this.elapsed >= REVEAL) {
-        this.phase = 'flicker';
-        this.elapsed = 0;
-        this.assistNextIn = ELEVEN_ASSIST_FIRST;
+    if (d.phase === 'reveal') {
+      this.cinematicStrobe.apply(d.on, false, 1);
+      this.billboard.setOpacity(this.billboard.isReady() ? easeOut(d.revealT) * 0.95 : 0);
+      if (d.enteredFlicker) {
         this.billboard.setOpacity(0);
         this.billboard.hide();
         this.demogorgonVisual.show();
@@ -273,40 +268,30 @@ export class DemogorgonReveal implements BossRevealController {
       return;
     }
 
-    if (this.phase === 'flicker') {
-      const breathe = Math.sin(this.pulseT * FIGHT_SHADE_SPEED) * FIGHT_SHADE_BREATHE;
-      const blink = strobeOn(this.strobeT, FIGHT_FLICKER_HZ);
-      const shade = THREE.MathUtils.clamp(
-        FIGHT_SHADE + breathe + (blink ? -FIGHT_FLICKER_LIFT : FIGHT_FLINKER_DIP),
-        0.18,
-        0.52,
-      );
-      this.cinematicStrobe.applyFightFlicker(shade, blink ? FIGHT_FLASH_MIX : 0);
+    if (d.phase === 'flicker') {
+      this.cinematicStrobe.applyFightFlicker(d.flickerShade, d.flickerBlink ? FIGHT_FLASH_MIX : 0);
       this.billboard.setOpacity(0);
-      if (!this.elevenAssistActive) {
-        this.assistNextIn -= dt;
-        if (this.assistNextIn <= 0) this.triggerElevenAssist();
-      }
-      this.updateElevenAssist(dt);
+      if (d.assistFired) this.fireElevenAssist();
+      if (d.assist) this.renderElevenAssist(d.assist);
+      if (d.assistFinished) this.hideElevenAssist();
       return;
     }
 
-    if (this.phase === 'victory') {
-      const t = Math.min(1, this.elapsed / VICTORY);
+    if (d.phase === 'victory') {
       this.cinematicStrobe.stop();
-      this.updateVictoryAnim(t);
-      if (t >= 1) {
+      this.updateVictoryAnim(d.victoryT);
+      if (d.finishedVictory) {
         this.beginRestore();
       }
       return;
     }
 
-    if (this.phase === 'restore') {
-      if (darkMix <= 0) {
+    if (d.phase === 'restore') {
+      if (d.finishedRestore) {
         this.resetAtmosphere();
         return;
       }
-      this.cinematicStrobe.applyHoldShade(FIGHT_SHADE * darkMix);
+      this.cinematicStrobe.applyHoldShade(FIGHT_SHADE * d.darkMix);
       this.billboard.setOpacity(0);
     }
   }
@@ -353,8 +338,7 @@ export class DemogorgonReveal implements BossRevealController {
     this.elevenShockInnerMat = null;
     this.elevenAssistLight = null;
     this.root = null;
-    this.phase = 'idle';
-    this.elapsed = 0;
+    this.machine.reset();
   }
 
   private buildTargetMesh(): THREE.Group {
@@ -379,10 +363,8 @@ export class DemogorgonReveal implements BossRevealController {
     });
   }
 
-  private triggerElevenAssist(): void {
-    this.elevenAssistActive = true;
-    this.elevenAssistT = 0;
-    this.assistNextIn = ASSIST_INTERVAL;
+  // IO side of an eleven assist trigger; the timer/state lives in the machine.
+  private fireElevenAssist(): void {
     this.targetPulse?.flashHit();
     if (this.elevenShockOuter) this.elevenShockOuter.visible = true;
     if (this.elevenShockInner) this.elevenShockInner.visible = true;
@@ -393,7 +375,6 @@ export class DemogorgonReveal implements BossRevealController {
   }
 
   private hideElevenAssist(): void {
-    this.elevenAssistActive = false;
     if (this.elevenShockOuter) {
       this.elevenShockOuter.visible = false;
       this.elevenShockOuter.scale.setScalar(1);
@@ -410,15 +391,9 @@ export class DemogorgonReveal implements BossRevealController {
     }
   }
 
-  private updateElevenAssist(dt: number): void {
-    if (!this.elevenAssistActive) return;
-
-    this.elevenAssistT += dt;
-    const t = Math.min(1, this.elevenAssistT / ELEVEN_ASSIST_ANIM);
-    const rise = easeOut(t);
-    const fade = easeIn(t);
-    const alpha = t < 0.18 ? rise / 0.18 : 1 - fade;
-    const burst = 1 - fade * 0.85;
+  // Mesh animation for an active assist; envelope scalars come from the machine.
+  private renderElevenAssist(frame: ElevenAssistFrame): void {
+    const { t, elapsed, rise, alpha, burst } = frame;
 
     if (this.elevenShockOuter) this.elevenShockOuter.scale.setScalar(1 + rise * 4.5);
     if (this.elevenShockOuterMat) this.elevenShockOuterMat.opacity = alpha * 0.5 * burst;
@@ -431,24 +406,18 @@ export class DemogorgonReveal implements BossRevealController {
     }
 
     if (this.targetGroup && t < 0.45) {
-      this.targetGroup.rotation.z = Math.sin(this.elevenAssistT * 32) * 0.1 * (1 - t / 0.45);
+      this.targetGroup.rotation.z = Math.sin(elapsed * 32) * 0.1 * (1 - t / 0.45);
     }
-
-    if (t >= 1) this.hideElevenAssist();
   }
 
   private beginVictory(): void {
     this.hideElevenAssist();
-    this.phase = 'victory';
-    this.elapsed = 0;
     this.billboard.hide();
     this.demogorgonVisual.playVictory();
     if (this.targetGroup) this.targetGroup.visible = true;
   }
 
   private beginRestore(): void {
-    this.phase = 'restore';
-    this.elapsed = 0;
     this.billboard.hide();
     if (this.targetGroup) {
       this.targetGroup.visible = false;
@@ -519,14 +488,9 @@ export class DemogorgonReveal implements BossRevealController {
   }
 
   private resetAtmosphere(): void {
-    const wasActive = this.phase !== 'idle';
-    this.phase = 'idle';
-    this.elapsed = 0;
-    this.strobeT = 0;
-    this.pulseT = 0;
-    this.assistNextIn = ELEVEN_ASSIST_FIRST;
+    const wasActive = this.machine.getPhase() !== 'idle';
+    this.machine.reset();
     this.hideElevenAssist();
-    this.elevenAssistT = 0;
 
     this.cinematicStrobe.stop();
     this.garlandLights?.setAtmosphere(1, 0);

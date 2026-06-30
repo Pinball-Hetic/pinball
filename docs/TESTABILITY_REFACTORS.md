@@ -155,11 +155,22 @@ identique sauf un import. **Fix** : monter dans `game-engine` (à côté de `Bos
 supprimer la dépendance `BOSS_IDS`. **Effort S · supprime ~83 lignes dupliquées, 1 test
 couvre les 2 maps.**
 
-### M2. `*Reveal` → `BossRevealPhaseMachine` pure (state pattern)
+### M2. `*Reveal` → `BossRevealPhaseMachine` pure (state pattern) — ✅ FAIT
 `{Demogorgon,Ganondorf,Vecna,DarkLink}Reveal.ts` : `update(dt)` mêle séquencement de
 phases/timers (pur, regression-prone, **0%**) et mutation Three. **Fix** : machine pure
 qui retourne un descripteur `{phase, shade, opacity, strobeOn, …}`, la classe devient un
 renderer mince. 2 machines couvrent les 4 boss. **Effort L · plus gros gain systèmes.**
+
+> **Résolu** : 2 machines pures dans `game-engine/infrastructure/`
+> — `WalkFightPhaseMachine` (shape A : Vecna + DarkLink, walk→settle→fight→victory,
+> sortie walk/settle gated par booléens visuels Three-side) et
+> `BlackoutFightPhaseMachine` (shape B : Demogorgon + Ganondorf,
+> blackout→reveal→flicker→victory→restore, time-driven + sous-machine
+> eleven-assist optionnelle, config flicker-shade injectée). Chaque `*Reveal`
+> appelle la machine puis traduit le descripteur en appels Three identiques.
+> Extraction VERBATIM (seuils/easing/timers copiés tels quels). Tests de
+> caractérisation : 36 (transitions de phase + scalaires aux instants clés).
+> Dé-dup : ST et Zelda partagent les 2 machines via `@pinball/game-engine`.
 
 ### P1-play. `PinballPlayfield.tsx` God-component (2055 L, useEffect de ~1450 L, 2.9%)
 **Fix par tranches** : extraire `buildFlipperHull(mesh)` (pur, game-engine), le **routeur

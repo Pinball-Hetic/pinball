@@ -59,3 +59,5 @@ export * from './infrastructure/PlayfieldCameraDirector';
 export * from './infrastructure/PlayfieldCameraFit';
 export * from './infrastructure/PlayfieldShadeOverlay';
 export * from './infrastructure/ShooterLaneGate';
+export * from './infrastructure/WalkFightPhaseMachine';
+export * from './infrastructure/BlackoutFightPhaseMachine';
