@@ -6,7 +6,7 @@
     "dev": "bun --watch src/interface/index.ts",
     "lint": "eslint src/**/*.ts",
     "prisma:generate": "prisma generate",
-    "test": "bun test src/infrastructure && bun test src/use-cases && bun test src/interface"
+    "test": "bun test"
   },
   "dependencies": {
     "@pinball/shared-types": "workspace:*",

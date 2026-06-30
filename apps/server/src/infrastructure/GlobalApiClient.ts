@@ -1,19 +1,5 @@
-export interface ScorePayload {
-  gameId: string; // idempotence : constant sur tous les retries d'une partie
-  mapId: string;
-  score: number;
-  maxCombo?: number;
-  maxMultiplier?: number;
-  counters?: Record<string, number>;
-  durationS?: number;
-  playedAt: string; // ISO-8601 avec offset
-}
-
-export interface ScoreRegistered {
-  scoreId: string;
-  code: string;
-  claimUrl: string;
-}
+import type { ScorePayload, ScoreRegistered } from '../use-cases/ports';
+export type { ScorePayload, ScoreRegistered } from '../use-cases/ports';
 
 export async function postScore(p: ScorePayload): Promise<ScoreRegistered> {
   const base = process.env.GLOBAL_API_URL;
