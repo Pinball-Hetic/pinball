@@ -5,6 +5,7 @@ export * from './domain/GameEvents';
 export * from './domain/FlipperConstants';
 export * from './domain/PlayfieldVisualConstants';
 export * from './domain/PlayfieldGeometry';
+export * from './domain/BumperEjection';
 export * from './domain/PlayfieldViewMode';
 export * from './domain/ScoringConstants';
 export * from './domain/BossRegistry';
@@ -12,6 +13,7 @@ export * from './domain/CameraCinematicConstants';
 export * from './domain/MapLayout';
 export * from './domain/MapModule';
 export * from './domain/LiveGameSnapshot';
+export * from './domain/AtmosphereBlend';
 
 // Use-cases
 export * from './use-cases/LaunchBall';
@@ -59,5 +61,7 @@ export * from './infrastructure/PlayfieldCameraDirector';
 export * from './infrastructure/PlayfieldCameraFit';
 export * from './infrastructure/PlayfieldShadeOverlay';
 export * from './infrastructure/ShooterLaneGate';
+export * from './infrastructure/WalkPathProgress';
 export * from './infrastructure/WalkFightPhaseMachine';
 export * from './infrastructure/BlackoutFightPhaseMachine';
+export * from './infrastructure/TransitionTimeline';

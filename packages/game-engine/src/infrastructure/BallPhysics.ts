@@ -12,6 +12,7 @@ import {
 } from '../domain/Ball';
 import type { MapLayout } from '../domain/MapLayout';
 import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
+import { radialEjectionImpulse, sidedEjectionImpulse } from '../domain/BumperEjection';
 import type { IBallPhysics } from '../use-cases/LaunchBall';
 import type { IBumperEject } from '../use-cases/BumperHit';
 
@@ -108,25 +109,14 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
 
   applyEjectionForce(bumperPos: { x: number; z: number }): void {
     const t = this.body.translation();
-    const px = t.x;
-    const pz = t.z;
-    const dx = px - bumperPos.x;
-    const dz = pz - bumperPos.z;
-    const len = Math.sqrt(dx * dx + dz * dz) || 1;
     this.body.applyImpulse(
-      { x: (dx / len) * BUMPER_EJECT_IMPULSE, y: 0, z: (dz / len) * BUMPER_EJECT_IMPULSE },
+      radialEjectionImpulse({ x: t.x, z: t.z }, bumperPos, BUMPER_EJECT_IMPULSE),
       true,
     );
   }
 
   applyScaledEjectionForce(scale: number, side: 'left' | 'right'): void {
-    // Direction X fixe : bump_left pousse toujours à droite (+X),
-    //                     bump_right pousse toujours à gauche (-X).
-    // Peu importe où la balle touche le mèche, la direction horizontale est
-    // déterministe → effet ping-pong entre les deux bumps.
-    const xDir = side === 'left' ? 1 : -1;
-    const impulse = BUMPER_EJECT_IMPULSE * scale;
-    this.body.applyImpulse({ x: xDir * impulse, y: 0, z: 0 }, true);
+    this.body.applyImpulse(sidedEjectionImpulse(side, BUMPER_EJECT_IMPULSE * scale), true);
   }
 
   syncToMesh(mesh: {
