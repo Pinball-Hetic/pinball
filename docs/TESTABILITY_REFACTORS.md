@@ -58,10 +58,15 @@
 >    `LeaderboardGateway` + adapter prisma + factories. **`mock.module` éliminé partout →
 >    script server = un seul `bun test` (69 tests)**. Bonus **S5** ✅ (`anonName`/
 >    `aggregateCounters` exportés + testés). **S4** partiel : `IoLike` narrowed, cast socket subsiste.
-> 4. **Reste** : G2 (planner collider), M2 (reveal machine), P1-play EventRouter (god-component),
->    D1 (DmdRenderer view/model). Détail ci-dessous.
->    ✅ FAITS dans la passe P1 : **M1** (`9543369` dedup orchestrator), **G3** (`54370ba`
->    FlipperGeometrySplit pur), **P1-play/toGameEvent** (`e6bc1b1` extrait + 20 tests).
+> 4. **P1 — bilan** : ✅ **M1** (`9543369`), **G3** (`54370ba`), **G2** (`16e9a60`), **M2**
+>    (reveal machines), **P1-play/toGameEvent** (`e6bc1b1`) — tous testés, tout vert
+>    (game-engine 38→46%). ⛔ **DIFFÉRÉ — P1-play EventRouter + `makeFlipperBody`** :
+>    le routeur `emit` (PinballPlayfield.tsx:660, ~600 L) et `makeFlipperBody` (:986) sont des
+>    closures entrelacées sur des dizaines de refs/objets runtime (Rapier/Three/scene/cinematics/
+>    score/dmd) dans un fichier 2006 L **sans test** → extraction **non vérifiable sans faire
+>    tourner le jeu 3D**, risque de régression non prouvable. À faire en **session dédiée** :
+>    caractériser par e2e/smoke 3D, OU petites tranches + revue humaine + smoke après chacune.
+>    Reste aussi : D1 (DmdRenderer), P2/P3 ci-dessous.
 >
 > **Découverts pendant la passe P1 (backlog évolutif)** :
 > - **N1** `DevGameEventTrigger.type` (shared-types) ↔ le switch de `toGameEvent` sont des
