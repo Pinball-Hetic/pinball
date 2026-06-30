@@ -18,8 +18,10 @@ import {
 import { MeshRoleResolver } from './MeshRoleResolver';
 import {
   ancestryMatchesSet,
+  laplacianSmoothPositions,
   mergeGeometryTuples,
   resolveMaterialParams,
+  reverseWoundIndices,
 } from './PlayfieldTrimeshRules';
 
 // Tuning matière par mesh (= manifest.elements). Passé en brut pour ne pas
@@ -252,14 +254,7 @@ function doubleSidedGeometry(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   const idx = welded.index;
   if (!idx) return welded;
 
-  const n = idx.count;
-  const doubled = new Uint32Array(n * 2);
-  doubled.set(idx.array as ArrayLike<number>);
-  for (let i = 0; i < n; i += 3) {
-    doubled[n + i] = idx.getX(i + 2);
-    doubled[n + i + 1] = idx.getX(i + 1);
-    doubled[n + i + 2] = idx.getX(i);
-  }
+  const doubled = Uint32Array.from(reverseWoundIndices(idx.array as ArrayLike<number>));
 
   const out = new THREE.BufferGeometry();
   out.setAttribute('position', welded.attributes.position);
@@ -277,33 +272,14 @@ function laplacianSmooth(
   const idx = welded.index;
   if (!idx) return welded;
 
-  for (let iter = 0; iter < iterations; iter++) {
-    const sums = new Float32Array(pos.count * 3);
-    const counts = new Uint32Array(pos.count);
-
-    for (let i = 0; i < idx.count; i += 3) {
-      const a = idx.getX(i), b = idx.getX(i + 1), c = idx.getX(i + 2);
-      for (const [u, v] of [[a, b], [b, c], [a, c]] as [number, number][]) {
-        sums[u * 3] += pos.getX(v); sums[u * 3 + 1] += pos.getY(v); sums[u * 3 + 2] += pos.getZ(v);
-        sums[v * 3] += pos.getX(u); sums[v * 3 + 1] += pos.getY(u); sums[v * 3 + 2] += pos.getZ(u);
-        counts[u]++; counts[v]++;
-      }
-    }
-
-    for (let i = 0; i < pos.count; i++) {
-      if (counts[i] === 0) continue;
-      const cx = sums[i * 3] / counts[i];
-      const cy = sums[i * 3 + 1] / counts[i];
-      const cz = sums[i * 3 + 2] / counts[i];
-      pos.setXYZ(
-        i,
-        pos.getX(i) + (cx - pos.getX(i)) * factor,
-        pos.getY(i) + (cy - pos.getY(i)) * factor,
-        pos.getZ(i) + (cz - pos.getZ(i)) * factor,
-      );
-    }
-    pos.needsUpdate = true;
-  }
+  const smoothed = laplacianSmoothPositions(
+    new Float32Array(pos.array as ArrayLike<number>),
+    idx.array as ArrayLike<number>,
+    iterations,
+    factor,
+  );
+  (pos.array as Float32Array).set(smoothed);
+  pos.needsUpdate = true;
 
   return welded;
 }

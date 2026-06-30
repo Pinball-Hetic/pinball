@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
   ancestryMatchesSet,
+  laplacianSmoothPositions,
   mergeGeometryTuples,
   resolveMaterialParams,
+  reverseWoundIndices,
 } from './PlayfieldTrimeshRules';
 
 describe('ancestryMatchesSet', () => {
@@ -74,6 +76,70 @@ describe('resolveMaterialParams', () => {
   test('smooth explicite prime sur le défaut de rôle', () => {
     expect(resolveMaterialParams({ smooth: 0 }, 'floor').smooth).toBe(false);
     expect(resolveMaterialParams({ smooth: 1 }, 'wall').smooth).toBe(true);
+  });
+});
+
+describe('laplacianSmoothPositions', () => {
+  // Fan : centre v0=(0,0,0), v1=(1,0,0), v2=(0,1,0), v3=(-1,0,0).
+  // Triangles [0,1,2] et [0,2,3].
+  const fanPositions = () =>
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0, 0]);
+  const fanIndex = [0, 1, 2, 0, 2, 3];
+
+  test('barycentre des voisins, factor 0.5, une passe', () => {
+    const out = laplacianSmoothPositions(fanPositions(), fanIndex, 1, 0.5);
+    expect(Array.from(out)).toEqual([
+      0, 0.25, 0,    // v0 vers (0,0.5,0)
+      0.5, 0.25, 0,  // v1 vers (0,0.5,0)
+      0, 0.5, 0,     // v2 vers (0,0,0)
+      -0.5, 0.25, 0, // v3 vers (0,0.5,0)
+    ]);
+  });
+
+  test('factor 0 → positions inchangées', () => {
+    const out = laplacianSmoothPositions(fanPositions(), fanIndex, 4, 0);
+    expect(Array.from(out)).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0, 0]);
+  });
+
+  test('zéro itération → identité', () => {
+    const out = laplacianSmoothPositions(fanPositions(), fanIndex, 0, 0.25);
+    expect(Array.from(out)).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0, 0]);
+  });
+
+  test('n_e mute pas le tableau d_entrée', () => {
+    const input = fanPositions();
+    laplacianSmoothPositions(input, fanIndex, 1, 0.5);
+    expect(Array.from(input)).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0, 0]);
+  });
+
+  test('sommet isolé (count 0) laissé inchangé', () => {
+    // v3 n_apparaît dans aucun triangle → counts[3] = 0.
+    const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 5, 5]);
+    const out = laplacianSmoothPositions(positions, [0, 1, 2], 1, 0.5);
+    expect(Array.from(out).slice(9)).toEqual([5, 5, 5]);
+  });
+});
+
+describe('reverseWoundIndices', () => {
+  test('concatène index + faces arrière (enroulement inversé)', () => {
+    expect(reverseWoundIndices([0, 1, 2])).toEqual([0, 1, 2, 2, 1, 0]);
+  });
+
+  test('plusieurs triangles → chaque face inversée séparément', () => {
+    expect(reverseWoundIndices([0, 1, 2, 3, 4, 5])).toEqual([
+      0, 1, 2, 3, 4, 5, // faces avant
+      2, 1, 0, 5, 4, 3, // faces arrière
+    ]);
+  });
+
+  test('accepte un Uint32Array', () => {
+    expect(reverseWoundIndices(new Uint32Array([0, 1, 2]))).toEqual([0, 1, 2, 2, 1, 0]);
+  });
+
+  test('n_e mute pas l_entrée', () => {
+    const input = new Uint32Array([0, 1, 2]);
+    reverseWoundIndices(input);
+    expect(Array.from(input)).toEqual([0, 1, 2]);
   });
 });
 

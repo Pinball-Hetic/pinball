@@ -51,6 +51,72 @@ export interface GeometryTuple {
 }
 
 /**
+ * Lissage laplacien PUR sur positions interleavées xyz d'une géométrie déjà
+ * soudée (welded). Chaque sommet est tiré vers le barycentre de ses voisins
+ * (arêtes des triangles) d'un facteur `factor`, sur `iterations` passes.
+ * Retourne un nouveau Float32Array ; l'entrée n'est pas mutée. Les sommets
+ * isolés (count 0) sont laissés inchangés.
+ */
+export function laplacianSmoothPositions(
+  positions: Float32Array,
+  index: ArrayLike<number>,
+  iterations: number,
+  factor: number,
+): Float32Array {
+  const out = new Float32Array(positions);
+  const vertexCount = out.length / 3;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const sums = new Float32Array(vertexCount * 3);
+    const counts = new Uint32Array(vertexCount);
+
+    for (let i = 0; i < index.length; i += 3) {
+      const a = index[i], b = index[i + 1], c = index[i + 2];
+      for (const [u, v] of [[a, b], [b, c], [a, c]] as [number, number][]) {
+        sums[u * 3] += out[v * 3];
+        sums[u * 3 + 1] += out[v * 3 + 1];
+        sums[u * 3 + 2] += out[v * 3 + 2];
+        sums[v * 3] += out[u * 3];
+        sums[v * 3 + 1] += out[u * 3 + 1];
+        sums[v * 3 + 2] += out[u * 3 + 2];
+        counts[u]++;
+        counts[v]++;
+      }
+    }
+
+    for (let i = 0; i < vertexCount; i++) {
+      if (counts[i] === 0) continue;
+      const cx = sums[i * 3] / counts[i];
+      const cy = sums[i * 3 + 1] / counts[i];
+      const cz = sums[i * 3 + 2] / counts[i];
+      out[i * 3] += (cx - out[i * 3]) * factor;
+      out[i * 3 + 1] += (cy - out[i * 3 + 1]) * factor;
+      out[i * 3 + 2] += (cz - out[i * 3 + 2]) * factor;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Index PUR d'une géométrie double-sided : concatène l'index original avec une
+ * copie à enroulement inversé (back-faces). Pour chaque triangle (i, i+1, i+2)
+ * la face arrière est (i+2, i+1, i). Retourne un nouveau tableau ; l'entrée
+ * n'est pas mutée.
+ */
+export function reverseWoundIndices(index: ArrayLike<number>): number[] {
+  const n = index.length;
+  const doubled = new Array<number>(n * 2);
+  for (let i = 0; i < n; i++) doubled[i] = index[i];
+  for (let i = 0; i < n; i += 3) {
+    doubled[n + i] = index[i + 2];
+    doubled[n + i + 1] = index[i + 1];
+    doubled[n + i + 2] = index[i];
+  }
+  return doubled;
+}
+
+/**
  * Fusionne plusieurs géométries (positions interleavées xyz + index optionnel)
  * en un seul couple verts/indices, en décalant les index par groupe. Sans
  * index, les sommets sont indexés séquentiellement.
