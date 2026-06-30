@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { GameEvent, BumperMatchRule } from '@pinball/game-engine';
-import { collectBumperParts, bumperPunchScale } from '@pinball/game-engine';
+import { collectBumperParts, tickPunchTimers, applyPunchScale } from '@pinball/game-engine';
 import { layout } from '../layout';
 import { GlowSprite } from '@pinball/game-engine';
 
@@ -168,23 +168,11 @@ export class BumperVisuals {
   update(dt: number): void {
     this.elapsed += dt;
 
-    for (const [idx, t] of this.hitTimers) {
-      const next = t - dt;
-      if (next <= 0) this.hitTimers.delete(idx);
-      else this.hitTimers.set(idx, next);
-    }
+    tickPunchTimers(this.hitTimers, dt);
 
     // Scale punch (mesh visuel uniquement, colliders inchangés).
-    for (const [idx, t] of this.punchTimers) {
-      const next = t - dt;
-      if (next <= 0) this.punchTimers.delete(idx);
-      else this.punchTimers.set(idx, next);
-    }
-    for (const part of this.parts) {
-      const pt = this.punchTimers.get(part.bumperIndex) ?? 0;
-      const factor = bumperPunchScale(pt, PUNCH_DURATION, PUNCH_PEAK);
-      part.mesh.scale.copy(part.baseScale).multiplyScalar(factor);
-    }
+    tickPunchTimers(this.punchTimers, dt);
+    applyPunchScale(this.parts, this.punchTimers, PUNCH_DURATION, PUNCH_PEAK);
 
     if (this.strobeActive) {
       if (!this.strobeOn) {
@@ -248,7 +236,10 @@ export class BumperVisuals {
   }
 
   dispose(): void {
+    // Remet les scales à leur valeur d'origine avant de vider (parité Zelda) :
+    // sinon un bumper disposé en plein punch reste agrandi.
     for (const part of this.parts) {
+      part.mesh.scale.copy(part.baseScale);
       part.glow?.dispose();
     }
     this.parts = [];

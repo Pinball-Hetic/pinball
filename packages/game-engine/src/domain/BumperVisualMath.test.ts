@@ -1,5 +1,12 @@
 import { test, expect, describe } from 'bun:test';
-import { nearestBumperIndex, bumperPunchScale, type BumperPoint } from './BumperVisualMath';
+import {
+  nearestBumperIndex,
+  bumperPunchScale,
+  tickPunchTimers,
+  applyPunchScale,
+  type BumperPoint,
+  type BumperScaleTarget,
+} from './BumperVisualMath';
 
 describe('nearestBumperIndex', () => {
   const bumpers: BumperPoint[] = [
@@ -71,5 +78,85 @@ describe('bumperPunchScale', () => {
     // vérifie la borne basse au tout début et toute fin
     expect(bumperPunchScale(DURATION * 0.999, DURATION, PEAK)).toBeGreaterThanOrEqual(1);
     expect(bumperPunchScale(DURATION * 0.001, DURATION, PEAK)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('tickPunchTimers', () => {
+  test('decremente chaque timer de dt', () => {
+    const timers = new Map([
+      [0, 0.18],
+      [1, 0.1],
+    ]);
+    tickPunchTimers(timers, 0.05);
+    expect(timers.get(0)).toBeCloseTo(0.13, 6);
+    expect(timers.get(1)).toBeCloseTo(0.05, 6);
+  });
+
+  test('supprime les timers qui atteignent 0 ou moins', () => {
+    const timers = new Map([
+      [0, 0.05],
+      [1, 0.04],
+    ]);
+    tickPunchTimers(timers, 0.05);
+    expect(timers.has(0)).toBe(false); // 0.05 - 0.05 = 0 -> supprimé
+    expect(timers.has(1)).toBe(false); // négatif -> supprimé
+  });
+
+  test('map vide -> no-op', () => {
+    const timers = new Map<number, number>();
+    tickPunchTimers(timers, 0.1);
+    expect(timers.size).toBe(0);
+  });
+});
+
+describe('applyPunchScale', () => {
+  function makeTarget(bumperIndex: number, base = 2): BumperScaleTarget & {
+    mesh: { scale: { x: number; y: number; z: number } };
+  } {
+    const scale = {
+      x: 0,
+      y: 0,
+      z: 0,
+      copy(v: { x: number; y: number; z: number }) {
+        this.x = v.x;
+        this.y = v.y;
+        this.z = v.z;
+        return this;
+      },
+      multiplyScalar(s: number) {
+        this.x *= s;
+        this.y *= s;
+        this.z *= s;
+        return this;
+      },
+    };
+    return {
+      bumperIndex,
+      baseScale: { x: base, y: base, z: base },
+      mesh: { scale },
+    };
+  }
+
+  test('part sans timer -> retour a baseScale (facteur 1)', () => {
+    const t = makeTarget(0, 3);
+    applyPunchScale([t], new Map(), 0.18, 0.28);
+    expect(t.mesh.scale.x).toBeCloseTo(3, 6);
+    expect(t.mesh.scale.y).toBeCloseTo(3, 6);
+    expect(t.mesh.scale.z).toBeCloseTo(3, 6);
+  });
+
+  test('part au pic -> baseScale x (1+peak)', () => {
+    const t = makeTarget(0, 2);
+    // remaining = duration/2 -> pic -> facteur 1+peak
+    applyPunchScale([t], new Map([[0, 0.18 / 2]]), 0.18, 0.28);
+    expect(t.mesh.scale.x).toBeCloseTo(2 * 1.28, 6);
+  });
+
+  test('seul le bumperIndex correspondant est punché', () => {
+    const a = makeTarget(0, 1);
+    const b = makeTarget(1, 1);
+    applyPunchScale([a, b], new Map([[0, 0.18 / 2]]), 0.18, 0.28);
+    expect(a.mesh.scale.x).toBeCloseTo(1.28, 6);
+    expect(b.mesh.scale.x).toBeCloseTo(1, 6); // pas de timer -> baseScale
   });
 });

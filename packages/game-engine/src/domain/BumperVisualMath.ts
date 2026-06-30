@@ -40,6 +40,44 @@ export function bumperPunchScale(remaining: number, duration: number, peak: numb
 }
 
 /**
+ * Décrémente en place tous les timers de `timers` de `dt`, supprimant les
+ * entrées qui atteignent 0 ou moins. Pur (mute uniquement la Map injectée),
+ * sans THREE. Logique de tick partagée ST/Zelda extraite verbatim.
+ */
+export function tickPunchTimers(timers: Map<number, number>, dt: number): void {
+  for (const [idx, t] of timers) {
+    const next = t - dt;
+    if (next <= 0) timers.delete(idx);
+    else timers.set(idx, next);
+  }
+}
+
+/** Cible minimale d'un punch de scale : un mesh avec un index de bumper. */
+export interface BumperScaleTarget {
+  bumperIndex: number;
+  baseScale: { x: number; y: number; z: number };
+  mesh: { scale: { copy(v: { x: number; y: number; z: number }): { multiplyScalar(s: number): unknown } } };
+}
+
+/**
+ * Applique le scale "punch" à chaque part : `baseScale × bumperPunchScale(...)`
+ * en fonction du temps restant lu dans `timers` (0 si absent → facteur 1, soit
+ * retour à baseScale). Boucle d'application partagée ST/Zelda extraite verbatim.
+ */
+export function applyPunchScale(
+  parts: readonly BumperScaleTarget[],
+  timers: Map<number, number>,
+  duration: number,
+  peak: number,
+): void {
+  for (const part of parts) {
+    const pt = timers.get(part.bumperIndex) ?? 0;
+    const factor = bumperPunchScale(pt, duration, peak);
+    part.mesh.scale.copy(part.baseScale).multiplyScalar(factor);
+  }
+}
+
+/**
  * Résultat de classification d'un nœud GLB par le matcher bumper :
  * - `skip` : ce nœud n'est pas un bumper (ignoré).
  * - `hide` : ce nœud doit être masqué (legacy mesh remplacé), pas de part.

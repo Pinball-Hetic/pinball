@@ -114,6 +114,23 @@ describe('strangerthings BumperVisuals wiring', () => {
     expect(ring.scale.x).toBeCloseTo(1, 5);
   });
 
+  test('dispose restaure la scale d origine (B2: parite Zelda)', () => {
+    const root = new THREE.Group();
+    const ring = meshNamed('bumper_ring.001', layout.bumpers[0]!);
+    ring.scale.set(1.5, 1.5, 1.5);
+    root.add(ring);
+
+    const v = new BumperVisuals();
+    v.setup(root);
+    v.onGameEvent(bumperHit(0));
+    v.update(PUNCH_DURATION / 2); // gonfle au-dela de baseScale
+    expect(ring.scale.x).toBeGreaterThan(1.5);
+
+    v.dispose();
+    // B2 : dispose remet la scale a baseScale (avant, ST la laissait gonflee)
+    expect(ring.scale.toArray()).toEqual([1.5, 1.5, 1.5]);
+  });
+
   test('dispose vide les parts: update ulterieur ne touche plus le mesh', () => {
     const root = new THREE.Group();
     const ring = meshNamed('bumper_ring.001', layout.bumpers[0]!);
@@ -121,10 +138,6 @@ describe('strangerthings BumperVisuals wiring', () => {
 
     const v = new BumperVisuals();
     v.setup(root);
-    v.onGameEvent(bumperHit(0));
-    v.update(PUNCH_DURATION / 2);
-    expect(ring.scale.x).toBeGreaterThan(1);
-
     v.dispose();
     const afterDispose = ring.scale.clone();
     // plus aucun part suivi -> update ne reapplique aucune transformation
