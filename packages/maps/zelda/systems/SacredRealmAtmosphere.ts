@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
-import { PlayfieldShadeOverlay } from '@pinball/game-engine';
+import { AtmosphereBlend, PlayfieldShadeOverlay } from '@pinball/game-engine';
 
 // ── Constantes Sacred Realm ───────────────────────────────────────────────────
 // Inspiré de UpsideDownAtmosphere (ST) — sans spores ni GarlandLights/BumperVisuals.
@@ -75,11 +75,7 @@ export class SacredRealmAtmosphere {
   private lighting: SceneLighting | null = null;
   private shade = new PlayfieldShadeOverlay();
 
-  private mix = 0;
-  private targetMix = 0;
-  private lastAppliedMix = -1;
-  private pulseT = 0;
-  private visited = false;
+  private blend = new AtmosphereBlend(BLEND_DURATION);
 
   // Valeurs d'origine sauvegardées au setup
   private origBg = new THREE.Color();
@@ -139,47 +135,32 @@ export class SacredRealmAtmosphere {
     this.savedFog = config.lighting.scene.fog;
     this.sacredFog = new THREE.FogExp2(SACRED_FOG_COLOR, 0);
 
-    this.mix = 0;
-    this.targetMix = 0;
-    this.lastAppliedMix = -1;
-    this.visited = false;
-    this.pulseT = 0;
+    this.blend.reset();
   }
 
   onGameEvent(event: GameEvent): void {
     // Entrée dans le Sacred Realm.
     if (event.type === 'PORTAL_TRANSITION_END') {
-      this.visited = true;
-      this.targetMix = 1;
+      this.blend.visited = true;
+      this.blend.targetMix = 1;
     }
     // Retour du Sacred Realm.
     if (event.type === 'RETURN_PORTAL_TRANSITION_END') {
-      this.targetMix = 0;
+      this.blend.targetMix = 0;
     }
   }
 
   /** Réinitialise l'atmosphère (retour à la normale) sans dispose. */
   reset(): void {
-    this.targetMix = 0;
+    this.blend.targetMix = 0;
   }
 
   update(dt: number): void {
-    if (this.mix === 0 && this.targetMix === 0 && !this.visited) return;
+    if (this.blend.isIdle()) return;
 
-    this.pulseT += dt;
-
-    const step = dt / BLEND_DURATION;
-    if (this.mix < this.targetMix) {
-      this.mix = Math.min(this.targetMix, this.mix + step);
-    } else if (this.mix > this.targetMix) {
-      this.mix = Math.max(this.targetMix, this.mix - step);
-    }
-
-    this.applyMix(this.mix);
-
-    if (this.mix === 0 && this.targetMix === 0) {
-      this.visited = false;
-    }
+    const tick = this.blend.step(dt);
+    this.applyMix(tick.mix);
+    this.blend.releaseVisitedIfAtRest();
   }
 
   dispose(): void {
@@ -191,22 +172,17 @@ export class SacredRealmAtmosphere {
     this.shade = new PlayfieldShadeOverlay();
     this.sacredFog = null;
     this.savedFog = null;
-    this.mix = 0;
-    this.targetMix = 0;
-    this.lastAppliedMix = -1;
-    this.visited = false;
-    this.pulseT = 0;
+    this.blend.reset();
   }
 
   // ── Internals ───────────────────────────────────────────────────────────────
 
   private applyMix(t: number): void {
-    if (Math.abs(t - this.lastAppliedMix) < 0.001) return;
-    this.lastAppliedMix = t;
+    if (!this.blend.shouldApply(t)) return;
 
     // Smoothstep.
-    const ease = t * t * (3 - 2 * t);
-    const fullyActive = t >= 1 && this.targetMix >= 1;
+    const ease = AtmosphereBlend.ease(t);
+    const fullyActive = t >= 1 && this.blend.targetMix >= 1;
 
     // ── Matériaux : teinte violet sombre + assombrissement ──────────────────
     for (const entry of this.materials) {
@@ -243,7 +219,7 @@ export class SacredRealmAtmosphere {
     if (!fullyActive) {
       renderer.toneMappingExposure = THREE.MathUtils.lerp(this.origExposure, SACRED_EXPOSURE, ease);
     } else {
-      const wave = 0.5 + Math.sin(this.pulseT * SACRED_PULSE_SPEED) * 0.5;
+      const wave = 0.5 + Math.sin(this.blend.pulseT * SACRED_PULSE_SPEED) * 0.5;
       renderer.toneMappingExposure = THREE.MathUtils.lerp(SACRED_PULSE_EXP_MIN, SACRED_PULSE_EXP_MAX, wave);
     }
 

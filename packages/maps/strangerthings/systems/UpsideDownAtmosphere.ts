@@ -27,7 +27,7 @@ import {
 } from './UpsideDownConstants';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
-import { PlayfieldShadeOverlay } from '@pinball/game-engine';
+import { AtmosphereBlend, PlayfieldShadeOverlay } from '@pinball/game-engine';
 import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from '@pinball/game-engine';
 
 type MaterialKind = 'surface' | 'wall' | 'decor' | 'default';
@@ -68,7 +68,8 @@ type SporeParticle = {
 
 const _lerpColor = new THREE.Color();
 
-function sporeTexture(): THREE.CanvasTexture {
+function sporeTexture(): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
   c.width = 16;
   c.height = 16;
@@ -178,11 +179,7 @@ export class UpsideDownAtmosphere {
   private sporeMat: THREE.PointsMaterial | null = null;
   private sporeTex: THREE.CanvasTexture | null = null;
   private sporesEnabled = true;
-  private mix = 0;
-  private targetMix = 0;
-  private lastAppliedMix = -1;
-  private visited = false;
-  private pulseT = 0;
+  private blend = new AtmosphereBlend(UPSIDE_DOWN_ATMOSPHERE_BLEND);
   private revealLift = 0;
 
   private origBg = new THREE.Color();
@@ -247,68 +244,47 @@ export class UpsideDownAtmosphere {
     this.savedFog = config.lighting.scene.fog;
     this.upsideDownFog = new THREE.FogExp2(UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR, 0);
 
-    this.mix = 0;
-    this.targetMix = 0;
-    this.visited = false;
-    this.pulseT = 0;
+    this.blend.reset();
   }
 
   onGameEvent(event: GameEvent): void {
     if (event.type !== 'PORTAL_TRANSITION_END') return;
-    this.visited = true;
-    this.targetMix = 1;
+    this.blend.visited = true;
+    this.blend.targetMix = 1;
   }
 
   update(dt: number): void {
-    const fullyActive = this.mix >= 1 && this.targetMix >= 1;
-    if (this.mix === this.targetMix && this.targetMix === 0 && !this.visited && !fullyActive) return;
+    if (this.blend.isIdle()) return;
 
-    this.pulseT += dt;
+    const tick = this.blend.step(dt);
 
-    const step = dt / UPSIDE_DOWN_ATMOSPHERE_BLEND;
-    if (this.mix < this.targetMix) {
-      this.mix = Math.min(this.targetMix, this.mix + step);
-    } else if (this.mix > this.targetMix) {
-      this.mix = Math.max(this.targetMix, this.mix - step);
-    }
+    this.applyMix(tick.mix);
 
-    this.applyMix(this.mix);
-
-    if (fullyActive) {
+    if (tick.fullyActivePre) {
       this.applyLivePulse();
     }
 
-    let sporeIntensity = 0;
-    if (this.mix > 0) {
-      if (this.targetMix >= 1) {
-        sporeIntensity = this.mix >= 1 ? 1 : Math.max(0, (this.mix - 0.85) / 0.15);
-      } else {
-        sporeIntensity = this.mix;
-      }
-    }
-    this.updateSpores(dt, sporeIntensity);
+    this.updateSpores(dt, tick.sporeIntensity);
 
-    if (this.mix === 0 && this.targetMix === 0) {
-      this.visited = false;
-    }
+    this.blend.releaseVisitedIfAtRest();
   }
 
   reset(): void {
-    this.targetMix = 0;
+    this.blend.targetMix = 0;
     this.revealLift = 0;
   }
 
   setRevealLift(lift: number): void {
     this.revealLift = THREE.MathUtils.clamp(lift, 0, 1);
-    if (this.mix > 0) {
-      this.applyMix(this.mix);
+    if (this.blend.mix > 0) {
+      this.applyMix(this.blend.mix);
     }
   }
 
   debugForceActive(): void {
-    this.visited = true;
-    this.targetMix = 1;
-    this.mix = 1;
+    this.blend.visited = true;
+    this.blend.targetMix = 1;
+    this.blend.mix = 1;
     this.applyMix(1);
     this.updateSpores(0, 1);
   }
@@ -338,10 +314,7 @@ export class UpsideDownAtmosphere {
     this.sporeTex = null;
     this.savedFog = null;
     this.upsideDownFog = null;
-    this.mix = 0;
-    this.targetMix = 0;
-    this.visited = false;
-    this.pulseT = 0;
+    this.blend.reset();
     this.revealLift = 0;
   }
 
@@ -400,11 +373,11 @@ export class UpsideDownAtmosphere {
     for (let i = 0; i < this.spores.length; i++) {
       const spore = this.spores[i];
       spore.angle += spore.speed * dt;
-      const r = spore.radius * (0.9 + Math.sin(this.pulseT * 2.4 + spore.angle) * 0.1);
-      const lift = Math.sin(this.pulseT * spore.drift + spore.angle) * 0.014;
-      const wander = Math.sin(this.pulseT * 1.6 + spore.angle * 2.1) * 0.006;
+      const r = spore.radius * (0.9 + Math.sin(this.blend.pulseT * 2.4 + spore.angle) * 0.1);
+      const lift = Math.sin(this.blend.pulseT * spore.drift + spore.angle) * 0.014;
+      const wander = Math.sin(this.blend.pulseT * 1.6 + spore.angle * 2.1) * 0.006;
       pos[i * 3] = spore.anchorX + Math.cos(spore.angle) * r + wander;
-      pos[i * 3 + 1] = spore.baseY + lift + Math.sin(this.pulseT * 0.35 + spore.angle) * 0.018;
+      pos[i * 3 + 1] = spore.baseY + lift + Math.sin(this.blend.pulseT * 0.35 + spore.angle) * 0.018;
       pos[i * 3 + 2] = spore.anchorZ + Math.sin(spore.angle) * r - wander * 0.6;
     }
     this.sporeGeo.attributes.position.needsUpdate = true;
@@ -412,7 +385,7 @@ export class UpsideDownAtmosphere {
 
   private applyLivePulse(): void {
     if (!this.lighting) return;
-    const wave = 0.5 + Math.sin(this.pulseT * UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED) * 0.5;
+    const wave = 0.5 + Math.sin(this.blend.pulseT * UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED) * 0.5;
     const minExp = THREE.MathUtils.lerp(
       UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MIN,
       1.48,
@@ -428,11 +401,10 @@ export class UpsideDownAtmosphere {
 
   private applyMix(t: number): void {
     // Early return : ne retoucher les matériaux/lumières que si mix a bougé.
-    if (Math.abs(t - this.lastAppliedMix) < 0.001) return;
-    this.lastAppliedMix = t;
+    if (!this.blend.shouldApply(t)) return;
 
-    const ease = t * t * (3 - 2 * t);
-    const fullyActive = t >= 1 && this.targetMix >= 1;
+    const ease = AtmosphereBlend.ease(t);
+    const fullyActive = t >= 1 && this.blend.targetMix >= 1;
 
     for (const entry of this.materials) {
       const targets = materialTintTargets(entry.kind);
