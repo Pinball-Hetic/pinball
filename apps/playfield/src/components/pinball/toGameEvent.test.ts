@@ -184,4 +184,30 @@ describe("toGameEvent", () => {
       toGameEvent({ type: "TOTALLY_UNKNOWN" } as unknown as DevGameEventTrigger, NO_BOSSES),
     ).toBeNull();
   });
+
+  // Exhaustiveness net: this record is keyed by EVERY DevGameEventTrigger.type.
+  // Adding a new type to the union without listing it here fails typecheck
+  // (missing key); the runtime loop then asserts each maps to a non-null event,
+  // so a forgotten switch case in toGameEvent is caught at test time too.
+  const ALL_TYPES: Record<DevGameEventTrigger["type"], true> = {
+    BUMPER_HIT: true,
+    SLINGSHOT_HIT: true,
+    RAMP_HIT: true,
+    DROP_TARGET_COMPLETE: true,
+    BOSS_REVEAL: true,
+    BOSS_TARGET_HIT: true,
+    PORTAL_ENTER: true,
+    DRAIN: true,
+    BOTTOM_OUT: true,
+    BALL_LAUNCHED: true,
+    ASSIST: true,
+    DEBUG_ADD_SCORE: true,
+  };
+
+  it.each(Object.keys(ALL_TYPES) as Array<DevGameEventTrigger["type"]>)(
+    "maps every trigger type to a non-null GameEvent: %s",
+    (type) => {
+      expect(toGameEvent({ type }, TWO_BOSSES)).not.toBeNull();
+    },
+  );
 });

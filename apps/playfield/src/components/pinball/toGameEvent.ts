@@ -52,7 +52,12 @@ export function toGameEvent(d: DevGameEventTrigger, mapBosses: ResolvedMap['layo
       return { type: "BOTTOM_OUT" };
     case "BALL_LAUNCHED":
       return { type: "BALL_LAUNCHED" };
-    default:
+    default: {
+      // Exhaustiveness guard: adding a DevGameEventTrigger.type without a case
+      // above makes `d.type` non-`never` here → typecheck fails.
+      const _exhaustive: never = d.type;
+      void _exhaustive;
       return null;
+    }
   }
 }
