@@ -15,6 +15,11 @@ import {
   SWITCH_SENSOR_NODES,
 } from './GltfNodeNames';
 import { MeshRoleResolver } from './MeshRoleResolver';
+import {
+  ancestryMatchesSet,
+  mergeGeometryTuples,
+  resolveMaterialParams,
+} from './PlayfieldTrimeshRules';
 
 // Tuning matière par mesh (= manifest.elements). Passé en brut pour ne pas
 // coupler game-engine à shared-types.
@@ -28,10 +33,6 @@ function ancestryNames(obj: THREE.Object3D): string[] {
     cur = cur.parent;
   }
   return names;
-}
-
-function elemNum(v: number | string | undefined, def: number): number {
-  return typeof v === 'number' ? v : def;
 }
 
 const COLLISION_SOLIDS = new Set([
@@ -135,17 +136,7 @@ const PLASTIC_GROUPS = new Set([
 ]);
 
 function meshMatchesSet(mesh: THREE.Mesh, names: Set<string>): boolean {
-  const self = normalizeGltfName(mesh.name);
-  const selfCanon = canonicalGltfName(mesh.name);
-  if (names.has(self) || names.has(selfCanon)) return true;
-  let parent: THREE.Object3D | null = mesh.parent;
-  while (parent) {
-    const pn = normalizeGltfName(parent.name);
-    const pc = canonicalGltfName(parent.name);
-    if (names.has(pn) || names.has(pc)) return true;
-    parent = parent.parent;
-  }
-  return false;
+  return ancestryMatchesSet(ancestryNames(mesh), names);
 }
 
 function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
@@ -290,16 +281,11 @@ export class PlayfieldTrimeshBuilder {
     resolver.warnUnresolvedOnce();
 
     for (const [key, g] of groups) {
-      const el = elements[key] ?? {};
-      const restitution = elemNum(el.restitution, 0.35);
-      const friction = elemNum(el.friction, 0.15);
-      const singleSided = el.singleSided === 1;
-      const doubleSided = el.doubleSided !== undefined ? el.doubleSided === 1 : !singleSided;
       // Lissage laplacien réservé au sol (anti-accroche au roulement).
       // Sur un mur concave il aplatit la concavité → corde de collision
       // fantôme. Défaut: floor lissé, wall/lane bruts. Override via manifest.
-      const defaultSmooth = g.role === 'floor';
-      const smooth = el.smooth !== undefined ? el.smooth === 1 : defaultSmooth;
+      const { restitution, friction, smooth, doubleSided } =
+        resolveMaterialParams(elements[key], g.role);
       PlayfieldTrimeshBuilder.createTrimeshCollider(
         world, g.geos, restitution, friction, smooth, doubleSided,
       );
@@ -559,20 +545,14 @@ export class PlayfieldTrimeshBuilder {
   }
 
   private static mergeGeos(geos: THREE.BufferGeometry[]): { verts: number[]; indices: number[] } {
-    const verts: number[] = [];
-    const indices: number[] = [];
-    let offset = 0;
-    for (const g of geos) {
-      const posAttr = g.getAttribute('position') as THREE.BufferAttribute;
-      for (let i = 0; i < posAttr.count; i++) {
-        verts.push(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
-      }
-      const idxArr = g.index
-        ? Array.from(g.index.array as ArrayLike<number>)
-        : Array.from({ length: posAttr.count }, (_, k) => k);
-      for (const idx of idxArr) indices.push(idx + offset);
-      offset += posAttr.count;
-    }
-    return { verts, indices };
+    return mergeGeometryTuples(
+      geos.map((g) => {
+        const posAttr = g.getAttribute('position') as THREE.BufferAttribute;
+        return {
+          positions: posAttr.array as ArrayLike<number>,
+          index: g.index ? (g.index.array as ArrayLike<number>) : null,
+        };
+      }),
+    );
   }
 }
