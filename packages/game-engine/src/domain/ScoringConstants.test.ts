@@ -31,7 +31,7 @@ describe('ScoringConstants invariants', () => {
     expect(SCORE_DROP_COMPLETE).toBeGreaterThan(SCORE_DROP_TARGET);
   });
 
-  test('the ramp is the highest single per-hit score (excl. completion bonus)', () => {
+  test('the bumper is the highest single per-hit score (excl. completion bonus)', () => {
     const perHit = [
       SCORE_BUMPER,
       SCORE_BUMP,
@@ -40,7 +40,7 @@ describe('ScoringConstants invariants', () => {
       SCORE_RAMP,
       SCORE_DROP_TARGET,
     ];
-    expect(Math.max(...perHit)).toBe(SCORE_RAMP);
+    expect(Math.max(...perHit)).toBe(SCORE_BUMPER);
   });
 
   test('slingshot is the lowest-value event', () => {
@@ -48,7 +48,7 @@ describe('ScoringConstants invariants', () => {
   });
 
   test('exposes the expected score values', () => {
-    expect(SCORE_BUMPER).toBe(100);
+    expect(SCORE_BUMPER).toBe(1000);
     expect(SCORE_BUMP).toBe(30);
     expect(SCORE_SLINGSHOT).toBe(10);
     expect(SCORE_POP_ZONE).toBe(50);

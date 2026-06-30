@@ -1,4 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
+import type { IMapBallPhysics } from '../domain/IBallPhysics';
 import {
   getBallRadius,
   BALL_MASS,
@@ -14,7 +15,7 @@ import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
 import type { IBallPhysics } from '../use-cases/LaunchBall';
 import type { IBumperEject } from '../use-cases/BumperHit';
 
-export class BallPhysics implements IBallPhysics, IBumperEject {
+export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics {
   public readonly body: RAPIER.RigidBody;
   public readonly collider: RAPIER.Collider;
 

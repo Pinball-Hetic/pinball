@@ -12,6 +12,8 @@ import {
 import { RETURN_PORTAL_TEXTURE_URL } from '../systems/UpsideDownConstants'
 import { bossThresholdMet } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
+import { grantExtraLife } from './lifeBonus'
+import { createLastLifeRescue } from './lastLifeRescue'
 
 // Module de comportement Stranger Things. Possède tous ses systèmes en
 // closure ; n'expose que le contrat MapModule (aucun bridge vers le
@@ -34,6 +36,7 @@ export function createModule(): MapModule {
   let bossReveals: BossRevealOrchestrator | null = null
   let demogorgonReveal: DemogorgonReveal | null = null
   let vecnaReveal: VecnaReveal | null = null
+  const lastLifeRescue = createLastLifeRescue()
   return {
     setup(ctx: MapContext): void {
       ctxRef = ctx
@@ -102,6 +105,10 @@ export function createModule(): MapModule {
       bossReveals = new BossRevealOrchestrator()
       bossReveals.register(demogorgonReveal).register(vecnaReveal)
       vecnaReveal.bindUpsideDownAtmosphere(atmosphere)
+
+      ctx.root.traverse((obj) => {
+        if (obj.name.includes('stangerthing_plate')) obj.visible = false
+      })
     },
     async preload(): Promise<void> {
       const ctx = ctxRef
@@ -118,6 +125,7 @@ export function createModule(): MapModule {
       if (e.type === 'BOSS_TARGET_HIT' && ctx) {
         const boss = ctx.layout.bosses.find((b) => b.id === e.bossId)
         if (boss && e.hitCount >= boss.targetHits) {
+          grantExtraLife(ctx)
           portal?.notifyBossDefeated(e.bossId, ctx.bossGateContext().alternateWorldActive)
         }
       }
@@ -125,6 +133,7 @@ export function createModule(): MapModule {
       bossReveals?.onGameEvent(e)
 
       if (!ctx) return
+      lastLifeRescue.onGameEvent(ctx, e)
       if (e.type === 'BOSS_LOCKED_HIT') {
         ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
       }
@@ -327,6 +336,7 @@ export function createModule(): MapModule {
       demogorgons = 0
       portals = 0
       hetic = 0
+      lastLifeRescue.reset()
       for (const k of Object.keys(armedAt)) delete armedAt[k]
       hintFired.clear()
       nestMarker?.reset()

@@ -75,7 +75,7 @@ export const manifest: MapManifest = {
   glb: mapAsset('playfield/newStrangerthings.glb'),
   // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
   scoring: {
-    bumper: 100, // SCORE_BUMPER
+    bumper: 1000, // SCORE_BUMPER
     bump: 30, // SCORE_BUMP
     slingshot: 10, // SCORE_SLINGSHOT
     popZone: 50, // SCORE_POP_ZONE
