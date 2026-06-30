@@ -3,7 +3,11 @@
 export * from './palette';
 export * from './fonts';
 export * from './dmdGrid';
-export { DmdRenderer } from './DmdRenderer';
+export {
+  DmdRenderer,
+  documentSpriteFactory,
+  type SpriteFactory,
+} from './DmdRenderer';
 export * from './effects';
 export * from './AsciiClipPlayer';
 export * from './layoutHelpers';

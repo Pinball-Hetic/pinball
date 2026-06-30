@@ -1,5 +1,12 @@
 import { test, expect, describe, beforeEach, afterEach } from 'bun:test'
-import { DmdRenderer, GRID_W, GRID_H, PITCH } from './DmdRenderer'
+import {
+  DmdRenderer,
+  documentSpriteFactory,
+  GRID_W,
+  GRID_H,
+  PITCH,
+  type SpriteFactory,
+} from './DmdRenderer'
 import { INDEX_TO_COLOR, PALETTE_NORMAL, type Palette } from './palette'
 
 // --- Faux canvas / contexte 2D -------------------------------------------
@@ -221,6 +228,83 @@ describe('buildSprites (via construction)', () => {
   test('ne crée aucun gradient quand le ctx offscreen est null', () => {
     spriteCanvasContextAvailable = false
     new DmdRenderer(makeFakeCanvas([]))
+    expect(
+      spriteCalls.filter((c) => c.method === 'createRadialGradient').length,
+    ).toBe(0)
+  })
+})
+
+describe('SpriteFactory injectée (sans document global)', () => {
+  test('buildSprites appelle la factory une fois par couleur, dans l ordre', () => {
+    // Pas besoin du document global : la factory est injectée. On retire
+    // le stub pour prouver qu il n est jamais touché.
+    delete (globalThis as { document?: unknown }).document
+    const seen: string[] = []
+    const fakeFactory: SpriteFactory = (color) => {
+      seen.push(color)
+      return null
+    }
+    new DmdRenderer(makeFakeCanvas([]), fakeFactory)
+    expect(seen.length).toBe(INDEX_TO_COLOR.length)
+    expect(seen).toEqual(INDEX_TO_COLOR.map((c) => PALETTE_NORMAL[c]))
+  })
+
+  test('render dessine pour chaque sprite non-null renvoyé par la factory', () => {
+    delete (globalThis as { document?: unknown }).document
+    const fakeSprite = { width: PITCH, height: PITCH } as HTMLCanvasElement
+    const fakeFactory: SpriteFactory = () => fakeSprite
+    const calls: Call[] = []
+    const r = new DmdRenderer(makeFakeCanvas(calls), fakeFactory)
+    r.grid[0] = 1
+    calls.length = 0
+    r.render()
+    const draws = calls.filter((c) => c.method === 'drawImage')
+    expect(draws.length).toBe(1)
+    expect(draws[0].args[0]).toBe(fakeSprite)
+  })
+
+  test('render saute les dots dont la factory renvoie null', () => {
+    delete (globalThis as { document?: unknown }).document
+    const fakeFactory: SpriteFactory = () => null
+    const calls: Call[] = []
+    const r = new DmdRenderer(makeFakeCanvas(calls), fakeFactory)
+    r.grid[0] = 1
+    calls.length = 0
+    r.render()
+    expect(calls.filter((c) => c.method === 'drawImage').length).toBe(0)
+  })
+
+  test('setPalette repasse les nouvelles couleurs à la factory', () => {
+    delete (globalThis as { document?: unknown }).document
+    const seen: string[] = []
+    const fakeFactory: SpriteFactory = (color) => {
+      seen.push(color)
+      return null
+    }
+    const r = new DmdRenderer(makeFakeCanvas([]), fakeFactory)
+    seen.length = 0
+    const custom: Palette = { ...PALETTE_NORMAL, score: '#010203' }
+    r.setPalette(custom)
+    expect(seen).toEqual(INDEX_TO_COLOR.map((c) => custom[c]))
+  })
+})
+
+describe('documentSpriteFactory (impl par défaut)', () => {
+  test('dimensionne le canvas offscreen à PITCH et crée le gradient halo', () => {
+    spriteCanvasContextAvailable = true
+    const sprite = documentSpriteFactory(PALETTE_NORMAL.score)
+    expect(sprite).not.toBeNull()
+    expect(sprite?.width).toBe(PITCH)
+    expect(sprite?.height).toBe(PITCH)
+    const grads = spriteCalls.filter((c) => c.method === 'createRadialGradient')
+    expect(grads.length).toBe(1)
+    expect(grads[0].args).toEqual([PITCH / 2, PITCH / 2, 0, PITCH / 2, PITCH / 2, PITCH / 2])
+  })
+
+  test('renvoie le canvas sans gradient quand le ctx 2D est indisponible', () => {
+    spriteCanvasContextAvailable = false
+    const sprite = documentSpriteFactory(PALETTE_NORMAL.score)
+    expect(sprite).not.toBeNull()
     expect(
       spriteCalls.filter((c) => c.method === 'createRadialGradient').length,
     ).toBe(0)
