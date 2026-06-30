@@ -58,8 +58,17 @@
 >    `LeaderboardGateway` + adapter prisma + factories. **`mock.module` éliminé partout →
 >    script server = un seul `bun test` (69 tests)**. Bonus **S5** ✅ (`anonName`/
 >    `aggregateCounters` exportés + testés). **S4** partiel : `IoLike` narrowed, cast socket subsiste.
-> 4. **Reste** : G2/G3 (extractions pures collider/triangle), M1/M2 (dedup + reveal machine),
->    P1-play (god-component playfield), D1 (DmdRenderer view/model). Détail ci-dessous.
+> 4. **Reste** : G2 (planner collider), M2 (reveal machine), P1-play EventRouter (god-component),
+>    D1 (DmdRenderer view/model). Détail ci-dessous.
+>    ✅ FAITS dans la passe P1 : **M1** (`9543369` dedup orchestrator), **G3** (`54370ba`
+>    FlipperGeometrySplit pur), **P1-play/toGameEvent** (`e6bc1b1` extrait + 20 tests).
+>
+> **Découverts pendant la passe P1 (backlog évolutif)** :
+> - **N1** `DevGameEventTrigger.type` (shared-types) ↔ le switch de `toGameEvent` sont des
+>   unions string tenues en phase **à la main** → un nouveau type de trigger tombe en silence
+>   dans `default → null`. Reco : source unique (map type→handler) ou test exhaustif sur l'union. P3.
+> - **N2** `PinballPlayfield.tsx` reste ~2000 L ; prochains purs extractibles : le wrapper `emit`
+>   + le dispatch `onGameEvent` (~1150-1290) + boss-event (~1242) = cœur de **P1-play EventRouter**. P1.
 >
 > > Note coverage : S1/S2 ajoutent du code d'**adapter/composition root** (`PrismaGameRepository`,
 > > `index.ts`) intentionnellement non testé en unit (territoire intégration/e2e) → le % brut
