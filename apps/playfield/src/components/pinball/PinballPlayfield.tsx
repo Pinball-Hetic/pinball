@@ -64,13 +64,6 @@ import {
   type PlayfieldCameraDebugTuning,
   BallTrail,
   QualityGovernor,
-  PORTAL_ENTER_SCORE,
-  ASSIST_SCORE,
-  SCORE_BUMPER,
-  SCORE_SLINGSHOT,
-  SCORE_RAMP,
-  SCORE_DROP_COMPLETE,
-  type GameEvent,
   ShooterLaneGate,
 } from "@pinball/game-engine";
 import { getBossById } from "@pinball/game-engine";
@@ -81,7 +74,6 @@ import type {
   ButtonAction,
   ButtonId,
   CinematicClip,
-  DevGameEventTrigger,
   GameAction,
 } from "@pinball/shared-types";
 import { BUTTON_ACTION, CABINET_BUTTONS, clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
@@ -91,51 +83,7 @@ const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 // fallback si aucun mapId n'est fourni en prop.
 const DEFAULT_RESOLVED_MAP = getMapPackage(MAP_ID);
 
-// Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
-function toGameEvent(d: DevGameEventTrigger, mapBosses: ResolvedMap['layout']['bosses']): GameEvent | null {
-  switch (d.type) {
-    case "BUMPER_HIT":
-      return { type: "BUMPER_HIT", bumperIndex: 0, scoreIncrement: SCORE_BUMPER };
-    case "SLINGSHOT_HIT":
-      return { type: "SLINGSHOT_HIT", side: "left", scoreIncrement: SCORE_SLINGSHOT };
-    case "RAMP_HIT":
-      return { type: "RAMP_HIT", scoreIncrement: SCORE_RAMP };
-    case "DROP_TARGET_COMPLETE":
-      return { type: "DROP_TARGET_COMPLETE", side: "left", scoreIncrement: SCORE_DROP_COMPLETE };
-    case "BOSS_REVEAL": {
-      const bossId = d.bossId ?? mapBosses[0]?.id ?? "";
-      return {
-        type: "BOSS_REVEAL",
-        bossId,
-        scoreIncrement: getBossById(mapBosses, bossId)?.reveal.scoreIncrement ?? 150,
-      };
-    }
-    case "BOSS_TARGET_HIT": {
-      const bossId = d.bossId ?? mapBosses[0]?.id ?? "";
-      return {
-        type: "BOSS_TARGET_HIT",
-        bossId,
-        hitCount: d.hitCount ?? 1,
-        scoreIncrement: getBossById(mapBosses, bossId)?.scoreTargetHit ?? 250,
-      };
-    }
-    case "PORTAL_ENTER":
-      return { type: "PORTAL_ENTER", scoreIncrement: PORTAL_ENTER_SCORE };
-    case "ASSIST":
-      return { type: "ASSIST", assistId: "assist", scoreIncrement: ASSIST_SCORE };
-    case "DEBUG_ADD_SCORE":
-      // Score brut → le pipeline score/paliers réagit naturellement.
-      return { type: "ZONE_HIT", zone: "debug", scoreIncrement: d.amount ?? 1000 };
-    case "DRAIN":
-      return { type: "DRAIN" };
-    case "BOTTOM_OUT":
-      return { type: "BOTTOM_OUT" };
-    case "BALL_LAUNCHED":
-      return { type: "BALL_LAUNCHED" };
-    default:
-      return null;
-  }
-}
+import { toGameEvent } from "./toGameEvent";
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
