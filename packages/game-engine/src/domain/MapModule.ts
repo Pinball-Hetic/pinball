@@ -24,7 +24,6 @@ export interface MapContext {
   scene: THREE.Scene;
   root: THREE.Object3D;
   camera: THREE.Camera;
-  // abstraction du moteur physique — pas de Rapier direct ici
   physics: IPhysicsWorld;
   layout: MapLayout;
   manifest: MapManifest;
@@ -39,7 +38,6 @@ export interface MapContext {
   enterAlternateWorld(): void;
   playSound(id: string): void;
   refreshScoreSnapshot(): void;
-  // amount ∈ ~[0..1]
   screenShake(amount: number): void;
   isFeverActive(): boolean;
   gameState(): string;
