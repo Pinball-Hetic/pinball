@@ -49,6 +49,19 @@ export class WalkPathProgress {
 }
 
 /**
+ * Placement statique d'un boss sur le tapis incliné : même formule que
+ * WalkPathProgress.positionAt(1). Verbatim des *TargetVisual (ST + Zelda) :
+ * { x, y: surfaceYAtZ(z) + footLift, z }. surfaceYAtZ injecté (DIP).
+ */
+export function surfacePoint(
+  target: WalkPathPoint,
+  footLift: number,
+  surfaceYAtZ: (z: number) => number,
+): WalkPathPosition {
+  return { x: target.x, y: surfaceYAtZ(target.z) + footLift, z: target.z };
+}
+
+/**
  * Yaw du modèle pour faire face à la caméra (billboard sur l'axe Y).
  * Verbatim des *TargetVisual : atan2(camX - anchorX, camZ - anchorZ) + yaw.
  */

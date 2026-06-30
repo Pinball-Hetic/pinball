@@ -12,7 +12,7 @@ import {
   DEMOGORGON_MODEL_FOOT_LIFT,
   DEMOGORGON_MODEL_YAW,
 } from './DemogorgonConstants';
-import { PLAYFIELD_TILT, surfaceYAtZ, cameraFacingYaw } from '@pinball/game-engine';
+import { PLAYFIELD_TILT, surfaceYAtZ, surfacePoint, cameraFacingYaw } from '@pinball/game-engine';
 import { findGltfAnimationClip } from '@pinball/game-engine';
 import { createGltfLoader } from '@pinball/game-engine';
 import {
@@ -20,37 +20,31 @@ import {
   fitSkinnedModelWithRetry,
 } from '@pinball/game-engine';
 import { warmupObject3D } from '@pinball/game-engine';
-
-type AnimState = 'idle' | 'hit' | 'victory';
+import { BossActorAnimator } from '@pinball/game-engine';
 
 const _facingPos = new THREE.Vector3();
 
 export class DemogorgonTargetVisual {
   private anchor: THREE.Group | null = null;
   private camera: THREE.Camera | null = null;
-  private mixer: THREE.AnimationMixer | null = null;
-  private idleAction: THREE.AnimationAction | null = null;
-  private hitAction: THREE.AnimationAction | null = null;
-  private victoryAction: THREE.AnimationAction | null = null;
-  private animState: AnimState = 'idle';
-  private pulseT = 0;
-  private hitFlash = 0;
   private rig: THREE.Group | null = null;
   private offset: THREE.Group | null = null;
   private pendingFit: THREE.Object3D | null = null;
-  private glowLight: THREE.PointLight | null = null;
   private loadPromise: Promise<void> | null = null;
+  private readonly animator = new BossActorAnimator({
+    color: 0xff5533,
+    distance: 0.38,
+    decay: 2,
+    y: 0.03,
+  });
 
   mount(parent: THREE.Object3D, camera: THREE.Camera): void {
     this.dispose();
     this.camera = camera;
 
     const anchor = new THREE.Group();
-    anchor.position.set(
-      DEMOGORGON_TARGET.x,
-      surfaceYAtZ(DEMOGORGON_TARGET.z) + DEMOGORGON_MODEL_FOOT_LIFT,
-      DEMOGORGON_TARGET.z,
-    );
+    const p = surfacePoint(DEMOGORGON_TARGET, DEMOGORGON_MODEL_FOOT_LIFT, surfaceYAtZ);
+    anchor.position.set(p.x, p.y, p.z);
     anchor.rotation.x = PLAYFIELD_TILT;
     anchor.visible = false;
     parent.add(anchor);
@@ -61,8 +55,7 @@ export class DemogorgonTargetVisual {
     this.rig = rig;
 
     // PointLight ajoutée à la scène SEULEMENT pendant le fight (show/hide).
-    this.glowLight = new THREE.PointLight(0xff5533, 0, 0.38, 2);
-    this.glowLight.position.y = 0.03;
+    this.animator.createGlowLight();
 
     this.loadPromise = this.loadModel();
   }
@@ -80,94 +73,47 @@ export class DemogorgonTargetVisual {
       () => this.anchor !== null,
     );
     this.syncFacing();
-    const primeActions = [this.idleAction, this.hitAction, this.victoryAction].filter(
-      (action): action is THREE.AnimationAction => action !== null,
-    );
     await warmupObject3D(renderer, scene, camera, this.anchor, {
-      mixer: this.mixer,
-      primeActions,
+      mixer: this.animator.currentMixer,
+      primeActions: this.animator.primeActions(),
     });
   }
 
   show(): void {
     if (this.anchor) this.anchor.visible = true;
-    if (this.glowLight && this.anchor && !this.glowLight.parent) {
-      this.anchor.add(this.glowLight);
-    }
-    this.playIdle();
+    if (this.anchor) this.animator.show(this.anchor);
   }
 
   hide(): void {
-    if (this.anchor) {
-      this.anchor.visible = false;
-      this.anchor.scale.setScalar(1);
-      this.anchor.rotation.z = 0;
-    }
-    this.animState = 'idle';
-    this.hitFlash = 0;
-    if (this.glowLight) {
-      this.glowLight.intensity = 0;
-      this.glowLight.removeFromParent(); // hors scène hors fight
-    }
+    if (this.anchor) this.anchor.visible = false;
+    this.animator.hide(this.anchor);
   }
 
   playHit(): void {
-    if (!this.mixer || !this.hitAction || !this.idleAction) return;
-    this.animState = 'hit';
-    this.hitFlash = 0.18;
-    this.hitAction.reset();
-    this.hitAction.setLoop(THREE.LoopOnce, 1);
-    this.hitAction.clampWhenFinished = true;
-    this.hitAction.crossFadeFrom(this.idleAction, 0.08, true).play();
+    this.animator.playHit();
   }
 
   playVictory(): void {
-    if (!this.mixer || !this.victoryAction || !this.idleAction) {
-      this.playIdle();
-      return;
-    }
-    this.animState = 'victory';
-    this.victoryAction.reset();
-    this.victoryAction.setLoop(THREE.LoopOnce, 1);
-    this.victoryAction.clampWhenFinished = true;
-    const from = this.hitAction?.isRunning() ? this.hitAction : this.idleAction;
-    this.victoryAction.crossFadeFrom(from, 0.12, true).play();
+    this.animator.playVictory();
   }
 
   update(dt: number): void {
     if (this.pendingFit) this.applyFit();
     if (!this.anchor?.visible) return;
 
-    this.mixer?.update(dt);
     this.syncFacing();
-
-    if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
-
-    this.pulseT += dt;
-    const hitBoost = this.hitFlash > 0 ? 1.4 : 1;
-    const pulse = (0.82 + Math.sin(this.pulseT * 2.5) * 0.12) * hitBoost;
-    if (this.glowLight) this.glowLight.intensity = 0.42 * pulse;
-
-    const scale = 1 + (this.hitFlash / 0.18) * 0.2;
-    this.anchor.scale.setScalar(scale);
+    this.animator.update(dt, this.anchor);
   }
 
   dispose(): void {
     if (this.anchor) this.anchor.parent?.remove(this.anchor);
     this.anchor = null;
     this.camera = null;
-    this.mixer = null;
-    this.idleAction = null;
-    this.hitAction = null;
-    this.victoryAction = null;
-    this.glowLight = null;
     this.rig = null;
     this.offset = null;
     this.pendingFit = null;
-    this.animState = 'idle';
-    this.hitFlash = 0;
-    this.pulseT = 0;
     this.loadPromise = null;
+    this.animator.reset(false);
   }
 
   private async loadModel(): Promise<void> {
@@ -181,18 +127,19 @@ export class DemogorgonTargetVisual {
         DEMOGORGON_MODEL_FIT_FRAMES,
         () => this.anchor !== null,
       );
-      if (this.anchor?.visible) this.playIdle();
+      if (this.anchor?.visible) this.animator.playIdle();
     } catch (err) {
       console.error('[Demogorgon] load error:', err);
     }
   }
 
   private preparePoseForFit(): void {
-    if (this.idleAction) {
-      this.idleAction.play();
-      this.idleAction.time = 0;
+    const idle = this.animator.idle;
+    if (idle) {
+      idle.play();
+      idle.time = 0;
     }
-    this.mixer?.update(0);
+    this.animator.currentMixer?.update(0);
     this.pendingFit?.updateWorldMatrix(true, true);
     this.pendingFit?.traverse((obj) => {
       if (obj instanceof THREE.SkinnedMesh) obj.skeleton.update();
@@ -255,40 +202,32 @@ export class DemogorgonTargetVisual {
       }
     });
 
-    this.mixer = new THREE.AnimationMixer(model);
+    const mixer = new THREE.AnimationMixer(model);
     const idleClip = findGltfAnimationClip(clips, DEMOGORGON_ANIM_IDLE);
     const hitClip = findGltfAnimationClip(clips, DEMOGORGON_ANIM_HIT);
     const victoryClip =
       findGltfAnimationClip(clips, DEMOGORGON_ANIM_VICTORY) ??
       findGltfAnimationClip(clips, DEMOGORGON_ANIM_VICTORY_FALLBACK);
 
+    let idleAction: THREE.AnimationAction | null = null;
+    let hitAction: THREE.AnimationAction | null = null;
+    let victoryAction: THREE.AnimationAction | null = null;
+
     if (idleClip) {
-      this.idleAction = this.mixer.clipAction(idleClip);
-      this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
+      idleAction = mixer.clipAction(idleClip);
+      idleAction.setLoop(THREE.LoopRepeat, Infinity);
     }
     if (hitClip) {
-      this.hitAction = this.mixer.clipAction(hitClip);
-      this.hitAction.setLoop(THREE.LoopOnce, 1);
-      this.hitAction.clampWhenFinished = true;
+      hitAction = mixer.clipAction(hitClip);
+      hitAction.setLoop(THREE.LoopOnce, 1);
+      hitAction.clampWhenFinished = true;
     }
     if (victoryClip) {
-      this.victoryAction = this.mixer.clipAction(victoryClip);
-      this.victoryAction.setLoop(THREE.LoopOnce, 1);
-      this.victoryAction.clampWhenFinished = true;
+      victoryAction = mixer.clipAction(victoryClip);
+      victoryAction.setLoop(THREE.LoopOnce, 1);
+      victoryAction.clampWhenFinished = true;
     }
 
-    this.mixer.addEventListener('finished', (event) => {
-      if (event.action === this.hitAction && this.animState === 'hit') {
-        this.playIdle();
-      }
-    });
-  }
-
-  private playIdle(): void {
-    if (!this.idleAction) return;
-    this.animState = 'idle';
-    this.idleAction.reset();
-    this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
-    this.idleAction.fadeIn(0.12).play();
+    this.animator.setActions({ mixer, idleAction, hitAction, victoryAction });
   }
 }

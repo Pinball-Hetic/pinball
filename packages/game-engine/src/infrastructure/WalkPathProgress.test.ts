@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'bun:test';
 import {
   WalkPathProgress,
+  surfacePoint,
   cameraFacingYaw,
   pathFacingYaw,
 } from './WalkPathProgress';
@@ -72,6 +73,33 @@ describe('WalkPathProgress.positionAt', () => {
     const p = path.positionAt(5);
     expect(p.x).toBeCloseTo(0.1, 12);
     expect(p.z).toBeCloseTo(0.2, 12);
+  });
+});
+
+describe('surfacePoint', () => {
+  it('keeps x/z and lifts y to surfaceYAtZ(z) + footLift', () => {
+    const footLift = 0.03;
+    const p = surfacePoint({ x: 0.12, z: -0.25 }, footLift, surfaceYAtZ);
+    expect(p.x).toBeCloseTo(0.12, 12);
+    expect(p.z).toBeCloseTo(-0.25, 12);
+    expect(p.y).toBeCloseTo(surfaceYAtZ(-0.25) + footLift, 12);
+  });
+
+  it('matches WalkPathProgress.positionAt(1) for the same target/footLift', () => {
+    const target = { x: 0.1, z: 0.2 };
+    const footLift = 0.05;
+    const path = new WalkPathProgress({ x: -0.2, z: -0.3 }, target, footLift, 2);
+    const fromPath = path.positionAt(1);
+    const fromPoint = surfacePoint(target, footLift, surfaceYAtZ);
+    expect(fromPoint.x).toBeCloseTo(fromPath.x, 12);
+    expect(fromPoint.y).toBeCloseTo(fromPath.y, 12);
+    expect(fromPoint.z).toBeCloseTo(fromPath.z, 12);
+  });
+
+  it('uses the injected surfaceYAtZ', () => {
+    const flat = () => 1;
+    const p = surfacePoint({ x: 0.5, z: 0.5 }, 0.1, flat);
+    expect(p.y).toBeCloseTo(1.1, 12);
   });
 });
 
