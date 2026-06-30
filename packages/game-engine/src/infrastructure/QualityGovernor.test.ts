@@ -5,8 +5,8 @@ import { QualityGovernor, type QualityTier } from './QualityGovernor';
 const WINDOW = 60;
 const DOWN_MS = 19;
 const UP_MS = 12;
-const UP_HOLD_MS = 5000;
-const COOLDOWN_MS = 3000;
+const _UP_HOLD_MS = 5000;
+const _COOLDOWN_MS = 3000;
 
 // Avance le gouverneur de `count` frames à un frame time constant.
 function feed(g: QualityGovernor, ms: number, count: number): void {
