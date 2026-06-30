@@ -52,9 +52,19 @@
 > **Plan d'attaque révisé (ROI, sans 3D fragile)** :
 > 1. ~~Tester ce que dev a déjà découplé~~ ✅ FAIT (handlers + gameStateUtils, +69 tests).
 > 1bis. ~~Injecter `now()` (débloque throttles)~~ ✅ FAIT (étape 2).
-> 2. **Finir S2** (factory `createApp/createSocketGateway`) → 3 passes server → 1 `bun test`.
-> 3. **S1** ports use-cases (supprime tout `mock.module`).
-> 4. Puis G2/G3/M1/M2 (extractions pures) selon le détail ci-dessous.
+> 2. ~~**S2** factory `createApp`/`createSocketGateway`~~ ✅ FAIT (`715652e`) — index.ts =
+>    composition root mince (entry/deploy inchangés), tests interface sans `mock.module`.
+> 3. ~~**S1** ports use-cases~~ ✅ FAIT (`622b963`) — `GameRepository`/`ScoreGateway`/
+>    `LeaderboardGateway` + adapter prisma + factories. **`mock.module` éliminé partout →
+>    script server = un seul `bun test` (69 tests)**. Bonus **S5** ✅ (`anonName`/
+>    `aggregateCounters` exportés + testés). **S4** partiel : `IoLike` narrowed, cast socket subsiste.
+> 4. **Reste** : G2/G3 (extractions pures collider/triangle), M1/M2 (dedup + reveal machine),
+>    P1-play (god-component playfield), D1 (DmdRenderer view/model). Détail ci-dessous.
+>
+> > Note coverage : S1/S2 ajoutent du code d'**adapter/composition root** (`PrismaGameRepository`,
+> > `index.ts`) intentionnellement non testé en unit (territoire intégration/e2e) → le % brut
+> > server descend (≈61%) alors que la **logique métier** (use-cases/routes/gateway/handlers) est ~100%.
+> > Le gain S1/S2 est **architectural** (testabilité, DI, single-pass), pas le % brut.
 >
 > ---
 
