@@ -1,4 +1,3 @@
-import type { Server, Socket } from 'socket.io';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -10,11 +9,52 @@ import type { GameStateManager } from '../infrastructure/GameStateManager';
 
 const INPUT_BRIDGE_ROOM = 'input-bridge';
 
-type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
-// Typed seams: SocketLike keeps event-payload typing (so `data` is inferred),
-// IoLike narrows the server to the two methods the handler uses.
-export type SocketLike = Socket<ClientToServerEvents, ServerToClientEvents>;
-export type IoLike = Pick<TypedServer, 'emit' | 'to'>;
+// Simple relay events: log + broadcast the payload verbatim to everyone.
+// Non-trivial handlers (map:select, dev:simulate-button, game:over, disconnect)
+// stay explicit below. Both keys of this list and the broadcast target are the
+// SAME event name — these are pure pass-through relays.
+const RELAY_EVENTS = [
+  'input:button',
+  'input:tilt',
+  'input:sensor',
+  'score:update',
+  'game:start',
+  'dmd:display',
+  'dev:trigger-game-event',
+] as const satisfies readonly (keyof ClientToServerEvents & keyof ServerToClientEvents)[];
+
+// Narrow structural seams (DIP): only the members the connection handler
+// actually touches. Both the real socket.io `Server`/`Socket` (composition
+// root) AND the unit-test fakes satisfy these — no `as unknown` double-cast.
+//
+// Listeners/emitters are typed against the event maps so payloads stay
+// inferred. The signatures are deliberately wide enough (a single broad
+// overload covering every event) that socket.io's per-event overloaded
+// methods remain assignable to them structurally.
+
+type ListenerFor<E> = E extends (...args: infer A) => void ? (...args: A) => void : never;
+
+export interface Emitter<EmitEvents> {
+  emit<Ev extends keyof EmitEvents>(event: Ev, ...args: Parameters<ListenerFor<EmitEvents[Ev]>>): boolean;
+}
+
+export interface IoLike extends Emitter<ServerToClientEvents> {
+  to(room: string): Emitter<ServerToClientEvents>;
+}
+
+export interface SocketLike extends Emitter<ServerToClientEvents> {
+  readonly id: string;
+  readonly handshake: { auth: unknown };
+  join(room: string): void | Promise<void>;
+  // Return is intentionally `void`: socket.io's real `on` returns `this`,
+  // which is assignable to a void-returning signature, while test fakes can
+  // return nothing — both satisfy this without a cast.
+  on<Ev extends keyof ClientToServerEvents>(
+    event: Ev,
+    listener: ListenerFor<ClientToServerEvents[Ev]>,
+  ): void;
+  on(event: 'disconnect', listener: () => void): void;
+}
 
 /**
  * Collaborators the socket gateway needs. Injected (DIP) so the connection
@@ -53,20 +93,13 @@ export function createSocketGateway(deps: SocketGatewayDeps) {
       io.emit('map:selected', { mapId });
     });
 
-    socket.on('input:button', (data) => {
-      console.log('[server] input:button', data.id, data.action, '→ broadcast');
-      io.emit('input:button', data);
-    });
-
-    socket.on('input:tilt', (data) => {
-      console.log('[server] input:tilt', data.state, '→ broadcast');
-      io.emit('input:tilt', data);
-    });
-
-    socket.on('input:sensor', (data) => {
-      console.log('[server] input:sensor', data.id, data.value, '→ broadcast');
-      io.emit('input:sensor', data);
-    });
+    // Data-driven relays (OCP/DRY): each just logs + broadcasts verbatim.
+    for (const event of RELAY_EVENTS) {
+      socket.on(event, (...args: unknown[]) => {
+        console.log('[server]', event, '→ broadcast');
+        io.emit(event, ...(args as Parameters<ListenerFor<ServerToClientEvents[typeof event]>>));
+      });
+    }
 
     // Dev `simulate-esp32` mode: route the event to the input-bridge room only.
     // The input-bridge injects the raw protocol line into its mock port, its parser
@@ -74,16 +107,6 @@ export function createSocketGateway(deps: SocketGatewayDeps) {
     socket.on('dev:simulate-button', (data) => {
       console.log('[server] dev:simulate-button', data.id, data.action, '→ input-bridge');
       io.to(INPUT_BRIDGE_ROOM).emit('dev:simulate-button', data);
-    });
-
-    socket.on('score:update', (data) => {
-      console.log('[server] score:update', data.player, data.score, 'combo=', data.combo, 'x', data.multiplier);
-      io.emit('score:update', data);
-    });
-
-    socket.on('game:start', (data) => {
-      console.log('[server] game:start', data.player);
-      io.emit('game:start', data);
     });
 
     socket.on('game:over', async (data) => {
@@ -100,16 +123,6 @@ export function createSocketGateway(deps: SocketGatewayDeps) {
       } catch (err) {
         console.error('[server] game:over persist failed:', err);
       }
-    });
-
-    socket.on('dmd:display', (data) => {
-      console.log('[server] dmd:display', data.mode);
-      io.emit('dmd:display', data);
-    });
-
-    socket.on('dev:trigger-game-event', (data) => {
-      console.log('[server] dev:trigger-game-event', data.type);
-      io.emit('dev:trigger-game-event', data);
     });
 
     socket.on('disconnect', () => {

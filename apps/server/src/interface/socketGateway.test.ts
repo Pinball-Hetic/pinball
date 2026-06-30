@@ -1,39 +1,49 @@
 import { test, expect, describe, mock, beforeEach } from 'bun:test';
 import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { GameStateManager } from '../infrastructure/GameStateManager';
-import { createSocketGateway, type SocketGatewayDeps } from './socketGateway';
+import type { GameOver, GameRegistered, LeaderboardEntry } from '@pinball/shared-types';
+import { createSocketGateway, type IoLike, type SocketLike } from './socketGateway';
 
 // Fakes injectés (DIP) — aucun mock.module.
-const registerScore = mock(async (..._a: unknown[]) => ({}) as unknown);
-const worldTopTen = mock(async (..._a: unknown[]) => [] as unknown);
+const registerScore = mock((_data: GameOver): Promise<GameRegistered> =>
+  Promise.resolve({ code: '', claimUrl: '' }));
+const worldTopTen = mock((_mapId?: string): Promise<LeaderboardEntry[]> => Promise.resolve([]));
 
 function makeGateway(gameState = new GameStateManager()) {
-  return createSocketGateway({ registerScore, worldTopTen, gameState } as unknown as SocketGatewayDeps);
+  return createSocketGateway({ registerScore, worldTopTen, gameState });
 }
 
 beforeEach(() => {
   registerScore.mockReset();
   worldTopTen.mockReset();
-  registerScore.mockResolvedValue({});
+  registerScore.mockResolvedValue({ code: '', claimUrl: '' });
   worldTopTen.mockResolvedValue([]);
 });
 
 // Fake io + fake socket minimaux ; on capture les socket.on(event, cb).
-type Handler = (data: unknown) => void;
+// Structurellement compatibles avec IoLike / SocketLike → aucun cast.
+type Handler = (...args: unknown[]) => void;
 
 function makeFakeIo() {
-  const emit = mock((..._a: unknown[]) => undefined);
-  const toEmit = mock((..._a: unknown[]) => undefined);
-  const to = mock((..._a: unknown[]) => ({ emit: toEmit }));
-  return { io: { emit, to }, emit, to, toEmit };
+  const emit = mock((..._a: unknown[]) => true);
+  const toEmit = mock((..._a: unknown[]) => true);
+  const to = mock((_room: string) => ({ emit: toEmit }));
+  const io: IoLike = { emit, to };
+  return { io, emit, to, toEmit };
 }
 
 function makeFakeSocket(role?: string) {
   const handlers = new Map<string, Handler>();
-  const join = mock((..._a: unknown[]) => undefined);
-  const emit = mock((..._a: unknown[]) => undefined);
+  const join = mock((_room: string) => undefined);
+  const emit = mock((..._a: unknown[]) => true);
   const on = mock((event: string, cb: Handler) => { handlers.set(event, cb); });
-  const socket = { id: 'socket-1', handshake: { auth: role ? { role } : {} }, join, emit, on };
+  const socket: SocketLike = {
+    id: 'socket-1',
+    handshake: { auth: role ? { role } : {} },
+    join,
+    emit,
+    on,
+  };
   const fire = (event: string, data?: unknown) => {
     const cb = handlers.get(event);
     if (!cb) throw new Error(`no handler registered for ${event}`);
@@ -46,9 +56,7 @@ function invoke(gameState?: GameStateManager, role?: string) {
   const handle = makeGateway(gameState);
   const fio = makeFakeIo();
   const fsock = makeFakeSocket(role);
-  // handleConnection typé sur les vrais types socket.io ; fakes structurellement
-  // compatibles via cast (les types socket.io ne sont pas réimplémentables à la main).
-  (handle as unknown as (io: unknown, socket: unknown) => void)(fio.io, fsock.socket);
+  handle(fio.io, fsock.socket);
   return {
     ioEmit: fio.emit, // io.emit → broadcast à tous
     to: fio.to,
@@ -120,6 +128,23 @@ describe('createSocketGateway / handleConnection', () => {
     expect(ctx.ioEmit).toHaveBeenCalledWith('input:button', { id: 'WHITE_LEFT', action: 'UP' });
     expect(ctx.ioEmit).toHaveBeenCalledWith('input:tilt', { state: 'TRIGGERED' });
     expect(ctx.ioEmit).toHaveBeenCalledWith('input:sensor', { id: 'PLUNGER', value: 42 });
+  });
+
+  test('chaque relay event est rediffusé verbatim via io.emit', () => {
+    const relays: Array<[string, unknown]> = [
+      ['input:button', { id: 'WHITE_LEFT', action: 'DOWN' }],
+      ['input:tilt', { state: 'TRIGGERED' }],
+      ['input:sensor', { id: 'PLUNGER', value: 7 }],
+      ['score:update', { player: 'A', score: 9, combo: 1, multiplier: 1 }],
+      ['game:start', { player: 'A' }],
+      ['dmd:display', { mode: 'idle' }],
+      ['dev:trigger-game-event', { type: 'DRAIN' }],
+    ];
+    for (const [event, payload] of relays) {
+      const ctx = invoke();
+      ctx.fire(event, payload);
+      expect(ctx.ioEmit).toHaveBeenCalledWith(event, payload);
+    }
   });
 
   test('score:update / game:start / dmd:display / dev:trigger-game-event relayés', () => {
