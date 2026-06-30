@@ -24,7 +24,7 @@
 > **NEW smells (post-merge, 15)** — surtout dans le code neuf dev :
 > | Prio | Smell | Fichier |
 > |---|---|---|
-> | **P1** | `now()` non injecté dans collision handlers (throttles intestables) | `BumpCollisionHandler.ts:27`, `CollisionEventProcessor.ts:187` |
+> | ✅ ~~P1~~ | ~~`now()` non injecté dans collision handlers~~ **RÉSOLU** (étape 2, `cbe64ee`) | `BumpCollisionHandler.ts`, `CollisionEventProcessor.ts` |
 > | **P2** | **Strategy registry collision introduit mais 0 test** (9 `*CollisionHandler.ts` désormais découplés → cible test facile, gros gain) | `CollisionHandler.ts` + 9 |
 > | **P2** | branche **boss-collision hors du registry** (special-case OCP) | `CollisionEventProcessor.ts:175-202` |
 > | **P2** | `gameStateUtils` extrait pur mais **non testé** (cible test facile) | `apps/playfield/src/hooks/gameStateUtils.ts:19` |
@@ -41,20 +41,20 @@
 >
 > **Étape 1 FAITE** (commits `7eb3d6d`, `eb7eba1`) : +69 tests sur les 9 `*CollisionHandler`
 > (OCP registry) + `gameStateUtils`. game-engine 38→39.9%, playfield 2.9→3.3%, global 30.4%.
-> Smell rencontré pendant l'écriture (loggé, à reprendre) :
-> - **`BumpCollisionHandler.ts:27`** — horloge ambiante : `performance.now()` lu inline pour
->   le cooldown anti-spam (pas de seam). **P2.** Testé via stub global de `performance.now`
->   (fragile, restauré en afterEach). **Fix** : injecter `now: () => number = () => performance.now()`
->   au constructeur (default conservé dans `CollisionEventProcessor.ts:150`), test passe un faux
->   contrôlable. → rejoint le smell P1 « `now()` non injecté » ci-dessus (même fix, tous les
->   handlers à cooldown + le throttle boss).
+> Smell rencontré pendant l'écriture (✅ RÉSOLU étape 2, commit `cbe64ee`) :
+> - **`BumpCollisionHandler.ts` + `CollisionEventProcessor.ts`** — horloge ambiante
+>   `performance.now()` inline (cooldown bump + throttle boss). **Fix appliqué** : `now: () =>
+>   number = () => performance.now()` injecté au constructeur (default = prod inchangée),
+>   threadé du processor vers le handler. Test bascule du stub global fragile vers une horloge
+>   injectée. → **résout aussi le smell P1 « `now()` non injecté »** (seules ces 2 horloges
+>   existaient dans le code collision).
 >
 > **Plan d'attaque révisé (ROI, sans 3D fragile)** :
-> 1. ~~Tester ce que dev a déjà découplé~~ ✅ FAIT (handlers + gameStateUtils).
-> 2. **Injecter `now()`** (P1, S) → débloque les throttles collision.
-> 3. **Finir S2** (factory `createApp/createSocketGateway`) → 3 passes server → 1 `bun test`.
-> 4. **S1** ports use-cases (supprime tout `mock.module`).
-> 5. Puis G2/G3/M1/M2 (extractions pures) selon le détail ci-dessous.
+> 1. ~~Tester ce que dev a déjà découplé~~ ✅ FAIT (handlers + gameStateUtils, +69 tests).
+> 1bis. ~~Injecter `now()` (débloque throttles)~~ ✅ FAIT (étape 2).
+> 2. **Finir S2** (factory `createApp/createSocketGateway`) → 3 passes server → 1 `bun test`.
+> 3. **S1** ports use-cases (supprime tout `mock.module`).
+> 4. Puis G2/G3/M1/M2 (extractions pures) selon le détail ci-dessous.
 >
 > ---
 
