@@ -5,9 +5,9 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@pinball/shared-types';
-import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 import { worldTopTen, globalStats } from '../use-cases/Leaderboard';
 import { registerScore } from '../use-cases/RegisterScore';
+import { GameStateManager } from '../infrastructure/GameStateManager';
 
 export const app = express();
 export const httpServer = createServer(app);
@@ -17,9 +17,9 @@ const PORT = process.env.PORT || 3001;
 
 const INPUT_BRIDGE_ROOM = 'input-bridge';
 
-// Active map on the server side: updated via 'map:select' (playfield → selector).
-// Sent to every newly connected client and broadcast to all when it changes.
-let currentMapId: string = DEFAULT_MAP_ID;
+// SRP: server-side map state is encapsulated in GameStateManager instead of a
+// mutable global `let currentMapId`. Injectable into handleConnection for tests.
+const gameState = new GameStateManager();
 
 app.get('/', (req, res) => {
   res.send('Pinball Server is running');
@@ -48,7 +48,7 @@ app.get('/api/stats', async (req, res) => {
 type SocketLike = Parameters<Parameters<typeof io.on<'connection'>>[1]>[0];
 type IoLike = Pick<typeof io, 'emit' | 'to'>;
 
-export function handleConnection(io: IoLike, socket: SocketLike) {
+export function handleConnection(io: IoLike, socket: SocketLike, state: GameStateManager = gameState) {
   const role = (socket.handshake.auth as { role?: string } | undefined)?.role;
   console.log('[server] client connected:', socket.id, 'role=', role ?? 'frontend');
 
@@ -59,12 +59,12 @@ export function handleConnection(io: IoLike, socket: SocketLike) {
 
   // Sync the newly connected client with the current map so DMD/backglass
   // are up to date even if no `map:select` has been emitted yet.
-  socket.emit('map:selected', { mapId: currentMapId });
+  socket.emit('map:selected', { mapId: state.getMapId() });
 
   socket.on('map:select', ({ mapId }) => {
-    if (typeof mapId !== 'string' || mapId === currentMapId) return;
+    if (typeof mapId !== 'string' || mapId === state.getMapId()) return;
     console.log('[server] map:select', mapId, '→ broadcast map:selected');
-    currentMapId = mapId;
+    state.setMapId(mapId);
     io.emit('map:selected', { mapId });
   });
 
