@@ -75,6 +75,31 @@
 > - **N2** `PinballPlayfield.tsx` reste ~2000 L ; prochains purs extractibles : le wrapper `emit`
 >   + le dispatch `onGameEvent` (~1150-1290) + boss-event (~1242) = cœur de **P1-play EventRouter**. P1.
 >
+> **✅ P2 FAIT (passe autonome, +118 tests, tout vert)** : G6 (`a197be1` BumperEjection),
+> G-new (`85f0ba9` BossCollisionHandler/OCP), G4 (`c0ed2c4` CinematicPhaseMachine), G5 partiel
+> (`eccd169` PlayfieldTrimeshRules), M3 (`7052791` AtmosphereBlend), M4 (`05a1098`
+> TransitionTimeline), M5 (`4f5798d` WalkPathProgress), S3 (`5adc8d4` createGlobalApiClient),
+> D1 (`8c0768b` dmdGrid MVC), D2 (`fde26f0` validators+safeFetch). ⚠ **À SMOKE-TESTER en E2E**
+> (Three/Rapier verbatim) : bumper eject, boss locked-hit/target, camera cinématique, colliders
+> trimesh, atmosphères ST/Zelda, transitions de monde, walk-in boss, rendu DMD.
+>
+> **Découverts pendant la passe P2 (backlog évolutif)** :
+> - **G5.a** (P2) `PlayfieldTrimeshBuilder` : `isSkipped()` reste THREE-bound (prédicats prennent
+>   `THREE.Mesh`). Extraire d'abord les prédicats de noms (`isPinballmapGameplayMesh`/
+>   `isFlipperGltfMesh`/`isVisualOnlyGltfName`) en versions pures `string[]`, puis `isSkipped(ancestryNames)`.
+> - **G5.b** (P3) `laplacianSmooth`/`doubleSidedGeometry` liés à `BufferGeometry`+`mergeVertices` → ne pas
+>   extraire sans helper de weld tuple + snapshot-test des vertices avant/après.
+> - **G5.c** (P3) `buildPinballmap` : filtre taille rail inline → `railSubmeshHasPhysics(dims)` pur + test bornes.
+> - **M3.a** (P3) `applyMix` tint matériaux/lights/fog encore structurellement dupliqué st/zelda →
+>   helper `applyAtmosphereTint(materials, ease, descriptor)` partagé. **M3.b** (P3) math particules
+>   spores → module pur `SporeField` testable.
+> - **M4.a** (P3) `captureShakeBases`/`restoreShakeBases` dupliqués verbatim → helper `ShakeBasis` partagé.
+> - **M5.a** (P2) `Demogorgon`/`Ganondorf TargetVisual` quasi identiques → base/lifecycle composé
+>   paramétré par config. **M5.b** (P3) placement surface inline = `surfaceYAtZ(z)+FOOT_LIFT` → helper
+>   `surfacePoint(target, footLift)` partagé (4 boss).
+> - **D1.a** (P3) `DmdRenderer.makeSprite` couplé au `document` global → param `SpriteFactory`/`CanvasPort`
+>   optionnel (default réel) pour testabilité offscreen.
+>
 > > Note coverage : S1/S2 ajoutent du code d'**adapter/composition root** (`PrismaGameRepository`,
 > > `index.ts`) intentionnellement non testé en unit (territoire intégration/e2e) → le % brut
 > > server descend (≈61%) alors que la **logique métier** (use-cases/routes/gateway/handlers) est ~100%.
