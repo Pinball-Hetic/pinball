@@ -115,6 +115,33 @@
 > - **C1'** `openSerial()` mêle IO (stty/createReadStream) + line-buffering (split newline + garde 8192) → extraire un `LineBuffer` pur testable ; config env au scope module → injecter.
 > - (N1 a signalé une erreur tsc transitoire sur `PlayfieldTrimeshBuilder` vue pendant l'édition // de G5.a — **faux positif**, repo tsc vert au final.)
 >
+> **✅ Follow-ups P3 FAITS (+106 tests, tout vert)** : G5.c'(classifyPinballmapMesh) + G2(consts),
+> M8'(resolveHeticProgress/selectMilestoneClip), M5.b(surfacePoint), M4.a(ShakeBasis), M3.a
+> (AtmosphereTint), M3.b(SporeField), M5.a(BossActorAnimator), M6/M7'(strobe wrapper), BumperVis'
+> (BumperPartCollector + tests wiring), C1'(LineBuffer pur), D1.a(SpriteFactory/CanvasPort).
+>
+> **🐞 BUGS POTENTIELS trouvés (à confirmer/corriger)** :
+> - **B1** `DemogorgonTargetVisual.dispose()` ne `dispose()` PAS son glow `PointLight` (nulle juste
+>   la ref) → **fuite GPU** ; Ganondorf le fait. P3 (fuite, pas crash).
+> - **B2** `strangerthings/systems/BumperVisuals.dispose()` ne **restaure pas** `mesh.scale` à
+>   baseScale (Zelda oui) → bumper peut rester scalé après dispose. Divergence = bug probable. P3.
+> - **B3** ST `module` n'a **pas de handler MILESTONE** alors que le manifest déclare les clips
+>   `milestone_5k/15k/30k/big` → cinématiques de palier ne se déclenchent jamais sur ST (parité
+>   Zelda manquante ?). `selectMilestoneClip` prêt à câbler. **Confirmer si voulu.** P3.
+>
+> **Découverts P3-followups (backlog évolutif)** :
+> - **G2.a'** (P2) `ColliderSpecPlanner.planPlayfieldFloor/planWalls` hardcodent les bounds ST →
+>   dériver de `layout.geometry.bounds` (thread layout, **behaviour-risk non-ST** → change dédiée + smoke par map).
+> - **G5.b'** (P3) `laplacianSmooth`/`doubleSidedGeometry` weld-bound → extraire `laplacianSmoothPositions`/
+>   `reverseWoundIndices` purs (weld d'abord dans le caller).
+> - **M3.a'** (P2) `SacredRealmAtmosphere` setup-snapshot/dispose-teardown dupliqué → helper capture/restore.
+> - **M3.b'/M3.c'** (P3) spores hand-roll Points+canvas ; fog apply/restore dupliqué.
+> - **M5.a'** (P3) Demogorgon/Ganondorf encore ~95% identiques après animator → dedup mount/walk plus loin.
+> - **M8'/M8''** (P3) bloc HETIC-rollover IO encore dupliqué ST/Zelda → helper `advanceHetic(ctx,count)`.
+> - **M67''** (P3) wrapper strobe ST encore boilerplate → `mountWithDecor` base.
+> - **BumperVis''** (P3) `update()` punch-timer + apply loop encore dupliqué ; ST manque diagnostic empty-parts.
+> - **C1''** (P3) `openSerial` mêle device IO + retry → séparer.
+>
 > > Note coverage : S1/S2 ajoutent du code d'**adapter/composition root** (`PrismaGameRepository`,
 > > `index.ts`) intentionnellement non testé en unit (territoire intégration/e2e) → le % brut
 > > server descend (≈61%) alors que la **logique métier** (use-cases/routes/gateway/handlers) est ~100%.
