@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { HINGE_INSET_FROM_EDGE } from '../domain/FlipperConstants';
 import type { FlipperPivots } from '../domain/MapLayout';
+import { partitionTrianglesByPlaneX, remapTriangles } from './FlipperGeometrySplit';
 import { findObjectByNormalizedName, normalizeGltfName } from './GltfNodeNames';
 
 export type PlayfieldFlipperPair = {
@@ -144,45 +145,36 @@ export function splitFlipperIntoTwo(
   const vertCount = posAttr.count;
 
   const wX: number[] = new Array(vertCount);
-  const localVerts: number[][] = new Array(vertCount);
+  const localPositions = new Float32Array(vertCount * 3);
+  const uvs: number[] | null = uvAttr ? new Array(vertCount * 2) : null;
   const tmp = new THREE.Vector3();
 
   for (let i = 0; i < vertCount; i++) {
     tmp.fromBufferAttribute(posAttr, i).applyMatrix4(worldMat);
     wX[i] = tmp.x;
     tmp.applyMatrix4(toParent);
-    localVerts[i] = [tmp.x, tmp.y, tmp.z];
+    localPositions[i * 3] = tmp.x;
+    localPositions[i * 3 + 1] = tmp.y;
+    localPositions[i * 3 + 2] = tmp.z;
+    if (uvs && uvAttr) {
+      uvs[i * 2] = uvAttr.getX(i);
+      uvs[i * 2 + 1] = uvAttr.getY(i);
+    }
   }
 
   const idxArr: number[] = geom.index
     ? Array.from(geom.index.array as ArrayLike<number>)
     : Array.from({ length: vertCount }, (_, i) => i);
 
-  const leftTris: number[] = [];
-  const rightTris: number[] = [];
-  for (let t = 0; t < idxArr.length; t += 3) {
-    const a = idxArr[t]!, b = idxArr[t + 1]!, c = idxArr[t + 2]!;
-    const cx = (wX[a]! + wX[b]! + wX[c]!) / 3;
-    (cx <= PLAYFIELD_CENTER_X ? leftTris : rightTris).push(a, b, c);
-  }
+  const { leftTris, rightTris } = partitionTrianglesByPlaneX(idxArr, wX, PLAYFIELD_CENTER_X);
 
   const buildGeom = (tris: number[]): THREE.BufferGeometry | null => {
     if (tris.length === 0) return null;
-    const remap = new Map<number, number>();
-    const pos: number[] = [], uvs: number[] = [], idx: number[] = [];
-    for (const old of tris) {
-      if (!remap.has(old)) {
-        remap.set(old, pos.length / 3);
-        const v = localVerts[old]!;
-        pos.push(v[0]!, v[1]!, v[2]!);
-        if (uvAttr) uvs.push(uvAttr.getX(old), uvAttr.getY(old));
-      }
-      idx.push(remap.get(old)!);
-    }
+    const { positions, uvs: remappedUvs, indices } = remapTriangles(tris, localPositions, uvs);
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    if (uvs.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    g.setIndex(idx);
+    g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (remappedUvs.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(remappedUvs, 2));
+    g.setIndex(indices);
     g.computeVertexNormals();
     return g;
   };
