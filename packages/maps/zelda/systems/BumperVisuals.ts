@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
-import { normalizeGltfName } from '@pinball/game-engine';
+import { normalizeGltfName, nearestBumperIndex, bumperPunchScale } from '@pinball/game-engine';
 import { layout } from '../layout';
 
 // Matche vis_bumper, vis_bumper.001, vis_bumper.002, vis_bumper_1, etc.
@@ -9,32 +9,11 @@ const VIS_BUMPER = /^vis_bumper/;
 const PUNCH_DURATION = 0.18; // secondes
 const PUNCH_PEAK     = 0.28; // +28% scale au pic
 
-// easeOutBack : monte vite, léger dépassement, retour fluide.
-function easeOutBack(t: number): number {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-}
-
 type BumperPart = {
   mesh: THREE.Mesh;
   bumperIndex: number;
   baseScale: THREE.Vector3;
 };
-
-function nearestBumperIndex(pos: THREE.Vector3): number {
-  let best     = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < layout.bumpers.length; i++) {
-    const p  = layout.bumpers[i]!;
-    const dx = pos.x - p.x;
-    const dy = pos.y - p.y;
-    const dz = pos.z - p.z;
-    const d  = dx * dx + dy * dy + dz * dz;
-    if (d < bestDist) { bestDist = d; best = i; }
-  }
-  return best;
-}
 
 export class BumperVisuals {
   private parts: BumperPart[]            = [];
@@ -52,7 +31,7 @@ export class BumperVisuals {
       obj.getWorldPosition(wp);
       this.parts.push({
         mesh:        obj,
-        bumperIndex: nearestBumperIndex(wp),
+        bumperIndex: nearestBumperIndex(wp, layout.bumpers),
         baseScale:   obj.scale.clone(),
       });
     });
@@ -74,14 +53,7 @@ export class BumperVisuals {
     // Animation scale : 1 → 1+PEAK → 1 avec easeOutBack.
     for (const part of this.parts) {
       const pt = this.punchTimers.get(part.bumperIndex) ?? 0;
-      let factor = 1;
-      if (pt > 0) {
-        const prog = 1 - pt / PUNCH_DURATION; // 0 → 1
-        const env  = prog < 0.5
-          ? easeOutBack(prog * 2)
-          : 1 - (prog - 0.5) * 2;
-        factor = 1 + PUNCH_PEAK * Math.max(0, env);
-      }
+      const factor = bumperPunchScale(pt, PUNCH_DURATION, PUNCH_PEAK);
       part.mesh.scale.copy(part.baseScale).multiplyScalar(factor);
     }
   }

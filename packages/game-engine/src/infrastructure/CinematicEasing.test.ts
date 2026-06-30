@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { easeOut, easeIn, easeInOut, strobeOn } from './CinematicEasing';
+import { easeOut, easeIn, easeInOut, easeOutBack, strobeOn } from './CinematicEasing';
 
 describe('easeOut', () => {
   test('boundaries: 0 -> 0, 1 -> 1', () => {
@@ -55,6 +55,25 @@ describe('easeInOut', () => {
 
   test('symétrie de la courbe: f(t) + f(1-t) = 1', () => {
     expect(easeInOut(0.3) + easeInOut(0.7)).toBeCloseTo(1, 6);
+  });
+});
+
+describe('easeOutBack', () => {
+  test('boundaries: 0 -> 0, 1 -> 1', () => {
+    expect(easeOutBack(0)).toBeCloseTo(0, 6);
+    expect(easeOutBack(1)).toBeCloseTo(1, 6);
+  });
+
+  test('depasse 1 avant de revenir (overshoot)', () => {
+    // le back ease dépasse 1 sur la fin de course
+    expect(easeOutBack(0.8)).toBeGreaterThan(1);
+  });
+
+  test('formule exacte', () => {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    const t = 0.6;
+    expect(easeOutBack(t)).toBeCloseTo(1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2), 6);
   });
 });
 

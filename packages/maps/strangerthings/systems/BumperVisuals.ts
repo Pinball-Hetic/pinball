@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
-import { normalizeGltfName } from '@pinball/game-engine';
+import { normalizeGltfName, nearestBumperIndex, bumperPunchScale } from '@pinball/game-engine';
 import { layout } from '../layout';
 import { GlowSprite } from '@pinball/game-engine';
 
@@ -29,13 +29,6 @@ const HIT_FLASH_BOOST = 1.1;
 const PUNCH_DURATION = 0.15; // durée du pop en secondes
 const PUNCH_PEAK = 0.20; // ampleur : 0.20 = grossit à 1.20×
 
-// easeOutBack : léger dépassement puis retour.
-function easeOutBack(t: number): number {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-}
-
 const _emissiveA = new THREE.Color();
 const _emissiveB = new THREE.Color();
 
@@ -59,23 +52,6 @@ function cloneStandardMaterial(mesh: THREE.Mesh): THREE.MeshStandardMaterial {
   const mat = (Array.isArray(src) ? src[0] : src) as THREE.Material;
   if (mat instanceof THREE.MeshStandardMaterial) return mat.clone();
   return new THREE.MeshStandardMaterial({ color: 0xffffff });
-}
-
-function nearestBumperIndex(pos: THREE.Vector3): number {
-  let best = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < layout.bumpers.length; i++) {
-    const p = layout.bumpers[i]!;
-    const dx = pos.x - p.x;
-    const dy = pos.y - p.y;
-    const dz = pos.z - p.z;
-    const d = dx * dx + dy * dy + dz * dz;
-    if (d < bestDist) {
-      bestDist = d;
-      best = i;
-    }
-  }
-  return best;
 }
 
 function applyGltfBumperLook(material: THREE.MeshStandardMaterial): void {
@@ -137,7 +113,7 @@ export class BumperVisuals {
       else return;
 
       obj.getWorldPosition(wp);
-      const bumperIndex = nearestBumperIndex(wp);
+      const bumperIndex = nearestBumperIndex(wp, layout.bumpers);
       const material = cloneStandardMaterial(obj);
       let glow: GlowSprite | null = null;
       let glowColor = BUMPER_LIGHT_COLOR;
@@ -217,12 +193,7 @@ export class BumperVisuals {
     }
     for (const part of this.parts) {
       const pt = this.punchTimers.get(part.bumperIndex) ?? 0;
-      let factor = 1;
-      if (pt > 0) {
-        const prog = 1 - pt / PUNCH_DURATION; // 0 → 1
-        const env = prog < 0.5 ? easeOutBack(prog * 2) : 1 - (prog - 0.5) * 2;
-        factor = 1 + PUNCH_PEAK * Math.max(0, env);
-      }
+      const factor = bumperPunchScale(pt, PUNCH_DURATION, PUNCH_PEAK);
       part.mesh.scale.copy(part.baseScale).multiplyScalar(factor);
     }
 
