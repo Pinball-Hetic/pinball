@@ -19,6 +19,14 @@ export function isVisualOnlyGltfName(name: string): boolean {
   return n.startsWith('vis_') || n === 'glass' || n.includes('glass');
 }
 
+/**
+ * Variante PURE par ascendance : true si self OU un ancêtre est visual-only.
+ * (Équivaut au walk parent dans isSkipped.)
+ */
+export function isVisualOnlyGltfAncestry(ancestryNames: string[]): boolean {
+  return ancestryNames.some(isVisualOnlyGltfName);
+}
+
 export function canonicalGltfName(name: string): string {
   return stripGltfPrefixes(normalizeGltfName(name));
 }
@@ -53,14 +61,25 @@ export function hasNamedAncestor(obj: THREE.Object3D, ...names: string[]): boole
   return false;
 }
 
+/**
+ * Variante PURE de isPinballmapGameplayMesh : opère sur la liste de noms
+ * d'ascendance (self → parents), pas sur un THREE.Mesh.
+ */
+export function isPinballmapGameplayMeshName(ancestryNames: string[]): boolean {
+  return ancestryNames.some((name) => normalizeGltfName(name) === 'pinballmap');
+}
+
 export function isPinballmapGameplayMesh(mesh: THREE.Mesh): boolean {
   return hasNamedAncestor(mesh, 'Pinballmap');
 }
 
-export function isFlipperGltfMesh(mesh: THREE.Mesh): boolean {
-  let current: THREE.Object3D | null = mesh;
-  while (current) {
-    const n = normalizeGltfName(current.name);
+/**
+ * Variante PURE de isFlipperGltfMesh : opère sur la liste de noms
+ * d'ascendance (self → parents). S'arrête à la frontière 'pinballmap'.
+ */
+export function isFlipperGltfMeshName(ancestryNames: string[]): boolean {
+  for (const name of ancestryNames) {
+    const n = normalizeGltfName(name);
     if (n === 'pinballmap') return false;
     // Ancienne convention : nœud unique "flipper" ou "flipper.001"
     // Nouvelle convention : sous-modèles séparés "flipper-left" / "flipper-right"
@@ -72,9 +91,18 @@ export function isFlipperGltfMesh(mesh: THREE.Mesh): boolean {
       n === 'flipper_left' ||
       n === 'flipper_right'
     ) return true;
-    current = current.parent;
   }
   return false;
+}
+
+export function isFlipperGltfMesh(mesh: THREE.Mesh): boolean {
+  const names: string[] = [];
+  let current: THREE.Object3D | null = mesh;
+  while (current) {
+    names.push(current.name);
+    current = current.parent;
+  }
+  return isFlipperGltfMeshName(names);
 }
 
 export function isPinballmapRailMesh(mesh: THREE.Mesh): boolean {

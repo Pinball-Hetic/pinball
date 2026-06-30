@@ -8,7 +8,10 @@ import {
   findObjectByNormalizedName,
   hasNamedAncestor,
   isPinballmapGameplayMesh,
+  isPinballmapGameplayMeshName,
   isFlipperGltfMesh,
+  isFlipperGltfMeshName,
+  isVisualOnlyGltfAncestry,
   isPinballmapRailMesh,
   hasPinballmapRoot,
   isPinballmapNonPhysicalFloorMesh,
@@ -173,6 +176,64 @@ describe('isFlipperGltfMesh', () => {
   });
   test('false for unrelated mesh', () => {
     expect(isFlipperGltfMesh(mesh('wall'))).toBe(false);
+  });
+});
+
+describe('isPinballmapGameplayMeshName (pure)', () => {
+  test('true when ancestry contains a Pinballmap node', () => {
+    expect(isPinballmapGameplayMeshName(['flipper', 'mid', 'Pinballmap'])).toBe(true);
+  });
+  test('matches case-insensitively / normalized', () => {
+    expect(isPinballmapGameplayMeshName(['x', 'PINBALLMAP'])).toBe(true);
+  });
+  test('false without a Pinballmap node', () => {
+    expect(isPinballmapGameplayMeshName(['flipper', 'root'])).toBe(false);
+  });
+  test('false for empty ancestry', () => {
+    expect(isPinballmapGameplayMeshName([])).toBe(false);
+  });
+});
+
+describe('isFlipperGltfMeshName (pure)', () => {
+  test('true for legacy single "flipper" self', () => {
+    expect(isFlipperGltfMeshName(['flipper'])).toBe(true);
+  });
+  test('true for numbered legacy flipper (flipper.001)', () => {
+    expect(isFlipperGltfMeshName(['flipper.001'])).toBe(true);
+  });
+  test('true for separated left/right (dash & underscore)', () => {
+    expect(isFlipperGltfMeshName(['flipper-left'])).toBe(true);
+    expect(isFlipperGltfMeshName(['flipper-right'])).toBe(true);
+    expect(isFlipperGltfMeshName(['flipper_left'])).toBe(true);
+    expect(isFlipperGltfMeshName(['flipper_right'])).toBe(true);
+  });
+  test('true via a flipper ancestor', () => {
+    expect(isFlipperGltfMeshName(['cap', 'flipper-left'])).toBe(true);
+  });
+  test('stops at pinballmap boundary before reaching flipper', () => {
+    // ancestry order self → parents: cap, pinballmap, flipper
+    expect(isFlipperGltfMeshName(['cap', 'Pinballmap', 'flipper'])).toBe(false);
+  });
+  test('false for unrelated names', () => {
+    expect(isFlipperGltfMeshName(['wall', 'root'])).toBe(false);
+  });
+  test('false for empty ancestry', () => {
+    expect(isFlipperGltfMeshName([])).toBe(false);
+  });
+});
+
+describe('isVisualOnlyGltfAncestry (pure)', () => {
+  test('true when self is vis_', () => {
+    expect(isVisualOnlyGltfAncestry(['VIS_Wall', 'root'])).toBe(true);
+  });
+  test('true when an ancestor is glass', () => {
+    expect(isVisualOnlyGltfAncestry(['decal', 'top_glass_cover'])).toBe(true);
+  });
+  test('false when nothing is visual-only', () => {
+    expect(isVisualOnlyGltfAncestry(['flipper', 'root'])).toBe(false);
+  });
+  test('false for empty ancestry', () => {
+    expect(isVisualOnlyGltfAncestry([])).toBe(false);
   });
 });
 

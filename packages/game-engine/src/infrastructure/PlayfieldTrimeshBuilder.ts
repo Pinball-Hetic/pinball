@@ -5,10 +5,12 @@ import {
   canonicalGltfName,
   hasPinballmapRoot,
   isFlipperGltfMesh,
+  isFlipperGltfMeshName,
   isJunkGltfMeshName,
   isPinballmapGameplayMesh,
+  isPinballmapGameplayMeshName,
   isPinballmapRailMesh,
-  isVisualOnlyGltfName,
+  isVisualOnlyGltfAncestry,
   normalizeGltfName,
   playfieldUsesCollOnlyCollision,
   isPinballmapNonPhysicalFloorMesh,
@@ -139,40 +141,42 @@ function meshMatchesSet(mesh: THREE.Mesh, names: Set<string>): boolean {
   return ancestryMatchesSet(ancestryNames(mesh), names);
 }
 
-function isSkipped(node: THREE.Object3D, collOnly: boolean): boolean {
-  const selfNorm = normalizeGltfName(node.name);
-  if (!(node instanceof THREE.Mesh)) return false;
+/**
+ * Décision PURE de skip d'un mesh, à partir de sa liste de noms d'ascendance
+ * (self → parents) et du flag collOnly. Aucune dépendance THREE.
+ */
+export function isSkipped(ancestryNames: string[], collOnly: boolean): boolean {
+  const selfNorm = normalizeGltfName(ancestryNames[0] ?? '');
 
-  if (isPinballmapGameplayMesh(node)) {
+  if (isPinballmapGameplayMeshName(ancestryNames)) {
     if (collOnly && !selfNorm.startsWith('coll_')) return true;
-    if (isFlipperGltfMesh(node)) return true;
+    if (isFlipperGltfMeshName(ancestryNames)) return true;
     // flipper_left_split / flipper_right_split ont des underscores (pas de points)
-    // → isFlipperGltfMesh ne les détecte pas. COLLISION_ANALYTIC couvre ces noms.
-    if (meshMatchesSet(node, COLLISION_ANALYTIC)) return true;
+    // → isFlipperGltfMeshName ne les détecte pas. COLLISION_ANALYTIC couvre ces noms.
+    if (ancestryMatchesSet(ancestryNames, COLLISION_ANALYTIC)) return true;
     return false;
   }
 
-  if (isJunkGltfMeshName(node.name)) return true;
+  if (isJunkGltfMeshName(selfNorm)) return true;
   if (collOnly && !selfNorm.startsWith('coll_')) return true;
 
-  let current: THREE.Object3D | null = node;
-  while (current) {
-    if (isVisualOnlyGltfName(current.name)) return true;
-    current = current.parent;
-  }
+  if (isVisualOnlyGltfAncestry(ancestryNames)) return true;
 
-  if (!meshMatchesSet(node, COLLISION_SOLIDS)) return true;
-  if (meshMatchesSet(node, COLLISION_ANALYTIC)) return true;
-  if (meshMatchesSet(node, TRIMESH_DEDICATED)) return true;
+  if (!ancestryMatchesSet(ancestryNames, COLLISION_SOLIDS)) return true;
+  if (ancestryMatchesSet(ancestryNames, COLLISION_ANALYTIC)) return true;
+  if (ancestryMatchesSet(ancestryNames, TRIMESH_DEDICATED)) return true;
 
-  let parent: THREE.Object3D | null = node.parent;
-  while (parent) {
-    const n = normalizeGltfName(parent.name);
-    const c = canonicalGltfName(parent.name);
+  for (let i = 1; i < ancestryNames.length; i++) {
+    const n = normalizeGltfName(ancestryNames[i]);
+    const c = canonicalGltfName(ancestryNames[i]);
     if (EXCLUDED_NODES.has(n) || EXCLUDED_NODES.has(c)) return true;
-    parent = parent.parent;
   }
   return false;
+}
+
+function isSkippedMesh(node: THREE.Object3D, collOnly: boolean): boolean {
+  if (!(node instanceof THREE.Mesh)) return false;
+  return isSkipped(ancestryNames(node), collOnly);
 }
 
 function extractWorldGeometry(mesh: THREE.Mesh): THREE.BufferGeometry {
@@ -312,7 +316,7 @@ export class PlayfieldTrimeshBuilder {
 
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
-      if (isSkipped(child, collOnly)) return;
+      if (isSkippedMesh(child, collOnly)) return;
       mainGeos.push(extractWorldGeometry(child));
     });
 
