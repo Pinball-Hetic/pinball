@@ -1,9 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import type { BossId, BossDefinition } from '../domain/BossRegistry';
-import {
-  bossPointsRemaining,
-  bossThresholdMet,
-} from '../domain/BossRegistry';
+import type { BossId } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import type { MapLayout } from '../domain/MapLayout';
 import type { BumperHit } from '../use-cases/BumperHit';
@@ -21,15 +17,14 @@ import { PopZoneCollisionHandler } from './PopZoneCollisionHandler';
 import { RocketRampCollisionHandler } from './RocketRampCollisionHandler';
 import { DropTargetCollisionHandler } from './DropTargetCollisionHandler';
 import { PortalCollisionHandler } from './PortalCollisionHandler';
+import { BossCollisionHandler } from './BossCollisionHandler';
 
 export class CollisionEventProcessor {
   private readonly bossFights: BossFightManager;
-  private readonly bossByRole = new Map<string, BossDefinition>();
   private alternateWorldActive = false;
   private normalWorldScoreBaseline = 0;
   private alternateWorldScoreBaseline = 0;
   private lastTotalScore = 0;
-  private lockedHitLastMs: Partial<Record<BossId, number>> = {};
   private pendingPhysics: Array<() => void> = [];
   private readonly handlers: CollisionHandler[] = [];
   private readonly portalHandler: PortalCollisionHandler;
@@ -139,16 +134,23 @@ export class CollisionEventProcessor {
   ) {
     this.bossFights = new BossFightManager(emit, layout.bosses);
 
-    // Index bosses by collider role for O(1) lookup in process().
-    for (const b of layout.bosses) this.bossByRole.set(b.colliderRole, b);
-
     // Kept as properties because they are exposed publicly (reset, state).
     this.dropTargetHandler = new DropTargetCollisionHandler(emit, layout);
     this.portalHandler = new PortalCollisionHandler(emit, () => this.alternateWorldActive);
 
     // Handler registry — declaration order = dispatch priority.
     // The first handler whose canHandle() returns true owns the collision.
+    // BossCollisionHandler is first: a boss collider role is always consumed
+    // here and never falls through to the generic handlers.
     this.handlers = [
+      new BossCollisionHandler(
+        layout.bosses,
+        this.bossFights,
+        emit,
+        () => this.alternateWorldActive,
+        () => this.gateContext(),
+        this.now,
+      ),
       new BumperCollisionHandler(this.pendingPhysics, bumperHitUC, layout),
       new BumpCollisionHandler(this.pendingPhysics, bumpHitUC, this.now),
       new DrainCollisionHandler(
@@ -175,36 +177,8 @@ export class CollisionEventProcessor {
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
 
-      // --- Boss handling (takes priority over generic handlers) ---
-      const boss = this.bossByRole.get(role);
-      if (
-        boss
-        && boss.reveal.requiresAlternateWorld === this.alternateWorldActive
-        && started
-        && gameState === 'playing'
-        && !this.bossFights.isTriggered(boss.id)
-      ) {
-        const ctx = this.gateContext();
-        if (!bossThresholdMet(boss, ctx)) {
-          // Anti-spam: do not re-emit BOSS_LOCKED_HIT more than once every 2s.
-          const now = this.now();
-          if (now - (this.lockedHitLastMs[boss.id] ?? 0) >= 2000) {
-            this.lockedHitLastMs[boss.id] = now;
-            this.emit({
-              type: 'BOSS_LOCKED_HIT',
-              bossId: boss.id,
-              remaining: bossPointsRemaining(boss, ctx),
-            });
-          }
-        }
-      }
-
-      // If the boss fight consumes the event, skip the generic handlers.
-      if (this.bossFights.handleTargetCollision(role, started, gameState)) {
-        return;
-      }
-
       // Dispatch to the registered handler for this role.
+      // BossCollisionHandler is first and consumes every boss collider role.
       const handler = this.handlers.find(h => h.canHandle(role));
       handler?.handle(role, gameState, started);
     });
