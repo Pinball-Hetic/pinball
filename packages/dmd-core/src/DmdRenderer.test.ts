@@ -61,7 +61,7 @@ afterEach(() => {
   if (originalDocument === undefined) {
     delete (globalThis as { document?: unknown }).document
   } else {
-    ;(globalThis as { document?: unknown }).document = originalDocument
+    (globalThis as { document?: unknown }).document = originalDocument
   }
   spriteCanvasContextAvailable = false
 })
