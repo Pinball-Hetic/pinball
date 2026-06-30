@@ -11,7 +11,7 @@ import {
   UPSIDE_DOWN_TRANSITION_STROBE_HZ,
   UPSIDE_DOWN_TRANSITION_TREMOR,
 } from './UpsideDownConstants';
-import { easeIn, easeOut, strobeOn } from '@pinball/game-engine';
+import { easeOut, TransitionTimeline, tremorOffset } from '@pinball/game-engine';
 import { CameraBillboardSprite } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
@@ -28,8 +28,6 @@ function fullScreenSpriteScale(camera: THREE.Camera, depth: number): THREE.Vecto
   const width = height * cam.aspect * BILLBOARD_PAD;
   return new THREE.Vector3(width, height, 1);
 }
-
-type Phase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore' | 'tremor';
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -57,9 +55,15 @@ export class UpsideDownTransition {
   private cinematicStrobe = new PlayfieldCinematicStrobe();
   private billboard = new CameraBillboardSprite();
 
-  private phase: Phase = 'idle';
-  private elapsed = 0;
-  private strobeT = 0;
+  private timeline = new TransitionTimeline({
+    blackout: UPSIDE_DOWN_TRANSITION_BLACKOUT,
+    reveal: UPSIDE_DOWN_TRANSITION_REVEAL,
+    hold: UPSIDE_DOWN_TRANSITION_HOLD,
+    restore: UPSIDE_DOWN_TRANSITION_RESTORE,
+    tremor: UPSIDE_DOWN_TRANSITION_TREMOR,
+    strobeHz: UPSIDE_DOWN_TRANSITION_STROBE_HZ,
+    hasReveal: true,
+  });
   private active = false;
   private pendingTextureUrl: string | null = null;
   private ballMesh: THREE.Object3D | null = null;
@@ -119,9 +123,8 @@ export class UpsideDownTransition {
     if (this.billboard.getActiveTextureUrl() !== (config.textureUrl ?? DEFAULT_TEXTURE_URL)) return;
 
     this.active = true;
-    this.phase = 'blackout';
-    this.elapsed = 0;
-    this.strobeT = 0;
+    this.timeline.reset();
+    this.timeline.begin();
     this.ballMesh = config.ballMesh;
     this.ballBody = config.ballBody;
     this.onComplete = onComplete;
@@ -141,60 +144,43 @@ export class UpsideDownTransition {
   }
 
   update(dt: number): void {
-    if (!this.active || this.phase === 'idle') return;
+    if (!this.active || this.timeline.getPhase() === 'idle') return;
 
     this.billboard.sync();
-    this.elapsed += dt;
-    this.strobeT += dt;
 
-    const on = strobeOn(this.strobeT, UPSIDE_DOWN_TRANSITION_STROBE_HZ);
     const textureReady =
       this.billboard.isReady() &&
       this.billboard.getActiveTextureUrl() === this.pendingTextureUrl;
 
-    if (this.phase === 'blackout') {
-      this.cinematicStrobe.apply(on, false, easeOut(Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_BLACKOUT)));
+    const d = this.timeline.tick(dt);
+
+    if (d.phase === 'blackout') {
+      this.cinematicStrobe.apply(d.on, false, d.blackoutMix);
       this.billboard.setOpacity(0);
-      if (this.elapsed >= UPSIDE_DOWN_TRANSITION_BLACKOUT) {
-        this.phase = 'reveal';
-        this.elapsed = 0;
-        this.strobeT = 0;
-        this.onRevealStart?.();
-      }
+      if (d.enteredReveal) this.onRevealStart?.();
       return;
     }
 
-    if (this.phase === 'reveal') {
-      const t = Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_REVEAL);
-      this.cinematicStrobe.apply(on, false, 1);
-      this.billboard.setOpacity(textureReady && on ? easeOut(t) * 0.95 : 0);
-      if (this.elapsed >= UPSIDE_DOWN_TRANSITION_REVEAL) {
-        this.phase = 'hold';
-        this.elapsed = 0;
+    if (d.phase === 'reveal') {
+      this.cinematicStrobe.apply(d.on, false, 1);
+      this.billboard.setOpacity(textureReady && d.on ? easeOut(d.revealT) * 0.95 : 0);
+      if (d.enteredHold) {
         this.billboard.setOpacity(textureReady ? 0.95 : 0);
         this.cinematicStrobe.applyHoldShade(0.72);
       }
       return;
     }
 
-    if (this.phase === 'hold') {
+    if (d.phase === 'hold') {
       this.billboard.setOpacity(textureReady ? 0.95 : 0);
       this.cinematicStrobe.setShadeOpacity(0.72);
-      if (this.elapsed >= UPSIDE_DOWN_TRANSITION_HOLD) {
-        this.phase = 'restore';
-        this.elapsed = 0;
-        this.strobeT = 0;
-      }
       return;
     }
 
-    if (this.phase === 'restore') {
-      const darkMix = 1 - easeIn(Math.min(1, this.elapsed / UPSIDE_DOWN_TRANSITION_RESTORE));
-      this.cinematicStrobe.apply(on, false, darkMix * 0.5);
-      this.billboard.setOpacity(textureReady ? 0.95 * darkMix : 0);
-      if (darkMix <= 0) {
-        this.phase = 'tremor';
-        this.elapsed = 0;
+    if (d.phase === 'restore') {
+      this.cinematicStrobe.apply(d.on, false, d.darkMix * 0.5);
+      this.billboard.setOpacity(textureReady ? 0.95 * d.darkMix : 0);
+      if (d.enteredTremor) {
         this.captureShakeBases();
         this.cinematicStrobe.stop();
         this.billboard.hide();
@@ -206,9 +192,9 @@ export class UpsideDownTransition {
       return;
     }
 
-    if (this.phase === 'tremor') {
+    if (d.phase === 'tremor') {
       this.applyTremor();
-      if (this.elapsed >= UPSIDE_DOWN_TRANSITION_TREMOR) this.finish();
+      if (d.finished) this.finish();
     }
   }
 
@@ -227,15 +213,13 @@ export class UpsideDownTransition {
     this.onTremorStart = null;
     this.tremorStarted = false;
     this.active = false;
-    this.phase = 'idle';
+    this.timeline.reset();
     this.pendingTextureUrl = null;
   }
 
   private resetAtmosphere(): void {
     this.restoreShakeBases();
-    this.phase = 'idle';
-    this.elapsed = 0;
-    this.strobeT = 0;
+    this.timeline.reset();
     this.active = false;
     this.tremorStarted = false;
     this.pendingTextureUrl = null;
@@ -261,21 +245,19 @@ export class UpsideDownTransition {
   }
 
   private applyTremor(): void {
-    const t = this.elapsed;
-    const ramp = Math.min(1, t / 0.45);
-    const amp = 0.0032 * ramp;
+    const o = tremorOffset(this.timeline.getElapsed(), 0.45, 0.0032);
 
     if (this.camera) {
       this.camera.position.set(
-        this.baseCamPos.x + Math.sin(t * 41) * amp,
-        this.baseCamPos.y + Math.sin(t * 53 + 0.8) * amp,
-        this.baseCamPos.z + Math.sin(t * 37 + 1.6) * amp,
+        this.baseCamPos.x + o.camX,
+        this.baseCamPos.y + o.camY,
+        this.baseCamPos.z + o.camZ,
       );
     }
 
     if (this.playfieldRoot) {
-      this.playfieldRoot.rotation.x = this.baseRootRot.x + Math.sin(t * 44) * amp * 0.4;
-      this.playfieldRoot.rotation.z = this.baseRootRot.z + Math.sin(t * 39 + 1.1) * amp * 0.5;
+      this.playfieldRoot.rotation.x = this.baseRootRot.x + o.rootRotX;
+      this.playfieldRoot.rotation.z = this.baseRootRot.z + o.rootRotZ;
     }
   }
 
