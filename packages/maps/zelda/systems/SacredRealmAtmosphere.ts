@@ -2,11 +2,15 @@ import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
 import {
   AtmosphereBlend,
+  AtmosphereFog,
+  LightingSnapshot,
   PlayfieldShadeOverlay,
   applyColorTint,
   applyLightTint,
   applyMaterialTint,
+  collectAtmosphereMaterials,
 } from '@pinball/game-engine';
+import type { AtmosphereMaterialEntry, SceneLighting } from '@pinball/game-engine';
 
 // ── Constantes Sacred Realm ───────────────────────────────────────────────────
 // Inspiré de UpsideDownAtmosphere (ST) — sans spores ni GarlandLights/BumperVisuals.
@@ -43,21 +47,7 @@ const SACRED_PULSE_EXP_MAX = 1.28;
 
 // ── Types internes ────────────────────────────────────────────────────────────
 
-type MaterialSnapshot = {
-  material: THREE.MeshStandardMaterial;
-  color: THREE.Color;
-  emissive: THREE.Color;
-  emissiveIntensity: number;
-};
-
-type SceneLighting = {
-  scene: THREE.Scene;
-  renderer: THREE.WebGLRenderer;
-  ambient: THREE.AmbientLight;
-  hemi: THREE.HemisphereLight;
-  dir: THREE.DirectionalLight;
-  fill: THREE.DirectionalLight;
-};
+type MaterialSnapshot = AtmosphereMaterialEntry;
 
 export type SacredRealmSetupConfig = {
   root: THREE.Object3D;
@@ -82,40 +72,15 @@ export class SacredRealmAtmosphere {
   private blend = new AtmosphereBlend(BLEND_DURATION);
 
   // Valeurs d'origine sauvegardées au setup
-  private origBg = new THREE.Color();
-  private origExposure = 1.45;
-  private origAmbientColor = new THREE.Color();
-  private origAmbientIntensity = 1;
-  private origHemiSky = new THREE.Color();
-  private origHemiGround = new THREE.Color();
-  private origHemiIntensity = 1;
-  private origDirColor = new THREE.Color();
-  private origDirIntensity = 1;
-  private origFillColor = new THREE.Color();
-  private origFillIntensity = 1;
-  private savedFog: THREE.Fog | THREE.FogExp2 | null = null;
-  private sacredFog: THREE.FogExp2 | null = null;
+  private snapshot = new LightingSnapshot();
+  private sacredFog: AtmosphereFog | null = null;
 
   setup(config: SacredRealmSetupConfig): void {
     this.dispose();
     this.lighting = config.lighting;
-    this.materials = [];
 
     // Snapshot de tous les matériaux MeshStandard dans l'arbre du root.
-    config.root.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      for (const mat of mats) {
-        if (!(mat instanceof THREE.MeshStandardMaterial)) continue;
-        if (this.materials.some((e) => e.material === mat)) continue;
-        this.materials.push({
-          material: mat,
-          color: mat.color.clone(),
-          emissive: mat.emissive.clone(),
-          emissiveIntensity: mat.emissiveIntensity,
-        });
-      }
-    });
+    this.materials = collectAtmosphereMaterials(config.root);
 
     // Voile sombre violet.
     this.shade.mount(config.root, {
@@ -124,20 +89,9 @@ export class SacredRealmAtmosphere {
     });
 
     // Sauvegarde de l'état d'éclairage d'origine.
-    const bg = config.lighting.scene.background;
-    if (bg instanceof THREE.Color) this.origBg.copy(bg);
-    this.origExposure = config.lighting.renderer.toneMappingExposure;
-    this.origAmbientColor.copy(config.lighting.ambient.color);
-    this.origAmbientIntensity = config.lighting.ambient.intensity;
-    this.origHemiSky.copy(config.lighting.hemi.color);
-    this.origHemiGround.copy(config.lighting.hemi.groundColor);
-    this.origHemiIntensity = config.lighting.hemi.intensity;
-    this.origDirColor.copy(config.lighting.dir.color);
-    this.origDirIntensity = config.lighting.dir.intensity;
-    this.origFillColor.copy(config.lighting.fill.color);
-    this.origFillIntensity = config.lighting.fill.intensity;
-    this.savedFog = config.lighting.scene.fog;
-    this.sacredFog = new THREE.FogExp2(SACRED_FOG_COLOR, 0);
+    this.snapshot.capture(config.lighting);
+    this.sacredFog = new AtmosphereFog(SACRED_FOG_COLOR);
+    this.sacredFog.save(config.lighting.scene);
 
     this.blend.reset();
   }
@@ -175,7 +129,6 @@ export class SacredRealmAtmosphere {
     this.lighting = null;
     this.shade = new PlayfieldShadeOverlay();
     this.sacredFog = null;
-    this.savedFog = null;
     this.blend.reset();
   }
 
@@ -210,12 +163,12 @@ export class SacredRealmAtmosphere {
 
     // Background.
     if (scene.background instanceof THREE.Color) {
-      applyColorTint(scene.background, this.origBg, SACRED_BG, ease, 1);
+      applyColorTint(scene.background, this.snapshot.bg, SACRED_BG, ease, 1);
     }
 
     // Exposure : transition, puis pulse lent quand pleinement actif.
     if (!fullyActive) {
-      renderer.toneMappingExposure = THREE.MathUtils.lerp(this.origExposure, SACRED_EXPOSURE, ease);
+      renderer.toneMappingExposure = THREE.MathUtils.lerp(this.snapshot.exposure, SACRED_EXPOSURE, ease);
     } else {
       const wave = 0.5 + Math.sin(this.blend.pulseT * SACRED_PULSE_SPEED) * 0.5;
       renderer.toneMappingExposure = THREE.MathUtils.lerp(SACRED_PULSE_EXP_MIN, SACRED_PULSE_EXP_MAX, wave);
@@ -224,7 +177,7 @@ export class SacredRealmAtmosphere {
     // Ambient : violacé, très réduit.
     applyLightTint(
       ambient,
-      { color: this.origAmbientColor, intensity: this.origAmbientIntensity },
+      { color: this.snapshot.ambientColor, intensity: this.snapshot.ambientIntensity },
       ease,
       { color: 0xcc88ff, colorK: 0.5, intensity: SACRED_AMBIENT_INTENSITY },
     );
@@ -232,16 +185,16 @@ export class SacredRealmAtmosphere {
     // Hemi : violet sombre.
     applyLightTint(
       hemi,
-      { color: this.origHemiSky, intensity: this.origHemiIntensity },
+      { color: this.snapshot.hemiSky, intensity: this.snapshot.hemiIntensity },
       ease,
       { color: 0x330055, colorK: 0.65, intensity: SACRED_HEMI_INTENSITY },
     );
-    applyColorTint(hemi.groundColor, this.origHemiGround, 0x180022, ease, 0.70);
+    applyColorTint(hemi.groundColor, this.snapshot.hemiGround, 0x180022, ease, 0.70);
 
     // Directional : lavande pâle, affaibli.
     applyLightTint(
       dir,
-      { color: this.origDirColor, intensity: this.origDirIntensity },
+      { color: this.snapshot.dirColor, intensity: this.snapshot.dirIntensity },
       ease,
       { color: 0xccaaff, colorK: 0.38, intensity: SACRED_DIR_INTENSITY },
     );
@@ -249,7 +202,7 @@ export class SacredRealmAtmosphere {
     // Fill : violet chaud, réduit.
     applyLightTint(
       fill,
-      { color: this.origFillColor, intensity: this.origFillIntensity },
+      { color: this.snapshot.fillColor, intensity: this.snapshot.fillIntensity },
       ease,
       { color: 0x9933cc, colorK: 0.48, intensity: SACRED_FILL_INTENSITY },
     );
@@ -260,17 +213,11 @@ export class SacredRealmAtmosphere {
 
   private applyFog(ease: number): void {
     if (!this.lighting || !this.sacredFog) return;
-    const scene = this.lighting.scene;
-    if (ease <= 0) {
-      this.restoreFog();
-      return;
-    }
-    this.sacredFog.density = SACRED_FOG_DENSITY * ease;
-    if (scene.fog !== this.sacredFog) scene.fog = this.sacredFog;
+    this.sacredFog.apply(this.lighting.scene, ease, SACRED_FOG_DENSITY * ease);
   }
 
   private restoreFog(): void {
-    if (!this.lighting) return;
-    this.lighting.scene.fog = this.savedFog;
+    if (!this.lighting || !this.sacredFog) return;
+    this.sacredFog.restore(this.lighting.scene);
   }
 }

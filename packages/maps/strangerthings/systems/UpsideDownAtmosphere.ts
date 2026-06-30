@@ -29,34 +29,22 @@ import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
 import {
   AtmosphereBlend,
+  AtmosphereFog,
+  LightingSnapshot,
   PlayfieldShadeOverlay,
   applyColorTint,
   applyLightTint,
   applyMaterialTint,
+  collectAtmosphereMaterials,
   seedSpores,
   stepSporeField,
 } from '@pinball/game-engine';
-import type { SporeParticle } from '@pinball/game-engine';
+import type { AtmosphereMaterialEntry, SceneLighting, SporeParticle } from '@pinball/game-engine';
 import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from '@pinball/game-engine';
 
 type MaterialKind = 'surface' | 'wall' | 'decor' | 'default';
 
-type MaterialSnapshot = {
-  material: THREE.MeshStandardMaterial;
-  color: THREE.Color;
-  emissive: THREE.Color;
-  emissiveIntensity: number;
-  kind: MaterialKind;
-};
-
-type SceneLighting = {
-  scene: THREE.Scene;
-  renderer: THREE.WebGLRenderer;
-  ambient: THREE.AmbientLight;
-  hemi: THREE.HemisphereLight;
-  dir: THREE.DirectionalLight;
-  fill: THREE.DirectionalLight;
-};
+type MaterialSnapshot = AtmosphereMaterialEntry<{ kind: MaterialKind }>;
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -179,42 +167,18 @@ export class UpsideDownAtmosphere {
   private blend = new AtmosphereBlend(UPSIDE_DOWN_ATMOSPHERE_BLEND);
   private revealLift = 0;
 
-  private origBg = new THREE.Color();
-  private origExposure = 1.45;
-  private origAmbientColor = new THREE.Color();
-  private origAmbientIntensity = 1;
-  private origHemiSky = new THREE.Color();
-  private origHemiGround = new THREE.Color();
-  private origHemiIntensity = 1;
-  private origDirColor = new THREE.Color();
-  private origDirIntensity = 1;
-  private origFillColor = new THREE.Color();
-  private origFillIntensity = 1;
-  private savedFog: THREE.Fog | THREE.FogExp2 | null = null;
-  private upsideDownFog: THREE.FogExp2 | null = null;
+  private snapshot = new LightingSnapshot();
+  private upsideDownFog: AtmosphereFog | null = null;
 
   setup(config: SetupConfig): void {
     this.dispose();
     this.lighting = config.lighting;
     this.garlandLights = config.garlandLights;
     this.bumperVisuals = config.bumperVisuals;
-    this.materials = [];
 
-    config.root.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
-      if (skipAtmosphereTint(obj)) return;
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      for (const mat of mats) {
-        if (!(mat instanceof THREE.MeshStandardMaterial)) continue;
-        if (this.materials.some((entry) => entry.material === mat)) continue;
-        this.materials.push({
-          material: mat,
-          color: mat.color.clone(),
-          emissive: mat.emissive.clone(),
-          emissiveIntensity: mat.emissiveIntensity,
-          kind: atmosphereMaterialKind(obj),
-        });
-      }
+    this.materials = collectAtmosphereMaterials(config.root, {
+      skip: skipAtmosphereTint,
+      extra: (obj) => ({ kind: atmosphereMaterialKind(obj) }),
     });
 
     this.playfieldShade.mount(config.root, {
@@ -224,22 +188,9 @@ export class UpsideDownAtmosphere {
 
     this.buildSpores(config.root);
 
-    const bg = config.lighting.scene.background;
-    if (bg instanceof THREE.Color) this.origBg.copy(bg);
-    this.origExposure = config.lighting.renderer.toneMappingExposure;
-
-    this.origAmbientColor.copy(config.lighting.ambient.color);
-    this.origAmbientIntensity = config.lighting.ambient.intensity;
-    this.origHemiSky.copy(config.lighting.hemi.color);
-    this.origHemiGround.copy(config.lighting.hemi.groundColor);
-    this.origHemiIntensity = config.lighting.hemi.intensity;
-    this.origDirColor.copy(config.lighting.dir.color);
-    this.origDirIntensity = config.lighting.dir.intensity;
-    this.origFillColor.copy(config.lighting.fill.color);
-    this.origFillIntensity = config.lighting.fill.intensity;
-
-    this.savedFog = config.lighting.scene.fog;
-    this.upsideDownFog = new THREE.FogExp2(UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR, 0);
+    this.snapshot.capture(config.lighting);
+    this.upsideDownFog = new AtmosphereFog(UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR);
+    this.upsideDownFog.save(config.lighting.scene);
 
     this.blend.reset();
   }
@@ -309,7 +260,6 @@ export class UpsideDownAtmosphere {
     this.spores = [];
     this.sporeMat = null;
     this.sporeTex = null;
-    this.savedFog = null;
     this.upsideDownFog = null;
     this.blend.reset();
     this.revealLift = 0;
@@ -405,38 +355,38 @@ export class UpsideDownAtmosphere {
       const { scene, renderer, ambient, hemi, dir, fill } = this.lighting;
 
       if (scene.background instanceof THREE.Color) {
-        applyColorTint(scene.background, this.origBg, UPSIDE_DOWN_ATMOSPHERE_BG, ease, 1);
+        applyColorTint(scene.background, this.snapshot.bg, UPSIDE_DOWN_ATMOSPHERE_BG, ease, 1);
       }
 
       if (!fullyActive) {
-        renderer.toneMappingExposure = THREE.MathUtils.lerp(this.origExposure, UPSIDE_DOWN_ATMOSPHERE_EXPOSURE, ease);
+        renderer.toneMappingExposure = THREE.MathUtils.lerp(this.snapshot.exposure, UPSIDE_DOWN_ATMOSPHERE_EXPOSURE, ease);
       }
 
       applyLightTint(
         ambient,
-        { color: this.origAmbientColor, intensity: this.origAmbientIntensity },
+        { color: this.snapshot.ambientColor, intensity: this.snapshot.ambientIntensity },
         ease,
         { color: 0xccb8d8, colorK: 0.45, intensity: UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY },
       );
 
       applyLightTint(
         hemi,
-        { color: this.origHemiSky, intensity: this.origHemiIntensity },
+        { color: this.snapshot.hemiSky, intensity: this.snapshot.hemiIntensity },
         ease,
         { color: 0x443366, colorK: 0.6, intensity: UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY },
       );
-      applyColorTint(hemi.groundColor, this.origHemiGround, 0x1a0a14, ease, 0.65);
+      applyColorTint(hemi.groundColor, this.snapshot.hemiGround, 0x1a0a14, ease, 0.65);
 
       applyLightTint(
         dir,
-        { color: this.origDirColor, intensity: this.origDirIntensity },
+        { color: this.snapshot.dirColor, intensity: this.snapshot.dirIntensity },
         ease,
         { color: 0xd8c8e8, colorK: 0.35, intensity: UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY },
       );
 
       applyLightTint(
         fill,
-        { color: this.origFillColor, intensity: this.origFillIntensity },
+        { color: this.snapshot.fillColor, intensity: this.snapshot.fillIntensity },
         ease,
         { color: 0x8866aa, colorK: 0.4, intensity: UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY },
       );
@@ -463,19 +413,12 @@ export class UpsideDownAtmosphere {
 
   private applyFog(ease: number): void {
     if (!this.lighting || !this.upsideDownFog) return;
-
-    const scene = this.lighting.scene;
-    if (ease <= 0) {
-      this.restoreFog();
-      return;
-    }
-
-    this.upsideDownFog.density = UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY * ease * (1 - this.revealLift * 0.8);
-    if (scene.fog !== this.upsideDownFog) scene.fog = this.upsideDownFog;
+    const density = UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY * ease * (1 - this.revealLift * 0.8);
+    this.upsideDownFog.apply(this.lighting.scene, ease, density);
   }
 
   private restoreFog(): void {
-    if (!this.lighting) return;
-    this.lighting.scene.fog = this.savedFog;
+    if (!this.lighting || !this.upsideDownFog) return;
+    this.upsideDownFog.restore(this.lighting.scene);
   }
 }
