@@ -16,236 +16,67 @@ import {
   GANONDORF_MODEL_YAW,
   GANONDORF_MODEL_URL,
 } from './GanondorfConstants';
-import { PLAYFIELD_TILT, surfaceYAtZ, surfacePoint, cameraFacingYaw } from '@pinball/game-engine';
-import { findGltfAnimationClip } from '@pinball/game-engine';
-import { createGltfLoader } from '@pinball/game-engine';
-import {
-  applySkinnedModelFit,
-  fitSkinnedModelWithRetry,
-} from '@pinball/game-engine';
-import { warmupObject3D } from '@pinball/game-engine';
-import { BossActorAnimator } from '@pinball/game-engine';
+import { BossTargetActor, findGltfAnimationClip } from '@pinball/game-engine';
 
-const _facingPos = new THREE.Vector3();
+export function resolveGanondorfClips(
+  mixer: THREE.AnimationMixer,
+  clips: THREE.AnimationClip[],
+) {
+  // Recadrage des clips sur leur plage Blender (Manual Frame Range).
+  // Sans subclip, le GLB exporte les keyframes en temps absolu et Three.js
+  // joue depuis t=0, ce qui fait jouer la mauvaise partie de l'animation.
+  const rawIdleClip = findGltfAnimationClip(clips, GANONDORF_ANIM_IDLE);
+  const rawHitClip = findGltfAnimationClip(clips, GANONDORF_ANIM_HIT);
+  const rawVictoryClip =
+    findGltfAnimationClip(clips, GANONDORF_ANIM_VICTORY) ??
+    findGltfAnimationClip(clips, GANONDORF_ANIM_VICTORY_FALLBACK);
 
-export class GanondorfTargetVisual {
-  private anchor: THREE.Group | null = null;
-  private camera: THREE.Camera | null = null;
-  private rig: THREE.Group | null = null;
-  private offset: THREE.Group | null = null;
-  private pendingFit: THREE.Object3D | null = null;
-  private loadPromise: Promise<void> | null = null;
-  private readonly animator = new BossActorAnimator({
-    color: 0xaa00ff,
-    distance: 0.38,
-    decay: 2,
-    y: 0.03,
-  });
+  const idleClip = rawIdleClip
+    ? THREE.AnimationUtils.subclip(rawIdleClip, GANONDORF_ANIM_IDLE, GANONDORF_ANIM_IDLE_FRAMES.start, GANONDORF_ANIM_IDLE_FRAMES.end, GANONDORF_ANIM_FPS)
+    : undefined;
+  const hitClip = rawHitClip
+    ? THREE.AnimationUtils.subclip(rawHitClip, GANONDORF_ANIM_HIT, GANONDORF_ANIM_HIT_FRAMES.start, GANONDORF_ANIM_HIT_FRAMES.end, GANONDORF_ANIM_FPS)
+    : undefined;
+  const victoryClip = rawVictoryClip
+    ? THREE.AnimationUtils.subclip(rawVictoryClip, GANONDORF_ANIM_VICTORY, GANONDORF_ANIM_VICTORY_FRAMES.start, GANONDORF_ANIM_VICTORY_FRAMES.end, GANONDORF_ANIM_FPS)
+    : undefined;
 
-  mount(parent: THREE.Object3D, camera: THREE.Camera): void {
-    this.dispose();
-    this.camera = camera;
+  let idleAction: THREE.AnimationAction | null = null;
+  let hitAction: THREE.AnimationAction | null = null;
+  let victoryAction: THREE.AnimationAction | null = null;
 
-    const anchor = new THREE.Group();
-    const p = surfacePoint(GANONDORF_TARGET, GANONDORF_MODEL_FOOT_LIFT, surfaceYAtZ);
-    anchor.position.set(p.x, p.y, p.z);
-    anchor.rotation.x = PLAYFIELD_TILT;
-    anchor.visible = false;
-    parent.add(anchor);
-    this.anchor = anchor;
-
-    const rig = new THREE.Group();
-    anchor.add(rig);
-    this.rig = rig;
-
-    // Lumière violette — ajoutée à la scène SEULEMENT pendant le fight.
-    this.animator.createGlowLight();
-
-    this.loadPromise = this.loadModel();
+  if (idleClip) {
+    idleAction = mixer.clipAction(idleClip);
+    idleAction.setLoop(THREE.LoopRepeat, Infinity);
+  }
+  if (hitClip) {
+    hitAction = mixer.clipAction(hitClip);
+    hitAction.setLoop(THREE.LoopOnce, 1);
+    hitAction.clampWhenFinished = true;
+  }
+  if (victoryClip) {
+    victoryAction = mixer.clipAction(victoryClip);
+    victoryAction.setLoop(THREE.LoopOnce, 1);
+    victoryAction.clampWhenFinished = true;
   }
 
-  ensureReady(): Promise<void> {
-    return this.loadPromise ?? Promise.resolve();
-  }
+  return { idleAction, hitAction, victoryAction };
+}
 
-  async warmup(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-    if (!this.anchor) return;
-    await this.ensureReady();
-    await fitSkinnedModelWithRetry(
-      () => this.applyFit(),
-      GANONDORF_MODEL_FIT_FRAMES,
-      () => this.anchor !== null,
-    );
-    this.syncFacing();
-    await warmupObject3D(renderer, scene, camera, this.anchor, {
-      mixer: this.animator.currentMixer,
-      primeActions: this.animator.primeActions(),
-    });
-  }
-
-  show(): void {
-    if (this.anchor) this.anchor.visible = true;
-    if (this.anchor) this.animator.show(this.anchor);
-  }
-
-  hide(): void {
-    if (this.anchor) this.anchor.visible = false;
-    this.animator.hide(this.anchor);
-  }
-
-  playHit(): void {
-    this.animator.playHit();
-  }
-
-  playVictory(): void {
-    this.animator.playVictory();
-  }
-
-  update(dt: number): void {
-    if (this.pendingFit) this.applyFit();
-    if (!this.anchor?.visible) return;
-
-    this.syncFacing();
-    this.animator.update(dt, this.anchor);
-  }
-
-  dispose(): void {
-    if (this.anchor) this.anchor.parent?.remove(this.anchor);
-    this.anchor = null;
-    this.camera = null;
-    this.rig = null;
-    this.offset = null;
-    this.pendingFit = null;
-    this.loadPromise = null;
-    this.animator.reset(true);
-  }
-
-  private async loadModel(): Promise<void> {
-    try {
-      const gltf = await createGltfLoader().loadAsync(GANONDORF_MODEL_URL);
-      if (!this.anchor) return;
-      this.fitModel(gltf.scene, gltf.animations);
-      this.syncFacing();
-      await fitSkinnedModelWithRetry(
-        () => this.applyFit(),
-        GANONDORF_MODEL_FIT_FRAMES,
-        () => this.anchor !== null,
-      );
-      if (this.anchor?.visible) this.animator.playIdle();
-    } catch (err) {
-      console.error('[Ganondorf] load error:', err);
-    }
-  }
-
-  private preparePoseForFit(): void {
-    const idle = this.animator.idle;
-    if (idle) {
-      idle.play();
-      idle.time = 0;
-    }
-    this.animator.currentMixer?.update(0);
-    this.pendingFit?.updateWorldMatrix(true, true);
-    this.pendingFit?.traverse((obj) => {
-      if (obj instanceof THREE.SkinnedMesh) obj.skeleton.update();
-    });
-  }
-
-  private syncFacing(): void {
-    if (!this.rig || !this.anchor || !this.camera) return;
-
-    this.anchor.getWorldPosition(_facingPos);
-    this.rig.rotation.y = cameraFacingYaw(_facingPos, this.camera.position, GANONDORF_MODEL_YAW);
-  }
-
-  private applyFit(): boolean {
-    const model = this.pendingFit;
-    if (!model || !this.rig || !this.offset || !this.anchor) return false;
-
-    const ok = applySkinnedModelFit({
-      model,
-      rig: this.rig,
-      offset: this.offset,
-      anchor: this.anchor,
-      targetHeight: GANONDORF_MODEL_HEIGHT,
+export class GanondorfTargetVisual extends BossTargetActor {
+  constructor() {
+    super({
+      logTag: 'Ganondorf',
+      modelUrl: GANONDORF_MODEL_URL,
+      target: GANONDORF_TARGET,
+      footLift: GANONDORF_MODEL_FOOT_LIFT,
+      modelHeight: GANONDORF_MODEL_HEIGHT,
       floorClearance: GANONDORF_MODEL_FLOOR_CLEARANCE,
-      beforeMeasure: () => this.preparePoseForFit(),
+      fitFrames: GANONDORF_MODEL_FIT_FRAMES,
+      yaw: GANONDORF_MODEL_YAW,
+      glow: { color: 0xaa00ff, distance: 0.38, decay: 2, y: 0.03 },
+      resolveClips: resolveGanondorfClips,
+      disposeGlowOnDispose: true,
     });
-    if (ok) this.pendingFit = null;
-    return ok;
-  }
-
-  private fitModel(model: THREE.Object3D, clips: THREE.AnimationClip[]): void {
-    if (!this.anchor || !this.rig) return;
-
-    this.rig.position.set(0, 0, 0);
-    this.rig.scale.set(1, 1, 1);
-    this.rig.rotation.set(0, 0, 0);
-    this.anchor.scale.set(1, 1, 1);
-    const offset = new THREE.Group();
-    this.offset = offset;
-    this.rig.add(offset);
-    offset.add(model);
-    this.pendingFit = model;
-
-    model.traverse((obj) => {
-      obj.frustumCulled = false;
-      if (obj instanceof THREE.SkinnedMesh) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (const mat of mats) {
-          if (mat instanceof THREE.MeshStandardMaterial) {
-            if (mat.map) {
-              mat.emissiveMap = mat.map;
-              mat.emissive.setHex(0xffffff);
-            } else {
-              mat.emissive.copy(mat.color);
-            }
-            mat.emissiveIntensity = 0.55;
-            mat.needsUpdate = true;
-          }
-        }
-      }
-    });
-
-    const mixer = new THREE.AnimationMixer(model);
-
-    // Recadrage des clips sur leur plage Blender (Manual Frame Range).
-    // Sans subclip, le GLB exporte les keyframes en temps absolu et Three.js
-    // joue depuis t=0, ce qui fait jouer la mauvaise partie de l'animation.
-    const rawIdleClip = findGltfAnimationClip(clips, GANONDORF_ANIM_IDLE);
-    const rawHitClip = findGltfAnimationClip(clips, GANONDORF_ANIM_HIT);
-    const rawVictoryClip =
-      findGltfAnimationClip(clips, GANONDORF_ANIM_VICTORY) ??
-      findGltfAnimationClip(clips, GANONDORF_ANIM_VICTORY_FALLBACK);
-
-    const idleClip = rawIdleClip
-      ? THREE.AnimationUtils.subclip(rawIdleClip, GANONDORF_ANIM_IDLE, GANONDORF_ANIM_IDLE_FRAMES.start, GANONDORF_ANIM_IDLE_FRAMES.end, GANONDORF_ANIM_FPS)
-      : undefined;
-    const hitClip = rawHitClip
-      ? THREE.AnimationUtils.subclip(rawHitClip, GANONDORF_ANIM_HIT, GANONDORF_ANIM_HIT_FRAMES.start, GANONDORF_ANIM_HIT_FRAMES.end, GANONDORF_ANIM_FPS)
-      : undefined;
-    const victoryClip = rawVictoryClip
-      ? THREE.AnimationUtils.subclip(rawVictoryClip, GANONDORF_ANIM_VICTORY, GANONDORF_ANIM_VICTORY_FRAMES.start, GANONDORF_ANIM_VICTORY_FRAMES.end, GANONDORF_ANIM_FPS)
-      : undefined;
-
-    let idleAction: THREE.AnimationAction | null = null;
-    let hitAction: THREE.AnimationAction | null = null;
-    let victoryAction: THREE.AnimationAction | null = null;
-
-    if (idleClip) {
-      idleAction = mixer.clipAction(idleClip);
-      idleAction.setLoop(THREE.LoopRepeat, Infinity);
-    }
-    if (hitClip) {
-      hitAction = mixer.clipAction(hitClip);
-      hitAction.setLoop(THREE.LoopOnce, 1);
-      hitAction.clampWhenFinished = true;
-    }
-    if (victoryClip) {
-      victoryAction = mixer.clipAction(victoryClip);
-      victoryAction.setLoop(THREE.LoopOnce, 1);
-      victoryAction.clampWhenFinished = true;
-    }
-
-    this.animator.setActions({ mixer, idleAction, hitAction, victoryAction });
   }
 }
