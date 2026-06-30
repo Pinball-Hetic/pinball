@@ -4,7 +4,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@pinball/shared-types';
-import { postScore, getWorldLeaderboard } from '../infrastructure/GlobalApiClient';
+import { createGlobalApiClient, type LeaderboardCache } from '../infrastructure/GlobalApiClient';
 import { prismaGameRepository } from '../infrastructure/PrismaGameRepository';
 import { GameStateManager } from '../infrastructure/GameStateManager';
 import { createRegisterScore } from '../use-cases/RegisterScore';
@@ -19,10 +19,16 @@ import { createSocketGateway } from './socketGateway';
 const PORT = process.env.PORT || 3001;
 
 const games = prismaGameRepository;
-const registerScore = createRegisterScore({ games, scores: { postScore } });
+const lbCache: LeaderboardCache = new Map();
+const globalApi = createGlobalApiClient({
+  fetch,
+  config: { baseUrl: process.env.GLOBAL_API_URL, token: process.env.BORNE_TOKEN },
+  cache: lbCache,
+});
+const registerScore = createRegisterScore({ games, scores: globalApi });
 const { worldTopTen, globalStats } = createLeaderboard({
   games,
-  world: { getWorldLeaderboard },
+  world: globalApi,
 });
 
 export const app = createApp({ worldTopTen, globalStats });

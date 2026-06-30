@@ -1,5 +1,10 @@
-import { test, expect, describe, mock, beforeEach, afterEach } from 'bun:test';
-import { postScore, getWorldLeaderboard, type ScorePayload } from './GlobalApiClient';
+import { test, expect, describe, mock } from 'bun:test';
+import {
+  createGlobalApiClient,
+  type GlobalApiConfig,
+  type LeaderboardCache,
+  type ScorePayload,
+} from './GlobalApiClient';
 
 // Helper : construit une réponse fetch minimale.
 function makeRes(opts: {
@@ -26,57 +31,56 @@ const PAYLOAD: ScorePayload = {
   playedAt: '2026-06-28T00:00:00.000Z',
 };
 
-const realFetch = globalThis.fetch;
-let envBackup: { url?: string; token?: string };
+const CONFIG: GlobalApiConfig = { baseUrl: 'https://global.example', token: 'tok-abc' };
 
-beforeEach(() => {
-  envBackup = { url: process.env.GLOBAL_API_URL, token: process.env.BORNE_TOKEN };
-  process.env.GLOBAL_API_URL = 'https://global.example';
-  process.env.BORNE_TOKEN = 'tok-abc';
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
-  if (envBackup.url === undefined) delete process.env.GLOBAL_API_URL;
-  else process.env.GLOBAL_API_URL = envBackup.url;
-  if (envBackup.token === undefined) delete process.env.BORNE_TOKEN;
-  else process.env.BORNE_TOKEN = envBackup.token;
-});
+function makeClient(
+  fetchImpl: typeof fetch,
+  config: GlobalApiConfig = CONFIG,
+  cache: LeaderboardCache = new Map(),
+) {
+  return createGlobalApiClient({ fetch: fetchImpl, config, cache });
+}
 
 describe('postScore', () => {
-  test('jette si GLOBAL_API_URL manquant', async () => {
-    delete process.env.GLOBAL_API_URL;
-    await expect(postScore(PAYLOAD)).rejects.toThrow(/manquants/);
+  test('jette si baseUrl manquant', async () => {
+    const client = makeClient(mock(async () => makeRes({ status: 201 })) as never, {
+      baseUrl: undefined,
+      token: 'tok-abc',
+    });
+    await expect(client.postScore(PAYLOAD)).rejects.toThrow(/manquants/);
   });
 
-  test('jette si BORNE_TOKEN manquant', async () => {
-    delete process.env.BORNE_TOKEN;
-    await expect(postScore(PAYLOAD)).rejects.toThrow(/manquants/);
+  test('jette si token manquant', async () => {
+    const client = makeClient(mock(async () => makeRes({ status: 201 })) as never, {
+      baseUrl: 'https://global.example',
+      token: undefined,
+    });
+    await expect(client.postScore(PAYLOAD)).rejects.toThrow(/manquants/);
   });
 
   test('201 → retourne le corps ScoreRegistered', async () => {
     const registered = { scoreId: 's1', code: 'AB12', claimUrl: 'https://c/AB12' };
     const fetchMock = mock(async () => makeRes({ status: 201, json: registered }));
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const client = makeClient(fetchMock as unknown as typeof fetch);
 
-    const out = await postScore(PAYLOAD);
+    const out = await client.postScore(PAYLOAD);
     expect(out).toEqual(registered);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   test('200 (replay idempotent) → retourne le corps', async () => {
     const registered = { scoreId: 's1', code: 'AB12', claimUrl: 'https://c/AB12' };
-    globalThis.fetch = mock(async () => makeRes({ status: 200, json: registered })) as never;
-    expect(await postScore(PAYLOAD)).toEqual(registered);
+    const client = makeClient(mock(async () => makeRes({ status: 200, json: registered })) as never);
+    expect(await client.postScore(PAYLOAD)).toEqual(registered);
   });
 
   test('envoie URL, méthode, Authorization Bearer et body JSON', async () => {
     const fetchMock = mock(async () =>
       makeRes({ status: 201, json: { scoreId: 's', code: 'C', claimUrl: 'u' } }),
     );
-    globalThis.fetch = fetchMock as never;
+    const client = makeClient(fetchMock as never);
 
-    await postScore(PAYLOAD);
+    await client.postScore(PAYLOAD);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://global.example/v1/scores');
     expect(init.method).toBe('POST');
@@ -87,17 +91,17 @@ describe('postScore', () => {
 
   test('4xx → erreur définitive, pas de retry', async () => {
     const fetchMock = mock(async () => makeRes({ status: 400, text: 'bad request' }));
-    globalThis.fetch = fetchMock as never;
+    const client = makeClient(fetchMock as never);
 
-    await expect(postScore(PAYLOAD)).rejects.toThrow(/400: bad request/);
+    await expect(client.postScore(PAYLOAD)).rejects.toThrow(/400: bad request/);
     expect(fetchMock).toHaveBeenCalledTimes(1); // un seul essai
   });
 
   test('5xx persistant → retry jusqu\'à 3 fois puis jette (épuisé)', async () => {
     const fetchMock = mock(async () => makeRes({ status: 503, text: 'down' }));
-    globalThis.fetch = fetchMock as never;
+    const client = makeClient(fetchMock as never);
 
-    await expect(postScore(PAYLOAD)).rejects.toThrow(/épuisé/);
+    await expect(client.postScore(PAYLOAD)).rejects.toThrow(/épuisé/);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -108,9 +112,9 @@ describe('postScore', () => {
       if (n === 1) return makeRes({ status: 500, text: 'oops' });
       return makeRes({ status: 201, json: { scoreId: 's', code: 'OK', claimUrl: 'u' } });
     });
-    globalThis.fetch = fetchMock as never;
+    const client = makeClient(fetchMock as never);
 
-    const out = await postScore(PAYLOAD);
+    const out = await client.postScore(PAYLOAD);
     expect(out.code).toBe('OK');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -119,9 +123,9 @@ describe('postScore', () => {
     const fetchMock = mock(async () => {
       throw new Error('network boom');
     });
-    globalThis.fetch = fetchMock as never;
+    const client = makeClient(fetchMock as never);
 
-    await expect(postScore(PAYLOAD)).rejects.toThrow(/network boom/);
+    await expect(client.postScore(PAYLOAD)).rejects.toThrow(/network boom/);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -132,25 +136,28 @@ describe('postScore', () => {
       if (n === 1) throw new Error('transient');
       return makeRes({ status: 201, json: { scoreId: 's', code: 'R', claimUrl: 'u' } });
     });
-    globalThis.fetch = fetchMock as never;
+    const client = makeClient(fetchMock as never);
 
-    expect((await postScore(PAYLOAD)).code).toBe('R');
+    expect((await client.postScore(PAYLOAD)).code).toBe('R');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('getWorldLeaderboard', () => {
-  test('jette si GLOBAL_API_URL manquant', async () => {
-    delete process.env.GLOBAL_API_URL;
-    await expect(getWorldLeaderboard('mapX')).rejects.toThrow(/manquant/);
+  test('jette si baseUrl manquant', async () => {
+    const client = makeClient(mock(async () => makeRes({ status: 200 })) as never, {
+      baseUrl: undefined,
+      token: 'tok-abc',
+    });
+    await expect(client.getWorldLeaderboard('mapX')).rejects.toThrow(/manquant/);
   });
 
   test('200 → retourne le body et construit l\'URL avec mapId/scope/limit', async () => {
     const board = [{ pseudo: 'A', score: 10 }];
     const fetchMock = mock(async () => makeRes({ status: 200, json: board }));
-    globalThis.fetch = fetchMock as never;
+    const client = makeClient(fetchMock as never);
 
-    const out = await getWorldLeaderboard('map enc', 5);
+    const out = await client.getWorldLeaderboard('map enc', 5);
     expect(out).toEqual(board);
     const [url] = fetchMock.mock.calls[0] as unknown as [string];
     expect(url).toBe(
@@ -160,15 +167,15 @@ describe('getWorldLeaderboard', () => {
 
   test('limit par défaut = 10', async () => {
     const fetchMock = mock(async () => makeRes({ status: 200, json: [] }));
-    globalThis.fetch = fetchMock as never;
-    await getWorldLeaderboard('m');
+    const client = makeClient(fetchMock as never);
+    await client.getWorldLeaderboard('m');
     const [url] = fetchMock.mock.calls[0] as unknown as [string];
     expect(url).toContain('limit=10');
   });
 
   test('!ok (500) → jette', async () => {
-    globalThis.fetch = mock(async () => makeRes({ status: 500 })) as never;
-    await expect(getWorldLeaderboard('m')).rejects.toThrow(/leaderboard 500/);
+    const client = makeClient(mock(async () => makeRes({ status: 500 })) as never);
+    await expect(client.getWorldLeaderboard('m')).rejects.toThrow(/leaderboard 500/);
   });
 
   test('cache ETag : 2e appel envoie If-None-Match, 304 renvoie le body caché', async () => {
@@ -181,20 +188,22 @@ describe('getWorldLeaderboard', () => {
       expect((init?.headers as Record<string, string>)['If-None-Match']).toBe('W/"v1"');
       return makeRes({ status: 304 });
     });
-    globalThis.fetch = fetchMock as never;
+    // Cache frais injecté → isolation sans clé unique.
+    const client = makeClient(fetchMock as never, CONFIG, new Map());
 
-    const key = `etagmap-${Date.now()}`; // clé unique pour isoler le cache de module
-    const first = await getWorldLeaderboard(key, 7);
+    const first = await client.getWorldLeaderboard('etagmap', 7);
     expect(first).toEqual(board);
-    const second = await getWorldLeaderboard(key, 7);
+    const second = await client.getWorldLeaderboard('etagmap', 7);
     expect(second).toEqual(board); // body servi depuis le cache
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   test('rejet fetch → propage l\'erreur', async () => {
-    globalThis.fetch = mock(async () => {
-      throw new Error('offline');
-    }) as never;
-    await expect(getWorldLeaderboard('m')).rejects.toThrow(/offline/);
+    const client = makeClient(
+      mock(async () => {
+        throw new Error('offline');
+      }) as never,
+    );
+    await expect(client.getWorldLeaderboard('m')).rejects.toThrow(/offline/);
   });
 });
