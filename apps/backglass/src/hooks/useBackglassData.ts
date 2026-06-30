@@ -5,6 +5,7 @@ import type {
   GlobalStats,
 } from '@pinball/shared-types'
 import { DEFAULT_MAP_ID } from '@pinball/shared-types'
+import { isLeaderboardShape, isStatsShape, safeFetch } from './backglassFetch'
 
 const EMPTY_STATS: GlobalStats = {
   totalGames: 0,
@@ -30,27 +31,13 @@ export function useBackglassData() {
     // ne doit JAMAIS remplacer un état valide. On valide statut + forme,
     // sinon on garde les données précédentes (ou EMPTY_STATS).
     const fetchLeaderboard = () =>
-      fetch(`/api/leaderboard?mapId=${mapIdRef.current}`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`leaderboard ${res.status}`)
-          return res.json()
-        })
-        .then((data) => {
-          if (!Array.isArray(data)) throw new Error('leaderboard shape')
-          setEntries(data)
-        })
+      safeFetch(`/api/leaderboard?mapId=${mapIdRef.current}`, isLeaderboardShape)
+        .then(setEntries)
         .catch(() => {})
 
     const fetchStats = () =>
-      fetch(`/api/stats?mapId=${mapIdRef.current}`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`stats ${res.status}`)
-          return res.json()
-        })
-        .then((data) => {
-          if (typeof data?.totalGames !== 'number') throw new Error('stats shape')
-          setStats(data as GlobalStats)
-        })
+      safeFetch(`/api/stats?mapId=${mapIdRef.current}`, isStatsShape)
+        .then(setStats)
         .catch(() => {})
 
     fetchLeaderboard()
