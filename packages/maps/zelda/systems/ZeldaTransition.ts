@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TransitionTimeline, tremorOffset } from '@pinball/game-engine';
+import { ShakeBasis, TransitionTimeline, tremorOffset } from '@pinball/game-engine';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { layout } from '../layout';
 
@@ -54,9 +54,7 @@ export class ZeldaTransition {
   // Références pour le tremor.
   private camera:        THREE.Camera | null       = null;
   private playfieldRoot: THREE.Object3D | null     = null;
-  private baseCamPos     = new THREE.Vector3();
-  private baseRootPos    = new THREE.Vector3();
-  private baseRootRot    = new THREE.Euler();
+  private shakeBasis     = new ShakeBasis();
 
   setup(config: SetupConfig): void {
     this.dispose();
@@ -130,32 +128,24 @@ export class ZeldaTransition {
 
     if (this.camera) {
       this.camera.position.set(
-        this.baseCamPos.x + o.camX,
-        this.baseCamPos.y + o.camY,
-        this.baseCamPos.z + o.camZ,
+        this.shakeBasis.camPos.x + o.camX,
+        this.shakeBasis.camPos.y + o.camY,
+        this.shakeBasis.camPos.z + o.camZ,
       );
     }
 
     if (this.playfieldRoot) {
-      this.playfieldRoot.rotation.x = this.baseRootRot.x + o.rootRotX;
-      this.playfieldRoot.rotation.z = this.baseRootRot.z + o.rootRotZ;
+      this.playfieldRoot.rotation.x = this.shakeBasis.rootRot.x + o.rootRotX;
+      this.playfieldRoot.rotation.z = this.shakeBasis.rootRot.z + o.rootRotZ;
     }
   }
 
   private captureShakeBases(): void {
-    if (this.camera) this.baseCamPos.copy(this.camera.position);
-    if (this.playfieldRoot) {
-      this.baseRootPos.copy(this.playfieldRoot.position);
-      this.baseRootRot.copy(this.playfieldRoot.rotation);
-    }
+    this.shakeBasis.capture(this.camera, this.playfieldRoot);
   }
 
   private restoreShakeBases(): void {
-    if (this.camera) this.camera.position.copy(this.baseCamPos);
-    if (this.playfieldRoot) {
-      this.playfieldRoot.position.copy(this.baseRootPos);
-      this.playfieldRoot.rotation.copy(this.baseRootRot);
-    }
+    this.shakeBasis.restore(this.camera, this.playfieldRoot);
   }
 
   private finish(): void {

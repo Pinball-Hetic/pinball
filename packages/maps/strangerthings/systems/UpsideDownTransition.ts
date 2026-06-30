@@ -11,11 +11,11 @@ import {
   UPSIDE_DOWN_TRANSITION_STROBE_HZ,
   UPSIDE_DOWN_TRANSITION_TREMOR,
 } from './UpsideDownConstants';
-import { easeOut, TransitionTimeline, tremorOffset } from '@pinball/game-engine';
+import { easeOut, ShakeBasis, TransitionTimeline, tremorOffset } from '@pinball/game-engine';
 import { CameraBillboardSprite } from '@pinball/game-engine';
 import type { GarlandLights } from './GarlandLights';
 import type { BumperVisuals } from './BumperVisuals';
-import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
+import { PlayfieldCinematicStrobe, strangerthingsDecor } from './PlayfieldCinematicStrobe';
 
 const DEFAULT_TEXTURE_URL = PORTAL_ENTER_TEXTURE_URL;
 const BILLBOARD_DEPTH = 0.38;
@@ -72,24 +72,26 @@ export class UpsideDownTransition {
   private onRevealStart: (() => void) | null = null;
   private onTremorStart: (() => void) | null = null;
   private tremorStarted = false;
-  private baseCamPos = new THREE.Vector3();
-  private baseRootPos = new THREE.Vector3();
-  private baseRootRot = new THREE.Euler();
+  private shakeBasis = new ShakeBasis();
 
   setup(config: SetupConfig): void {
     this.dispose();
     this.camera = config.camera;
     this.playfieldRoot = config.root;
 
-    this.cinematicStrobe.mount(config.root, config.garlandLights, config.bumperVisuals, {
-      flashColor: 0x9933ff,
-      flashIntensity: 2.4,
-      flashPosition: new THREE.Vector3(
-        layout.sensors.portal.x,
-        layout.sensors.portal.y + 0.12,
-        layout.sensors.portal.z,
-      ),
-    });
+    this.cinematicStrobe.mount(
+      config.root,
+      {
+        flashColor: 0x9933ff,
+        flashIntensity: 2.4,
+        flashPosition: new THREE.Vector3(
+          layout.sensors.portal.x,
+          layout.sensors.portal.y + 0.12,
+          layout.sensors.portal.z,
+        ),
+      },
+      strangerthingsDecor(config.garlandLights, config.bumperVisuals),
+    );
 
     this.billboard.mount(config.scene, config.camera, {
       textureUrl: DEFAULT_TEXTURE_URL,
@@ -229,19 +231,11 @@ export class UpsideDownTransition {
   }
 
   private captureShakeBases(): void {
-    if (this.camera) this.baseCamPos.copy(this.camera.position);
-    if (this.playfieldRoot) {
-      this.baseRootPos.copy(this.playfieldRoot.position);
-      this.baseRootRot.copy(this.playfieldRoot.rotation);
-    }
+    this.shakeBasis.capture(this.camera, this.playfieldRoot);
   }
 
   private restoreShakeBases(): void {
-    if (this.camera) this.camera.position.copy(this.baseCamPos);
-    if (this.playfieldRoot) {
-      this.playfieldRoot.position.copy(this.baseRootPos);
-      this.playfieldRoot.rotation.copy(this.baseRootRot);
-    }
+    this.shakeBasis.restore(this.camera, this.playfieldRoot);
   }
 
   private applyTremor(): void {
@@ -249,15 +243,15 @@ export class UpsideDownTransition {
 
     if (this.camera) {
       this.camera.position.set(
-        this.baseCamPos.x + o.camX,
-        this.baseCamPos.y + o.camY,
-        this.baseCamPos.z + o.camZ,
+        this.shakeBasis.camPos.x + o.camX,
+        this.shakeBasis.camPos.y + o.camY,
+        this.shakeBasis.camPos.z + o.camZ,
       );
     }
 
     if (this.playfieldRoot) {
-      this.playfieldRoot.rotation.x = this.baseRootRot.x + o.rootRotX;
-      this.playfieldRoot.rotation.z = this.baseRootRot.z + o.rootRotZ;
+      this.playfieldRoot.rotation.x = this.shakeBasis.rootRot.x + o.rootRotX;
+      this.playfieldRoot.rotation.z = this.shakeBasis.rootRot.z + o.rootRotZ;
     }
   }
 
