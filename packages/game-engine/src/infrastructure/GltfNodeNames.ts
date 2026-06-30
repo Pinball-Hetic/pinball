@@ -105,17 +105,34 @@ export function isFlipperGltfMesh(mesh: THREE.Mesh): boolean {
   return isFlipperGltfMeshName(names);
 }
 
-export function isPinballmapRailMesh(mesh: THREE.Mesh): boolean {
-  const self = normalizeGltfName(mesh.name);
-  if (/^circle\.\d+$/.test(self) || /^plane\.\d+$/.test(self)) return true;
-  let current: THREE.Object3D | null = mesh.parent;
-  while (current) {
-    const n = normalizeGltfName(current.name);
+function isRailNodeName(normalized: string): boolean {
+  return /^circle\.\d+$/.test(normalized) || /^plane\.\d+$/.test(normalized);
+}
+
+/**
+ * Variante PURE de isPinballmapRailMesh : opère sur la liste de noms
+ * d'ascendance (self → parents). Le self est rail s'il matche circle.NNN /
+ * plane.NNN ; sinon on remonte les parents jusqu'à la frontière 'pinballmap'.
+ */
+export function isPinballmapRailMeshName(ancestryNames: string[]): boolean {
+  const self = normalizeGltfName(ancestryNames[0] ?? '');
+  if (isRailNodeName(self)) return true;
+  for (let i = 1; i < ancestryNames.length; i++) {
+    const n = normalizeGltfName(ancestryNames[i]);
     if (n === 'pinballmap') return false;
-    if (/^circle\.\d+$/.test(n) || /^plane\.\d+$/.test(n)) return true;
-    current = current.parent;
+    if (isRailNodeName(n)) return true;
   }
   return false;
+}
+
+export function isPinballmapRailMesh(mesh: THREE.Mesh): boolean {
+  const names: string[] = [];
+  let current: THREE.Object3D | null = mesh;
+  while (current) {
+    names.push(current.name);
+    current = current.parent;
+  }
+  return isPinballmapRailMeshName(names);
 }
 
 export function hasPinballmapRoot(root: THREE.Object3D): boolean {
@@ -140,13 +157,18 @@ export const PINBALLMAP_NONPHYSICAL_FLOOR_MESHES = new Set([
   'mesh0',
 ]);
 
-export function isPinballmapNonPhysicalFloorMesh(mesh: THREE.Mesh): boolean {
-  const n = normalizeGltfName(mesh.name);
-  const c = canonicalGltfName(mesh.name);
+/** Variante PURE de isPinballmapNonPhysicalFloorMesh (sur le nom du self). */
+export function isPinballmapNonPhysicalFloorMeshName(selfName: string): boolean {
+  const n = normalizeGltfName(selfName);
+  const c = canonicalGltfName(selfName);
   return (
     PINBALLMAP_NONPHYSICAL_FLOOR_MESHES.has(n) ||
     PINBALLMAP_NONPHYSICAL_FLOOR_MESHES.has(c)
   );
+}
+
+export function isPinballmapNonPhysicalFloorMesh(mesh: THREE.Mesh): boolean {
+  return isPinballmapNonPhysicalFloorMeshName(mesh.name);
 }
 
 /**

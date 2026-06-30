@@ -4,16 +4,15 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   canonicalGltfName,
   hasPinballmapRoot,
-  isFlipperGltfMesh,
   isFlipperGltfMeshName,
   isJunkGltfMeshName,
   isPinballmapGameplayMesh,
   isPinballmapGameplayMeshName,
-  isPinballmapRailMesh,
+  isPinballmapRailMeshName,
   isVisualOnlyGltfAncestry,
   normalizeGltfName,
   playfieldUsesCollOnlyCollision,
-  isPinballmapNonPhysicalFloorMesh,
+  isPinballmapNonPhysicalFloorMeshName,
   SWITCH_SENSOR_NODES,
 } from './GltfNodeNames';
 import { MeshRoleResolver } from './MeshRoleResolver';
@@ -179,6 +178,65 @@ function isSkippedMesh(node: THREE.Object3D, collOnly: boolean): boolean {
   return isSkipped(ancestryNames(node), collOnly);
 }
 
+/**
+ * Classification PURE d'un mesh Pinballmap (routage trimesh), à partir de sa
+ * liste de noms d'ascendance (self → parents) et des dimensions de sa AABB.
+ * Aucune dépendance THREE/Rapier. `buildPinballmap` n'est plus qu'une boucle
+ * d'application qui extrait la géométrie + crée le collider selon ce kind.
+ *
+ * Ordre = ordre des gardes de l'ancien buildPinballmap :
+ * not-gameplay / flipper / analytic / non-physical-floor → 'skip' ;
+ * puis bump (tag = nom self avec '-'→'_'), rail (filtre dimension), wall.
+ */
+export type PinballmapMeshClass =
+  | { kind: 'skip' }
+  | { kind: 'bump'; tag: string; restitution: number; friction: number; doubleSided: boolean }
+  | { kind: 'rail'; restitution: number; friction: number }
+  | { kind: 'wall'; restitution: number; friction: number; doubleSided: boolean };
+
+export function classifyPinballmapMesh(
+  ancestry: string[],
+  aabbDims: [number, number, number] | null,
+): PinballmapMeshClass {
+  if (!isPinballmapGameplayMeshName(ancestry)) return { kind: 'skip' };
+  if (isFlipperGltfMeshName(ancestry)) return { kind: 'skip' };
+  if (ancestryMatchesSet(ancestry, COLLISION_ANALYTIC)) return { kind: 'skip' };
+  if (isPinballmapNonPhysicalFloorMeshName(ancestry[0] ?? '')) return { kind: 'skip' };
+
+  if (ancestryMatchesSet(ancestry, PINBALLMAP_HIGH_BOUNCE)) {
+    const tag = normalizeGltfName(ancestry[0] ?? '').replace(/-/g, '_');
+    return {
+      kind: 'bump',
+      tag,
+      restitution: PINBALLMAP_HIGH_BOUNCE_RESTITUTION,
+      friction: PINBALLMAP_HIGH_BOUNCE_FRICTION,
+      doubleSided: false,
+    };
+  }
+
+  if (isPinballmapRailMeshName(ancestry)) {
+    if (aabbDims) {
+      const sorted = [...aabbDims].sort((a, b) => a - b);
+      if (sorted[0] < RAIL_SUBMESH_MIN_PHYS_DIM && sorted[1] < RAIL_SUBMESH_MIN_PHYS_DIM) {
+        return { kind: 'skip' };
+      }
+    }
+    return {
+      kind: 'rail',
+      restitution: PINBALLMAP_TRIMESH_RESTITUTION,
+      friction: PINBALLMAP_TRIMESH_FRICTION,
+    };
+  }
+
+  const isMesh1 = normalizeGltfName(ancestry[0] ?? '') === PINBALLMAP_SINGLE_SIDED_WALL;
+  return {
+    kind: 'wall',
+    restitution: PINBALLMAP_TRIMESH_RESTITUTION,
+    friction: PINBALLMAP_TRIMESH_FRICTION,
+    doubleSided: !isMesh1,
+  };
+}
+
 function extractWorldGeometry(mesh: THREE.Mesh): THREE.BufferGeometry {
   mesh.updateMatrixWorld(true);
   const geo = mesh.geometry.clone() as THREE.BufferGeometry;
@@ -336,76 +394,42 @@ export class PlayfieldTrimeshBuilder {
   ): void {
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
+      // Skip rapide avant extraction de géométrie (gardes sans AABB).
       if (!isPinballmapGameplayMesh(child)) return;
-      if (isFlipperGltfMesh(child)) return;
-      if (meshMatchesSet(child, COLLISION_ANALYTIC)) return;
-      // Mesh_0 (surface de jeu) : visible mais SANS collision. La physique est
-      // assurée par le cuboïde analytique lisse (createPlayfieldFloor) → la
-      // balle glisse sans accrocher les arêtes du trimesh. Mesh_1…4 (cadre bois,
-      // structure haute) gardent leur collision.
-      if (isPinballmapNonPhysicalFloorMesh(child)) return;
 
-      // Surfaces "bump" : le trimesh du mèche EST la surface de rebond ET la
-      // surface de détection. On l'ajoute à colliderMap (tag bump_left/bump_right)
-      // et on active COLLISION_EVENTS pour que CollisionEventProcessor le détecte.
-      // Aucun corps invisible supplémentaire : la balle ne rebondit que quand elle
-      // touche physiquement le mesh.
-      if (meshMatchesSet(child, PINBALLMAP_HIGH_BOUNCE)) {
-        const meshName = normalizeGltfName(child.name);   // 'bump-right' | 'bump-left'
-        const tag      = meshName.replace(/-/g, '_');     // 'bump_right' | 'bump_left'
-        const col = PlayfieldTrimeshBuilder.createTrimeshCollider(
-          world,
-          [extractWorldGeometry(child)],
-          PINBALLMAP_HIGH_BOUNCE_RESTITUTION,
-          PINBALLMAP_HIGH_BOUNCE_FRICTION,
-          false, // pas de lissage (mesh déjà propre)
-          false, // single-sided : les normales du mèche pointent vers la zone de jeu
-        );
-        if (col && colliderMap) {
-          col.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-          colliderMap.set(col.handle, tag);
-        }
+      // La AABB n'est nécessaire que pour le filtre dimension des rails ; on
+      // extrait la géométrie monde une fois et on la réutilise pour le collider.
+      const geo = extractWorldGeometry(child);
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox;
+      const dims: [number, number, number] | null = bb
+        ? [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z]
+        : null;
+
+      const cls = classifyPinballmapMesh(ancestryNames(child), dims);
+      if (cls.kind === 'skip') return;
+
+      if (cls.kind === 'rail') {
+        // Trimesh seul (cf. createRailColliders). Réutilise la géométrie déjà extraite.
+        PlayfieldTrimeshBuilder.createRailColliders(world, child, cls.restitution, cls.friction, geo);
         return;
       }
 
-      if (isPinballmapRailMesh(child)) {
-        // Filtrer les détails décoratifs microscopiques (vis, clips, anneaux fins).
-        // On calcule la AABB du mesh et on vérifie que les 2 plus petites dimensions
-        // dépassent le seuil RAIL_SUBMESH_MIN_PHYS_DIM (25 mm).
-        // Ex : Circle.018/Mesh_11 (18×29×19mm), Mesh_12 (6×0.6mm×6mm) → exclus.
-        const testGeo = extractWorldGeometry(child);
-        testGeo.computeBoundingBox();
-        const bb = testGeo.boundingBox;
-        if (bb) {
-          const dims = [
-            bb.max.x - bb.min.x,
-            bb.max.y - bb.min.y,
-            bb.max.z - bb.min.z,
-          ].sort((a, b) => a - b);
-          // Les 2 plus petites dimensions doivent dépasser le seuil.
-          if (dims[0] < RAIL_SUBMESH_MIN_PHYS_DIM && dims[1] < RAIL_SUBMESH_MIN_PHYS_DIM) return;
-        }
-        // Réutilise la géométrie déjà extraite pour le test de taille.
-        PlayfieldTrimeshBuilder.createRailColliders(
-          world,
-          child,
-          PINBALLMAP_TRIMESH_RESTITUTION,
-          PINBALLMAP_TRIMESH_FRICTION,
-          testGeo,
-        );
-        return;
-      }
-
-      // Mesh_1 (murs moulés) : single-sided (cf. PINBALLMAP_SINGLE_SIDED_WALL).
-      const isMesh1 = normalizeGltfName(child.name) === PINBALLMAP_SINGLE_SIDED_WALL;
-      PlayfieldTrimeshBuilder.createTrimeshCollider(
+      // Surfaces "bump" : le trimesh EST la surface de rebond ET de détection.
+      // On active COLLISION_EVENTS + on l'enregistre dans colliderMap (tag).
+      // Murs (wall) : trimesh simple, doubleSided sauf Mesh_1 (single-sided).
+      const col = PlayfieldTrimeshBuilder.createTrimeshCollider(
         world,
-        [extractWorldGeometry(child)],
-        PINBALLMAP_TRIMESH_RESTITUTION,
-        PINBALLMAP_TRIMESH_FRICTION,
+        [geo],
+        cls.restitution,
+        cls.friction,
         false,
-        !isMesh1,  // doubleSided=false pour Mesh_1, true pour les autres
+        cls.doubleSided,
       );
+      if (cls.kind === 'bump' && col && colliderMap) {
+        col.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+        colliderMap.set(col.handle, cls.tag);
+      }
     });
   }
 

@@ -48,6 +48,40 @@ export interface ColliderSpec {
   role?: string;
 }
 
+// ── Géométrie analytique du plateau (valeurs ST, verbatim) ───────────────────
+// PLAYFIELD_*_Z = bornes Z du sol analytique. Numériquement égales à
+// layout.geometry.bounds.topZ / bottomZ, mais planPlayfieldFloor() ne reçoit
+// pas de layout → constantes nommées (cf. backlog : injecter layout pour
+// dériver et rendre générique).
+const PLAYFIELD_MIN_Z = -0.552;
+const PLAYFIELD_MAX_Z = 0.418;
+const PLAYFIELD_HALF_X = 0.27; // pas une borne (bounds = ±0.265) : marge collider
+const PLAYFIELD_FLOOR_HALF_Y = 0.003;
+const PLAYFIELD_FLOOR_RESTITUTION = 0.35;
+const PLAYFIELD_FLOOR_FRICTION = 0.12;
+
+// Couloir plongeur "legacy" (planLaneFloor) — bornes X verbatim. 0.265 = rightX,
+// 0.206 n'est pas une borne layout → conservées en l'état.
+const LANE_FLOOR_X_MIN = 0.206;
+const LANE_FLOOR_X_MAX = 0.265;
+const LANE_FLOOR_HALF_Y = 0.003;
+const LANE_FLOOR_RESTITUTION = 0.35;
+const LANE_FLOOR_FRICTION = 0.15;
+
+// Murs analytiques (planWalls) — positions/épaisseurs verbatim ST.
+const WALL_HEIGHT = 0.06;
+const WALL_THICKNESS = 0.015;
+const WALL_SIDE_LEFT_X = -0.265; // = bounds.leftX (gardé littéral : valeurs ST hardcodées)
+const WALL_SIDE_RIGHT_X = 0.265; // = bounds.rightX
+const WALL_SIDE_HALF_Z = 0.485;
+const WALL_SIDE_Z = -0.067;
+const WALL_BACK_HALF_X = 0.265; // = bounds.rightX
+const WALL_BACK_Z = -0.552; // = bounds.topZ
+const WALL_LANE_SEP_HALF_Z = 0.5;
+const WALL_LANE_SEP_Z = -0.05;
+const WALL_RESTITUTION = 0.4;
+const WALL_FRICTION = 0.1;
+
 /** Quaternion d'une rotation autour de l'axe X (tilt du tapis). */
 function quatAroundX(angle: number): SpecQuat {
   return { x: Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) };
@@ -63,19 +97,19 @@ function quatAroundY(angle: number): SpecQuat {
  * bosselé du GLB. Z ∈ [-0.552, 0.418], inclinaison dérivée de surfaceYAtZ.
  */
 export function planPlayfieldFloor(): ColliderSpec {
-  const zMin = -0.552;
-  const zMax = 0.418;
+  const zMin = PLAYFIELD_MIN_Z;
+  const zMax = PLAYFIELD_MAX_Z;
   const midZ = (zMin + zMax) / 2;
   const midY = surfaceYAtZ(midZ);
-  const halfX = 0.27;
+  const halfX = PLAYFIELD_HALF_X;
   const halfZ = (zMax - zMin) / 2;
   const tiltAngle = Math.atan2(surfaceYAtZ(zMin) - surfaceYAtZ(zMax), zMax - zMin);
   return {
-    shape: { kind: 'cuboid', halfExtents: { x: halfX, y: 0.003, z: halfZ } },
+    shape: { kind: 'cuboid', halfExtents: { x: halfX, y: PLAYFIELD_FLOOR_HALF_Y, z: halfZ } },
     translation: { x: 0, y: midY, z: midZ },
     rotation: quatAroundX(tiltAngle),
-    restitution: 0.35,
-    friction: 0.12,
+    restitution: PLAYFIELD_FLOOR_RESTITUTION,
+    friction: PLAYFIELD_FLOOR_FRICTION,
   };
 }
 
@@ -83,41 +117,39 @@ export function planPlayfieldFloor(): ColliderSpec {
 export function planLaneFloor(laneTopZ = 0.03, laneBotZ = 0.42): ColliderSpec {
   const laneMidZ = (laneTopZ + laneBotZ) / 2;
   const laneHalfZ = (laneBotZ - laneTopZ) / 2;
-  const laneMidX = (0.206 + 0.265) / 2;
-  const laneHalfX = (0.265 - 0.206) / 2;
+  const laneMidX = (LANE_FLOOR_X_MIN + LANE_FLOOR_X_MAX) / 2;
+  const laneHalfX = (LANE_FLOOR_X_MAX - LANE_FLOOR_X_MIN) / 2;
   const yTop = surfaceYAtZ(laneTopZ);
   const yBot = surfaceYAtZ(laneBotZ);
   const laneMidY = (yTop + yBot) / 2;
   const tiltAngle = Math.atan2(yTop - yBot, laneBotZ - laneTopZ);
   return {
-    shape: { kind: 'cuboid', halfExtents: { x: laneHalfX, y: 0.003, z: laneHalfZ } },
+    shape: { kind: 'cuboid', halfExtents: { x: laneHalfX, y: LANE_FLOOR_HALF_Y, z: laneHalfZ } },
     translation: { x: laneMidX, y: laneMidY, z: laneMidZ },
     rotation: quatAroundX(tiltAngle),
-    restitution: 0.35,
-    friction: 0.15,
+    restitution: LANE_FLOOR_RESTITUTION,
+    friction: LANE_FLOOR_FRICTION,
   };
 }
 
 /** Murs analytiques du terrain (côtés + fond + séparateur couloir). */
 export function planWalls(layout: MapLayout): ColliderSpec[] {
-  const WALL_H = 0.06;
-  const WALL_T = 0.015;
-  const HH = WALL_H / 2;
-  const HT = WALL_T / 2;
+  const HH = WALL_HEIGHT / 2;
+  const HT = WALL_THICKNESS / 2;
   const laneSepX = layout.spawns.ball.x - getBallRadius() * 2;
 
   const boxes = [
-    { hx: HT, hy: HH, hz: 0.485, px: -0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
-    { hx: HT, hy: HH, hz: 0.485, px: 0.265, py: surfaceYAtZ(-0.067) + HH, pz: -0.067 },
-    { hx: 0.265, hy: HH, hz: HT, px: 0.0, py: surfaceYAtZ(-0.552) + HH, pz: -0.552 },
-    { hx: HT, hy: HH, hz: 0.5, px: laneSepX, py: surfaceYAtZ(-0.05) + HH, pz: -0.05 },
+    { hx: HT, hy: HH, hz: WALL_SIDE_HALF_Z, px: WALL_SIDE_LEFT_X, py: surfaceYAtZ(WALL_SIDE_Z) + HH, pz: WALL_SIDE_Z },
+    { hx: HT, hy: HH, hz: WALL_SIDE_HALF_Z, px: WALL_SIDE_RIGHT_X, py: surfaceYAtZ(WALL_SIDE_Z) + HH, pz: WALL_SIDE_Z },
+    { hx: WALL_BACK_HALF_X, hy: HH, hz: HT, px: 0.0, py: surfaceYAtZ(WALL_BACK_Z) + HH, pz: WALL_BACK_Z },
+    { hx: HT, hy: HH, hz: WALL_LANE_SEP_HALF_Z, px: laneSepX, py: surfaceYAtZ(WALL_LANE_SEP_Z) + HH, pz: WALL_LANE_SEP_Z },
   ];
 
   return boxes.map((w) => ({
     shape: { kind: 'cuboid', halfExtents: { x: w.hx, y: w.hy, z: w.hz } },
     translation: { x: w.px, y: w.py, z: w.pz },
-    restitution: 0.4,
-    friction: 0.1,
+    restitution: WALL_RESTITUTION,
+    friction: WALL_FRICTION,
   }));
 }
 

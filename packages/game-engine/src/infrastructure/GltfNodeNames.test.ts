@@ -13,8 +13,10 @@ import {
   isFlipperGltfMeshName,
   isVisualOnlyGltfAncestry,
   isPinballmapRailMesh,
+  isPinballmapRailMeshName,
   hasPinballmapRoot,
   isPinballmapNonPhysicalFloorMesh,
+  isPinballmapNonPhysicalFloorMeshName,
   PINBALLMAP_NONPHYSICAL_FLOOR_MESHES,
   SWITCH_SENSOR_NODES,
   hidePinballmapDecorNodes,
@@ -259,6 +261,23 @@ describe('isPinballmapRailMesh', () => {
   });
 });
 
+describe('isPinballmapRailMeshName (pure)', () => {
+  // ancestry = self → parents.
+  test('true for self circle.NNN', () => {
+    expect(isPinballmapRailMeshName(['Circle.001'])).toBe(true);
+  });
+  test('true via rail ancestor below pinballmap', () => {
+    expect(isPinballmapRailMeshName(['detail', 'circle.003', 'Pinballmap'])).toBe(true);
+  });
+  test('false when rail ancestor is above the pinballmap boundary', () => {
+    expect(isPinballmapRailMeshName(['detail', 'Pinballmap', 'plane.001'])).toBe(false);
+  });
+  test('false for plain circle / empty', () => {
+    expect(isPinballmapRailMeshName(['circle'])).toBe(false);
+    expect(isPinballmapRailMeshName([])).toBe(false);
+  });
+});
+
 describe('hasPinballmapRoot', () => {
   test('true when a Pinballmap node exists', () => {
     const root = node('scene', node('Pinballmap'));
@@ -280,6 +299,16 @@ describe('isPinballmapNonPhysicalFloorMesh', () => {
   });
   test('set contains the documented variants', () => {
     expect(PINBALLMAP_NONPHYSICAL_FLOOR_MESHES.has('mesh_0')).toBe(true);
+  });
+});
+
+describe('isPinballmapNonPhysicalFloorMeshName (pure)', () => {
+  test('matches mesh_0 variants by name', () => {
+    expect(isPinballmapNonPhysicalFloorMeshName('Mesh_0')).toBe(true);
+    expect(isPinballmapNonPhysicalFloorMeshName('mesh.0')).toBe(true);
+  });
+  test('does NOT match mesh_1', () => {
+    expect(isPinballmapNonPhysicalFloorMeshName('Mesh_1')).toBe(false);
   });
 });
 
