@@ -10,7 +10,7 @@ import {
   BossRevealOrchestrator,
 } from '../systems'
 import { RETURN_PORTAL_TEXTURE_URL } from '../systems/UpsideDownConstants'
-import { resolveNestState, dueLateHints } from '@pinball/game-engine'
+import { resolveNestState, dueLateHints, resolveHeticProgress } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 import { grantExtraLife } from './lifeBonus'
 import { createLastLifeRescue } from './lastLifeRescue'
@@ -185,11 +185,12 @@ export function createModule(): MapModule {
       }
       if (e.type === 'DROP_TARGET_COMPLETE') {
         hetic += 1
-        if (hetic < 5) {
-          ctx.setMapState({ hetic })
-          ctx.playCinematic('hetic_letter', { value: hetic })
+        const progress = resolveHeticProgress(hetic)
+        if (!progress.completed) {
+          ctx.setMapState({ hetic: progress.display })
+          ctx.playCinematic('hetic_letter', { value: progress.display })
         } else {
-          ctx.setMapState({ hetic: 5 })
+          ctx.setMapState({ hetic: progress.display })
           ctx.playCinematic('hetic_complete', {
             onEnd: () => {
               // Fever 30s : multiplicateur forcé + reprise immédiate du SCORE.

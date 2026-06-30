@@ -1,5 +1,5 @@
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
-import { dueLateHints } from '@pinball/game-engine'
+import { dueLateHints, resolveHeticProgress, selectMilestoneClip } from '@pinball/game-engine'
 import {
   GanondorfReveal,
   DarkLinkReveal,
@@ -125,15 +125,7 @@ export function createModule(): MapModule {
 
       // ── Palier de score ──────────────────────────────────────────────────
       if (e.type === 'MILESTONE') {
-        const clip =
-          e.threshold === 5000
-            ? 'milestone_5k'
-            : e.threshold === 15000
-              ? 'milestone_15k'
-              : e.threshold === 30000
-                ? 'milestone_30k'
-                : 'milestone_big'
-        ctx.playCinematic(clip, { value: e.threshold })
+        ctx.playCinematic(selectMilestoneClip(e.threshold), { value: e.threshold })
         ctx.screenShake(0.4)
       }
 
@@ -205,11 +197,12 @@ export function createModule(): MapModule {
       // ── Compteur HETIC ───────────────────────────────────────────────────
       if (e.type === 'DROP_TARGET_COMPLETE') {
         hetic += 1
-        if (hetic < 5) {
-          ctx.setMapState({ hetic })
-          ctx.playCinematic('hetic_letter', { value: hetic })
+        const progress = resolveHeticProgress(hetic)
+        if (!progress.completed) {
+          ctx.setMapState({ hetic: progress.display })
+          ctx.playCinematic('hetic_letter', { value: progress.display })
         } else {
-          ctx.setMapState({ hetic: 5 })
+          ctx.setMapState({ hetic: progress.display })
           ctx.playCinematic('hetic_complete', {
             onEnd: () => {
               ctx.forceMultiplier(5, 30_000)
