@@ -177,12 +177,46 @@ renderer mince. 2 machines couvrent les 4 boss. **Effort L · plus gros gain sys
 > caractérisation : 36 (transitions de phase + scalaires aux instants clés).
 > Dé-dup : ST et Zelda partagent les 2 machines via `@pinball/game-engine`.
 
-### P1-play. `PinballPlayfield.tsx` God-component (2055 L, useEffect de ~1450 L, 2.9%)
-**Fix par tranches** : extraire `buildFlipperHull(mesh)` (pur, game-engine), le **routeur
-`emit`** (1201-1294) en `EventRouter` injecté, les corrections ball par frame
-(lane-lock/clamp/stuck) en fns pures façon `computeSurfaceSnap`, `createPlayfieldScene()`.
-**Quick win immédiat** : `toGameEvent` (95-138) est déjà pur module-scope → **juste écrire
-un test**. **Effort L (tranches S).**
+### P1-play. `PinballPlayfield.tsx` God-component (2006 L, useEffect de ~1450 L, 2.9%) — SRP
+Violation SRP massive : un `useEffect` fait scene/lights, GLB load, flippers, plunger,
+inputs, routeur d'events, render loop, physique ball, debug. **Fix par tranches**, chacune
+avec ses tests à créer.
+
+**Règles de code à respecter pour CHAQUE tranche (zéro smell)** :
+- `bun:test`, test **colocé** `Foo.test.ts`. **Zéro `any`** (types réels / `unknown` /
+  interfaces structurelles). Petites fonctions, early-return, pas de commentaire inutile.
+- **Behaviour identique** (move verbatim ; ne pas « améliorer » les seuils/maths).
+- Pur extrait = **aucun side-effect import**, aucune dépendance React/Three/Rapier directe
+  (sinon injecter). game-engine n'importe **jamais** une map.
+- Gate avant commit : `bun test` + `bunx tsc --noEmit` + `bun run lint` **verts**.
+- Vérifier les **doublons** avec l'existant (`SnapBallToSurface`, `DetectStuckBall`,
+  `ColliderSpecPlanner`…) → réutiliser, ne pas re-créer.
+
+**Tranches + tests à créer** :
+1. ✅ **`toGameEvent`** (`e6bc1b1`) — extrait + 20 tests (toutes variantes + défauts).
+2. **`buildFlipperHull(mesh)`** → game-engine (depuis `makeFlipperBody:986`). Pur :
+   geom mesh → `{ hullPoints: Float32Array, localOffset }`. **Ne PAS** extraire le Rapier
+   (`convexHull` collider) ni le Three (debug mesh) — seulement le calcul des points.
+   *Tests `FlipperHull.test.ts`* : points hull d'un mesh simple connu ; offset local
+   (centrage) ; mesh vide/null ; ordre/déterminisme. Effort S.
+3. **Corrections ball par frame** (lane-lock `:1729`, clamp vitesse `:1763`, stuck `:1783`)
+   → fns pures retournant `{ translation?, linvel? }` façon `computeSurfaceSnap`.
+   *Tests* : lane-lock dans/hors couloir ; clamp quand |v|>max (préserve direction) ;
+   stuck quand immobile > seuil. **Vérifier doublon** avec `SnapBallToSurface`/`DetectStuckBall`.
+   Effort S-M.
+4. **`createPlayfieldScene(rendering)`** (`:507-600`) → helper. *Tests* : lights/fog/exposure
+   créés selon `manifest.rendering` (assert sur de vrais objets THREE en bun, façon
+   `BossTargetPulse.test`). Effort S-M.
+5. ⛔ **`EventRouter`** (le routeur `emit` `:660`, ~600 L) — le gros morceau SRP.
+   Extraire un routeur keyé sur `GameEvent.type` avec collaborateurs **injectés**
+   (`cinematics`, `cameraDirector`, `screenShake`, `dmd`, `mapModule`, score-setters).
+   *Tests `EventRouter.test.ts`* : pour chaque `GameEvent.type`, le bon collaborateur est
+   appelé avec le bon payload (spies) ; défaut/no-op pour type inconnu ; pas de double-emit.
+   **⚠ DIFFÉRÉ** : closures sur dizaines de refs runtime, **non vérifiable sans smoke 3D** →
+   caractériser d'abord (e2e/smoke), OU sortir tranche par tranche avec **revue humaine +
+   smoke 3D après chacune**. Ne PAS extraire en aveugle. Effort L.
+
+Ordre conseillé : 2 → 4 → 3 (sûrs, testables) ; 5 en dernier en session dédiée.
 
 ---
 
