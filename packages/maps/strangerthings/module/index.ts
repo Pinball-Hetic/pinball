@@ -10,7 +10,7 @@ import {
   BossRevealOrchestrator,
 } from '../systems'
 import { RETURN_PORTAL_TEXTURE_URL } from '../systems/UpsideDownConstants'
-import { resolveNestState, dueLateHints, resolveHeticProgress } from '@pinball/game-engine'
+import { resolveNestState, dueLateHints, advanceHetic } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 import { grantExtraLife } from './lifeBonus'
 import { createLastLifeRescue } from './lastLifeRescue'
@@ -184,23 +184,7 @@ export function createModule(): MapModule {
         }
       }
       if (e.type === 'DROP_TARGET_COMPLETE') {
-        hetic += 1
-        const progress = resolveHeticProgress(hetic)
-        if (!progress.completed) {
-          ctx.setMapState({ hetic: progress.display })
-          ctx.playCinematic('hetic_letter', { value: progress.display })
-        } else {
-          ctx.setMapState({ hetic: progress.display })
-          ctx.playCinematic('hetic_complete', {
-            onEnd: () => {
-              // Fever 30s : multiplicateur forcé + reprise immédiate du SCORE.
-              ctx.forceMultiplier(5, 30_000)
-              ctx.refreshScoreSnapshot()
-            },
-          })
-          hetic = 0
-          ctx.setMapState({ hetic: 0 })
-        }
+        hetic = advanceHetic(ctx, hetic)
       }
 
       // ── Cycle de monde : entrée Upside Down / retour monde normal ──────────

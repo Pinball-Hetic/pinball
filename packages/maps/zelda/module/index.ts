@@ -1,5 +1,5 @@
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
-import { dueLateHints, resolveHeticProgress, selectMilestoneClip } from '@pinball/game-engine'
+import { dueLateHints, advanceHetic, selectMilestoneClip } from '@pinball/game-engine'
 import {
   GanondorfReveal,
   DarkLinkReveal,
@@ -196,22 +196,7 @@ export function createModule(): MapModule {
 
       // ── Compteur HETIC ───────────────────────────────────────────────────
       if (e.type === 'DROP_TARGET_COMPLETE') {
-        hetic += 1
-        const progress = resolveHeticProgress(hetic)
-        if (!progress.completed) {
-          ctx.setMapState({ hetic: progress.display })
-          ctx.playCinematic('hetic_letter', { value: progress.display })
-        } else {
-          ctx.setMapState({ hetic: progress.display })
-          ctx.playCinematic('hetic_complete', {
-            onEnd: () => {
-              ctx.forceMultiplier(5, 30_000)
-              ctx.refreshScoreSnapshot()
-            },
-          })
-          hetic = 0
-          ctx.setMapState({ hetic: 0 })
-        }
+        hetic = advanceHetic(ctx, hetic)
       }
 
       // ── Entrée Sacred Realm ───────────────────────────────────────────────
