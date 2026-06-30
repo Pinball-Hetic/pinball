@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { GameEvent } from '@pinball/game-engine';
-import { normalizeGltfName, nearestBumperIndex, bumperPunchScale } from '@pinball/game-engine';
+import type { GameEvent, BumperMatchRule } from '@pinball/game-engine';
+import { collectBumperParts, bumperPunchScale } from '@pinball/game-engine';
 import { layout } from '../layout';
 import { GlowSprite } from '@pinball/game-engine';
 
@@ -33,6 +33,15 @@ const _emissiveA = new THREE.Color();
 const _emissiveB = new THREE.Color();
 
 type BumperKind = 'gltf' | 'base' | 'ring';
+
+// Ordre = ancien if/else (première règle gagnante) : legacy hide, puis gltf,
+// puis base, puis ring.
+const MATCH_RULES: readonly BumperMatchRule<BumperKind>[] = [
+  { pattern: LEGACY_BUMPER, result: { action: 'hide' } },
+  { pattern: GLTF_BUMPER, result: { action: 'part', kind: 'gltf' } },
+  { pattern: LEGACY_BASE, result: { action: 'part', kind: 'base' } },
+  { pattern: LEGACY_RING, result: { action: 'part', kind: 'ring' } },
+];
 
 const GLOW_SIZE = 0.11;
 
@@ -91,29 +100,9 @@ export class BumperVisuals {
     this.dispose();
     this.elapsed = 0;
 
-    const wp = new THREE.Vector3();
-
-    root.traverse((obj) => {
-      const n = normalizeGltfName(obj.name);
-
-      if (LEGACY_BUMPER.test(n)) {
-        obj.visible = false;
-        obj.traverse((child) => {
-          child.visible = false;
-        });
-        return;
-      }
-
-      if (!(obj instanceof THREE.Mesh)) return;
-
-      let kind: BumperKind | null = null;
-      if (GLTF_BUMPER.test(n)) kind = 'gltf';
-      else if (LEGACY_BASE.test(n)) kind = 'base';
-      else if (LEGACY_RING.test(n)) kind = 'ring';
-      else return;
-
-      obj.getWorldPosition(wp);
-      const bumperIndex = nearestBumperIndex(wp, layout.bumpers);
+    this.parts = collectBumperParts(root, layout.bumpers, MATCH_RULES, (ctx) => {
+      const obj = ctx.mesh;
+      const kind = ctx.kind;
       const material = cloneStandardMaterial(obj);
       let glow: GlowSprite | null = null;
       let glowColor = BUMPER_LIGHT_COLOR;
@@ -147,16 +136,16 @@ export class BumperVisuals {
 
       obj.material = material;
 
-      this.parts.push({
+      return {
         mesh: obj,
         material,
-        bumperIndex,
+        bumperIndex: ctx.bumperIndex,
         kind,
         glow,
         glowColor,
         baseIntensity: material.emissiveIntensity,
-        baseScale: obj.scale.clone(),
-      });
+        baseScale: ctx.baseScale,
+      };
     });
 
     // Échoue bruyamment : si aucun mesh n'a matché (ex. convention de nommage

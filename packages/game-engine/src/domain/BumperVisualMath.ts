@@ -38,3 +38,41 @@ export function bumperPunchScale(remaining: number, duration: number, peak: numb
   const env = prog < 0.5 ? easeOutBack(prog * 2) : 1 - (prog - 0.5) * 2;
   return 1 + peak * Math.max(0, env);
 }
+
+/**
+ * Résultat de classification d'un nœud GLB par le matcher bumper :
+ * - `skip` : ce nœud n'est pas un bumper (ignoré).
+ * - `hide` : ce nœud doit être masqué (legacy mesh remplacé), pas de part.
+ * - `part` : ce nœud est un bumper visuel de catégorie `kind`.
+ *
+ * `kind` est paramétré par la map (chaîne libre) — le core ne connaît pas
+ * les catégories spécifiques (gltf/base/ring côté ST, etc.).
+ */
+export type BumperMatch<K extends string> =
+  | { action: 'skip' }
+  | { action: 'hide' }
+  | { action: 'part'; kind: K };
+
+/**
+ * Règle de matching bumper : si `pattern` matche le nom normalisé, le nœud
+ * reçoit `result`. Les règles sont évaluées dans l'ordre, première gagnante.
+ */
+export interface BumperMatchRule<K extends string> {
+  pattern: RegExp;
+  result: BumperMatch<K>;
+}
+
+/**
+ * Classe un nom de mesh normalisé via une liste ordonnée de règles
+ * (première règle dont le pattern matche gagne). Aucune règle → `skip`.
+ * Pur : ne dépend pas de THREE, paramétrable par map.
+ */
+export function classifyBumperName<K extends string>(
+  normalizedName: string,
+  rules: readonly BumperMatchRule<K>[],
+): BumperMatch<K> {
+  for (const rule of rules) {
+    if (rule.pattern.test(normalizedName)) return rule.result;
+  }
+  return { action: 'skip' };
+}

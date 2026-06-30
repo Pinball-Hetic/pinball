@@ -1,10 +1,16 @@
 import * as THREE from 'three';
-import type { GameEvent } from '@pinball/game-engine';
-import { normalizeGltfName, nearestBumperIndex, bumperPunchScale } from '@pinball/game-engine';
+import type { GameEvent, BumperMatchRule } from '@pinball/game-engine';
+import { collectBumperParts, bumperPunchScale } from '@pinball/game-engine';
 import { layout } from '../layout';
 
 // Matche vis_bumper, vis_bumper.001, vis_bumper.002, vis_bumper_1, etc.
 const VIS_BUMPER = /^vis_bumper/;
+
+type BumperKind = 'vis';
+
+const MATCH_RULES: readonly BumperMatchRule<BumperKind>[] = [
+  { pattern: VIS_BUMPER, result: { action: 'part', kind: 'vis' } },
+];
 
 const PUNCH_DURATION = 0.18; // secondes
 const PUNCH_PEAK     = 0.28; // +28% scale au pic
@@ -22,19 +28,11 @@ export class BumperVisuals {
   setup(root: THREE.Object3D): void {
     this.dispose();
 
-    const wp = new THREE.Vector3();
-
-    root.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
-      if (!VIS_BUMPER.test(normalizeGltfName(obj.name))) return;
-
-      obj.getWorldPosition(wp);
-      this.parts.push({
-        mesh:        obj,
-        bumperIndex: nearestBumperIndex(wp, layout.bumpers),
-        baseScale:   obj.scale.clone(),
-      });
-    });
+    this.parts = collectBumperParts(root, layout.bumpers, MATCH_RULES, (ctx) => ({
+      mesh:        ctx.mesh,
+      bumperIndex: ctx.bumperIndex,
+      baseScale:   ctx.baseScale,
+    }));
   }
 
   onGameEvent(event: GameEvent): void {
