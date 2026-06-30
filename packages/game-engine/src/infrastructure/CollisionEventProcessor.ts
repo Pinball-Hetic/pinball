@@ -133,6 +133,9 @@ export class CollisionEventProcessor {
     drainBallUC: DrainBall,
     bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
+    // Injected clock (DIP): defaults to performance.now in production, a
+    // controllable fake in tests — makes the anti-spam throttles deterministic.
+    private readonly now: () => number = () => performance.now(),
   ) {
     this.bossFights = new BossFightManager(emit, layout.bosses);
 
@@ -147,7 +150,7 @@ export class CollisionEventProcessor {
     // The first handler whose canHandle() returns true owns the collision.
     this.handlers = [
       new BumperCollisionHandler(this.pendingPhysics, bumperHitUC, layout),
-      new BumpCollisionHandler(this.pendingPhysics, bumpHitUC),
+      new BumpCollisionHandler(this.pendingPhysics, bumpHitUC, this.now),
       new DrainCollisionHandler(
         this.pendingPhysics,
         () => this.dropTargetHandler.resetDropTargets(),
@@ -184,7 +187,7 @@ export class CollisionEventProcessor {
         const ctx = this.gateContext();
         if (!bossThresholdMet(boss, ctx)) {
           // Anti-spam: do not re-emit BOSS_LOCKED_HIT more than once every 2s.
-          const now = performance.now();
+          const now = this.now();
           if (now - (this.lockedHitLastMs[boss.id] ?? 0) >= 2000) {
             this.lockedHitLastMs[boss.id] = now;
             this.emit({
