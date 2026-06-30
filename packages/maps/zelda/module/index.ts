@@ -1,4 +1,5 @@
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
+import { dueLateHints } from '@pinball/game-engine'
 import {
   GanondorfReveal,
   DarkLinkReveal,
@@ -282,12 +283,10 @@ export function createModule(): MapModule {
       if (!ctx) return
 
       // Hint tardif du nid.
-      const now = performance.now()
-      for (const boss of ctx.layout.bosses) {
-        const at = armedAt[boss.id]
-        if (at === undefined || hintFired.has(boss.id) || now - at < 45_000) continue
-        hintFired.add(boss.id)
-        const hint = boss.hud.nestHintLabel
+      const candidates = ctx.layout.bosses.map((boss) => boss.id)
+      for (const id of dueLateHints(candidates, armedAt, hintFired, performance.now())) {
+        hintFired.add(id)
+        const hint = ctx.layout.bosses.find((b) => b.id === id)?.hud.nestHintLabel
         if (hint) ctx.pushDmdEvent(hint, 0)
       }
     },

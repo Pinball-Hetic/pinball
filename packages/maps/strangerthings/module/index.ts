@@ -10,7 +10,7 @@ import {
   BossRevealOrchestrator,
 } from '../systems'
 import { RETURN_PORTAL_TEXTURE_URL } from '../systems/UpsideDownConstants'
-import { bossThresholdMet } from '@pinball/game-engine'
+import { resolveNestState, dueLateHints } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 import { grantExtraLife } from './lifeBonus'
 import { createLastLifeRescue } from './lastLifeRescue'
@@ -270,11 +270,7 @@ export function createModule(): MapModule {
         const gate = ctx.bossGateContext()
         nestMarker.setUpsideDown(gate.alternateWorldActive)
         for (const boss of ctx.layout.bosses) {
-          if (ctx.isBossTriggered(boss.id)) {
-            nestMarker.setState(boss.id, 'revealed')
-          } else {
-            nestMarker.setState(boss.id, bossThresholdMet(boss, gate) ? 'armed' : 'locked')
-          }
+          nestMarker.setState(boss.id, resolveNestState(boss, gate, ctx.isBossTriggered(boss.id)))
         }
       }
     },
@@ -291,20 +287,14 @@ export function createModule(): MapModule {
       // Hint tardif du nid : armé > 45 s sans reveal → bandeau DMD une fois.
       const ctx = ctxRef
       if (ctx && nestMarker) {
-        const now = performance.now()
-        for (const boss of ctx.layout.bosses) {
-          const at = armedAt[boss.id]
-          if (
-            at === undefined ||
-            hintFired.has(boss.id) ||
-            !nestMarker.isArmed(boss.id) ||
-            now - at < 45_000
-          ) {
-            continue
-          }
-          hintFired.add(boss.id)
-          nestMarker.setLateHint(boss.id, true)
-          const hint = boss.hud.nestHintLabel
+        const marker = nestMarker
+        const candidates = ctx.layout.bosses
+          .filter((boss) => marker.isArmed(boss.id))
+          .map((boss) => boss.id)
+        for (const id of dueLateHints(candidates, armedAt, hintFired, performance.now())) {
+          hintFired.add(id)
+          marker.setLateHint(id, true)
+          const hint = ctx.layout.bosses.find((b) => b.id === id)?.hud.nestHintLabel
           if (hint) ctx.pushDmdEvent(hint, 0)
         }
       }
