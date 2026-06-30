@@ -2,8 +2,27 @@
 
 > ## 🔄 STATUS POST-MERGE (audit refresh — branche à jour avec `origin/dev`, +50 commits)
 >
-> Bilan : **0 FIXED · 7 PARTIAL · 17 OUTSTANDING**. dev a attaqué plusieurs items
-> mais en **partiel**, en introduisant de nouveaux trous de test.
+> ## 🏁 BACKLOG DRAINÉ — ne reste que 3 items human-gated
+> Toutes les extractions/dedup autonomes-sûres sont **FAITES + testées** (S1-S5, G1-G6+G-new,
+> M1-M8 + tous follow-ups, D1/D2, C1, N1, SrvRelays, toGameEvent, + follow-ups-de-follow-ups
+> M3.a'/G5.b'/M5.a'/M8''/BumperVis''/C1''). **Bugs B1 (Demogorgon glow leak) + B2 (ST bumper
+> dispose scale) CORRIGÉS.** Repo vert (test+tsc+lint), global ~38%, game-engine ~57%.
+>
+> **Reste UNIQUEMENT ce qui exige une décision/vérif humaine (je ne peux pas le clore seul)** :
+> 1. **P1-play EventRouter** — extraction du routeur `emit` (PinballPlayfield.tsx, ~600 L,
+>    closures sur refs runtime). **Exige un smoke 3D** (code non testé) → session dédiée, tranches + smoke.
+> 2. **B3** — ST sans handler `MILESTONE` (clips déclarés, jamais déclenchés). **Décision produit** :
+>    parité Zelda voulue ? Si oui, câblage trivial (`selectMilestoneClip` prêt).
+> 3. **G2.a'** — dériver les bounds collider de `layout.geometry.bounds` (vs littéraux ST).
+>    **Behaviour-risk multi-map** → exige un smoke colliders par map avant.
+>
+> → **Le backlog "refacto testabilité" autonome est vide.** Les 3 ci-dessus sont bloqués sur
+> toi (smoke 3D / produit / smoke multi-map). Historique ci-dessous.
+>
+> ---
+>
+> Bilan initial (avant drain) : **0 FIXED · 7 PARTIAL · 17 OUTSTANDING**. dev a attaqué plusieurs
+> items mais en **partiel**, en introduisant de nouveaux trous de test.
 >
 > **⚠️ Régression de merge réparée** : le merge avait droppé le PR #104
 > (`GameStateManager` / `currentMapId`) → dead code orphelin + global remis. Corrigé
