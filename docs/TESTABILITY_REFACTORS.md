@@ -1,5 +1,54 @@
 # Backlog refacto — testabilité & clean architecture
 
+> ## 🔄 STATUS POST-MERGE (audit refresh — branche à jour avec `origin/dev`, +50 commits)
+>
+> Bilan : **0 FIXED · 7 PARTIAL · 17 OUTSTANDING**. dev a attaqué plusieurs items
+> mais en **partiel**, en introduisant de nouveaux trous de test.
+>
+> **⚠️ Régression de merge réparée** : le merge avait droppé le PR #104
+> (`GameStateManager` / `currentMapId`) → dead code orphelin + global remis. Corrigé
+> (commit `4b2db35`) : `handleConnection(io, socket, state = gameState)` route l'état
+> via un `GameStateManager` injectable + tests. **(item S2 : moitié encapsulation faite.)**
+>
+> **PARTIAL (dev a commencé, reste à finir)** :
+> - **S2** seam testable posé (export app/io/handleConnection, guard `import.meta.main`) +
+>   `GameStateManager` re-câblé. **Reste** : `createApp/createSocketGateway/createServer`
+>   factory + `main.ts` (supprime le side-effect import + la 3e passe de test).
+> - **G1** dev a fait CollisionEventProcessor **OCP handler-registry** (#103). **Reste** :
+>   injecter `now()` (throttles intestables) + tester les 9 handlers (voir NEW ci-dessous).
+> - **G4** dev a extrait les **phase ticks** du camera director (#108). **Reste** : machine
+>   de phase 100% pure isolée du `THREE.Camera`.
+> - **S4** `IoLike` narrowed (bien) mais `SocketLike` dérivé structurellement → tests encore
+>   en `as unknown`. **C1 / D1 / D2** inchangés (toujours partiels).
+>
+> **NEW smells (post-merge, 15)** — surtout dans le code neuf dev :
+> | Prio | Smell | Fichier |
+> |---|---|---|
+> | **P1** | `now()` non injecté dans collision handlers (throttles intestables) | `BumpCollisionHandler.ts:27`, `CollisionEventProcessor.ts:187` |
+> | **P2** | **Strategy registry collision introduit mais 0 test** (9 `*CollisionHandler.ts` désormais découplés → cible test facile, gros gain) | `CollisionHandler.ts` + 9 |
+> | **P2** | branche **boss-collision hors du registry** (special-case OCP) | `CollisionEventProcessor.ts:175-202` |
+> | **P2** | `gameStateUtils` extrait pur mais **non testé** (cible test facile) | `apps/playfield/src/hooks/gameStateUtils.ts:19` |
+> | **P2** | `game:over` handler mêle broadcast + persistance + refresh leaderboard | `interface/index.ts:104` |
+> | **P2** | `useBackglassData` re-fetch + validation dupliqués | `useBackglassData.ts:32` |
+> | **P2** | `PlayfieldColliderFactory` classe 100% statique, World hardcodé | `PlayfieldColliderFactory.ts:19-49` |
+> | **P3** | handlers socket = 13 relais inline (pas de table OCP) | `interface/index.ts:71` |
+> | **P3** | `BumperVisuals` forké st/zelda (déjà divergent) | `*/systems/BumperVisuals.ts` |
+> | **P3** | hint nest = global mutable de closure | `*/module/index.ts` |
+> | **P3** | input-bridge emit hardwired au socket global (DIP) | `input-bridge/src/index.ts:44` |
+>
+> **Bon pattern dev à imiter** : `lastLifeRescue.ts` / `lifeBonus.ts` (factory pure +
+> `MapContext` comme port, **testés**) — modèle pour le reste. (DRY-risque si copié par map.)
+>
+> **Plan d'attaque révisé (ROI, sans 3D fragile)** :
+> 1. **Tester ce que dev a déjà découplé** (rapide, gros gain) : 9 `*CollisionHandler`
+>    + `gameStateUtils` → couverture game-engine/playfield ↑ sans refacto.
+> 2. **Injecter `now()`** (P1, S) → débloque les throttles collision.
+> 3. **Finir S2** (factory `createApp/createSocketGateway`) → 3 passes server → 1 `bun test`.
+> 4. **S1** ports use-cases (supprime tout `mock.module`).
+> 5. Puis G2/G3/M1/M2 (extractions pures) selon le détail ci-dessous.
+>
+> ---
+
 > Issu de l'audit mené pendant la montée de couverture (branche `test/coverage-pyramid`).
 > Chaque item = un endroit où un test a été **dur/impossible** à cause d'une violation
 > SOLID ou d'un pattern manquant. Priorité : **couplage faible, encapsulation,
