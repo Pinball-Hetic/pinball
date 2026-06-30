@@ -7,6 +7,7 @@ import type {
 } from '@pinball/shared-types';
 import { createSocketEmitter, handleLine, type BridgeEmitter } from './dispatch';
 import { createLineBuffer } from './line-buffer';
+import { runWithRetry, type OpenOutcome } from './serial-retry';
 
 // Lecture série en fs brut + stty (pas de @serialport) : le binding natif
 // serialport appelle uv_default_loop, non supporté par Bun (SIGILL au runtime).
@@ -48,10 +49,11 @@ socket.on('dev:simulate-button', (data) => {
   console.log('[bridge] dev:simulate-button replayed as', `BTN:${data.id}:${data.action}`);
 });
 
-// Ouvre le device série : passe la tty en mode raw au bon baud (busybox stty),
-// puis lit le flux ligne par ligne. Si le device est absent (ESP non branché /
-// pas encore énuméré), retente toutes les 3 s — tolère le reboot USB après flash.
-function openSerial() {
+// Adaptateur IO PUR du device série (pas de politique de retry ici — elle vit
+// dans serial-retry.ts). Passe la tty en mode raw au bon baud (busybox stty),
+// puis lit le flux ligne par ligne. Échec d'ouverture → 'failed' ; sinon câble
+// error/close du stream sur `reopen` (fourni par la politique) et → 'opened'.
+function openSerialDevice(reopen: () => void): OpenOutcome {
   try {
     execFileSync('stty', [
       '-F', SERIAL_PATH, SERIAL_BAUD, 'raw', '-echo', 'cs8', '-parenb', '-cstopb',
@@ -59,8 +61,7 @@ function openSerial() {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.log('[bridge] device not ready, retry in 3s:', SERIAL_PATH, '-', msg);
-    setTimeout(openSerial, 3000);
-    return;
+    return 'failed';
   }
 
   const stream = createReadStream(SERIAL_PATH);
@@ -69,13 +70,23 @@ function openSerial() {
 
   stream.on('data', (chunk: string | Buffer) => lineBuffer.push(chunk));
 
-  const reopen = (label: string) => {
+  const onDown = (label: string) => {
     console.log('[bridge] serial', label, '— reopening in 3s');
     stream.destroy();
-    setTimeout(openSerial, 3000);
+    reopen();
   };
-  stream.once('error', (err) => reopen('error: ' + err.message));
-  stream.once('close', () => reopen('closed'));
+  stream.once('error', (err) => onDown('error: ' + err.message));
+  stream.once('close', () => onDown('closed'));
+  return 'opened';
+}
+
+// Si le device est absent (ESP non branché / pas encore énuméré), retente toutes
+// les 3 s — tolère le reboot USB après flash. Politique pure injectée.
+function openSerial() {
+  runWithRetry({
+    openDevice: openSerialDevice,
+    schedule: (run, delayMs) => setTimeout(run, delayMs),
+  });
 }
 
 function main() {
