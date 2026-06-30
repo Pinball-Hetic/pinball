@@ -4,10 +4,8 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
-  ButtonId,
-  ButtonAction,
 } from '@pinball/shared-types';
-import { parseLine } from './parser';
+import { createSocketEmitter, handleLine, type BridgeEmitter } from './dispatch';
 
 // Lecture série en fs brut + stty (pas de @serialport) : le binding natif
 // serialport appelle uv_default_loop, non supporté par Bun (SIGILL au runtime).
@@ -25,6 +23,8 @@ const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL
   auth: { role: 'input-bridge' },
 });
 
+const emitter: BridgeEmitter = createSocketEmitter(socket);
+
 socket.on('connect', () => console.log('[bridge] socket connected to', SERVER_URL, 'as input-bridge id=', socket.id));
 socket.on('disconnect', (reason) => console.log('[bridge] socket disconnected:', reason));
 socket.on('connect_error', (err) => console.log('[bridge] connect_error:', err.message));
@@ -37,47 +37,9 @@ socket.on('dev:simulate-button', (data) => {
     console.warn('[bridge] dev:simulate-button ignored (serial mode, use real ESP32):', data);
     return;
   }
-  handleLine(`BTN:${data.id}:${data.action}`);
+  handleLine(`BTN:${data.id}:${data.action}`, emitter);
   console.log('[bridge] dev:simulate-button replayed as', `BTN:${data.id}:${data.action}`);
 });
-
-function emitButton(id: ButtonId, action: ButtonAction) {
-  socket.emit('input:button', { id, action });
-  console.log('[bridge] emit input:button', id, action);
-}
-
-function emitTilt() {
-  socket.emit('input:tilt', { state: 'TRIGGERED' });
-  console.log('[bridge] emit input:tilt TRIGGERED');
-}
-
-function emitSensor(id: string, value: number) {
-  socket.emit('input:sensor', { id, value });
-  console.log('[bridge] emit input:sensor', id, value);
-}
-
-function handleLine(raw: string) {
-  const parsed = parseLine(raw);
-  if (!parsed) return;
-  switch (parsed.kind) {
-    case 'button':
-      emitButton(parsed.id, parsed.action);
-      return;
-    case 'tilt':
-      emitTilt();
-      return;
-    case 'sensor':
-      emitSensor(parsed.id, parsed.value);
-      return;
-    case 'unknown':
-      // Lignes non reconnues (bruit de boot ESP32, etc.) — ignorées hors debug
-      // pour ne pas noyer les logs au démarrage du chip.
-      if (process.env.INPUT_BRIDGE_VERBOSE) {
-        console.error('[bridge] parse: unknown line:', JSON.stringify(parsed.line));
-      }
-      return;
-  }
-}
 
 // Ouvre le device série : passe la tty en mode raw au bon baud (busybox stty),
 // puis lit le flux ligne par ligne. Si le device est absent (ESP non branché /
@@ -104,7 +66,7 @@ function openSerial() {
     while ((nl = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, nl);
       buf = buf.slice(nl + 1);
-      handleLine(line);
+      handleLine(line, emitter);
     }
     if (buf.length > 8192) buf = ''; // garde-fou contre une ligne sans newline
   });
@@ -135,4 +97,4 @@ function main() {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-main();
+if (import.meta.main) main();
