@@ -12,7 +12,7 @@ import {
   DEMOGORGON_MODEL_FOOT_LIFT,
   DEMOGORGON_MODEL_YAW,
 } from './DemogorgonConstants';
-import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
+import { PLAYFIELD_TILT, surfaceYAtZ, cameraFacingYaw } from '@pinball/game-engine';
 import { findGltfAnimationClip } from '@pinball/game-engine';
 import { createGltfLoader } from '@pinball/game-engine';
 import {
@@ -203,9 +203,7 @@ export class DemogorgonTargetVisual {
     if (!this.rig || !this.anchor || !this.camera) return;
 
     this.anchor.getWorldPosition(_facingPos);
-    const dx = this.camera.position.x - _facingPos.x;
-    const dz = this.camera.position.z - _facingPos.z;
-    this.rig.rotation.y = Math.atan2(dx, dz) + DEMOGORGON_MODEL_YAW;
+    this.rig.rotation.y = cameraFacingYaw(_facingPos, this.camera.position, DEMOGORGON_MODEL_YAW);
   }
 
   private applyFit(): boolean {

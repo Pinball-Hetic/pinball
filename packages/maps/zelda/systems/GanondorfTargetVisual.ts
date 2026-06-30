@@ -16,7 +16,7 @@ import {
   GANONDORF_MODEL_YAW,
   GANONDORF_MODEL_URL,
 } from './GanondorfConstants';
-import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
+import { PLAYFIELD_TILT, surfaceYAtZ, cameraFacingYaw } from '@pinball/game-engine';
 import { findGltfAnimationClip } from '@pinball/game-engine';
 import { createGltfLoader } from '@pinball/game-engine';
 import {
@@ -211,9 +211,7 @@ export class GanondorfTargetVisual {
     if (!this.rig || !this.anchor || !this.camera) return;
 
     this.anchor.getWorldPosition(_facingPos);
-    const dx = this.camera.position.x - _facingPos.x;
-    const dz = this.camera.position.z - _facingPos.z;
-    this.rig.rotation.y = Math.atan2(dx, dz) + GANONDORF_MODEL_YAW;
+    this.rig.rotation.y = cameraFacingYaw(_facingPos, this.camera.position, GANONDORF_MODEL_YAW);
   }
 
   private applyFit(): boolean {

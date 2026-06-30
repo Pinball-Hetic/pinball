@@ -18,7 +18,6 @@ import {
 } from './VecnaConstants';
 import {
   PLAYFIELD_TILT,
-  surfaceYAtZ,
   easeOut,
   findGltfAnimationClip,
   createGltfLoader,
@@ -26,9 +25,14 @@ import {
   fitSkinnedModelWithRetry,
   updateSkinnedBindPose,
   warmupObject3D,
+  WalkPathProgress,
+  cameraFacingYaw,
+  pathFacingYaw,
 } from '@pinball/game-engine';
 
 type AnimState = 'walk' | 'fight' | 'hit' | 'victory';
+
+const _walkPath = new WalkPathProgress(VECNA_SPAWN, VECNA_TARGET, VECNA_MODEL_FOOT_LIFT, VECNA_WALK_DURATION);
 
 const _vecnaFacingPos = new THREE.Vector3();
 
@@ -121,9 +125,8 @@ export class VecnaTargetVisual {
     this.pathT = THREE.MathUtils.clamp(t, 0, 1);
     if (!this.anchor) return;
 
-    const x = THREE.MathUtils.lerp(VECNA_SPAWN.x, VECNA_TARGET.x, this.pathT);
-    const z = THREE.MathUtils.lerp(VECNA_SPAWN.z, VECNA_TARGET.z, this.pathT);
-    this.anchor.position.set(x, surfaceYAtZ(z) + VECNA_MODEL_FOOT_LIFT, z);
+    const p = _walkPath.positionAt(this.pathT);
+    this.anchor.position.set(p.x, p.y, p.z);
   }
 
   show(): void {
@@ -182,8 +185,7 @@ export class VecnaTargetVisual {
   }
 
   private syncWalkPath(): void {
-    const t = Math.min(1, this.walkElapsed / VECNA_WALK_DURATION);
-    this.setPathProgress(t);
+    this.setPathProgress(_walkPath.progressAt(this.walkElapsed));
   }
 
   updateSettle(dt: number): boolean {
@@ -416,9 +418,7 @@ export class VecnaTargetVisual {
 
   private syncWalkFacing(): void {
     if (!this.rig) return;
-    const dz = VECNA_TARGET.z - VECNA_SPAWN.z;
-    const dx = VECNA_TARGET.x - VECNA_SPAWN.x;
-    this.rig.rotation.y = Math.atan2(dx, dz) + VECNA_MODEL_YAW;
+    this.rig.rotation.y = pathFacingYaw(VECNA_SPAWN, VECNA_TARGET, VECNA_MODEL_YAW);
   }
 
   private syncFacing(): void {
@@ -432,8 +432,6 @@ export class VecnaTargetVisual {
     if (!this.anchor || !this.camera) return null;
 
     this.anchor.getWorldPosition(_vecnaFacingPos);
-    const dx = this.camera.position.x - _vecnaFacingPos.x;
-    const dz = this.camera.position.z - _vecnaFacingPos.z;
-    return Math.atan2(dx, dz) + VECNA_MODEL_YAW;
+    return cameraFacingYaw(_vecnaFacingPos, this.camera.position, VECNA_MODEL_YAW);
   }
 }

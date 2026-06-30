@@ -23,7 +23,6 @@ import {
 } from './DarkLinkConstants';
 import {
   PLAYFIELD_TILT,
-  surfaceYAtZ,
   easeOut,
   findGltfAnimationClip,
   createGltfLoader,
@@ -31,11 +30,16 @@ import {
   fitSkinnedModelWithRetry,
   updateSkinnedBindPose,
   warmupObject3D,
+  WalkPathProgress,
+  cameraFacingYaw,
+  pathFacingYaw,
 } from '@pinball/game-engine';
 
 type AnimState = 'walk' | 'fight' | 'hit' | 'dead';
 
 const _facingPos = new THREE.Vector3();
+
+const _walkPath = new WalkPathProgress(DARK_LINK_SPAWN, DARK_LINK_TARGET, DARK_LINK_MODEL_FOOT_LIFT, DARK_LINK_WALK_DURATION);
 
 /**
  * Visuel 3D de Dark Link (GLB + animations).
@@ -138,9 +142,8 @@ export class DarkLinkTargetVisual {
   setPathProgress(t: number): void {
     this.pathT = THREE.MathUtils.clamp(t, 0, 1);
     if (!this.anchor) return;
-    const x = THREE.MathUtils.lerp(DARK_LINK_SPAWN.x, DARK_LINK_TARGET.x, this.pathT);
-    const z = THREE.MathUtils.lerp(DARK_LINK_SPAWN.z, DARK_LINK_TARGET.z, this.pathT);
-    this.anchor.position.set(x, surfaceYAtZ(z) + DARK_LINK_MODEL_FOOT_LIFT, z);
+    const p = _walkPath.positionAt(this.pathT);
+    this.anchor.position.set(p.x, p.y, p.z);
   }
 
   show(): void { if (this.anchor) this.anchor.visible = true; }
@@ -274,8 +277,7 @@ export class DarkLinkTargetVisual {
   // ── Privé ────────────────────────────────────────────────────────────────
 
   private syncWalkPath(): void {
-    const t = Math.min(1, this.walkElapsed / DARK_LINK_WALK_DURATION);
-    this.setPathProgress(t);
+    this.setPathProgress(_walkPath.progressAt(this.walkElapsed));
   }
 
   private completeSettle(): void {
@@ -420,9 +422,7 @@ export class DarkLinkTargetVisual {
 
   private syncWalkFacing(): void {
     if (!this.rig) return;
-    const dz = DARK_LINK_TARGET.z - DARK_LINK_SPAWN.z;
-    const dx = DARK_LINK_TARGET.x - DARK_LINK_SPAWN.x;
-    this.rig.rotation.y = Math.atan2(dx, dz) + DARK_LINK_MODEL_YAW;
+    this.rig.rotation.y = pathFacingYaw(DARK_LINK_SPAWN, DARK_LINK_TARGET, DARK_LINK_MODEL_YAW);
   }
 
   private syncFacing(): void {
@@ -441,8 +441,6 @@ export class DarkLinkTargetVisual {
   private cameraFacingY(): number | null {
     if (!this.anchor || !this.camera) return null;
     this.anchor.getWorldPosition(_facingPos);
-    const dx = this.camera.position.x - _facingPos.x;
-    const dz = this.camera.position.z - _facingPos.z;
-    return Math.atan2(dx, dz) + DARK_LINK_MODEL_YAW;
+    return cameraFacingYaw(_facingPos, this.camera.position, DARK_LINK_MODEL_YAW);
   }
 }
