@@ -9,7 +9,7 @@ import type { UpsideDownAtmosphere } from './UpsideDownAtmosphere';
 import { createBossTargetMesh } from '@pinball/game-engine';
 import { BossTargetPulse } from '@pinball/game-engine';
 import { WalkFightPhaseMachine } from '@pinball/game-engine';
-import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
+import { PlayfieldCinematicStrobe, strangerthingsDecor } from './PlayfieldCinematicStrobe';
 import { VecnaTargetVisual } from './VecnaTargetVisual';
 import type { BossRevealController } from './BossRevealController';
 
@@ -69,15 +69,19 @@ export class VecnaReveal implements BossRevealController {
     this.onFightEnd = config.onFightEnd ?? null;
     this.onTargetReady = config.onTargetReady ?? null;
 
-    this.cinematicStrobe.mount(config.root, config.garlandLights, config.bumperVisuals, {
-      flashColor: 0x6622aa,
-      flashIntensity: 1.6,
-      flashPosition: new THREE.Vector3(
-        VECNA_TARGET.x,
-        VECNA_TARGET.y + 0.14,
-        VECNA_TARGET.z,
-      ),
-    });
+    this.cinematicStrobe.mount(
+      config.root,
+      {
+        flashColor: 0x6622aa,
+        flashIntensity: 1.6,
+        flashPosition: new THREE.Vector3(
+          VECNA_TARGET.x,
+          VECNA_TARGET.y + 0.14,
+          VECNA_TARGET.z,
+        ),
+      },
+      strangerthingsDecor(config.garlandLights, config.bumperVisuals),
+    );
 
     this.vecnaVisual.mount(config.root, config.camera);
 

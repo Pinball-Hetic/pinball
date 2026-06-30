@@ -16,7 +16,7 @@ import type { BumperVisuals } from './BumperVisuals';
 import { createBossTargetMesh } from '@pinball/game-engine';
 import { BossTargetPulse } from '@pinball/game-engine';
 import { BlackoutFightPhaseMachine } from '@pinball/game-engine';
-import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
+import { PlayfieldCinematicStrobe, strangerthingsDecor } from './PlayfieldCinematicStrobe';
 import { DemogorgonTargetVisual } from './DemogorgonTargetVisual';
 import type { BossRevealController } from './BossRevealController';
 
@@ -137,15 +137,19 @@ export class DemogorgonReveal implements BossRevealController {
     this.onTargetReady = config.onTargetReady ?? null;
     this.root = config.root;
 
-    this.cinematicStrobe.mount(config.root, config.garlandLights, config.bumperVisuals, {
-      flashColor: 0xff1122,
-      flashIntensity: FLASH_INTENSITY,
-      flashPosition: new THREE.Vector3(
-        layout.sensors.bossReveal.x,
-        layout.sensors.bossReveal.y + 0.12,
-        layout.sensors.bossReveal.z,
-      ),
-    });
+    this.cinematicStrobe.mount(
+      config.root,
+      {
+        flashColor: 0xff1122,
+        flashIntensity: FLASH_INTENSITY,
+        flashPosition: new THREE.Vector3(
+          layout.sensors.bossReveal.x,
+          layout.sensors.bossReveal.y + 0.12,
+          layout.sensors.bossReveal.z,
+        ),
+      },
+      strangerthingsDecor(config.garlandLights, config.bumperVisuals),
+    );
 
     this.billboard.mount(config.scene, config.camera, { textureUrl: TEXTURE_URL });
     this.demogorgonVisual.mount(config.root, config.camera);
