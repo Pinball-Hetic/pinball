@@ -27,7 +27,16 @@ import {
 } from './UpsideDownConstants';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
-import { AtmosphereBlend, PlayfieldShadeOverlay } from '@pinball/game-engine';
+import {
+  AtmosphereBlend,
+  PlayfieldShadeOverlay,
+  applyColorTint,
+  applyLightTint,
+  applyMaterialTint,
+  seedSpores,
+  stepSporeField,
+} from '@pinball/game-engine';
+import type { SporeParticle } from '@pinball/game-engine';
 import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from '@pinball/game-engine';
 
 type MaterialKind = 'surface' | 'wall' | 'decor' | 'default';
@@ -55,18 +64,6 @@ type SetupConfig = {
   garlandLights: GarlandLights | null;
   bumperVisuals: BumperVisuals | null;
 };
-
-type SporeParticle = {
-  anchorX: number;
-  anchorZ: number;
-  baseY: number;
-  angle: number;
-  radius: number;
-  speed: number;
-  drift: number;
-};
-
-const _lerpColor = new THREE.Color();
 
 function sporeTexture(): THREE.CanvasTexture | null {
   if (typeof document === 'undefined') return null;
@@ -346,17 +343,7 @@ export class UpsideDownAtmosphere {
     this.sporePoints.visible = false;
     this.sporePoints.renderOrder = 520;
 
-    for (let i = 0; i < n; i++) {
-      this.spores.push({
-        anchorX: THREE.MathUtils.lerp(-0.22, 0.22, ((i * 0.37) % 1)),
-        anchorZ: THREE.MathUtils.lerp(-0.48, 0.32, ((i * 0.53 + 0.11) % 1)),
-        baseY: 1.035 + (i % 6) * 0.009,
-        angle: (i / n) * Math.PI * 2,
-        radius: 0.014 + (i % 5) * 0.006,
-        speed: 0.32 + (i % 7) * 0.1,
-        drift: 0.55 + (i % 4) * 0.18,
-      });
-    }
+    this.spores = seedSpores(n);
 
     root.add(this.sporePoints);
   }
@@ -369,17 +356,7 @@ export class UpsideDownAtmosphere {
     this.sporeMat.opacity = 0.72 * intensity;
     if (!active) return;
 
-    const pos = this.sporePositions;
-    for (let i = 0; i < this.spores.length; i++) {
-      const spore = this.spores[i];
-      spore.angle += spore.speed * dt;
-      const r = spore.radius * (0.9 + Math.sin(this.blend.pulseT * 2.4 + spore.angle) * 0.1);
-      const lift = Math.sin(this.blend.pulseT * spore.drift + spore.angle) * 0.014;
-      const wander = Math.sin(this.blend.pulseT * 1.6 + spore.angle * 2.1) * 0.006;
-      pos[i * 3] = spore.anchorX + Math.cos(spore.angle) * r + wander;
-      pos[i * 3 + 1] = spore.baseY + lift + Math.sin(this.blend.pulseT * 0.35 + spore.angle) * 0.018;
-      pos[i * 3 + 2] = spore.anchorZ + Math.sin(spore.angle) * r - wander * 0.6;
-    }
+    stepSporeField(this.spores, dt, this.blend.pulseT, this.sporePositions);
     this.sporeGeo.attributes.position.needsUpdate = true;
   }
 
@@ -409,19 +386,15 @@ export class UpsideDownAtmosphere {
     for (const entry of this.materials) {
       const targets = materialTintTargets(entry.kind);
 
-      entry.material.color.copy(entry.color);
-      _lerpColor.set(targets.tint);
-      entry.material.color.lerp(_lerpColor, ease * 0.5);
-      entry.material.color.multiplyScalar(1 - ease * targets.darken);
-
-      entry.material.emissive.copy(entry.emissive);
-      _lerpColor.set(targets.emissive);
-      entry.material.emissive.lerp(_lerpColor, ease * 0.35);
-      entry.material.emissiveIntensity = THREE.MathUtils.lerp(
-        entry.emissiveIntensity,
-        entry.emissiveIntensity * targets.emissiveMul + targets.emissiveAdd,
-        ease,
-      );
+      applyMaterialTint(entry, ease, {
+        tint: targets.tint,
+        tintK: 0.5,
+        darken: targets.darken,
+        emissive: targets.emissive,
+        emissiveK: 0.35,
+        emissiveMul: targets.emissiveMul,
+        emissiveAdd: targets.emissiveAdd,
+      });
     }
 
     this.playfieldShade.setOpacity(
@@ -432,37 +405,41 @@ export class UpsideDownAtmosphere {
       const { scene, renderer, ambient, hemi, dir, fill } = this.lighting;
 
       if (scene.background instanceof THREE.Color) {
-        scene.background.copy(this.origBg);
-        _lerpColor.set(UPSIDE_DOWN_ATMOSPHERE_BG);
-        (scene.background as THREE.Color).lerp(_lerpColor, ease);
+        applyColorTint(scene.background, this.origBg, UPSIDE_DOWN_ATMOSPHERE_BG, ease, 1);
       }
 
       if (!fullyActive) {
         renderer.toneMappingExposure = THREE.MathUtils.lerp(this.origExposure, UPSIDE_DOWN_ATMOSPHERE_EXPOSURE, ease);
       }
 
-      ambient.color.copy(this.origAmbientColor);
-      _lerpColor.set(0xccb8d8);
-      ambient.color.lerp(_lerpColor, ease * 0.45);
-      ambient.intensity = THREE.MathUtils.lerp(this.origAmbientIntensity, UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY, ease);
+      applyLightTint(
+        ambient,
+        { color: this.origAmbientColor, intensity: this.origAmbientIntensity },
+        ease,
+        { color: 0xccb8d8, colorK: 0.45, intensity: UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY },
+      );
 
-      hemi.color.copy(this.origHemiSky);
-      _lerpColor.set(0x443366);
-      hemi.color.lerp(_lerpColor, ease * 0.6);
-      hemi.groundColor.copy(this.origHemiGround);
-      _lerpColor.set(0x1a0a14);
-      hemi.groundColor.lerp(_lerpColor, ease * 0.65);
-      hemi.intensity = THREE.MathUtils.lerp(this.origHemiIntensity, UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY, ease);
+      applyLightTint(
+        hemi,
+        { color: this.origHemiSky, intensity: this.origHemiIntensity },
+        ease,
+        { color: 0x443366, colorK: 0.6, intensity: UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY },
+      );
+      applyColorTint(hemi.groundColor, this.origHemiGround, 0x1a0a14, ease, 0.65);
 
-      dir.color.copy(this.origDirColor);
-      _lerpColor.set(0xd8c8e8);
-      dir.color.lerp(_lerpColor, ease * 0.35);
-      dir.intensity = THREE.MathUtils.lerp(this.origDirIntensity, UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY, ease);
+      applyLightTint(
+        dir,
+        { color: this.origDirColor, intensity: this.origDirIntensity },
+        ease,
+        { color: 0xd8c8e8, colorK: 0.35, intensity: UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY },
+      );
 
-      fill.color.copy(this.origFillColor);
-      _lerpColor.set(0x8866aa);
-      fill.color.lerp(_lerpColor, ease * 0.4);
-      fill.intensity = THREE.MathUtils.lerp(this.origFillIntensity, UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY, ease);
+      applyLightTint(
+        fill,
+        { color: this.origFillColor, intensity: this.origFillIntensity },
+        ease,
+        { color: 0x8866aa, colorK: 0.4, intensity: UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY },
+      );
 
       if (this.revealLift > 0 && fullyActive) {
         ambient.intensity += 0.34 * this.revealLift;

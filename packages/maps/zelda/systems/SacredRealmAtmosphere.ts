@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
-import { AtmosphereBlend, PlayfieldShadeOverlay } from '@pinball/game-engine';
+import {
+  AtmosphereBlend,
+  PlayfieldShadeOverlay,
+  applyColorTint,
+  applyLightTint,
+  applyMaterialTint,
+} from '@pinball/game-engine';
 
 // ── Constantes Sacred Realm ───────────────────────────────────────────────────
 // Inspiré de UpsideDownAtmosphere (ST) — sans spores ni GarlandLights/BumperVisuals.
@@ -57,8 +63,6 @@ export type SacredRealmSetupConfig = {
   root: THREE.Object3D;
   lighting: SceneLighting;
 };
-
-const _c = new THREE.Color();
 
 // ── Classe principale ─────────────────────────────────────────────────────────
 
@@ -186,19 +190,15 @@ export class SacredRealmAtmosphere {
 
     // ── Matériaux : teinte violet sombre + assombrissement ──────────────────
     for (const entry of this.materials) {
-      entry.material.color.copy(entry.color);
-      _c.set(SACRED_MAT_TINT);
-      entry.material.color.lerp(_c, ease * 0.35);
-      entry.material.color.multiplyScalar(1 - ease * 0.18);
-
-      entry.material.emissive.copy(entry.emissive);
-      _c.set(SACRED_MAT_EMISSIVE);
-      entry.material.emissive.lerp(_c, ease * 0.30);
-      entry.material.emissiveIntensity = THREE.MathUtils.lerp(
-        entry.emissiveIntensity,
-        entry.emissiveIntensity * 1.12 + 0.05,
-        ease,
-      );
+      applyMaterialTint(entry, ease, {
+        tint: SACRED_MAT_TINT,
+        tintK: 0.35,
+        darken: 0.18,
+        emissive: SACRED_MAT_EMISSIVE,
+        emissiveK: 0.30,
+        emissiveMul: 1.12,
+        emissiveAdd: 0.05,
+      });
     }
 
     // ── Voile violet ────────────────────────────────────────────────────────
@@ -210,9 +210,7 @@ export class SacredRealmAtmosphere {
 
     // Background.
     if (scene.background instanceof THREE.Color) {
-      scene.background.copy(this.origBg);
-      _c.set(SACRED_BG);
-      (scene.background as THREE.Color).lerp(_c, ease);
+      applyColorTint(scene.background, this.origBg, SACRED_BG, ease, 1);
     }
 
     // Exposure : transition, puis pulse lent quand pleinement actif.
@@ -224,31 +222,37 @@ export class SacredRealmAtmosphere {
     }
 
     // Ambient : violacé, très réduit.
-    ambient.color.copy(this.origAmbientColor);
-    _c.set(0xcc88ff);
-    ambient.color.lerp(_c, ease * 0.5);
-    ambient.intensity = THREE.MathUtils.lerp(this.origAmbientIntensity, SACRED_AMBIENT_INTENSITY, ease);
+    applyLightTint(
+      ambient,
+      { color: this.origAmbientColor, intensity: this.origAmbientIntensity },
+      ease,
+      { color: 0xcc88ff, colorK: 0.5, intensity: SACRED_AMBIENT_INTENSITY },
+    );
 
     // Hemi : violet sombre.
-    hemi.color.copy(this.origHemiSky);
-    _c.set(0x330055);
-    hemi.color.lerp(_c, ease * 0.65);
-    hemi.groundColor.copy(this.origHemiGround);
-    _c.set(0x180022);
-    hemi.groundColor.lerp(_c, ease * 0.70);
-    hemi.intensity = THREE.MathUtils.lerp(this.origHemiIntensity, SACRED_HEMI_INTENSITY, ease);
+    applyLightTint(
+      hemi,
+      { color: this.origHemiSky, intensity: this.origHemiIntensity },
+      ease,
+      { color: 0x330055, colorK: 0.65, intensity: SACRED_HEMI_INTENSITY },
+    );
+    applyColorTint(hemi.groundColor, this.origHemiGround, 0x180022, ease, 0.70);
 
     // Directional : lavande pâle, affaibli.
-    dir.color.copy(this.origDirColor);
-    _c.set(0xccaaff);
-    dir.color.lerp(_c, ease * 0.38);
-    dir.intensity = THREE.MathUtils.lerp(this.origDirIntensity, SACRED_DIR_INTENSITY, ease);
+    applyLightTint(
+      dir,
+      { color: this.origDirColor, intensity: this.origDirIntensity },
+      ease,
+      { color: 0xccaaff, colorK: 0.38, intensity: SACRED_DIR_INTENSITY },
+    );
 
     // Fill : violet chaud, réduit.
-    fill.color.copy(this.origFillColor);
-    _c.set(0x9933cc);
-    fill.color.lerp(_c, ease * 0.48);
-    fill.intensity = THREE.MathUtils.lerp(this.origFillIntensity, SACRED_FILL_INTENSITY, ease);
+    applyLightTint(
+      fill,
+      { color: this.origFillColor, intensity: this.origFillIntensity },
+      ease,
+      { color: 0x9933cc, colorK: 0.48, intensity: SACRED_FILL_INTENSITY },
+    );
 
     // Fog.
     this.applyFog(ease);
