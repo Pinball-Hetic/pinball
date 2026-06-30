@@ -100,6 +100,21 @@
 > - **D1.a** (P3) `DmdRenderer.makeSprite` couplé au `document` global → param `SpriteFactory`/`CanvasPort`
 >   optionnel (default réel) pour testabilité offscreen.
 >
+> **✅ P3 FAIT (passe autonome, +75 tests, tout vert)** : G5.a (isSkipped pur via ancestryNames),
+> M8 (resolveNestState + dueLateHints purs), M6/M7 (PlayfieldCinematicStrobe unifié + port
+> `DecorLights`), BumperVis (BumperVisualMath pur partagé), S4 (seams socket explicites → plus de
+> `as unknown`) + SrvRelays (table `RELAY_EVENTS`), C1 (input-bridge `BridgeEmitter` port +
+> `dispatch` + guard `import.meta.main`), N1 (exhaustivité `toGameEvent`). ⚠ **SMOKE E2E** : colliders
+> trimesh, nest marker locked/armed/revealed + hint 45s, strobe/flash 2 maps, bumper pulse/flash.
+>
+> **Découverts pendant la passe P3 (backlog évolutif, tous P3)** :
+> - **G5.c'** `buildPinballmap` (~333-410) IO long → planner pur `classifyPinballmapMesh(ancestryNames,aabbDims)→spec` (pattern ColliderSpecPlanner).
+> - **M8'** `zelda/module onGameEvent` ~160 L mêle décisions pures (hetic rollover@5, milestone clip 5k/15k/30k, boss-defeat gating) + IO ; dupliqué avec ST → extraire `resolveHeticProgress`/`selectMilestoneClip` partagés.
+> - **M6/M7'** wrapper composition ST = 7 méthodes déléguées (base non sous-classable, TS2416) → ajouter `mountWithDecor` à la base ou composite DecorLights map-level.
+> - **BumperVis'** matcher/setup encore divergents st/zelda (naming/kind) ; manque test wiring classe BumperVisuals.
+> - **C1'** `openSerial()` mêle IO (stty/createReadStream) + line-buffering (split newline + garde 8192) → extraire un `LineBuffer` pur testable ; config env au scope module → injecter.
+> - (N1 a signalé une erreur tsc transitoire sur `PlayfieldTrimeshBuilder` vue pendant l'édition // de G5.a — **faux positif**, repo tsc vert au final.)
+>
 > > Note coverage : S1/S2 ajoutent du code d'**adapter/composition root** (`PrismaGameRepository`,
 > > `index.ts`) intentionnellement non testé en unit (territoire intégration/e2e) → le % brut
 > > server descend (≈61%) alors que la **logique métier** (use-cases/routes/gateway/handlers) est ~100%.
