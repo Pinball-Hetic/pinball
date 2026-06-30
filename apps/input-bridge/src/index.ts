@@ -6,16 +6,23 @@ import type {
   ServerToClientEvents,
 } from '@pinball/shared-types';
 import { createSocketEmitter, handleLine, type BridgeEmitter } from './dispatch';
+import { createLineBuffer } from './line-buffer';
 
 // Lecture série en fs brut + stty (pas de @serialport) : le binding natif
 // serialport appelle uv_default_loop, non supporté par Bun (SIGILL au runtime).
 // On lit donc le device comme un fichier après l'avoir mis en mode raw, exactement
 // comme le bridge de référence Fliphetic. Bun supporte node:fs/child_process.
 
-const MODE = process.env.INPUT_BRIDGE_MODE === 'serial' ? 'serial' : 'mock';
-const SERIAL_PATH = process.env.SERIAL_PATH ?? '/dev/ttyUSB0';
-const SERIAL_BAUD = process.env.SERIAL_BAUD ?? '115200';
-const SERVER_URL = process.env.SERVER_URL ?? 'http://server:3001';
+function readConfig() {
+  return {
+    MODE: process.env.INPUT_BRIDGE_MODE === 'serial' ? 'serial' : 'mock',
+    SERIAL_PATH: process.env.SERIAL_PATH ?? '/dev/ttyUSB0',
+    SERIAL_BAUD: process.env.SERIAL_BAUD ?? '115200',
+    SERVER_URL: process.env.SERVER_URL ?? 'http://server:3001',
+  } as const;
+}
+
+const { MODE, SERIAL_PATH, SERIAL_BAUD, SERVER_URL } = readConfig();
 
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
   transports: ['websocket'],
@@ -57,19 +64,10 @@ function openSerial() {
   }
 
   const stream = createReadStream(SERIAL_PATH);
-  let buf = '';
+  const lineBuffer = createLineBuffer((line) => handleLine(line, emitter));
   console.log('[bridge] serial port opened', SERIAL_PATH, '@', SERIAL_BAUD);
 
-  stream.on('data', (chunk: string | Buffer) => {
-    buf += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-    let nl: number;
-    while ((nl = buf.indexOf('\n')) >= 0) {
-      const line = buf.slice(0, nl);
-      buf = buf.slice(nl + 1);
-      handleLine(line, emitter);
-    }
-    if (buf.length > 8192) buf = ''; // garde-fou contre une ligne sans newline
-  });
+  stream.on('data', (chunk: string | Buffer) => lineBuffer.push(chunk));
 
   const reopen = (label: string) => {
     console.log('[bridge] serial', label, '— reopening in 3s');
