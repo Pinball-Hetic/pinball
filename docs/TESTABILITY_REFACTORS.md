@@ -39,9 +39,18 @@
 > **Bon pattern dev à imiter** : `lastLifeRescue.ts` / `lifeBonus.ts` (factory pure +
 > `MapContext` comme port, **testés**) — modèle pour le reste. (DRY-risque si copié par map.)
 >
+> **Étape 1 FAITE** (commits `7eb3d6d`, `eb7eba1`) : +69 tests sur les 9 `*CollisionHandler`
+> (OCP registry) + `gameStateUtils`. game-engine 38→39.9%, playfield 2.9→3.3%, global 30.4%.
+> Smell rencontré pendant l'écriture (loggé, à reprendre) :
+> - **`BumpCollisionHandler.ts:27`** — horloge ambiante : `performance.now()` lu inline pour
+>   le cooldown anti-spam (pas de seam). **P2.** Testé via stub global de `performance.now`
+>   (fragile, restauré en afterEach). **Fix** : injecter `now: () => number = () => performance.now()`
+>   au constructeur (default conservé dans `CollisionEventProcessor.ts:150`), test passe un faux
+>   contrôlable. → rejoint le smell P1 « `now()` non injecté » ci-dessus (même fix, tous les
+>   handlers à cooldown + le throttle boss).
+>
 > **Plan d'attaque révisé (ROI, sans 3D fragile)** :
-> 1. **Tester ce que dev a déjà découplé** (rapide, gros gain) : 9 `*CollisionHandler`
->    + `gameStateUtils` → couverture game-engine/playfield ↑ sans refacto.
+> 1. ~~Tester ce que dev a déjà découplé~~ ✅ FAIT (handlers + gameStateUtils).
 > 2. **Injecter `now()`** (P1, S) → débloque les throttles collision.
 > 3. **Finir S2** (factory `createApp/createSocketGateway`) → 3 passes server → 1 `bun test`.
 > 4. **S1** ports use-cases (supprime tout `mock.module`).
