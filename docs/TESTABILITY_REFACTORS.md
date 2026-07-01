@@ -7,13 +7,18 @@
 >
 > | # | Slice | Module | Risque | Test | État |
 > |---|---|---|---|---|---|
-> | 1 | Keyboard map pur (idForAction fail-fast + key→action) | `keyboardMap.ts` | low | pure | — |
-> | 2 | Flipper bodies + pivot debug factory | `physics/buildFlipperBodies.ts` | med | smoke | — |
-> | 3 | Plunger visual + kinematic body factory | `physics/buildPlungerBody.ts` | med | smoke | — |
-> | 4 | Keyboard router + debug-mesh facade | `createKeyboardRouter.ts` | med | partial | dep 1,2 |
-> | 5 | MapContext factory (~85 L object literal) | `createMapContext.ts` | med | partial | — |
-> | 6 | Init physique/scène (compo async, fail-fast) | `initPlayfield.ts` | high | smoke | dep 2-5 |
-> | 7 | Animate hot loop (lift ENTIER, order load-bearing) | `HotLoop.ts` | high | smoke | dep 6 |
+> | 1 | Keyboard map pur (idForAction fail-fast + key→action) | `keyboardMap.ts` | low | pure | ✅ `c7deb69` |
+> | 2 | Flipper bodies + pivot debug factory | `physics/buildFlipperBodies.ts` | med | smoke | ✅ `3cfa972` |
+> | 3 | Plunger visual + kinematic body factory | `physics/buildPlungerBody.ts` | med | smoke | ✅ `2157a10` |
+> | 4 | Keyboard router + debug-mesh facade | `createKeyboardRouter.ts` + `debug/DebugMeshManager.ts` | med | partial | ✅ `e48b249` |
+> | 5 | MapContext factory (~85 L object literal) | `createMapContext.ts` | med | partial | ✅ `509d4e0` |
+> | 6 | Init physique/scène (compo async, fail-fast) | `initPlayfield.ts` | high | smoke | ⏸ dep 2-5 (gate smoke) |
+> | 7 | Animate hot loop (lift ENTIER, order load-bearing) | `HotLoop.ts` | high | smoke | ⏸ dep 6 (gate smoke) |
+>
+> **Slices 0-5 FAITES** (2026-07-01/02) : `PinballPlayfield.tsx` 1798→1621 L (−177), 7 modules
+> extraits (644 L dont tests), +37 tests, repo vert. **Slices 6-7 gated sur un smoke de 0-5**
+> (raison : leur classe de bug = *stale live-binding* est INVISIBLE à tsc et non smoke-able par
+> l'agent → un baseline smoké est la seule vérif possible avant de lifter init + hot loop).
 >
 > **Backlog smells (workflow, dédupliqués)** — au-delà des slices :
 > - **P1** SRP+OCP — décomposer animate en stages ordonnés APRÈS le lift (slice 7 fait le move entier d'abord). `PinballPlayfield.tsx:1270-1592`
