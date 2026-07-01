@@ -110,6 +110,7 @@ import { createKeyboardRouter } from "./createKeyboardRouter";
 import { DebugMeshManager } from "./debug/DebugMeshManager";
 import { createMapContext } from "./createMapContext";
 import { computePlungerVisual } from "./hotLoop/computePlungerVisual";
+import { computeFrameDt, computeTrailIntensity } from "./hotLoop/frameMath";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -1145,7 +1146,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const animate = (time: number) => {
       frameId = requestAnimationFrame(animate);
 
-      const dt = prevFrameTime > 0 ? Math.min((time - prevFrameTime) / 1000, 0.05) : 0.016;
+      const dt = computeFrameDt(prevFrameTime, time);
       prevFrameTime = time;
 
       // visuals + garlands (incl. setFever via ctx.isFeverActive) + bosses +
@@ -1432,12 +1433,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // ── Traînée de feu (intensité ∝ combo, max en fever) ────────────────
       if (ballTrail) {
         const feverNow = isFeverActive();
-        const playing = ballMesh?.visible && gameStateRef.current === "playing";
-        const intensity = !playing
-          ? 0
-          : feverNow
-            ? 1
-            : Math.max(0, Math.min(1, (comboRef.current - 3) / 7));
+        const playing = !!ballMesh?.visible && gameStateRef.current === "playing";
+        const intensity = computeTrailIntensity(playing, feverNow, comboRef.current);
         ballTrail.update(
           dt,
           ballMesh ? ballMesh.position : { x: 0, y: 0, z: 0 },
