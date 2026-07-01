@@ -2,38 +2,39 @@ import {
   test,
   expect,
   describe,
-  mock,
   beforeEach,
   afterEach,
 } from 'bun:test';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import type { LeaderboardEntry } from '@pinball/shared-types';
+import type { PinballSocket } from '@pinball/shared-types/src/socket-client';
 import { MapContentProvider, EMPTY_CONTENT } from '@/map/content';
 import type { BackglassContent } from '@/map/content';
 
-// ── Faux socket : capture les handlers .on() pour les déclencher à la main. ──
+// ── Faux socket INJECTÉ dans le hook : capture les handlers .on() pour les
+// déclencher à la main, compte les .off() au nettoyage. Le hook ne crée plus son
+// propre socket (il est lifté dans BackglassStage et passé en argument). ──
 type Handler = (...args: unknown[]) => void;
 
 let handlers: Record<string, Handler>;
-let disconnectCalls: number;
+let offCalls: number;
 
 function emit(event: string, ...args: unknown[]) {
   handlers[event]?.(...args);
 }
 
-const createPinballSocket = mock(() => ({
-  on(event: string, cb: Handler) {
-    handlers[event] = cb;
-  },
-  disconnect() {
-    disconnectCalls += 1;
-  },
-}));
-
-mock.module('@pinball/shared-types/src/socket-client', () => ({
-  createPinballSocket,
-}));
+function makeSocket(): PinballSocket {
+  return {
+    on(event: string, cb: Handler) {
+      handlers[event] = cb;
+    },
+    off(event: string) {
+      offCalls += 1;
+      delete handlers[event];
+    },
+  } as unknown as PinballSocket;
+}
 
 // ── Horloge déterministe : performance.now() pilotée par la variable `clock`. ─
 let clock: number;
@@ -61,12 +62,11 @@ const ENTRIES: LeaderboardEntry[] = [
 
 beforeEach(() => {
   handlers = {};
-  disconnectCalls = 0;
+  offCalls = 0;
   clock = 0;
   tickCallback = null;
   tickHandle = null;
   clearIntervalCalls = 0;
-  createPinballSocket.mockClear();
 
   performance.now = () => clock;
 
@@ -114,9 +114,10 @@ function renderTakeover(
   entries: LeaderboardEntry[] = ENTRIES,
   content: BackglassContent = makeContent(),
 ) {
+  const socket = makeSocket();
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(MapContentProvider, { value: content }, children);
-  return renderHook(() => __hook(entries), { wrapper });
+  return renderHook(() => __hook(entries, socket), { wrapper });
 }
 
 // __hook est rempli juste avant chaque renderTakeover (importHook async).
@@ -136,9 +137,10 @@ describe('useBackglassTakeover — état initial', () => {
     expect(result.current.highlightRank).toBeUndefined();
   });
 
-  test('ouvre un socket au montage', () => {
+  test('enregistre ses handlers sur le socket injecté au montage', () => {
     renderTakeover();
-    expect(createPinballSocket).toHaveBeenCalledTimes(1);
+    expect(typeof handlers['game:over']).toBe('function');
+    expect(typeof handlers['dmd:display']).toBe('function');
   });
 });
 
@@ -323,10 +325,12 @@ describe('useBackglassTakeover — dmd:display SCORE', () => {
 });
 
 describe('useBackglassTakeover — cycle de vie', () => {
-  test('au démontage : clearInterval + socket.disconnect', () => {
+  test('au démontage : clearInterval + retrait des handlers (pas de disconnect du socket partagé)', () => {
     const { unmount } = renderTakeover();
     unmount();
     expect(clearIntervalCalls).toBe(1);
-    expect(disconnectCalls).toBe(1);
+    // Socket partagé (lifté dans BackglassStage) : le hook retire ses 4 handlers
+    // (game:start, score:update, game:over, dmd:display) sans le déconnecter.
+    expect(offCalls).toBe(4);
   });
 });

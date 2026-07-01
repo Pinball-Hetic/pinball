@@ -1,11 +1,11 @@
 import { createContext, useContext } from 'react'
-import { DEFAULT_MAP_ID } from '@pinball/shared-types'
 import { getBackglassContent } from '@pinball/maps/backglass'
 
 export type BackglassContent = NonNullable<ReturnType<typeof getBackglassContent>>
 
-// Valeur de fallback : no-op pour chaque champ (la page gate sur hasMapContent,
-// donc ce fallback n'est jamais rendu — il évite les crashes pendant le montage).
+// Valeur de fallback : no-op pour chaque champ (la page gate sur la présence du
+// contenu avant de rendre le Stage, donc ce fallback n'est jamais rendu en
+// pratique — il évite les crashes si un consommateur lit le contexte hors Provider).
 export const EMPTY_CONTENT: BackglassContent = {
   JoyceWall: () => null,
   SideArt: () => null,
@@ -30,25 +30,3 @@ export const MapContentProvider = MapContentCtx.Provider
 export function useMapContent(): BackglassContent {
   return useContext(MapContentCtx)
 }
-
-// ─── Compat statique (build-time, pour les contextes mono-map) ───────────────
-// Résolution UNIQUE du contenu backglass de la map active (build-time via
-// NEXT_PUBLIC_MAP_ID) par le registry. Conservé pour les imports existants
-// non encore migrés vers useMapContent().
-export const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID
-
-const _content = getBackglassContent(MAP_ID)
-export const hasMapContent = _content != null
-
-/** @deprecated Utiliser useMapContent() à la place (dynamique). */
-export const {
-  JoyceWall,
-  SideArt,
-  renderMapTakeover,
-  clipBehavior,
-  eventTakeovers,
-  counterLabels,
-  clips,
-  backglassTheme,
-  backglassThemeAlternate,
-} = _content ?? EMPTY_CONTENT

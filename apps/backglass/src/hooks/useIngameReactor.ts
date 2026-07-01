@@ -1,5 +1,6 @@
 import { RefObject, useEffect, useRef } from 'react'
-import { createPinballSocket } from '@pinball/shared-types/src/socket-client'
+import type { PinballSocket } from '@pinball/shared-types/src/socket-client'
+import type { DmdDisplay, GameStart } from '@pinball/shared-types'
 
 export type Reaction =
   | { kind: 'gameStart'; player: string }
@@ -23,7 +24,10 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 const HEAT_DECAY = 0.5 // par seconde
 const HIT_GAIN = 0.3
 
-export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reactor {
+export function useIngameReactor(
+  targetRef: RefObject<HTMLElement | null>,
+  socket: PinballSocket,
+): Reactor {
   const listenersRef = useRef<Set<(r: Reaction) => void>>(new Set())
   const heatRef = useRef(0)
   const lastScoreRef = useRef<number | null>(null)
@@ -52,14 +56,13 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
       listenersRef.current.forEach((cb) => cb(r))
     }
 
-    const socket = createPinballSocket()
-
-    socket.on('game:start', (d) => {
+    const onGameStart = (d: GameStart) => {
       lastScoreRef.current = null
       emit({ kind: 'gameStart', player: d.player })
-    })
+    }
+    socket.on('game:start', onGameStart)
 
-    socket.on('dmd:display', (d) => {
+    const onDmdDisplay = (d: DmdDisplay) => {
       switch (d.mode) {
         case 'SCORE': {
           const prev = lastScoreRef.current
@@ -89,7 +92,8 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
         default:
           break
       }
-    })
+    }
+    socket.on('dmd:display', onDmdDisplay)
 
     // Boucle heat : decay continu, écriture directe de --heat (pas de re-render).
     // On n'écrit que si la valeur arrondie change → 0 invalidation style au repos.
@@ -115,9 +119,12 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
 
     return () => {
       cancelAnimationFrame(raf)
-      socket.disconnect()
+      // Socket partagé (lifté dans BackglassStage) : on retire NOS handlers,
+      // sans le déconnecter — l'appelant gère son cycle de vie.
+      socket.off('game:start', onGameStart)
+      socket.off('dmd:display', onDmdDisplay)
     }
-  }, [targetRef])
+  }, [targetRef, socket])
 
   return reactorRef.current
 }

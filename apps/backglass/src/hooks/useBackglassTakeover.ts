@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPinballSocket } from '@pinball/shared-types/src/socket-client'
-import type { LeaderboardEntry, GameOver } from '@pinball/shared-types'
+import type { PinballSocket } from '@pinball/shared-types/src/socket-client'
+import type { LeaderboardEntry, GameOver, DmdDisplay } from '@pinball/shared-types'
 import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
 import { useMapContent } from '@/map/content'
 import { TakeoverStack } from './takeoverStack'
@@ -48,7 +48,7 @@ function agitationAt(elapsed: number): number {
   return elapsed < half ? elapsed / half : (AGITATION_MS - elapsed) / half
 }
 
-export function useBackglassTakeover(entries: LeaderboardEntry[]) {
+export function useBackglassTakeover(entries: LeaderboardEntry[], socket: PinballSocket) {
   const { clipBehavior, eventTakeovers, clips } = useMapContent()
   // Refs sur les données map : la closure du useEffect([], []) lit toujours les
   // valeurs courantes sans se recréer. key={mapId} sur le Stage force un
@@ -95,8 +95,6 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
     const stack = stackRef.current
     stack.start(performance.now())
 
-    const socket = createPinballSocket()
-
     const markActivity = () => {
       stack.markActivity(performance.now())
     }
@@ -104,7 +102,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
     socket.on('game:start', markActivity)
     socket.on('score:update', markActivity)
 
-    socket.on('game:over', (data: GameOver) => {
+    const onGameOver = (data: GameOver) => {
       const now = performance.now()
       markActivity()
       const list = entriesRef.current
@@ -134,9 +132,10 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         })
         pushJoyce('GAME OVER')
       }
-    })
+    }
+    socket.on('game:over', onGameOver)
 
-    socket.on('dmd:display', (d) => {
+    const onDmdDisplay = (d: DmdDisplay) => {
       alternateWorldRef.current = d.alternateWorld ?? false
       if ('mapState' in d) feverRef.current = mapStateFlag(d.mapState, 'fever')
       if (d.mode === 'CINEMATIC') {
@@ -187,7 +186,8 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         markActivity()
         agitationStartRef.current = performance.now()
       }
-    })
+    }
+    socket.on('dmd:display', onDmdDisplay)
 
     const interval = window.setInterval(() => {
       const now = performance.now()
@@ -216,9 +216,14 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
 
     return () => {
       window.clearInterval(interval)
-      socket.disconnect()
+      // Socket partagé (lifté dans BackglassStage) : on retire NOS handlers,
+      // sans le déconnecter — l'appelant gère son cycle de vie.
+      socket.off('game:start', markActivity)
+      socket.off('score:update', markActivity)
+      socket.off('game:over', onGameOver)
+      socket.off('dmd:display', onDmdDisplay)
     }
-  }, [])
+  }, [socket])
 
   return state
 }

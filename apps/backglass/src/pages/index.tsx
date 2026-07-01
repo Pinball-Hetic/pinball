@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NoSignal } from '@pinball/ui'
+import { createPinballSocket, type PinballSocket } from '@pinball/shared-types/src/socket-client'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
@@ -45,11 +46,22 @@ interface StageProps {
 
 function BackglassStage({ entries, stats, connected }: StageProps) {
   const { JoyceWall, SideArt, backglassTheme, backglassThemeAlternate } = useMapContent()
+  // UNE seule connexion Socket.io pour tout le Stage, partagée entre les hooks
+  // takeover + reactor (avant : 2 connexions indépendantes par Stage). Créée une
+  // fois (initializer useState), déconnectée au démontage. key={mapId} sur le
+  // Stage garantit un socket neuf à chaque changement de map.
+  const [socket] = useState<PinballSocket>(() => createPinballSocket())
+  useEffect(() => {
+    return () => {
+      socket.disconnect()
+    }
+  }, [socket])
+
   const { takeover, alternateWorld, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
-    useBackglassTakeover(entries)
+    useBackglassTakeover(entries, socket)
   const stageRef = useRef<HTMLDivElement>(null)
   const goldWaveRef = useRef<HTMLDivElement>(null)
-  const reactor = useIngameReactor(stageRef)
+  const reactor = useIngameReactor(stageRef, socket)
 
   // Réacteur in-game suspendu pendant un clip cinématique (il ne doit pas
   // poser de heat/hits par-dessus la scène).

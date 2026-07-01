@@ -2,35 +2,35 @@ import {
   test,
   expect,
   describe,
-  mock,
   beforeEach,
   afterEach,
 } from 'bun:test';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { createRef } from 'react';
 
-// ── Faux socket : capture les handlers .on() pour les déclencher à la main. ──
+// ── Faux socket INJECTÉ dans le hook : capture les handlers .on() pour les
+// déclencher à la main, et compte les .off() au nettoyage. Le hook ne crée plus
+// son propre socket (il est lifté dans BackglassStage et passé en argument). ──
 type Handler = (...args: unknown[]) => void;
 
 let handlers: Record<string, Handler>;
-let disconnectCalls: number;
+let offCalls: number;
 
 function emit(event: string, ...args: unknown[]) {
   handlers[event]?.(...args);
 }
 
-const createPinballSocket = mock(() => ({
-  on(event: string, cb: Handler) {
-    handlers[event] = cb;
-  },
-  disconnect() {
-    disconnectCalls += 1;
-  },
-}));
-
-mock.module('@pinball/shared-types/src/socket-client', () => ({
-  createPinballSocket,
-}));
+function makeSocket() {
+  return {
+    on(event: string, cb: Handler) {
+      handlers[event] = cb;
+    },
+    off(event: string) {
+      offCalls += 1;
+      delete handlers[event];
+    },
+  } as unknown as import('@pinball/shared-types/src/socket-client').PinballSocket;
+}
 
 // ── Contrôle de la boucle RAF : on capture le callback du hook et on l'avance
 // manuellement avec des timestamps déterministes. ───────────────────────────
@@ -52,11 +52,10 @@ function frame(t: number) {
 
 beforeEach(() => {
   handlers = {};
-  disconnectCalls = 0;
+  offCalls = 0;
   rafCallback = null;
   rafCancelled = false;
   nextRafId = 1;
-  createPinballSocket.mockClear();
 
   globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
     rafCallback = cb;
@@ -83,14 +82,14 @@ function makeTarget() {
   const el = document.createElement('div');
   const ref = createRef<HTMLElement | null>();
   (ref as { current: HTMLElement | null }).current = el;
-  return { ref, el };
+  return { ref, el, socket: makeSocket() };
 }
 
 describe('useIngameReactor — listeners', () => {
   test('on() enregistre un listener et retourne un unsubscribe', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
 
     const received: unknown[] = [];
     const off = result.current.on((r) => received.push(r));
@@ -106,8 +105,8 @@ describe('useIngameReactor — listeners', () => {
 
   test('plusieurs listeners reçoivent tous l’événement', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
 
     const a: unknown[] = [];
     const b: unknown[] = [];
@@ -123,8 +122,8 @@ describe('useIngameReactor — listeners', () => {
 describe('useIngameReactor — events dmd:display', () => {
   test('SCORE en hausse émet hit et augmente le heat', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
 
     const received: Array<{ kind: string; intensity?: number }> = [];
     result.current.on((r) => received.push(r as never));
@@ -145,8 +144,8 @@ describe('useIngameReactor — events dmd:display', () => {
 
   test('intensité clampée entre 0.1 et 1', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
     const hits: number[] = [];
     result.current.on((r) => {
       if (r.kind === 'hit') hits.push(r.intensity);
@@ -163,8 +162,8 @@ describe('useIngameReactor — events dmd:display', () => {
 
   test('un SCORE non croissant n’émet pas de hit', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
     const hits: unknown[] = [];
     result.current.on((r) => {
       if (r.kind === 'hit') hits.push(r);
@@ -178,8 +177,8 @@ describe('useIngameReactor — events dmd:display', () => {
 
   test('EVENT / COMBO_FLASH / MULTI_FLASH / LIFE_LOST émettent la bonne réaction', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
     const received: Array<{ kind: string } & Record<string, unknown>> = [];
     result.current.on((r) => received.push(r as never));
 
@@ -198,8 +197,8 @@ describe('useIngameReactor — events dmd:display', () => {
 
   test('un mode inconnu (default) n’émet rien', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
     const received: unknown[] = [];
     result.current.on((r) => received.push(r));
 
@@ -209,8 +208,8 @@ describe('useIngameReactor — events dmd:display', () => {
 
   test('game:start réinitialise le baseline de score (pas de hit au prochain SCORE)', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
     const hits: unknown[] = [];
     result.current.on((r) => {
       if (r.kind === 'hit') hits.push(r);
@@ -227,8 +226,8 @@ describe('useIngameReactor — events dmd:display', () => {
 describe('useIngameReactor — suspension', () => {
   test('setSuspended(true) bloque toute émission', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
     const received: unknown[] = [];
     result.current.on((r) => received.push(r));
 
@@ -244,8 +243,8 @@ describe('useIngameReactor — suspension', () => {
 
   test('suspendu : un SCORE croissant ne fait pas monter le heat ni n’émet de hit', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
     const hits: unknown[] = [];
     result.current.on((r) => {
       if (r.kind === 'hit') hits.push(r);
@@ -262,8 +261,8 @@ describe('useIngameReactor — suspension', () => {
 describe('useIngameReactor — boucle heat (RAF)', () => {
   test('écrit --heat sur l’élément cible et décroît avec le temps', async () => {
     const useIngameReactor = await importHook();
-    const { ref, el } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, el, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
 
     // Monte le heat via deux SCORE (delta 500 → +0.3).
     act(() => emit('dmd:display', { mode: 'SCORE', score: 0 }));
@@ -282,8 +281,8 @@ describe('useIngameReactor — boucle heat (RAF)', () => {
 
   test('heatLock verrouille le heat à 1 à chaque frame', async () => {
     const useIngameReactor = await importHook();
-    const { ref, el } = makeTarget();
-    const { result } = renderHook(() => useIngameReactor(ref));
+    const { ref, el, socket } = makeTarget();
+    const { result } = renderHook(() => useIngameReactor(ref, socket));
 
     act(() => result.current.setHeatLock(true));
     frame(0);
@@ -297,8 +296,8 @@ describe('useIngameReactor — boucle heat (RAF)', () => {
 
   test('n’écrit --heat que lorsque la valeur arrondie change', async () => {
     const useIngameReactor = await importHook();
-    const { ref, el } = makeTarget();
-    renderHook(() => useIngameReactor(ref));
+    const { ref, el, socket } = makeTarget();
+    renderHook(() => useIngameReactor(ref, socket));
 
     frame(0); // heat 0 → écrit "0"
     expect(el.style.getPropertyValue('--heat')).toBe('0');
@@ -311,13 +310,15 @@ describe('useIngameReactor — boucle heat (RAF)', () => {
 });
 
 describe('useIngameReactor — cycle de vie', () => {
-  test('au démontage : cancelAnimationFrame + socket.disconnect', async () => {
+  test('au démontage : cancelAnimationFrame + retrait des handlers (pas de disconnect du socket partagé)', async () => {
     const useIngameReactor = await importHook();
-    const { ref } = makeTarget();
-    const { unmount } = renderHook(() => useIngameReactor(ref));
+    const { ref, socket } = makeTarget();
+    const { unmount } = renderHook(() => useIngameReactor(ref, socket));
 
     unmount();
     expect(rafCancelled).toBe(true);
-    expect(disconnectCalls).toBe(1);
+    // Le socket est partagé (lifté dans BackglassStage) : le hook retire ses
+    // propres handlers (game:start + dmd:display) sans déconnecter le socket.
+    expect(offCalls).toBe(2);
   });
 });

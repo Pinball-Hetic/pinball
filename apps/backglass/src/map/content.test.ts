@@ -1,10 +1,10 @@
-import { test, expect, describe, mock, beforeEach, afterEach } from 'bun:test'
+import { test, expect, describe, mock, afterEach } from 'bun:test'
 import { render, screen, renderHook, cleanup } from '@testing-library/react'
 import { createElement } from 'react'
 
-// On mocke le registry maps pour contrôler la branche "contenu présent / null"
-// de content.ts (résolution build-time via getBackglassContent). Le mock doit
-// être posé AVANT le `await import('./content')` dynamique.
+// content.ts n'a plus d'effet de bord à l'import (plus de getBackglassContent
+// appelé au chargement du module) : la résolution du contenu vit dans la page.
+// On mocke tout de même le registry pour rester découplé du contenu réel.
 
 const fakeContent = {
   JoyceWall: () => createElement('div', { 'data-testid': 'joyce' }, 'JOYCE'),
@@ -18,18 +18,15 @@ const fakeContent = {
   backglassThemeAlternate: { color: 'blue' },
 }
 
+mock.module('@pinball/maps/backglass', () => ({
+  getBackglassContent: (id: string) => (id ? fakeContent : null),
+}))
+
 afterEach(() => {
   cleanup()
-  mock.restore()
 })
 
-describe('content.ts — contenu présent', () => {
-  beforeEach(() => {
-    mock.module('@pinball/maps/backglass', () => ({
-      getBackglassContent: (id: string) => (id ? fakeContent : null),
-    }))
-  })
-
+describe('content.ts', () => {
   test('EMPTY_CONTENT expose un no-op pour chaque champ rendu', () => {
     return import('./content').then((mod) => {
       const ec = mod.EMPTY_CONTENT
@@ -42,23 +39,6 @@ describe('content.ts — contenu présent', () => {
       expect(ec.clips).toEqual({})
       expect(ec.backglassTheme).toEqual({})
       expect(ec.backglassThemeAlternate).toEqual({})
-    })
-  })
-
-  test('hasMapContent est true quand le registry renvoie du contenu', () => {
-    return import('./content').then((mod) => {
-      expect(mod.hasMapContent).toBe(true)
-    })
-  })
-
-  test('les exports dérivés proviennent du contenu résolu', () => {
-    return import('./content').then((mod) => {
-      expect(mod.clipBehavior).toEqual(fakeContent.clipBehavior)
-      expect(mod.eventTakeovers).toEqual(fakeContent.eventTakeovers)
-      expect(mod.counterLabels).toEqual(fakeContent.counterLabels)
-      expect(mod.clips).toEqual(fakeContent.clips)
-      expect(mod.backglassTheme).toEqual(fakeContent.backglassTheme)
-      expect(mod.backglassThemeAlternate).toEqual(fakeContent.backglassThemeAlternate)
     })
   })
 
@@ -94,30 +74,6 @@ describe('content.ts — contenu présent', () => {
         ),
       )
       expect(screen.getByTestId('joyce').textContent).toBe('JOYCE')
-    })
-  })
-})
-
-describe('content.ts — pas de contenu (fallback)', () => {
-  beforeEach(() => {
-    mock.module('@pinball/maps/backglass', () => ({
-      getBackglassContent: () => null,
-    }))
-  })
-
-  test('hasMapContent est false quand le registry renvoie null', () => {
-    return import('./content?null').then((mod) => {
-      expect(mod.hasMapContent).toBe(false)
-    })
-  })
-
-  test('les exports dérivés retombent sur EMPTY_CONTENT (no-op)', () => {
-    return import('./content?null').then((mod) => {
-      expect(mod.JoyceWall()).toBeNull()
-      expect(mod.SideArt()).toBeNull()
-      expect(mod.renderMapTakeover()).toBeNull()
-      expect(mod.clips).toEqual({})
-      expect(mod.backglassTheme).toEqual({})
     })
   })
 })
