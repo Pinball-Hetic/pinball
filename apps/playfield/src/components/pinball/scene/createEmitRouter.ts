@@ -79,14 +79,35 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
     cameraRig.restoreBoss();
   };
 
+  /**
+   * Sink d'events injecté dans le CollisionEventProcessor et le game loop.
+   *
+   * Ordre GARANTI de fan-out par event (contrat — voir aussi le JSDoc du
+   * paramètre `emit` de CollisionEventProcessor) :
+   *
+   *   1. mapModule.onPreDrain(livesPré-décrément) — DRAIN/BOTTOM_OUT uniquement.
+   *   2. baseEmit (useGameState) — scoring, décrément de vie, reset.
+   *   3. mapModule.onGameEvent — visuels, bascule de monde, reveals de boss.
+   *
+   * L'invariant porteur est le split 1 avant 2 : `onPreDrain` s'exécute AVANT
+   * que `baseEmit` ne lise/décrémente les vies, afin qu'une map puisse
+   * accorder une vie de sauvetage sur la dernière bille (elle voit le compte
+   * pré-décrément). Ne pas déplacer ces trois appels les uns par rapport aux
+   * autres. Les effets react-scope suivants (screen shake, caméra, DMD,
+   * cleanup) observent l'état post-scoring et sont hors-contrat entre eux.
+   */
   const emit: GameEventListener = (event: GameEvent) => {
     const collisionProcessor = getCollisionProcessor();
-    // Sauvetage dernière vie : la map peut accorder une vie AVANT le
-    // décrément (handleDrain) pour éviter le game over. On lui passe le
-    // compte de vies pré-décrément (livesRef n'est pas encore modifié).
+
+    // ── Phase 1 : pré-drain (sauvetage dernière vie) ─────────────────────
+    // La map peut accorder une vie AVANT le décrément (handleDrain) pour
+    // éviter le game over. On lui passe le compte de vies pré-décrément
+    // (livesRef n'est pas encore modifié par baseEmit).
     if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
       mapModule?.onPreDrain?.(livesRef.current);
     }
+
+    // ── Phase 2 : baseEmit (scoring / vies / reset, react-scope) ─────────
     baseEmit(event);
     if (
       "scoreIncrement" in event
@@ -102,6 +123,8 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
       restoreBossCamera();
     }
     if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
+
+    // ── Phase 3 : mapModule.onGameEvent (observe l'état post-scoring) ────
     // bumperVisuals + garlands : onGameEvent géré par le module de map.
     // bossReveals + upsideDownPortal + upsideDownAtmosphere : onGameEvent
     // géré par le module de map.

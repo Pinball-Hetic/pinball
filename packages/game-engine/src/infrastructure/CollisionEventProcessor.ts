@@ -135,6 +135,20 @@ export class CollisionEventProcessor {
     // ever created with role 'drain', so this use-case is no longer dispatched here.
     _drainBallUC: DrainBall,
     bottomOutBallUC: BottomOutBall,
+    // Single event sink for every collision this processor dispatches. Its
+    // fan-out ordering is a CONTRACT the processor relies on but does not
+    // itself enforce (the injected listener owns sequencing — in the playfield
+    // that is `createEmitRouter`):
+    //
+    //   1. onPreDrain(livesPreDecrement)  — DRAIN/BOTTOM_OUT only; map may
+    //                                        grant a rescue life BEFORE step 2
+    //                                        reads/decrements lives.
+    //   2. baseEmit (useGameState)        — scoring, lives decrement, reset.
+    //   3. mapModule.onGameEvent          — visuals, world switch, boss reveals;
+    //                                        observes the post-scoring state.
+    //
+    // The DRAIN-vs-rescue split (1 before 2) is the load-bearing invariant:
+    // a map that rescues on the last ball must see the pre-decrement count.
     private readonly emit: GameEventListener,
     // Injected clock (DIP): defaults to performance.now in production, a
     // controllable fake in tests — makes the anti-spam throttles deterministic.
