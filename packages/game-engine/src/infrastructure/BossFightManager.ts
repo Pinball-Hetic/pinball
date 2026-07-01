@@ -22,9 +22,12 @@ export class BossFightManager {
   constructor(
     private readonly emit: GameEventListener,
     private readonly bosses: BossDefinition[],
+    // Injected clock (DIP): threaded into each BossTargetSensor so the per-hit
+    // cooldown is deterministic in tests.
+    now: () => number = () => performance.now(),
   ) {
     for (const def of bosses) {
-      this.states.set(def.id, { triggered: false, sensor: new BossTargetSensor() });
+      this.states.set(def.id, { triggered: false, sensor: new BossTargetSensor(now) });
       this.byId.set(def.id, def);
       this.byRole.set(def.colliderRole, def);
     }

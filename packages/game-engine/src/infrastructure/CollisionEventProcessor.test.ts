@@ -61,6 +61,16 @@ test('deferred physics still runs on the 2nd flush cycle (bumper)', () => {
   expect(bumperExec).toHaveBeenCalledTimes(2);
 });
 
+test('bumper collision during game_over does not run the use-case (régression)', () => {
+  // Régression : le handler bumper manquait la garde gameState === 'playing',
+  // donc les bumpers éjectaient/scoraient pendant game_over/idle.
+  const { cep, bumperExec } = makeProcessor();
+
+  cep.process(queueFor(1), 'game_over');
+  cep.flushPendingPhysics();
+  expect(bumperExec).toHaveBeenCalledTimes(0);
+});
+
 test('bottom_out still drains on a later flush cycle (game-over path)', () => {
   const { cep, bottomOutExec } = makeProcessor();
 

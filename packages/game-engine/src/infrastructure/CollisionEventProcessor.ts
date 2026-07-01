@@ -29,6 +29,7 @@ export class CollisionEventProcessor {
   private readonly handlers: CollisionHandler[] = [];
   private readonly portalHandler: PortalCollisionHandler;
   private readonly dropTargetHandler: DropTargetCollisionHandler;
+  private readonly bossHandler: BossCollisionHandler;
 
   private gateContext() {
     return {
@@ -81,6 +82,11 @@ export class CollisionEventProcessor {
 
   resetAllBossFights(): void {
     this.bossFights.resetAll();
+    this.resetLockedHitThrottle();
+  }
+
+  resetLockedHitThrottle(id?: BossId): void {
+    this.bossHandler.resetThrottle(id);
   }
 
   onAlternateWorldEntered(score: number): void {
@@ -132,25 +138,26 @@ export class CollisionEventProcessor {
     // controllable fake in tests — makes the anti-spam throttles deterministic.
     private readonly now: () => number = () => performance.now(),
   ) {
-    this.bossFights = new BossFightManager(emit, layout.bosses);
+    this.bossFights = new BossFightManager(emit, layout.bosses, this.now);
 
     // Kept as properties because they are exposed publicly (reset, state).
     this.dropTargetHandler = new DropTargetCollisionHandler(emit, layout);
     this.portalHandler = new PortalCollisionHandler(emit, () => this.alternateWorldActive);
+    this.bossHandler = new BossCollisionHandler(
+      layout.bosses,
+      this.bossFights,
+      emit,
+      () => this.alternateWorldActive,
+      () => this.gateContext(),
+      this.now,
+    );
 
     // Handler registry — declaration order = dispatch priority.
     // The first handler whose canHandle() returns true owns the collision.
     // BossCollisionHandler is first: a boss collider role is always consumed
     // here and never falls through to the generic handlers.
     this.handlers = [
-      new BossCollisionHandler(
-        layout.bosses,
-        this.bossFights,
-        emit,
-        () => this.alternateWorldActive,
-        () => this.gateContext(),
-        this.now,
-      ),
+      this.bossHandler,
       new BumperCollisionHandler(this.pendingPhysics, bumperHitUC, layout),
       new BumpCollisionHandler(this.pendingPhysics, bumpHitUC, this.now),
       new DrainCollisionHandler(

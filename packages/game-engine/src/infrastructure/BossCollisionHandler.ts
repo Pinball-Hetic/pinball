@@ -72,4 +72,17 @@ export class BossCollisionHandler implements CollisionHandler {
     // Delegate the fight collision; the role is always a boss role here.
     this.bossFights.handleTargetCollision(role, started, gameState);
   }
+
+  /**
+   * Clears the anti-spam throttle. Without this, after a game/world reset a
+   * re-armed boss would suppress BOSS_LOCKED_HIT for up to 2s. Clears all
+   * bosses when no id is given, otherwise just that boss.
+   */
+  resetThrottle(id?: BossId): void {
+    if (id === undefined) {
+      this.lockedHitLastMs = {};
+      return;
+    }
+    delete this.lockedHitLastMs[id];
+  }
 }

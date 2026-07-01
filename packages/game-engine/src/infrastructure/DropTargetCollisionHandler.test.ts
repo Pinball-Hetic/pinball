@@ -105,6 +105,27 @@ test('handle: un seul côté complété ne reset pas/affecte pas l’autre côt�
   expect(events.length).toBe(before);
 });
 
+test('resetDropTargets: réinitialise aussi un rôle orphelin (absent du layout) — régression', () => {
+  // Régression : resetDropTargets ne réinitialisait que les ids présents dans
+  // layout.dropTargets ; un rôle 'drop_*' orphelin (dans colliderMap mais pas
+  // le layout) restait down à vie. Doit maintenant redevenir jouable.
+  const { handler, events } = setup([dt('drop_a', 'left')]);
+  handler.handle('drop_orphan', 'playing', true); // met un rôle inconnu down
+  expect(events.at(-1)).toEqual({
+    type: 'DROP_TARGET_HIT',
+    targetId: 'drop_orphan',
+    scoreIncrement: SCORE_DROP_TARGET,
+  });
+
+  handler.resetDropTargets();
+  events.length = 0;
+
+  handler.handle('drop_orphan', 'playing', true); // doit ré-émettre après reset
+  expect(events).toEqual([
+    { type: 'DROP_TARGET_HIT', targetId: 'drop_orphan', scoreIncrement: SCORE_DROP_TARGET },
+  ]);
+});
+
 test('resetDropTargets: remet tout up et émet DROP_TARGET_RESET', () => {
   const { handler, events } = setup([dt('drop_a', 'left'), dt('drop_b', 'left')]);
   handler.handle('drop_a', 'playing', true);

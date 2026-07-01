@@ -61,12 +61,20 @@ test('no-op si aucune position de bumper pour cet index', () => {
   expect(pending.length).toBe(0);
 });
 
-test('ne tient PAS compte de gameState (déclenche même hors playing)', () => {
-  // Le handler bumper ne filtre que sur started, pas sur gameState.
-  const { uc } = makeBumperHitUC();
+test('no-op si gameState != playing (régression : garde game_over/idle)', () => {
+  // Régression : sans la garde gameState === 'playing', les bumpers éjectaient
+  // et émettaient encore pendant game_over/idle. Le use-case ne doit PAS être
+  // planifié hors playing.
+  const { uc, calls } = makeBumperHitUC();
   const pending: Array<() => void> = [];
   const h = new BumperCollisionHandler(pending, uc as never, makeLayout([{ x: 0, z: 0 }]));
 
   h.handle('bumper_0', 'game_over', true);
-  expect(pending.length).toBe(1);
+  h.handle('bumper_0', 'idle', true);
+  expect(pending.length).toBe(0);
+
+  // Sanity : en 'playing' le use-case est bien planifié.
+  h.handle('bumper_0', 'playing', true);
+  drain(pending);
+  expect(calls).toEqual([{ idx: 0, pos: { x: 0, z: 0 } }]);
 });

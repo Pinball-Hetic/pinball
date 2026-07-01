@@ -20,7 +20,7 @@ export class BumperCollisionHandler implements CollisionHandler {
   }
 
   handle(role: string, gameState: string, started: boolean): void {
-    if (!started) return;
+    if (!started || gameState !== 'playing') return;
     // The bumper index is encoded in the GLB role (e.g. 'bumper_2' → idx 2).
     const idx = parseInt(role.split('_')[1], 10);
     const pos = this.layout.bumpers[idx];

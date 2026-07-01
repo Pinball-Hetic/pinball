@@ -58,9 +58,9 @@ const BOSS_B = boss({
   unlocksReturnPortal: true,
 });
 
-function make() {
+function make(now: () => number = () => 0) {
   const events: GameEvent[] = [];
-  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A, BOSS_B]);
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A, BOSS_B], now);
   return { mgr, events };
 }
 
@@ -141,13 +141,28 @@ test('mutual exclusion: cannot reveal a second boss while another fight is activ
   expect(events[1]).toEqual({ type: 'BOSS_REVEAL', bossId: 'boss_b', scoreIncrement: 200 });
 });
 
-test('handleTargetCollision routes by collider role and emits a hit', async () => {
-  await new Promise((r) => setTimeout(r, 500));
-  const { mgr, events } = make();
+test('handleTargetCollision routes by collider role and emits a hit', () => {
+  // Injected clock (start at 0, no wall-clock leak between tests) — the first
+  // hit always passes the cooldown since lastHitMs starts at 0.
+  const { mgr, events } = make(() => 1000);
   mgr.beginFight('boss_a', true); // fightActive + targetArmed
   const handled = mgr.handleTargetCollision('a_target', true, 'playing');
   expect(handled).toBe(true);
   expect(events).toEqual([{ type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 1, scoreIncrement: 250 }]);
+});
+
+test('handleTargetCollision: two hits across the cooldown boundary via injected clock', () => {
+  const clock = { t: 1000 };
+  const { mgr, events } = make(() => clock.t);
+  mgr.beginFight('boss_a', true);
+  mgr.handleTargetCollision('a_target', true, 'playing'); // 1st hit (t=1000)
+  mgr.handleTargetCollision('a_target', false, 'playing'); // ball leaves
+  clock.t = 1000 + 450; // exactly at the 450ms cooldown boundary
+  mgr.handleTargetCollision('a_target', true, 'playing'); // 2nd hit
+  expect(events).toEqual([
+    { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 1, scoreIncrement: 250 },
+    { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 2, scoreIncrement: 250 },
+  ]);
 });
 
 test('handleTargetCollision ignores unknown roles', () => {
