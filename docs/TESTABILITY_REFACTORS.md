@@ -73,8 +73,9 @@
 > **Reste UNIQUEMENT ce qui exige une décision/vérif humaine (je ne peux pas le clore seul)** :
 > 1. **P1-play EventRouter** — extraction du routeur `emit` (PinballPlayfield.tsx, ~600 L,
 >    closures sur refs runtime). **Exige un smoke 3D** (code non testé) → session dédiée, tranches + smoke.
-> 2. **B3** — ST sans handler `MILESTONE` (clips déclarés, jamais déclenchés). **Décision produit** :
->    parité Zelda voulue ? Si oui, câblage trivial (`selectMilestoneClip` prêt).
+> 2. ~~**B3** — ST sans handler `MILESTONE`~~ ✅ **RÉSOLU** (2026-07-01) : MILESTONE émis
+>    (`useGameState.nextMilestone` → `onMilestone` → `emit`) + câblé côté module ST
+>    (`onMilestone` → `playMilestoneCinematic` + `garlands.rocketBurst`). Parité Zelda faite.
 > 3. **G2.a'** — dériver les bounds collider de `layout.geometry.bounds` (vs littéraux ST).
 >    **Behaviour-risk multi-map** → exige un smoke colliders par map avant.
 >

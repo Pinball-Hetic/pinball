@@ -108,6 +108,11 @@ import {
   shouldAutoBeginSession,
   type PlayfieldBootPhase,
 } from "./bootPhase";
+import {
+  createApplyAction,
+  createInputState,
+  type InputState,
+} from "./createApplyAction";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -572,7 +577,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let flipperZones: FlipperZones | null = null;
     let leftSwing = 0, rightSwing = 0;
     let prevLeftSwing = 0, prevRightSwing = 0;
-    let leftTarget = 0, rightTarget = 0;
+    // État d'entrée mutable partagé (flippers + plunger) — possédé ici, muté par
+    // applyAction ET lu par la boucle animate. Cf. createApplyAction.ts.
+    const inputState: InputState = createInputState();
 
     // ── Juice : screen shake + hit-flash flippers ───────────────────────────
     const screenShake = screenShakeRef.current!;
@@ -628,8 +635,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     // au vrai centre géométrique du mesh et pas à l'origine du groupe parent.
     const leftFlipperBodyOffset  = new THREE.Vector3();
     const rightFlipperBodyOffset = new THREE.Vector3();
-    let isChargingPlunger = false;
-    let chargeStartTime = 0;
     let physicsReady = false;
     // Handlers clavier stockés en scope-effet (pas de monkeypatch sur
     // physicsWorld) → cleanup sûr même si init() est annulé avant le câblage.
@@ -699,8 +704,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     // ── Plunger kinematic ────────────────────────────────────────────────────
     let plungerBody: RAPIER.RigidBody | null = null;
     let plungerMesh: THREE.Mesh | null = null;
-    type PlungerState = "idle" | "charging" | "releasing" | "returning";
-    let plungerState: PlungerState = "idle";
     let plungerRestZ = 0;
 
     const loadPlayfieldGlb = async () => {
@@ -1097,8 +1100,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         resetBallRef.current = () => {
           if (!drainBallUC || !sessionStartedRef.current) return;
           if (gameStateRef.current === "game_over") return;
-          isChargingPlunger = false;
-          plungerState = "idle";
+          inputState.isChargingPlunger = false;
+          inputState.plungerState = "idle";
           setPlungerCharge(null);
           stuckDetector.reset();
           bottomOutBallUC?.resetLatch();
@@ -1114,15 +1117,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // ── Input handling ────────────────────────────────────────────────────
         console.log("[PinballPlayfield] KEYBOARD_MODE =", KEYBOARD_MODE);
 
-        // Le callback métier (vrai effet sur le game loop). Source de vérité
-        // unique : appelé soit par les events réseau `input:button`, soit
-        // localement en mode `direct` via dispatchButton. Le mode
-        // `simulate-esp32` n'appelle PAS ce callback directement — il émet sur
-        // le réseau et c'est le broadcast server qui rappelle ce même
-        // callback via socket.on('input:button').
-        // Cœur métier : ferme sur les `let` leftTarget/rightTarget (~L600), donc
-        // doit vivre dans cette closure (non hoistable). Reçoit l'ACTION jeu
-        // (résolue depuis le bouton physique via BUTTON_ACTION), pas l'id brut.
         // Sortie de l'écran outro/QR (game over) → recommencer le workflow
         // DEPUIS LE DÉBUT : reload complet → boot pinball.tsx → MapSelectorScreen
         // (multi-map) ou attract de la map forcée (mono-map Fliphetic via
@@ -1131,71 +1125,24 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // React) — on ne rejoue jamais la même map en place.
         const restartWorkflow = () => window.location.reload();
 
-        const applyAction = (action: GameAction, btnAction: ButtonAction) => {
-          if (!sessionStartedRef.current) {
-            if (
-              btnAction === "DOWN"
-              && physicsReadyRef.current
-              && (action === "PLUNGE" || action === "START")
-            ) {
-              beginSessionRef.current();
-              if (action === "PLUNGE" && gameStateRef.current === "idle") {
-                plunger.startCharge(performance.now());
-                isChargingPlunger = true;
-                chargeStartTime = performance.now();
-              }
-            }
-            return;
-          }
-          switch (action) {
-            case "FLIP_LEFT":
-              leftTarget = btnAction === "DOWN" ? 1 : 0;
-              break;
-            case "FLIP_RIGHT":
-              rightTarget = btnAction === "DOWN" ? 1 : 0;
-              break;
-            case "PLUNGE": {
-              if (btnAction === "DOWN") {
-                debugLog(
-                  `[Plunger] DOWN — gameState=${gameStateRef.current} physicsReady=${physicsReady} charging=${isChargingPlunger}`,
-                );
-                if (gameStateRef.current === "game_over") {
-                  restartWorkflow();
-                  return;
-                }
-                if (gameStateRef.current === "idle" && physicsReadyRef.current) {
-                  plunger.startCharge(performance.now());
-                  isChargingPlunger = true;
-                  chargeStartTime = performance.now();
-                } else {
-                  debugLog(
-                    `[Plunger] DOWN ignoré — charge impossible (idle requis + physicsReady). ` +
-                      `gameState=${gameStateRef.current} physicsReady=${physicsReady}`,
-                  );
-                }
-              } else if (isChargingPlunger && gameStateRef.current === "idle") {
-                isChargingPlunger = false;
-                plungerState = "releasing";
-                const t = plungerChargeProgress(performance.now(), chargeStartTime);
-                const factor = plungerLaunchFactor(t);
-                setPlungerCharge(null);
-                debugLog(`[Plunger] RELEASE — factor=${factor.toFixed(2)} → lancement`);
-                launchBallUC?.execute(factor);
-              } else {
-                debugLog(
-                  `[Plunger] UP ignoré — pas en charge ou pas idle. ` +
-                    `charging=${isChargingPlunger} gameState=${gameStateRef.current}`,
-                );
-              }
-              break;
-            }
-            case "START":
-              if (btnAction === "DOWN" && gameStateRef.current === "game_over") {
-                restartWorkflow();
-              }
-              break;
-          }
-        };
+        // Routeur d'actions de jeu → effets (flippers/plunger/reset). Source de
+        // vérité unique, appelée par les events réseau `input:button` comme par
+        // le clavier dev. Logique extraite + testée (createApplyAction.ts) ;
+        // toute la collaboration passe par des getters/callbacks + l'objet
+        // `inputState` partagé avec la boucle animate.
+        const applyAction = createApplyAction({
+          state: inputState,
+          now: () => performance.now(),
+          isSessionStarted: () => sessionStartedRef.current,
+          isPhysicsReady: () => physicsReadyRef.current,
+          getGameState: () => gameStateRef.current,
+          beginSession: () => beginSessionRef.current(),
+          startPlungerCharge: (t) => plunger.startCharge(t),
+          launchBall: (factor) => launchBallUC?.execute(factor),
+          setPlungerCharge: (v) => setPlungerCharge(v),
+          restartWorkflow,
+          debugLog,
+        });
 
         physicalInputsRef.current = {
           onButton: (data) => {
@@ -1354,8 +1301,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         bossIntroBallPos.y = p.y;
         bossIntroBallPos.z = p.z;
         bossIntroHolding = true;
-        leftTarget = 0;
-        rightTarget = 0;
+        inputState.leftTarget = 0;
+        inputState.rightTarget = 0;
         ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       }
@@ -1371,8 +1318,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         prevLeftSwing  = leftSwing;
         prevRightSwing = rightSwing;
         const swingDecay = 1 - Math.pow(1 - SWING_SMOOTH, dt * 60);
-        leftSwing  += (leftTarget  * SWING_RAD - leftSwing)  * swingDecay;
-        rightSwing += (rightTarget * SWING_RAD - rightSwing) * swingDecay;
+        leftSwing  += (inputState.leftTarget  * SWING_RAD - leftSwing)  * swingDecay;
+        rightSwing += (inputState.rightTarget * SWING_RAD - rightSwing) * swingDecay;
         if (leftFlipperPivot)  applyFlipperSwing(leftFlipperPivot,  leftSwing);
         if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
 
@@ -1557,8 +1504,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       }
 
       // Plunger animation + jauge UI
-      if (isChargingPlunger) {
-        const t = plungerChargeProgress(time, chargeStartTime);
+      if (inputState.isChargingPlunger) {
+        const t = plungerChargeProgress(time, inputState.chargeStartTime);
         plungerChargeUiActive = true;
         if (time - lastPlungerChargeUiPush > 40) {
           lastPlungerChargeUiPush = time;
@@ -1571,16 +1518,16 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
       if (plungerMesh && plungerRestZ > 0) {
         let plungerZ = plungerRestZ;
-        if (isChargingPlunger) {
-          const t = plungerChargeProgress(time, chargeStartTime);
+        if (inputState.isChargingPlunger) {
+          const t = plungerChargeProgress(time, inputState.chargeStartTime);
           const pullback = plungerLaunchFactor(t) * 0.08;
           plungerZ = plungerRestZ + pullback;
-        } else if (plungerState === "releasing") {
+        } else if (inputState.plungerState === "releasing") {
           plungerZ = plungerRestZ - 0.015;
-          if (time - chargeStartTime > PLUNGER_CHARGE_MS * 0.1) plungerState = "returning";
-        } else if (plungerState === "returning") {
+          if (time - inputState.chargeStartTime > PLUNGER_CHARGE_MS * 0.1) inputState.plungerState = "returning";
+        } else if (inputState.plungerState === "returning") {
           plungerZ = plungerRestZ;
-          plungerState = "idle";
+          inputState.plungerState = "idle";
         }
         plungerMesh.position.z = plungerZ;
         if (plungerBody) {
