@@ -186,8 +186,12 @@ export class CollisionEventProcessor {
 
   flushPendingPhysics(): void {
     if (this.pendingPhysics.length === 0) return;
-    const pending = this.pendingPhysics;
-    this.pendingPhysics = [];
+    // Vide EN PLACE (splice) — ne PAS réassigner : les handlers de collision
+    // capturent cette même référence de tableau à la construction. Un
+    // `this.pendingPhysics = []` la détacherait → après le 1er flush, les
+    // handlers pousseraient dans l'ancien tableau et plus rien ne s'exécuterait
+    // (bumpers muets, drain/game-over jamais déclenchés).
+    const pending = this.pendingPhysics.splice(0);
     for (const run of pending) run();
   }
 }
