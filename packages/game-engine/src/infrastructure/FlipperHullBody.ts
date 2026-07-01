@@ -1,5 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
+import { kinematicPositionBasedDesc } from './RapierCompat';
 
 export type FlipperHullBodyResult = {
   body: RAPIER.RigidBody | null;
@@ -55,7 +56,7 @@ export function buildFlipperHullBody(
   const hullVertices = new Float32Array(raw);
 
   const body = world.createRigidBody(
-    RAPIER.RigidBodyDesc.kinematicPositionBased()
+    kinematicPositionBasedDesc()
       .setTranslation(geoCenter.x, geoCenter.y, geoCenter.z)
       .setRotation({ x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w }),
   );
