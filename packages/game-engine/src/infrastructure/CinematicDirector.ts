@@ -49,7 +49,10 @@ export class CinematicDirector {
   resetGame(): void {
     this.playedThisGame.clear();
     // Annule un clip encore actif (sinon shouldFreeze() resterait vrai et
-    // gèlerait la physique de la nouvelle partie).
+    // gèlerait la physique de la nouvelle partie). onEnd() lève le gel
+    // gameplay / restaure caméra+DMD → doit être appelé avant de nuller.
+    const spec = this.active;
     this.active = null;
+    spec?.onEnd?.();
   }
 }
