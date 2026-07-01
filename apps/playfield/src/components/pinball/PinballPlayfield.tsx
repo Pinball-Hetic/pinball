@@ -43,7 +43,6 @@ import {
   hidePinballmapDecorNodes,
   prepareGltfMaterialsForDisplay,
   createGltfLoader,
-  PlungerPhysics,
   type BossId,
   CinematicDirector,
   PlayfieldCinematicStrobe,
@@ -110,6 +109,7 @@ import {
 } from "./createApplyAction";
 import { idForAction, gameKeyToAction, isPreventDefaultKey } from "./keyboardMap";
 import { buildFlipperBodies } from "./physics/buildFlipperBodies";
+import { buildPlungerBody } from "./physics/buildPlungerBody";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -956,24 +956,18 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         ballPhysicsInst.body.wakeUp();
 
         // ── Plunger visual + kinematic body ──────────────────────────────────
-        const PLUNGER_RADIUS = 0.010;
-        plungerRestZ = 0.240;
-
-        const pgeo = new THREE.CylinderGeometry(PLUNGER_RADIUS, PLUNGER_RADIUS * 1.3, 0.04, 12);
-        const pmat = new THREE.MeshStandardMaterial({ color: 0xddaa00, metalness: 0.9, roughness: 0.15 });
-        const pmesh = new THREE.Mesh(pgeo, pmat);
-        pmesh.rotation.x = Math.PI / 2;
-        pmesh.position.set(mapLayout.spawns.ball.x, mapLayout.spawns.ball.y, plungerRestZ);
-        scene.add(pmesh);
-        plungerMesh = pmesh;
-        disposableGeos.push(pgeo);
-        disposableMats.push(pmat);
-
-        plungerBody = PlungerPhysics.createBody(world, {
-          x: mapLayout.spawns.ball.x,
-          y: mapLayout.spawns.ball.y,
-          z: plungerRestZ,
+        // Setup extrait (physics/buildPlungerBody.ts). animate lit
+        // mesh/body/restZ après assignation.
+        const plungerSetup = buildPlungerBody({
+          world,
+          scene,
+          spawn: mapLayout.spawns.ball,
+          disposableGeos,
+          disposableMats,
         });
+        plungerMesh = plungerSetup.mesh;
+        plungerBody = plungerSetup.body;
+        plungerRestZ = plungerSetup.restZ;
 
         // ── Caméra cabine fixe (non rotatable) — tapis jouable uniquement ───────
         modelRoot.updateMatrixWorld(true);
