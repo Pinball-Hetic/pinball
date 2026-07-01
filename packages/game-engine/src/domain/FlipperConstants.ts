@@ -1,7 +1,6 @@
 // ── Géométrie ────────────────────────────────────────────────────────────────
 export const SWING_RAD    = 0.75;
 export const SWING_SMOOTH = 0.78;
-export const FLIPPER_SWING_AXIS: 'x' | 'y' | 'z' = 'x';
 export const HINGE_INSET_FROM_EDGE = 0.0;
 
 // Réglage fin du pivot des flippers : déplacé dans le layout de la map

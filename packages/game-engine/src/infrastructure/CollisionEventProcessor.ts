@@ -10,7 +10,6 @@ import { BossFightManager } from './BossFightManager';
 import type { CollisionHandler } from './CollisionHandler';
 import { BumperCollisionHandler } from './BumperCollisionHandler';
 import { BumpCollisionHandler } from './BumpCollisionHandler';
-import { DrainCollisionHandler } from './DrainCollisionHandler';
 import { BottomOutCollisionHandler } from './BottomOutCollisionHandler';
 import { SlingshotCollisionHandler } from './SlingshotCollisionHandler';
 import { PopZoneCollisionHandler } from './PopZoneCollisionHandler';
@@ -131,7 +130,10 @@ export class CollisionEventProcessor {
     private readonly colliderMap: Map<number, string>,
     bumperHitUC: BumperHit,
     bumpHitUC: BumpHit,
-    drainBallUC: DrainBall,
+    // Positional slot preserved for call-site compatibility. The real drain is
+    // handled by BottomOutCollisionHandler (role 'bottom_out'); no collider is
+    // ever created with role 'drain', so this use-case is no longer dispatched here.
+    _drainBallUC: DrainBall,
     bottomOutBallUC: BottomOutBall,
     private readonly emit: GameEventListener,
     // Injected clock (DIP): defaults to performance.now in production, a
@@ -160,11 +162,6 @@ export class CollisionEventProcessor {
       this.bossHandler,
       new BumperCollisionHandler(this.pendingPhysics, bumperHitUC, layout),
       new BumpCollisionHandler(this.pendingPhysics, bumpHitUC, this.now),
-      new DrainCollisionHandler(
-        this.pendingPhysics,
-        () => this.dropTargetHandler.resetDropTargets(),
-        drainBallUC,
-      ),
       new BottomOutCollisionHandler(
         this.pendingPhysics,
         () => this.dropTargetHandler.resetDropTargets(),

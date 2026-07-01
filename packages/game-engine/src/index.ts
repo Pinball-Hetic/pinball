@@ -49,7 +49,6 @@ export * from './infrastructure/BossTargetActor';
 export * from './infrastructure/BossTargetMesh';
 export * from './infrastructure/BallDiagnostics';
 export * from './infrastructure/GltfNodeNames';
-export * from './infrastructure/FlipperPhysics';
 export * from './infrastructure/PlungerPhysics';
 export * from './infrastructure/GltfDisplay';
 export * from './infrastructure/GltfAnimationClips';
