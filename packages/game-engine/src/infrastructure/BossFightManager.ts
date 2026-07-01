@@ -12,6 +12,13 @@ export type BossRevealContext = BossGateContext & {
   gameState: string;
 };
 
+// Injectable sensor factory (DIP): defaults to a real BossTargetSensor, but
+// tests can substitute a fake to observe/drive per-boss sensor behaviour
+// without touching the wall clock.
+export type BossTargetSensorFactory = (now: () => number) => BossTargetSensor;
+
+const defaultSensorFactory: BossTargetSensorFactory = (now) => new BossTargetSensor(now);
+
 export class BossFightManager {
   private readonly states = new Map<BossId, BossFightState>();
   private readonly byId = new Map<BossId, BossDefinition>();
@@ -25,9 +32,12 @@ export class BossFightManager {
     // Injected clock (DIP): threaded into each BossTargetSensor so the per-hit
     // cooldown is deterministic in tests.
     now: () => number = () => performance.now(),
+    // Injected sensor factory (DIP): substitutable in tests, defaults to a real
+    // BossTargetSensor wired to `now`.
+    createSensor: BossTargetSensorFactory = defaultSensorFactory,
   ) {
     for (const def of bosses) {
-      this.states.set(def.id, { triggered: false, sensor: new BossTargetSensor(now) });
+      this.states.set(def.id, { triggered: false, sensor: createSensor(now) });
       this.byId.set(def.id, def);
       this.byRole.set(def.colliderRole, def);
     }

@@ -26,6 +26,14 @@ export const PLAYFIELD_PORTRAIT_HALF_WIDTH =
 export const PLAYFIELD_PORTRAIT_LOOK_Z_BIAS = 0;
 export const PLAYFIELD_PORTRAIT_LOOK_Y_BIAS = 0;
 
+// Scratch partagés au niveau module : évitent d'allouer dans la boucle chaude de
+// cadrage (recherche dichotomique ~30 itérations × N coins, par resize/refit).
+// Sûrs car tout l'usage est SYNCHRONE, non récursif et sans await : JS mono-thread
+// garantit qu'un scratch est écrit puis pleinement consommé avant le prochain
+// écrivain. `_clipMatrix` est renvoyé par withCameraAt puis lu immédiatement (une
+// seule matrice vivante à la fois) ; `_ndcPoint`/`_camPosScratch` sont des objets
+// distincts, aucun aliasing. Les passer en locaux réintroduirait des allocations
+// par frame — régression, pas nettoyage.
 const _clipMatrix = new THREE.Matrix4();
 const _ndcPoint = new THREE.Vector4();
 const _camPosScratch = new THREE.Vector3();

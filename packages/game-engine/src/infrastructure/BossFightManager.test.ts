@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
 import { BossFightManager } from './BossFightManager';
+import { BossTargetSensor } from './BossTargetSensor';
 import type { BossDefinition } from '../domain/BossRegistry';
 import type { GameEvent } from '../domain/GameEvents';
 
@@ -168,4 +169,33 @@ test('handleTargetCollision: two hits across the cooldown boundary via injected 
 test('handleTargetCollision ignores unknown roles', () => {
   const { mgr } = make();
   expect(mgr.handleTargetCollision('not_a_boss', true, 'playing')).toBe(false);
+});
+
+test('sensor factory is injectable: one sensor built per boss, wired to the clock', () => {
+  const built: BossTargetSensor[] = [];
+  const clock = { t: 1000 };
+  const events: GameEvent[] = [];
+  const mgr = new BossFightManager(
+    (e) => events.push(e),
+    [BOSS_A, BOSS_B],
+    () => clock.t,
+    (now) => {
+      const s = new BossTargetSensor(now);
+      built.push(s);
+      return s;
+    },
+  );
+  // One sensor instantiated per injected boss definition.
+  expect(built).toHaveLength(2);
+  // Behaviour identical to the default factory: the injected clock still drives
+  // the cooldown, so a first hit lands then a second lands at the boundary.
+  mgr.beginFight('boss_a', true);
+  mgr.handleTargetCollision('a_target', true, 'playing');
+  mgr.handleTargetCollision('a_target', false, 'playing');
+  clock.t = 1000 + 450;
+  mgr.handleTargetCollision('a_target', true, 'playing');
+  expect(events).toEqual([
+    { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 1, scoreIncrement: 250 },
+    { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 2, scoreIncrement: 250 },
+  ]);
 });

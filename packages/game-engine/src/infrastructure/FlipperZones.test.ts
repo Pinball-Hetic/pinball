@@ -1,6 +1,6 @@
 import { test, expect, describe, spyOn, beforeEach, afterEach } from 'bun:test';
 import * as THREE from 'three';
-import { computeFlipperZones } from './FlipperZones';
+import { computeFlipperZones, setFlipperZonesLogging } from './FlipperZones';
 
 // Construit un mesh boîte centré sur `center`, de demi-dimensions `half`.
 // La bbox monde résultante est [center - half, center + half] sur chaque axe.
@@ -123,5 +123,19 @@ describe('computeFlipperZones', () => {
 
     expect(infoSpy).toHaveBeenCalledTimes(1);
     expect(infoSpy).toHaveBeenCalledWith('[FlipperZones]', zones);
+  });
+
+  test('setFlipperZonesLogging(false) coupe le console.info sans changer le résultat', () => {
+    const left = boxAt({ x: 0, y: 0, z: 0 });
+    const right = boxAt({ x: 1, y: 0, z: 0 });
+
+    setFlipperZonesLogging(false);
+    try {
+      const zones = computeFlipperZones(left, right, 0);
+      expect(infoSpy).not.toHaveBeenCalled();
+      expect(zones.left.xMin).toBeCloseTo(-0.05, 6);
+    } finally {
+      setFlipperZonesLogging(true);
+    }
   });
 });

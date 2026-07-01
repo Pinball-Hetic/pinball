@@ -15,6 +15,11 @@ export class CinematicDirector {
   private active: CinematicSpec | null = null;
   private startedAt = 0;
   private playedThisGame = new Set<string>();
+  private readonly now: () => number;
+
+  constructor(now: () => number = () => performance.now()) {
+    this.now = now;
+  }
 
   isActive(): boolean {
     return this.active !== null;
@@ -30,7 +35,7 @@ export class CinematicDirector {
     if (opts?.once && this.playedThisGame.has(spec.id)) return false;
     if (opts?.once) this.playedThisGame.add(spec.id);
     this.active = spec;
-    this.startedAt = performance.now();
+    this.startedAt = this.now();
     spec.onStart?.();
     return true;
   }

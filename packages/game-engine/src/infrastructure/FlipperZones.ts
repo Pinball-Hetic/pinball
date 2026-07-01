@@ -11,6 +11,17 @@ export type FlipperZone = {
 export type FlipperZones = { left: FlipperZone; right: FlipperZone };
 
 /**
+ * Interrupteur du log de dérivation des zones. Activé par défaut (comportement
+ * historique : un `console.info` unique au chargement). La borne peut le couper
+ * en prod via `setFlipperZonesLogging(false)` pour éviter le bruit console.
+ */
+let flipperZonesLogging = true;
+
+export function setFlipperZonesLogging(enabled: boolean): void {
+  flipperZonesLogging = enabled;
+}
+
+/**
  * Dérive les zones de garantie de lancement depuis la bbox réelle des meshes
  * flippers (pose de repos, AVANT le démarrage de la simulation). Évite les
  * coordonnées X figées mesurées sur un ancien GLB.
@@ -37,6 +48,6 @@ export function computeFlipperZones(
   };
 
   const zones = { left: zoneOf(left), right: zoneOf(right) };
-  console.info('[FlipperZones]', zones);
+  if (flipperZonesLogging) console.info('[FlipperZones]', zones);
   return zones;
 }

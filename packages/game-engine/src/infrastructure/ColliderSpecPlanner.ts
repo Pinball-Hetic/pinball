@@ -232,6 +232,11 @@ export function planBottomOutSensor(layout: MapLayout): ColliderSpec {
   const rightX = layout.geometry.bounds.rightX;
   const centerX = (leftX + rightX) / 2;
   const halfX = (rightX - leftX) / 2;
+  // Offset +0.03 : centre le sensor JUSTE au-delà de la ligne de drain
+  // (BOTTOM_OUT_Z) plutôt que dessus, pour ne déclencher qu'une fois la balle
+  // franchie. halfZ 0.06 (bande de 0.12 de profond) : sensor épais volontaire —
+  // une balle qui draine vite pourrait tunneler à travers une bande mince entre
+  // deux pas de physique. Ce ne sont donc PAS des valeurs à "corriger".
   const sensorZ = BOTTOM_OUT_Z + 0.03;
   return {
     shape: { kind: 'cuboid', halfExtents: { x: halfX, y: 0.03, z: 0.06 } },

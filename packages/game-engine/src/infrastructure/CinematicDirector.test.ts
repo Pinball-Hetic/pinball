@@ -54,3 +54,45 @@ describe('resetGame', () => {
     expect(onEndCalls).toBe(1);
   });
 });
+
+describe('injected clock', () => {
+  test('startedAt uses the injected now, making elapsed deterministic', () => {
+    const clock = 100;
+    const d = new CinematicDirector(() => clock);
+    let onEndCalls = 0;
+
+    d.play(spec({ durationMs: 1000, onEnd: () => (onEndCalls += 1) }));
+    expect(d.isActive()).toBe(true);
+
+    // one frame short of duration → still active
+    d.update(clock + 999);
+    expect(onEndCalls).toBe(0);
+    expect(d.isActive()).toBe(true);
+
+    // exactly at duration → ends
+    d.update(clock + 1000);
+    expect(onEndCalls).toBe(1);
+    expect(d.isActive()).toBe(false);
+  });
+
+  test('startedAt tracks the injected clock at play time, not construction', () => {
+    let clock = 0;
+    const d = new CinematicDirector(() => clock);
+
+    clock = 5000;
+    d.play(spec({ durationMs: 200 }));
+
+    // elapsed measured from clock at play() (5000), not 0
+    d.update(5199);
+    expect(d.isActive()).toBe(true);
+    d.update(5200);
+    expect(d.isActive()).toBe(false);
+  });
+
+  test('defaults to performance.now when no clock injected', () => {
+    const d = new CinematicDirector();
+    d.play(spec({ durationMs: 0 }));
+    d.update(performance.now() + 1);
+    expect(d.isActive()).toBe(false);
+  });
+});

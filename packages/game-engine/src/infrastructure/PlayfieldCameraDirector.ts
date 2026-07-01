@@ -145,9 +145,11 @@ export class PlayfieldCameraDirector {
   }
 
   private finish(): void {
-    if (this.base) {
-      this.applyView(this.base.target, this.base.distance);
-    }
+    // Pas de applyView ici : `finish()` n'est appelé que par `update()` sur la
+    // tick finale de zoomOut, où `blend = { lookAtT: 1, distanceT: 1, dirT: 0 }`.
+    // Cette tick a déjà exécuté `applyView(base.target, base.distance)` (lerp à
+    // t=1 → base exact, lerpViewDir(0) → dir de base) ; le rejouer était un
+    // no-op prouvable. `restore()` conserve son applyView (chemin indépendant).
     this.resetState();
   }
 
