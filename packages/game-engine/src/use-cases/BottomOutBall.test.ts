@@ -51,6 +51,20 @@ describe('BottomOutBall.execute', () => {
     expect(ball.emit).not.toHaveBeenCalled();
   });
 
+  test('noteRespawn réarme le latch (filet de sécurité reset de partie)', () => {
+    uc.execute();
+    uc.noteRespawn();
+    uc.execute();
+    expect(ball.emit).toHaveBeenCalledTimes(2);
+    expect(ball.physics.resetToSpawn).toHaveBeenCalledTimes(2);
+  });
+
+  test('noteRespawn seul n\'émet rien (ne fait que réarmer)', () => {
+    uc.noteRespawn();
+    expect(ball.emit).not.toHaveBeenCalled();
+    expect(ball.physics.resetToSpawn).not.toHaveBeenCalled();
+  });
+
   test('émet l\'event AVANT de reset le ball', () => {
     const order: string[] = [];
     const physics: IBallPhysics = {

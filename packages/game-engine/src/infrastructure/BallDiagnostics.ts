@@ -313,21 +313,24 @@ export class BallDiagnostics {
     const crossedInward = prev > this.wallFaceOuter && p.x < this.wallFaceInner;
     if (!crossedOutward && !crossedInward) return;
 
-    // Franchissement détecté : warn TOUJOURS + compteur snapshot (sentinelle).
+    // Franchissement détecté : compteur snapshot TOUJOURS incrémenté (sentinelle
+    // HUD), warn console uniquement en `verbose` (silence total en prod).
     const side = p.z < this.lane.leftWallTopZ ? 'above_top' : 'below_top';
     this.snapshot = {
       ...this.snapshot,
       wallCrossCount: this.snapshot.wallCrossCount + 1,
     };
-    // eslint-disable-next-line no-console
-    console.warn('[WALL CROSS]', {
-      x: p.x,
-      z: p.z,
-      vx: v.x,
-      vz: v.z,
-      side,
-      dir: crossedOutward ? 'inner_to_outer' : 'outer_to_inner',
-    });
+    if (this.verbose) {
+      // eslint-disable-next-line no-console
+      console.warn('[WALL CROSS]', {
+        x: p.x,
+        z: p.z,
+        vx: v.x,
+        vz: v.z,
+        side,
+        dir: crossedOutward ? 'inner_to_outer' : 'outer_to_inner',
+      });
+    }
   }
 
   /** Mémorise le dernier évènement de jeu (BUMPER_HIT, DRAIN, ...) pour le HUD. */

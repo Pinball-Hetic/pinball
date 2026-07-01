@@ -6,6 +6,7 @@ import type { BumperHit } from '../use-cases/BumperHit';
 import type { BumpHit } from '../use-cases/BumpHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
+import { AlternateWorldState } from './AlternateWorldState';
 import { BossFightManager } from './BossFightManager';
 import type { CollisionHandler } from './CollisionHandler';
 import { BumperCollisionHandler } from './BumperCollisionHandler';
@@ -20,10 +21,7 @@ import { BossCollisionHandler } from './BossCollisionHandler';
 
 export class CollisionEventProcessor {
   private readonly bossFights: BossFightManager;
-  private alternateWorldActive = false;
-  private normalWorldScoreBaseline = 0;
-  private alternateWorldScoreBaseline = 0;
-  private lastTotalScore = 0;
+  private readonly worldState = new AlternateWorldState();
   private pendingPhysics: Array<() => void> = [];
   private readonly handlers: CollisionHandler[] = [];
   private readonly portalHandler: PortalCollisionHandler;
@@ -31,24 +29,19 @@ export class CollisionEventProcessor {
   private readonly bossHandler: BossCollisionHandler;
 
   private gateContext() {
-    return {
-      totalScore: this.lastTotalScore,
-      alternateWorldActive: this.alternateWorldActive,
-      normalWorldScoreBaseline: this.normalWorldScoreBaseline,
-      alternateWorldScoreBaseline: this.alternateWorldScoreBaseline,
-    };
+    return this.worldState.gateContext();
   }
 
   getNormalWorldScoreBaseline(): number {
-    return this.normalWorldScoreBaseline;
+    return this.worldState.getNormalWorldScoreBaseline();
   }
 
   getAlternateWorldScoreBaseline(): number {
-    return this.alternateWorldScoreBaseline;
+    return this.worldState.getAlternateWorldScoreBaseline();
   }
 
   isAlternateWorldActive(): boolean {
-    return this.alternateWorldActive;
+    return this.worldState.isActive();
   }
 
   isBossTriggered(id: BossId): boolean {
@@ -89,39 +82,29 @@ export class CollisionEventProcessor {
   }
 
   onAlternateWorldEntered(score: number): void {
-    this.alternateWorldActive = true;
-    this.alternateWorldScoreBaseline = score;
+    this.worldState.enter(score);
   }
 
   resetAlternateWorldSession(): void {
-    this.alternateWorldActive = false;
-    this.alternateWorldScoreBaseline = 0;
-    for (const b of this.layout.bosses) {
-      if (b.reveal.requiresAlternateWorld) this.resetBossFight(b.id);
-    }
+    this.worldState.resetSession();
+    this.bossFights.resetAlternateWorldBosses();
   }
 
   resetScoreBaselines(): void {
-    this.normalWorldScoreBaseline = 0;
-    this.alternateWorldScoreBaseline = 0;
+    this.worldState.resetScoreBaselines();
   }
 
   completeWorldCycle(score: number): void {
-    this.alternateWorldActive = false;
-    this.alternateWorldScoreBaseline = 0;
-    this.normalWorldScoreBaseline = score;
+    this.worldState.completeCycle(score);
     this.portalHandler.resetPortalTrigger();
     this.resetAllBossFights();
   }
 
   tryAllBossReveals(totalScore: number, gameState: string): void {
-    this.lastTotalScore = totalScore;
+    this.worldState.setLastTotalScore(totalScore);
     this.bossFights.tryAllReveals({
-      totalScore,
+      ...this.worldState.gateContext(),
       gameState,
-      alternateWorldActive: this.alternateWorldActive,
-      normalWorldScoreBaseline: this.normalWorldScoreBaseline,
-      alternateWorldScoreBaseline: this.alternateWorldScoreBaseline,
     });
   }
 
@@ -158,12 +141,12 @@ export class CollisionEventProcessor {
 
     // Kept as properties because they are exposed publicly (reset, state).
     this.dropTargetHandler = new DropTargetCollisionHandler(emit, layout);
-    this.portalHandler = new PortalCollisionHandler(emit, () => this.alternateWorldActive);
+    this.portalHandler = new PortalCollisionHandler(emit, () => this.worldState.isActive());
     this.bossHandler = new BossCollisionHandler(
       layout.bosses,
       this.bossFights,
       emit,
-      () => this.alternateWorldActive,
+      () => this.worldState.isActive(),
       () => this.gateContext(),
       this.now,
     );

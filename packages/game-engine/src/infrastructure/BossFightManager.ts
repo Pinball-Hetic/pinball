@@ -56,6 +56,14 @@ export class BossFightManager {
     }
   }
 
+  /** Reset only the bosses that gate on the alternate world — used when the
+   *  alternate-world session ends without completing a full world cycle. */
+  resetAlternateWorldBosses(): void {
+    for (const def of this.bosses) {
+      if (def.reveal.requiresAlternateWorld) this.resetBoss(def.id);
+    }
+  }
+
   setFightActive(id: BossId, active: boolean): void {
     this.states.get(id)?.sensor.setFightActive(active);
   }

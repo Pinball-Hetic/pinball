@@ -166,6 +166,18 @@ test('handleTargetCollision: two hits across the cooldown boundary via injected 
   ]);
 });
 
+test('resetAlternateWorldBosses resets only alternate-world bosses', () => {
+  const { mgr } = make();
+  mgr.beginFight('boss_a', false); // normal-world boss triggered
+  mgr.beginFight('boss_b', false); // alternate-world boss triggered
+  expect(mgr.isTriggered('boss_a')).toBe(true);
+  expect(mgr.isTriggered('boss_b')).toBe(true);
+
+  mgr.resetAlternateWorldBosses();
+  expect(mgr.isTriggered('boss_a')).toBe(true); // normal-world boss untouched
+  expect(mgr.isTriggered('boss_b')).toBe(false); // alternate-world boss reset
+});
+
 test('handleTargetCollision ignores unknown roles', () => {
   const { mgr } = make();
   expect(mgr.handleTargetCollision('not_a_boss', true, 'playing')).toBe(false);

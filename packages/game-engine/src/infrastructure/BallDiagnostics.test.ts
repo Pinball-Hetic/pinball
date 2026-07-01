@@ -217,9 +217,23 @@ describe('BallDiagnostics — traceur de traversée du mur gauche', () => {
   // wallFaceOuter = xMin + thickness/2 = 0.206 + 0.01 = 0.216
   // bande X = [0.17, 0.23]
 
-  test('franchissement interne→externe détecté et compté', () => {
+  test('franchissement interne→externe détecté et compté (compteur inconditionnel)', () => {
     diag.update(body({ x: 0.18, y: 1, z: 0 }), 'playing'); // dans bande, < inner
     diag.update(body({ x: 0.22, y: 1, z: 0 }), 'playing'); // > outer → cross
+    expect(diag.getSnapshot().wallCrossCount).toBe(1);
+  });
+
+  test('verbose=false → compteur incrémenté MAIS aucun console.warn [WALL CROSS]', () => {
+    diag.update(body({ x: 0.18, y: 1, z: 0 }), 'playing');
+    diag.update(body({ x: 0.22, y: 1, z: 0 }), 'playing');
+    expect(diag.getSnapshot().wallCrossCount).toBe(1);
+    expect(warnSpy).not.toHaveBeenCalledWith('[WALL CROSS]', expect.anything());
+  });
+
+  test('verbose=true → console.warn [WALL CROSS] émis en plus du compteur', () => {
+    diag.verbose = true;
+    diag.update(body({ x: 0.18, y: 1, z: 0 }), 'playing');
+    diag.update(body({ x: 0.22, y: 1, z: 0 }), 'playing');
     expect(diag.getSnapshot().wallCrossCount).toBe(1);
     expect(warnSpy).toHaveBeenCalledWith('[WALL CROSS]', expect.anything());
   });

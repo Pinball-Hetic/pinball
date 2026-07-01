@@ -43,13 +43,37 @@ test('ne touche jamais au plongeur (applyPlungerImpulse non appelé)', () => {
   expect(ball.applyPlungerImpulse).not.toHaveBeenCalled();
 });
 
-test('chaque execute() ré-émet et reset (idempotence des appels)', () => {
+test('latch anti-rebond : execute() consécutifs ne déclenchent qu\'un DRAIN', () => {
   const events: GameEvent[] = [];
   const ball = makeBallPhysics();
   const drain = new DrainBall(ball, (e) => events.push(e));
   drain.execute();
   drain.execute();
+  drain.execute();
+
+  expect(events).toHaveLength(1);
+  expect(events).toEqual([{ type: 'DRAIN' }]);
+  expect(ball.resetToSpawn).toHaveBeenCalledTimes(1);
+});
+
+test('resetLatch réarme le use-case (bille relancée)', () => {
+  const events: GameEvent[] = [];
+  const ball = makeBallPhysics();
+  const drain = new DrainBall(ball, (e) => events.push(e));
+  drain.execute();
+  drain.resetLatch();
+  drain.execute();
 
   expect(events).toHaveLength(2);
   expect(ball.resetToSpawn).toHaveBeenCalledTimes(2);
+});
+
+test('resetLatch avant tout execute n\'émet rien', () => {
+  const events: GameEvent[] = [];
+  const ball = makeBallPhysics();
+  const drain = new DrainBall(ball, (e) => events.push(e));
+  drain.resetLatch();
+
+  expect(events).toHaveLength(0);
+  expect(ball.resetToSpawn).not.toHaveBeenCalled();
 });
