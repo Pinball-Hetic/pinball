@@ -59,8 +59,10 @@ export function createModule(): MapModule {
   // Chacun garde le contrat de l'ancien if-block : test de type + effet.
   function onMilestone(ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'MILESTONE') return
-    // Palier de score : cinématique + frisson garlands + shake.
-    playMilestoneCinematic(ctx, e.threshold, () => garlands?.celebrate())
+    // Palier de score : cinématique rocket + décollage garlands (balayage
+    // montant orange, cohérent avec la fusée DMD/backglass) + shake. Remplace
+    // l'ancien chenillard jaune « celebrate » (unité rocket cross-écrans).
+    playMilestoneCinematic(ctx, e.threshold, () => garlands?.rocketBurst())
   }
 
   function onPortalTransitionEnd(ctx: MapContext, e: GameEvent): void {

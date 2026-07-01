@@ -89,8 +89,10 @@ export const layout: MapLayout = {
     ball: { x: 0.2355, y: 1.01, z: 0.161 },
     alternateWorld: { x: -0.0225, z: -0.48 },
     alternateWorldImpulse: { x: 0, y: 0, z: 0.055 },
-    normalReturn: { x: -0.0225, z: -0.12 },
-    normalReturnImpulse: { x: 0, y: 0, z: 0.05 },
+    // Retour monde normal → couloir plongeur (= spawns.ball), catchable/jouable.
+    // Anciennement { x: -0.0225, z: -0.12 } = centre du terrain → bille injouable.
+    normalReturn: { x: 0.2355, z: 0.161 },
+    normalReturnImpulse: { x: 0, y: 0, z: 0 },
   },
   // Couloir plongeur : géométrie analytique (pas de mesh). Littéraux map.
   shooterLane: {

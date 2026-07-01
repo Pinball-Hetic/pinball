@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'bun:test'
 import { GRID_W, GRID_H, DOT } from '@pinball/dmd-core'
 import type { ClipContext } from '@pinball/dmd-core'
-import { cinematicHandlers } from './handlers'
+import { cinematicHandlers, rocketLaunchY } from './handlers'
 
 // Crée un buffer grid vierge (index palette par dot, 0 = éteint).
 const newGrid = () => new Uint8Array(GRID_W * GRID_H)
@@ -15,7 +15,7 @@ const ctx = (over: Partial<ClipContext> = {}): ClipContext => ({
 })
 
 describe('cinematicHandlers registry', () => {
-  test('expose les 6 clips ST attendus', () => {
+  test('expose les clips ST attendus (dont les 4 paliers rocket)', () => {
     expect(Object.keys(cinematicHandlers).sort()).toEqual(
       [
         'demogorgon_rises',
@@ -24,6 +24,10 @@ describe('cinematicHandlers registry', () => {
         'hetic_letter',
         'last_chance',
         'portal_swallow',
+        'milestone_5k',
+        'milestone_15k',
+        'milestone_30k',
+        'milestone_big',
       ].sort(),
     )
   })
@@ -39,6 +43,44 @@ describe('cinematicHandlers registry', () => {
         expect(v).toBeGreaterThanOrEqual(0)
       }
     }
+  })
+})
+
+describe('rocketLaunchY (pure)', () => {
+  test('démarre en bas de la grille à ms=0', () => {
+    expect(rocketLaunchY(0, 1600)).toBe(GRID_H - 1)
+  })
+
+  test('atteint topY à la fin de l’ascension et y reste (clamp)', () => {
+    expect(rocketLaunchY(1600, 1600, 3)).toBe(3)
+    expect(rocketLaunchY(5000, 1600, 3)).toBe(3)
+  })
+
+  test('monte de façon monotone pendant l’ascension', () => {
+    expect(rocketLaunchY(400, 1600)).toBeGreaterThan(rocketLaunchY(1200, 1600))
+  })
+})
+
+describe('milestone rocket (paliers)', () => {
+  test('phase ascension (<1600ms) allume la fusée', () => {
+    const grid = newGrid()
+    cinematicHandlers.milestone_5k(grid, 500, ctx({ value: 5000 }))
+    expect(litCount(grid)).toBeGreaterThan(0)
+  })
+
+  test('phase apogée (>=1600ms) affiche la valeur du palier', () => {
+    const grid = newGrid()
+    cinematicHandlers.milestone_30k(grid, 2200, ctx({ value: 30000 }))
+    expect(usedColors(grid).has(DOT.score)).toBe(true)
+    expect(litCount(grid)).toBeGreaterThan(0)
+  })
+
+  test('déterministe : même ms → même grille (seeded RNG)', () => {
+    const a = newGrid()
+    const b = newGrid()
+    cinematicHandlers.milestone_big(a, 2200, ctx({ value: 50000 }))
+    cinematicHandlers.milestone_big(b, 2200, ctx({ value: 50000 }))
+    expect([...a].join(',')).toBe([...b].join(','))
   })
 })
 

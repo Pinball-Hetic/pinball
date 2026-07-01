@@ -19,13 +19,13 @@ function mockCtx() {
 }
 
 describe('playMilestoneCinematic (ST MILESTONE handler)', () => {
-  test('plays the per-threshold clip, celebrates, then shakes', () => {
+  test('plays the per-threshold clip, runs the playfield cue, then shakes', () => {
     const order: string[] = []
     const sim = mockCtx()
-    playMilestoneCinematic(sim.ctx, 15_000, () => order.push('celebrate'))
+    playMilestoneCinematic(sim.ctx, 15_000, () => order.push('cue'))
 
     expect(sim.cinematics).toEqual([{ clipId: 'milestone_15k', value: 15_000 }])
-    expect(order).toEqual(['celebrate'])
+    expect(order).toEqual(['cue'])
     expect(sim.shakes).toEqual([0.4])
   })
 
@@ -44,7 +44,7 @@ describe('playMilestoneCinematic (ST MILESTONE handler)', () => {
     }
   })
 
-  test('celebrate is optional (garlands absent before setup)', () => {
+  test('playfield cue is optional (garlands absent before setup)', () => {
     const sim = mockCtx()
     expect(() => playMilestoneCinematic(sim.ctx, 5_000)).not.toThrow()
     expect(sim.cinematics).toEqual([{ clipId: 'milestone_5k', value: 5_000 }])

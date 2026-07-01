@@ -14,6 +14,20 @@ export interface MapTakeoverContext {
   Vhs: VhsComponent
 }
 
+// Takeover rocket partagé par tous les paliers de score (5k/15k/30k/big).
+// Fusée qui traverse l'écran de bas en haut + libellé du palier. Unité rocket
+// cross-écrans (playfield garlands + DMD).
+function rocketTakeover(Vhs: VhsComponent, label: string): ReactNode {
+  return (
+    <Vhs className={cx('tk-cine-rocket')}>
+      <div className={cx('cine-rocket')} />
+      <div className="tk-center">
+        <div className="tk-kicker tabular-nums">{label}</div>
+      </div>
+    </Vhs>
+  )
+}
+
 // Visuel de takeover propre à la map pour un clip (ou une clé d'event-scene).
 // Retourne null si le clip n'a pas de takeover ST → le core gère
 // hall_of_fame + le fallback générique. Styles ST dans ./art.module.css
@@ -62,39 +76,19 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
         </Vhs>
       )
 
+    // Tous les paliers de score partagent le takeover rocket (unité rocket
+    // cross-écrans avec le playfield + le DMD). Le libellé varie par palier ;
+    // milestone_big affiche le score final.
+    case 'milestone_5k':
+      return rocketTakeover(Vhs, '5 000')
+    case 'milestone_15k':
+      return rocketTakeover(Vhs, '15 000')
     case 'milestone_30k':
-      return (
-        <Vhs className={cx('tk-cine-rocket')}>
-          <div className={cx('cine-rocket')} />
-          <div className="tk-center">
-            <div className="tk-kicker tabular-nums">30 000</div>
-          </div>
-        </Vhs>
-      )
-
+      return rocketTakeover(Vhs, '30 000')
     case 'milestone_big':
-      return (
-        <Vhs className={cx('tk-cine-fireworks')}>
-          <div className="tk-confetti">
-            {Array.from({ length: 50 }).map((_, i) => (
-              <span
-                key={i}
-                className="confetti-dot"
-                style={{
-                  left: `${(i * 31) % 100}%`,
-                  background: i % 2 ? '#ffd95e' : '#ff7700',
-                  animationDelay: `${(i % 12) * 0.1}s`,
-                  animationDuration: `${1.4 + (i % 5) * 0.3}s`,
-                }}
-              />
-            ))}
-          </div>
-          <div className="tk-center">
-            <div className="tk-score tabular-nums">
-              {(payload?.finalScore ?? 50000).toLocaleString('fr-FR')}
-            </div>
-          </div>
-        </Vhs>
+      return rocketTakeover(
+        Vhs,
+        (payload?.finalScore ?? 50000).toLocaleString('fr-FR'),
       )
 
     case 'hetic_complete':
@@ -135,8 +129,11 @@ export interface ClipBehavior {
 }
 
 export const clipBehavior: Record<string, ClipBehavior> = {
-  milestone_5k: { goldWave: true, noTakeover: true },
-  milestone_15k: { goldWave: true, joyce: 'BIEN', noTakeover: true },
+  // Paliers : tous poussent le takeover rocket (unité rocket cross-écrans).
+  // goldWave/joyce conservés pour 5k/15k ; takeoverMs = fenêtre visible par
+  // palier (aligné sur clips.showMs du manifest).
+  milestone_5k: { goldWave: true, takeoverMs: 4_000 },
+  milestone_15k: { goldWave: true, joyce: 'BIEN', takeoverMs: 8_000 },
   hetic_letter: { joyce: (v) => 'HETIC'[(v ?? 1) - 1] ?? 'H', noTakeover: true },
   milestone_30k: { takeoverMs: 4_000 },
   milestone_big: { takeoverMs: 6_000 },

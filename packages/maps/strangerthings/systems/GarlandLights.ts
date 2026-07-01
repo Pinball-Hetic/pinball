@@ -9,6 +9,25 @@ const TWINKLE_AMP = 0.28;
 const HIT_SURGE_DURATION = 0.3;
 const HIT_SURGE_BOOST = 0.55;
 
+// Largeur (en nombre de bulbes) de la bande lumineuse du décollage rocket.
+const ROCKET_BAND = 3;
+
+// Position du front lumineux du décollage rocket, indexé sur les bulbes.
+// rocketT décroît de 1 → 0 ; le front monte de -ROCKET_BAND (avant le premier
+// bulbe) jusqu'à count (au-delà du dernier) → balayage complet montant. Pur.
+export function rocketFront(rocketT: number, count: number): number {
+  const progress = 1 - Math.max(0, Math.min(1, rocketT));
+  return -ROCKET_BAND + progress * (count + ROCKET_BAND);
+}
+
+// Intensité [0,1] d'un bulbe donné pour un front rocket : 1 au front, décroît
+// linéairement sur ROCKET_BAND en dessous, 0 ailleurs. Pur.
+export function rocketGlow(index: number, front: number): number {
+  const d = front - index;
+  if (d < 0 || d > ROCKET_BAND) return 0;
+  return 1 - d / ROCKET_BAND;
+}
+
 /**
  * Chaque guirlande dans le GLB newStrangerthings.glb possède :
  *  - baseColorTexture  : câble sombre + bulbes colorés
@@ -39,6 +58,7 @@ export class GarlandLights {
   private strobeNormalWhenOn = false;
   private feverActive = false;
   private celebrateT = 0;
+  private rocketT = 0;
 
   // Chenillard continu pendant le fever (vague permanente).
   setFever(on: boolean): void {
@@ -48,6 +68,13 @@ export class GarlandLights {
   // 1s de chenillard ponctuel (palier franchi).
   celebrate(): void {
     this.celebrateT = 1;
+  }
+
+  // Décollage rocket (palier de score) : balayage montant orange/or, cohérent
+  // avec la fusée du backglass/DMD. Remplace le chenillard jaune « celebrate »
+  // sur les paliers pour l'unité rocket cross-écrans.
+  rocketBurst(): void {
+    this.rocketT = 1;
   }
 
   setAtmosphere(dim: number, strobe: number, strobeHz = 4): void {
@@ -148,6 +175,23 @@ export class GarlandLights {
         if (this.feverActive) {
           bulb.material.emissive.setHex(i % 2 === 0 ? 0xff8800 : 0x00c8ff);
         }
+      }
+    }
+
+    // Décollage rocket (palier) : bande lumineuse orange/or qui remonte les
+    // guirlandes une fois, puis retombe. Cohérent avec la fusée backglass/DMD.
+    if (this.rocketT > 0) {
+      this.rocketT = Math.max(0, this.rocketT - dt);
+      const front = rocketFront(this.rocketT, this.bulbs.length);
+      for (let i = 0; i < this.bulbs.length; i++) {
+        const bulb = this.bulbs[i];
+        const glow = rocketGlow(i, front);
+        if (glow <= 0) continue;
+        bulb.material.emissiveIntensity = Math.max(
+          bulb.material.emissiveIntensity,
+          bulb.origIntensity * (0.6 + glow * 2.4),
+        );
+        bulb.material.emissive.setHex(glow > 0.6 ? 0xffe08a : 0xff7700);
       }
     }
   }

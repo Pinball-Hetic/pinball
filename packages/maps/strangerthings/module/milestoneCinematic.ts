@@ -8,15 +8,16 @@ export interface MilestoneContext {
 }
 
 // Effet du palier de score (MILESTONE) : joue la cinématique du clip choisi
-// (parité Zelda via selectMilestoneClip), déclenche le frisson des garlands ST
+// (parité Zelda via selectMilestoneClip), déclenche le cue playfield ST
 // (optionnel, absent hors setup) puis un screen shake. Sélection de clip
-// partagée avec Zelda ; garlands.celebrate() reste spécifique à ST.
+// partagée avec Zelda ; le cue playfield (décollage rocket des garlands) reste
+// spécifique à ST et est injecté par le caller.
 export function playMilestoneCinematic(
   ctx: MilestoneContext,
   threshold: number,
-  celebrate?: () => void,
+  playfieldCue?: () => void,
 ): void {
   ctx.playCinematic(selectMilestoneClip(threshold), { value: threshold })
-  celebrate?.()
+  playfieldCue?.()
   ctx.screenShake(0.4)
 }
