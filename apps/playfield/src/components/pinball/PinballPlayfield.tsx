@@ -13,9 +13,7 @@ import {
   DetectBottomOut,
   getBallRadius,
   INITIAL_LIVES,
-  PLUNGER_CHARGE_MS,
   plungerChargeProgress,
-  plungerLaunchFactor,
   SWING_RAD,
   SWING_SMOOTH,
   computeSurfaceSnap,
@@ -111,6 +109,7 @@ import { buildPlungerBody } from "./physics/buildPlungerBody";
 import { createKeyboardRouter } from "./createKeyboardRouter";
 import { DebugMeshManager } from "./debug/DebugMeshManager";
 import { createMapContext } from "./createMapContext";
+import { computePlungerVisual } from "./hotLoop/computePlungerVisual";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -1393,24 +1392,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       }
 
       if (plungerMesh && plungerRestZ > 0) {
-        let plungerZ = plungerRestZ;
-        if (inputState.isChargingPlunger) {
-          const t = plungerChargeProgress(time, inputState.chargeStartTime);
-          const pullback = plungerLaunchFactor(t) * 0.08;
-          plungerZ = plungerRestZ + pullback;
-        } else if (inputState.plungerState === "releasing") {
-          plungerZ = plungerRestZ - 0.015;
-          if (time - inputState.chargeStartTime > PLUNGER_CHARGE_MS * 0.1) inputState.plungerState = "returning";
-        } else if (inputState.plungerState === "returning") {
-          plungerZ = plungerRestZ;
-          inputState.plungerState = "idle";
-        }
-        plungerMesh.position.z = plungerZ;
+        // FSM visuelle extraite (hotLoop/computePlungerVisual, pure + testée).
+        const pv = computePlungerVisual(inputState, time, plungerRestZ);
+        inputState.plungerState = pv.plungerState;
+        plungerMesh.position.z = pv.z;
         if (plungerBody) {
           plungerBody.setNextKinematicTranslation({
             x: mapLayout.spawns.ball.x,
             y: mapLayout.spawns.ball.y,
-            z: plungerZ,
+            z: pv.z,
           });
         }
       }
