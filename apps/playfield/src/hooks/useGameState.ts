@@ -509,6 +509,10 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       }
       if (event.type === "RETURN_PORTAL_TRANSITION_END") {
         setAlternateWorldActive(false);
+        // Ref (source de vérité lue par bossThresholdMet) doit suivre l'état :
+        // symétrique de PORTAL_TRANSITION_END. Sans ça, les gates de boss
+        // requiresAlternateWorld restent faussés après retour au monde normal.
+        alternateWorldActiveRef.current = false;
         setAlternateWorldHint(false);
         if (alternateWorldHintTimerRef.current !== null) {
           window.clearTimeout(alternateWorldHintTimerRef.current);
