@@ -108,7 +108,6 @@ import {
   shouldAutoBeginSession,
   type PlayfieldBootPhase,
 } from "./bootPhase";
-import { createOutroInactivityTimer } from "./outroInactivityTimer";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -131,6 +130,10 @@ const KEYBOARD_MODE: KeyboardMode =
 
 const PLAYFIELD_VIEW_MODE = parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE);
 const IS_PORTRAIT_FILL = PLAYFIELD_VIEW_MODE === 'portrait-fill';
+
+// Délai d'inactivité sur l'écran outro/QR avant de recommencer le workflow
+// depuis le début (reload → sélecteur de map). Libère la borne au joueur suivant.
+const OUTRO_IDLE_TIMEOUT_MS = 20_000;
 
 type PinballPlayfieldProps = {
   /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
@@ -327,7 +330,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     isFeverActive,
     startFever,
     clearAlternateWorldSession,
-    resetGame,
     buildEmit,
     addLife,
   } = useGameState({
@@ -399,9 +401,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // Clip poussé à CHAQUE game over ; DMD/backglass décident de
       // l'ampleur (le backglass connaît le rang → fanfare ou recap).
       dmd.pushCinematic('hall_of_fame');
-      // Auto-exit de l'écran outro/QR après 20s sans interaction (libère la
-      // borne). Toute interaction annule le timer (cf. applyAction).
-      armOutroInactivityRef.current?.();
+      // L'auto-exit de l'outro/QR (20s → reload → sélecteur) est géré par un
+      // effet React sur gameState (cf. plus bas), pas ici.
     },
     onGameStart: () => {
       setGameOverClaimUrl(null); // évite un QR périmé qui flashe sur la partie suivante
@@ -489,10 +490,21 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     resetBallRef.current?.();
   }, []);
 
-  // Outro/QR auto-exit : armé à l'entrée en game_over (onGameOver), annulé à
-  // toute interaction. Peuplé par le closure de la boucle animate (accès à
-  // resetGameSequence). Cf. outroInactivityTimer.ts.
-  const armOutroInactivityRef = useRef<(() => void) | null>(null);
+  // Outro/QR auto-exit : après 20s en game_over, on recommence le workflow
+  // depuis le début (reload → sélecteur de map, ou attract de la map forcée en
+  // mono-map). Effet React sur `gameState` → robuste : contrairement à
+  // l'ancien timer dans la closure animate, il n'est PAS annulé par les echos
+  // de boutons réseau (simulate-esp32) qui arrivaient après le game_over. Le
+  // cleanup ne s'exécute qu'à la sortie réelle de game_over (donc jamais tant
+  // qu'on est sur l'outro).
+  useEffect(() => {
+    if (gameState !== "game_over") return;
+    const handle = window.setTimeout(
+      () => window.location.reload(),
+      OUTRO_IDLE_TIMEOUT_MS,
+    );
+    return () => window.clearTimeout(handle);
+  }, [gameState]);
 
   const { callbacksRef: physicalInputsRef, simulateButton, isConnectedRef } = usePhysicalInputs();
 
@@ -623,8 +635,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     // physicsWorld) → cleanup sûr même si init() est annulé avant le câblage.
     let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
     let keyupHandler: ((e: KeyboardEvent) => void) | null = null;
-    // Annulation du timer outro/QR au cleanup (l'instance vit dans init()).
-    let cancelOutroInactivity: (() => void) | null = null;
     let prevFrameTime = 0;
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
@@ -1113,45 +1123,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // Cœur métier : ferme sur les `let` leftTarget/rightTarget (~L600), donc
         // doit vivre dans cette closure (non hoistable). Reçoit l'ACTION jeu
         // (résolue depuis le bouton physique via BUTTON_ACTION), pas l'id brut.
-        // Séquence de redémarrage après game over — identique pour PLUNGE et
-        // START (DRY). Réinitialise l'état jeu, la caméra boss, les combats et
-        // baselines de score, le monde de la map, puis rend la bille visible.
-        const resetGameSequence = () => {
-          outroInactivity.cancel();
-          resetGame();
-          restoreBossCamera();
-          collisionProcessor?.resetAllBossFights();
-          collisionProcessor?.resetScoreBaselines();
-          mapModule?.resetWorld?.();
-          if (ballMesh) ballMesh.visible = true;
-        };
-
-        // Timer d'inactivité de l'outro/QR : après 20s sans interaction, on
-        // recommence le workflow DEPUIS LE DÉBUT (retour à la sélection de map)
-        // pour libérer la borne au joueur suivant. Un reload complet rejoue le
-        // boot pinball.tsx → MapSelectorScreen (multi-map) ou l'attract de la
-        // map forcée (mono-map Fliphetic via NEXT_PUBLIC_MAP_ID), avec un état
-        // moteur/sockets/refs vierge. Le replay instantané reste dispo via
-        // START/PLUNGE (label « START — Rejouer »). Timing injecté (window.*).
-        const outroInactivity = createOutroInactivityTimer(
-          () => window.location.reload(),
-          {
-            // Wrap (pas de ref nue) : window.setTimeout appelée hors de window
-            // jette "Illegal invocation".
-            setTimeout: (fn, ms) => window.setTimeout(fn, ms),
-            clearTimeout: (h) => window.clearTimeout(h),
-          },
-        );
-        armOutroInactivityRef.current = () => outroInactivity.arm();
-        cancelOutroInactivity = () => outroInactivity.cancel();
+        // Sortie de l'écran outro/QR (game over) → recommencer le workflow
+        // DEPUIS LE DÉBUT : reload complet → boot pinball.tsx → MapSelectorScreen
+        // (multi-map) ou attract de la map forcée (mono-map Fliphetic via
+        // NEXT_PUBLIC_MAP_ID), avec un état moteur/sockets/refs vierge. Même
+        // chemin pour le replay manuel (START/PLUNGE) et l'auto-exit 20s (effet
+        // React) — on ne rejoue jamais la même map en place.
+        const restartWorkflow = () => window.location.reload();
 
         const applyAction = (action: GameAction, btnAction: ButtonAction) => {
-          // Toute interaction sur l'écran outro/QR annule l'auto-exit (le
-          // replay via PLUNGE/START le fait déjà via resetGameSequence ; ceci
-          // couvre aussi les flips et les UP qui ne redémarrent pas la partie).
-          if (btnAction === "DOWN" && gameStateRef.current === "game_over") {
-            outroInactivity.cancel();
-          }
           if (!sessionStartedRef.current) {
             if (
               btnAction === "DOWN"
@@ -1180,7 +1160,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
                   `[Plunger] DOWN — gameState=${gameStateRef.current} physicsReady=${physicsReady} charging=${isChargingPlunger}`,
                 );
                 if (gameStateRef.current === "game_over") {
-                  resetGameSequence();
+                  restartWorkflow();
                   return;
                 }
                 if (gameStateRef.current === "idle" && physicsReadyRef.current) {
@@ -1211,7 +1191,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             }
             case "START":
               if (btnAction === "DOWN" && gameStateRef.current === "game_over") {
-                resetGameSequence();
+                restartWorkflow();
               }
               break;
           }
@@ -1700,8 +1680,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       cameraRig.dispose();
       if (keydownHandler) document.removeEventListener("keydown", keydownHandler);
       if (keyupHandler) document.removeEventListener("keyup", keyupHandler);
-      cancelOutroInactivity?.();
-      armOutroInactivityRef.current = null;
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
       // bumperVisuals + garlands + bossReveals + nestMarker : dispose géré par
       // mapModule.dispose.
