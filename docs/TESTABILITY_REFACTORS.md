@@ -1,6 +1,8 @@
 # Backlog refacto — testabilité & clean architecture
 
-> # 🎮 AXES D'AMÉLIORATION E2E (user, 2026-07-01) — à traiter
+> # 🎮 AXES D'AMÉLIORATION E2E (user, 2026-07-01) — ✅ TOUS FAITS (à smoke-tester)
+> A1 auto-spawn+prompt · A2 DMD vies ×N · A3 respawn Vecna · A4 feedback freeze lettre ·
+> A5 fusée palier (playfield+DMD+backglass) · A6 QR timeout 20s. Tout committé, repo vert.
 > Décisions user prises :
 > - **A1** (UX) Overlay : retirer le prompt "ESPACE ou START pour jouer" + **auto-spawn la bille**
 >   dans le couloir (map déjà choisie en amont). `GameOverlay.tsx:329`.
