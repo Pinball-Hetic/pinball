@@ -1,6 +1,7 @@
 import { RefObject, useEffect, useRef } from 'react'
 import type { PinballSocket } from '@pinball/shared-types/src/socket-client'
 import type { DmdDisplay, GameStart } from '@pinball/shared-types'
+import { hitIntensity, heatAfterHit, nextHeat, roundedHeat } from './heatModel'
 
 export type Reaction =
   | { kind: 'gameStart'; player: string }
@@ -18,11 +19,6 @@ export interface Reactor {
   // Verrouille le heat à 1 (état FEVER : embrasement permanent).
   setHeatLock: (locked: boolean) => void
 }
-
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
-
-const HEAT_DECAY = 0.5 // par seconde
-const HIT_GAIN = 0.3
 
 export function useIngameReactor(
   targetRef: RefObject<HTMLElement | null>,
@@ -68,8 +64,8 @@ export function useIngameReactor(
           const prev = lastScoreRef.current
           lastScoreRef.current = d.score
           if (prev !== null && d.score > prev && !suspendedRef.current) {
-            const intensity = clamp((d.score - prev) / 500, 0.1, 1)
-            heatRef.current = Math.min(1, heatRef.current + intensity * HIT_GAIN)
+            const intensity = hitIntensity(d.score - prev)
+            heatRef.current = heatAfterHit(heatRef.current, intensity)
             emit({ kind: 'hit', intensity })
           }
           break
@@ -101,14 +97,10 @@ export function useIngameReactor(
     let last: number | null = null
     let written = -1
     const loop = (t: number) => {
-      if (heatLockRef.current) {
-        heatRef.current = 1 // FEVER : embrasement verrouillé
-      } else if (last !== null) {
-        const dt = (t - last) / 1000
-        heatRef.current = Math.max(0, heatRef.current - HEAT_DECAY * dt)
-      }
+      const dt = last !== null ? (t - last) / 1000 : null
+      heatRef.current = nextHeat(heatRef.current, dt, heatLockRef.current)
       last = t
-      const rounded = Math.round(heatRef.current * 100) / 100
+      const rounded = roundedHeat(heatRef.current)
       if (rounded !== written) {
         written = rounded
         targetRef.current?.style.setProperty('--heat', String(rounded))
