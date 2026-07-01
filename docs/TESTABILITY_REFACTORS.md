@@ -2,7 +2,30 @@
 
 > ## 🔄 STATUS POST-MERGE (audit refresh — branche à jour avec `origin/dev`, +50 commits)
 >
-> ## 🏁 BACKLOG DRAINÉ — ne reste que 3 items human-gated
+> ## 🐞 AUDIT RÉGRESSION (range 263d14c..263600f, 214 commits)
+> Après le bug **flush ref-detach** (fixé `440421a`), audit des sous-systèmes refactorés :
+> **24 bugs (0 P1, 11 P2, 13 P3) + 28 smells** (détail : `tasks/wgxuq36d4.output`).
+>
+> **✅ FIXÉS (critiques + haute-confiance, tests repro)** :
+> - `440421a` **flush pendingPhysics** → **#1 drain/gameover + #2 bumpers** (splice en place, pas de réassign).
+> - `40233dc` **collision-state ×4** : boss throttle jamais reset · Bumper sans garde `gameState` ·
+>   DropTarget orphelins · BossTargetSensor clock injectée.
+> - `0e3dc4c` **flipper #3** : `FlipperZone` sans borne Y + launch X non bridé → yMin/yMax +
+>   `FLIPPER_LAUNCH_VX_ATTENUATION`. ⚠ **smoke 3D** (feel flipper).
+>
+> **⛔ DIFFÉRÉS — bugs réels, gate humaine (3D/produit/arch)** :
+> - **P2** `CinematicDirector.resetGame` ne rappelle pas `onEnd()` → **risque freeze** post-reset. 3D.
+> - **P2** `lastLifeRescue` **feature morte** (lit `lives()` après `handleDrain`) → fix = activer le
+>   rescue = décision gameplay + 3D.
+> - **P2** `onMilestone` supprimé (5af34eb) → cinématiques palier ST off. **Décision produit**.
+> - **P2** double socket backglass · double portal-open · `content.ts` side-effect import.
+> - **P3** (vérif appelant/3D) : refs caméra mutables (`lerpViewDir`/`cameraUp`) · `UpsideDownPortal.revealT`
+>   double-avancé · `DrainCollisionHandler` sans collider `drain` (dead) · GltfDisplay mutate color.
+> - **28 smells** SOLID/dedup → par lots quand zone retouchée.
+>
+> ---
+>
+> ## 🏁 BACKLOG DRAINÉ (refacto testabilité) — 3 items human-gated
 > Toutes les extractions/dedup autonomes-sûres sont **FAITES + testées** (S1-S5, G1-G6+G-new,
 > M1-M8 + tous follow-ups, D1/D2, C1, N1, SrvRelays, toGameEvent, + follow-ups-de-follow-ups
 > M3.a'/G5.b'/M5.a'/M8''/BumperVis''/C1''). **Bugs B1 (Demogorgon glow leak) + B2 (ST bumper
