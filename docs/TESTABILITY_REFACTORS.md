@@ -33,6 +33,24 @@
 > `emit`/`collisionProcessor`/`ballPhysicsInst` assignés mid-init). ROI défavorable vs risque
 > non-vérifiable → à faire en session dédiée avec smoke serré si vraiment voulu, pas en aveugle.
 >
+> ## 🧩 Session autonome 2 (2026-07-02) — extractions supplémentaires
+> `PinballPlayfield.tsx` **1621 → 1495 L** (total depuis le début : 1798→1495, **−303 / −17%**).
+> **12 modules extraits**, **+55 tests**, repo vert (playfield 136, game-engine 903, maps 141).
+> Nouvelles extractions (toutes behavior-preserving, tsc/lint/test) :
+> - `hotLoop/frameMath.ts` (`computeFrameDt` + `computeTrailIntensity`, pur, +6 tests)
+> - `physics/buildPlayfieldColliders.ts` (trimesh + colliders role-driven, inerte, needs-smoke)
+> - `physics/setupFlippers.ts` (résolution/attache flippers + zones, inerte, needs-smoke)
+> - `hotLoop/stepBallSync.ts` (locks/snap/clamp/stuck/bottom-out, args live/frame, needs-smoke)
+>
+> **Arrêt volontaire de l'extraction agressive** : le reste d'`animate` partage des accumulateurs
+> de frame (`leftSwing`/`rightSwing`/`prevs`/`leftFlash`/`rightFlash`, des `number`) entre le bloc
+> flipper-cinématique et le bloc flipper-assist. Les extraire exige de threader un objet partagé
+> avec **risque de swap silencieux number↔number** (invisible à tsc, non smoke-able agent). Reporté.
+>
+> **Reste dans PinballPlayfield (candidats, non faits)** : bloc flipper-cinématique + assist (via
+> objet `flipperFrame` partagé — risque swap), câblage use-cases (`LaunchBall`/`BumperHit`/…, couplé
+> à `emit`), GLB load+prepare (~10 L), boss/monde orchestration. + les lifts monolithiques 6/7 (différés).
+>
 > **Backlog smells (workflow, dédupliqués)** — au-delà des slices :
 > - **P1** SRP+OCP — décomposer animate en stages ordonnés APRÈS le lift (slice 7 fait le move entier d'abord). `PinballPlayfield.tsx:1270-1592`
 > - **P1** Circular (managed) — documenter le contrat 2-way `CollisionEventProcessor↔emit` aux seams (garde-fou, PAS un refacto). `:1079` + `createEmitRouter.ts:104`
