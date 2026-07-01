@@ -7,7 +7,9 @@
 
 export const OUTRO_IDLE_TIMEOUT_MS = 20_000;
 
-type TimeoutHandle = ReturnType<typeof setTimeout>;
+// Timer navigateur (window.setTimeout renvoie un number). Évite le type Node
+// `Timeout` qui fuite via @types/node.
+type TimeoutHandle = number;
 
 export interface OutroInactivitySchedule {
   setTimeout: (fn: () => void, ms: number) => TimeoutHandle;

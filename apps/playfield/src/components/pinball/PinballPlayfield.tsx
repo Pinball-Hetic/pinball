@@ -1131,7 +1131,12 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // idle/attract. Timing injecté (window.*) → logique pure testée.
         const outroInactivity = createOutroInactivityTimer(
           () => resetGameSequence(),
-          { setTimeout: window.setTimeout, clearTimeout: window.clearTimeout },
+          {
+            // Wrap (pas de ref nue) : window.setTimeout appelée hors de window
+            // jette "Illegal invocation".
+            setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+            clearTimeout: (h) => window.clearTimeout(h),
+          },
         );
         armOutroInactivityRef.current = () => outroInactivity.arm();
         cancelOutroInactivity = () => outroInactivity.cancel();
