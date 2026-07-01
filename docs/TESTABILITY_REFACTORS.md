@@ -1,5 +1,21 @@
 # Backlog refacto — testabilité & clean architecture
 
+> # ✅ BACKLOG VIDE (convergence atteinte)
+> Après boucle autonome complète : god-component décomposé (SRP), refacto structurels,
+> smells P3, + 4 vagues de fix bugs. **Audit de convergence strict (P1/P2 + God objects) =
+> CLEAN sur game-engine, maps, playfield, apps.** Aucun bug ouvert, aucune violation SRP
+> flagrante. Repo **100% vert** (1929 tests, tsc, lint), ~86 commits depuis le merge.
+>
+> **Résidu volontairement laissé (acceptable, non-backlog)** : 2 petits builders inline dans
+> `PinballPlayfield` (makeFlipperBody 24 L, plunger) — jugés unsafe à extraire (closures serrées),
+> acceptables dans un orchestrateur.
+>
+> **⚠ À smoke-tester (équipe, changements 3D/gameplay)** : voir les notes "SMOKE" dans les commits
+> (flipper feel, boss reveals/victory timing, portal, atmosphères, rescue, milestone ST, drain/
+> gameover double-fire, monde alternatif HUD/trail/DMD après cycle, mapId multi-map).
+>
+> ---
+>
 > ## 🔄 STATUS POST-MERGE (audit refresh — branche à jour avec `origin/dev`, +50 commits)
 >
 > ## 🐞 AUDIT RÉGRESSION (range 263d14c..263600f, 214 commits)
