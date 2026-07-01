@@ -207,9 +207,7 @@ export class UpsideDownPortal {
       const u = Math.min(1, this.revealT / portalRevealTotalDuration());
       this.applyOpenProgress(mapPortalRevealProgress(u));
       if (u >= 1) this.finishOpening();
-    }
-
-    if (this.revealing && this.portalGroup) {
+    } else if (this.revealing && this.portalGroup) {
       this.revealT += dt;
       const t = Math.min(1, this.revealT / UPSIDE_DOWN_PORTAL_OPEN_POLISH);
       const ease = 1 - Math.pow(1 - t, 3);

@@ -14,6 +14,7 @@ import { resolveNestState, dueLateHints, advanceHetic } from '@pinball/game-engi
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 import { grantExtraLife } from './lifeBonus'
 import { createLastLifeRescue } from './lastLifeRescue'
+import { playMilestoneCinematic } from './milestoneCinematic'
 
 // Module de comportement Stranger Things. Possède tous ses systèmes en
 // closure ; n'expose que le contrat MapModule (aucun bridge vers le
@@ -117,25 +118,36 @@ export function createModule(): MapModule {
         .preloadAll(ctx.lighting.renderer, ctx.scene, ctx.camera)
         .catch((err) => console.warn('[BossReveals] preload failed:', err))
     },
+    onPreDrain(livesBeforeDrain: number): void {
+      const ctx = ctxRef
+      if (!ctx) return
+      lastLifeRescue.onPreDrain(ctx, livesBeforeDrain)
+    },
     onGameEvent(e: GameEvent): void {
       bumperVisuals?.onGameEvent(e)
       garlands?.onGameEvent(e)
       atmosphere?.onGameEvent(e)
       const ctx = ctxRef
+      let portalDefeatHandled = false
       if (e.type === 'BOSS_TARGET_HIT' && ctx) {
         const boss = ctx.layout.bosses.find((b) => b.id === e.bossId)
         if (boss && e.hitCount >= boss.targetHits) {
           grantExtraLife(ctx)
           portal?.notifyBossDefeated(e.bossId, ctx.bossGateContext().alternateWorldActive)
+          portalDefeatHandled = true
         }
       }
-      portal?.onGameEvent(e)
+      if (!portalDefeatHandled) portal?.onGameEvent(e)
       bossReveals?.onGameEvent(e)
 
       if (!ctx) return
       lastLifeRescue.onGameEvent(ctx, e)
       if (e.type === 'BOSS_LOCKED_HIT') {
         ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
+      }
+      // Palier de score : cinématique + frisson garlands + shake.
+      if (e.type === 'MILESTONE') {
+        playMilestoneCinematic(ctx, e.threshold, () => garlands?.celebrate())
       }
       // Entrée Upside Down confirmée (fin de transition) : portail actif +
       // baseline core + nid en mode Upside Down.
