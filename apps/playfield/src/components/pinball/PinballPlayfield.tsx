@@ -75,9 +75,8 @@ import type {
   ButtonAction,
   ButtonId,
   CinematicClip,
-  GameAction,
 } from "@pinball/shared-types";
-import { BUTTON_ACTION, CABINET_BUTTONS, clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
+import { BUTTON_ACTION, clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
 
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 // Résolu au niveau module (MAP_ID = constante build-time) — utilisé comme
@@ -113,6 +112,7 @@ import {
   createInputState,
   type InputState,
 } from "./createApplyAction";
+import { idForAction, gameKeyToAction, isPreventDefaultKey } from "./keyboardMap";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -1179,16 +1179,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           physicalInputsRef.current.onButton?.({ id, action });
         };
 
-        // Clavier dev : dérive les ids physiques depuis l'action (DRY, survit à
-        // un futur remap GPIO). Pas de littéral 'WHITE_LEFT' codé en dur ici.
-        const idForAction = (a: GameAction): ButtonId =>
-          CABINET_BUTTONS.find((b) => b.action === a)!.id;
-        const KEY_LEFT = idForAction("FLIP_LEFT"); // WHITE_LEFT
-        const KEY_RIGHT = idForAction("FLIP_RIGHT"); // WHITE_RIGHT
-        const KEY_PLUNGE = idForAction("PLUNGE"); // PLUNGER
-
+        // Clavier dev : mapping key→action + résolution de l'id physique
+        // extraits + testés (keyboardMap.ts, idForAction fail-fast).
         const onKeyDown = (e: KeyboardEvent) => {
-          if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+          if (isPreventDefaultKey(e.key)) e.preventDefault();
           unlockPinballAudio();
           if (e.repeat) return;
           // `H` reste TOUJOURS actif (debug), indépendant du KEYBOARD_MODE.
@@ -1227,16 +1221,14 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             resetBallRef.current?.();
             return;
           }
-          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton(KEY_LEFT, "DOWN");
-          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton(KEY_RIGHT, "DOWN");
-          if (e.key === " ") dispatchButton(KEY_PLUNGE, "DOWN");
+          const downAction = gameKeyToAction(e.key);
+          if (downAction) dispatchButton(idForAction(downAction), "DOWN");
         };
 
         const onKeyUp = (e: KeyboardEvent) => {
-          if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
-          if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dispatchButton(KEY_LEFT, "UP");
-          if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dispatchButton(KEY_RIGHT, "UP");
-          if (e.key === " ") dispatchButton(KEY_PLUNGE, "UP");
+          if (isPreventDefaultKey(e.key)) e.preventDefault();
+          const upAction = gameKeyToAction(e.key);
+          if (upAction) dispatchButton(idForAction(upAction), "UP");
         };
 
         onSessionStartRef.current = () => {

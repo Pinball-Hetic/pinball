@@ -1,5 +1,39 @@
 # Backlog refacto — testabilité & clean architecture
 
+> # 🧩 DÉCOMPOSITION God-component `PinballPlayfield.tsx` (2026-07-01)
+> Plan de slices (workflow d'analyse `w5wj6iobk`, risk-ascending, animate en dernier).
+> Slice 0 (inputs → `createApplyAction`) ✅ FAITE. Slices 1-5 ne touchent PAS le hot
+> loop (autonomes). Slices 6-7 = high-risk, human-smoke-only.
+>
+> | # | Slice | Module | Risque | Test | État |
+> |---|---|---|---|---|---|
+> | 1 | Keyboard map pur (idForAction fail-fast + key→action) | `keyboardMap.ts` | low | pure | — |
+> | 2 | Flipper bodies + pivot debug factory | `physics/buildFlipperBodies.ts` | med | smoke | — |
+> | 3 | Plunger visual + kinematic body factory | `physics/buildPlungerBody.ts` | med | smoke | — |
+> | 4 | Keyboard router + debug-mesh facade | `createKeyboardRouter.ts` | med | partial | dep 1,2 |
+> | 5 | MapContext factory (~85 L object literal) | `createMapContext.ts` | med | partial | — |
+> | 6 | Init physique/scène (compo async, fail-fast) | `initPlayfield.ts` | high | smoke | dep 2-5 |
+> | 7 | Animate hot loop (lift ENTIER, order load-bearing) | `HotLoop.ts` | high | smoke | dep 6 |
+>
+> **Backlog smells (workflow, dédupliqués)** — au-delà des slices :
+> - **P1** SRP+OCP — décomposer animate en stages ordonnés APRÈS le lift (slice 7 fait le move entier d'abord). `PinballPlayfield.tsx:1270-1592`
+> - **P1** Circular (managed) — documenter le contrat 2-way `CollisionEventProcessor↔emit` aux seams (garde-fou, PAS un refacto). `:1079` + `createEmitRouter.ts:104`
+> - **P2** State Machine — `PlungerStateMachine(now)→{state,progress,meshZ}` (transitions inline dans animate + throttle UI 40ms). `:1507-1540`
+> - **P2** DIP — `BallLossDetectionOrchestrator` : unifier stuck + bottomOut + drain Rapier (3 détecteurs, latch idempotent) + `ballLockGuard` dupliqué. `:1395-1500`
+> - **P2** Strategy — magic `Z<0.22` (zone drain) → dériver de `mapLayout.sensors`. `:1481`
+> - **P2** OCP/DIP — `AlternateWorldController` : état éclaté sur collisionProcessor/mapModule/useGameState (+ predicate release inline). `:1041` + `createEmitRouter.ts:158`
+> - **P2** OCP — `BossLifecycleController` : reveal/arm/victory orchestré sur 3 modules. `:1027` + `createEmitRouter.ts:149`
+> - **P2** DIP/OCP — `createEmitRouter` : snapshot des lazy getters (getCollisionProcessor 4+/event en cascade bumper) + naming mesh `drop_*→target_*` couplé au GLB + shake amounts littéraux. `createEmitRouter.ts:104,138-206`
+> - **P2** ISP — `DmdOrchestrator` : race `game:registered` + tick 100ms hardcodé → `DmdPushPort` + `SocketGateway` mockable. `useDmdOrchestrator.ts:98-136`
+> - **P2** DIP — `emitRef.current` bridge remount-fragile (OK car effet sans deps ; passer emit en callback dep à la slice 6). `:1072`
+> - **P3** DIP — `AudioOrchestrator` port (appels audio épars sur 5+ sites). `:97,165,258,429,836`
+> - **P3** Resource — `DisposalManager` LIFO (disposableGeos/Mats order-sensitive ; folder dans slice 6). `:555,1639`
+> - **P3** State — supprimer le local `physicsReady` redondant (source = ref). `:638`
+> - **P3** DIP — injecter `now():number` dans animate (tests hermétiques ; slice 7 HotLoopDeps). `:1270`
+> - **P3** LSP/OCP — `idForAction ...!.id` non-null-assert = time bomb → Optional/throw (fixé slice 1). `:1184`
+>
+> **Couplages bloquants (flag)** : lazy forward-refs (`collisionProcessor`/`ballPhysicsInst`/`ballMesh`/`emit` assignés mid-init, lus par animate ET callbacks) → passer en getters/refs JAMAIS snapshots ; cycle `processor↔emit` à garder visible ; `inputState` live-ref partagé (pas de double-buffer dans le lift) ; **ordre des frame-steps load-bearing** (cinematics→map→freeze→flipper→world.step→ballSync→plunger→camera→debug→shake) à préserver byte-for-byte en slice 7.
+
 > # 🎮 AXES D'AMÉLIORATION E2E (user, 2026-07-01) — ✅ TOUS FAITS (à smoke-tester)
 > A1 auto-spawn+prompt · A2 DMD vies ×N · A3 respawn Vecna · A4 feedback freeze lettre ·
 > A5 fusée palier (playfield+DMD+backglass) · A6 QR timeout 20s. Tout committé, repo vert.
