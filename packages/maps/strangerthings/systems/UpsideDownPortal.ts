@@ -4,23 +4,25 @@ import type { GameEvent } from '@pinball/game-engine';
 import { getBossDefinition } from '../bosses';
 import {
   PORTAL_HOLE_RADIUS,
-  PORTAL_MAGNET_RADIUS,
-  PORTAL_MAGNET_STRENGTH,
   PORTAL_SENSOR_RADIUS,
 } from '@pinball/game-engine';
 import { layout } from '../layout';
 import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
 import {
-  UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_ANCHOR_NAMES,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
-  UPSIDE_DOWN_PORTAL_PULSE_SPEED,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from './UpsideDownConstants';
 import { mapPortalRevealProgress, portalRevealTotalDuration } from './PortalRevealCurve';
+import {
+  portalMagnetImpulse,
+  portalOpenLevels,
+  portalPulseLevels,
+  portalRevealingProgress,
+} from './PortalTimeline';
 import { findObjectByNormalizedName, canonicalGltfName } from '@pinball/game-engine';
 import type { BossId } from '@pinball/game-engine';
-import { GlowSprite, easeInOut } from '@pinball/game-engine';
+import { GlowSprite } from '@pinball/game-engine';
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -185,18 +187,9 @@ export class UpsideDownPortal {
     const dx = this.anchorPos.x - p.x;
     const dz = this.anchorPos.z - p.z;
     const horiz = Math.sqrt(dx * dx + dz * dz);
-    if (horiz > PORTAL_MAGNET_RADIUS || horiz < 0.0005) return;
-
-    const t = 1 - horiz / PORTAL_MAGNET_RADIUS;
-    const pull = PORTAL_MAGNET_STRENGTH * t * t * (1 + this.suckBoost);
-    body.applyImpulse(
-      {
-        x: (dx / horiz) * pull,
-        y: -pull * (0.42 + t * 0.35),
-        z: (dz / horiz) * pull,
-      },
-      true,
-    );
+    const impulse = portalMagnetImpulse(dx, dz, horiz, this.suckBoost);
+    if (!impulse) return;
+    body.applyImpulse(impulse, true);
   }
 
   update(dt: number): void {
@@ -210,40 +203,38 @@ export class UpsideDownPortal {
     } else if (this.revealing && this.portalGroup) {
       this.revealT += dt;
       const t = Math.min(1, this.revealT / UPSIDE_DOWN_PORTAL_OPEN_POLISH);
-      const ease = 1 - Math.pow(1 - t, 3);
-      this.applyOpenProgress(0.35 + ease * 0.65);
+      this.applyOpenProgress(portalRevealingProgress(t));
       if (t >= 1) this.revealing = false;
     }
 
     if (!this.revealed || !this.portalGroup) return;
 
-    const pulse = 0.65 + Math.sin(this.pulseT * UPSIDE_DOWN_PORTAL_PULSE_SPEED) * 0.35;
-    const fast = this.pulseT * 4.2;
+    const levels = portalPulseLevels(this.pulseT, this.suckBoost);
+    const { fast } = levels;
 
     if (this.outerRingMat) {
-      this.outerRingMat.emissiveIntensity = 1.8 * pulse * (1 + this.suckBoost);
+      this.outerRingMat.emissiveIntensity = levels.outerRingEmissive;
     }
     if (this.innerRingMat) {
-      this.innerRingMat.emissiveIntensity = 2.4 * pulse * (1 + this.suckBoost * 0.6);
+      this.innerRingMat.emissiveIntensity = levels.innerRingEmissive;
     }
     if (this.coreMat) {
-      this.coreMat.opacity = 0.55 + pulse * 0.35;
+      this.coreMat.opacity = levels.coreOpacity;
     }
     if (this.vortexMat) {
-      this.vortexMat.opacity = 0.25 + pulse * 0.2;
+      this.vortexMat.opacity = levels.vortexOpacity;
     }
     if (this.rimGlow) {
-      this.rimGlow.set(Math.min(1, 0.55 * pulse * (1 + this.suckBoost)), 0.9 + pulse * 0.4);
+      this.rimGlow.set(levels.rimGlowIntensity, levels.rimGlowScale);
     }
     if (this.coreLight) {
-      this.coreLight.intensity = 0.85 * pulse * (1 + this.suckBoost * 1.2);
+      this.coreLight.intensity = levels.coreLightIntensity;
     }
     if (this.accentGlow) {
-      const accentPulse = 0.55 + Math.sin(this.pulseT * UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED) * 0.45;
-      this.accentGlow.set(Math.min(1, 0.48 * accentPulse * (1 + this.suckBoost * 0.55)), 1);
+      this.accentGlow.set(levels.accentGlowIntensity, 1);
     }
     if (this.vineMat) {
-      this.vineMat.emissiveIntensity = 0.22 + pulse * 0.28 * (1 + this.suckBoost * 0.4);
+      this.vineMat.emissiveIntensity = levels.vineEmissiveIntensity;
     }
 
     for (const vine of this.vines) {
@@ -509,32 +500,30 @@ export class UpsideDownPortal {
   private applyOpenProgress(p: number): void {
     if (!this.portalGroup) return;
 
-    const portalOn = easeInOut(p);
-    const glbOff = easeInOut(Math.min(1, p / 0.42));
-    const fx = Math.min(1, 0.22 + portalOn * 0.78);
-    this.setGlbPortalOpacity(1 - glbOff);
+    const levels = portalOpenLevels(p);
+    this.setGlbPortalOpacity(1 - levels.glbOff);
 
-    this.portalGroup.visible = fx > 0.01;
-    this.portalGroup.scale.setScalar(0.14 + portalOn * 0.86);
+    this.portalGroup.visible = levels.visible;
+    this.portalGroup.scale.setScalar(levels.scale);
 
-    if (this.coreMat) this.coreMat.opacity = 0.7 * fx;
-    if (this.vortexMat) this.vortexMat.opacity = 0.35 * fx;
+    if (this.coreMat) this.coreMat.opacity = levels.coreOpacity;
+    if (this.vortexMat) this.vortexMat.opacity = levels.vortexOpacity;
     if (this.outerRingMat) {
       this.outerRingMat.transparent = true;
-      this.outerRingMat.opacity = 0.95 * fx;
+      this.outerRingMat.opacity = levels.outerRingOpacity;
     }
     if (this.innerRingMat) {
       this.innerRingMat.transparent = true;
-      this.innerRingMat.opacity = 0.88 * fx;
+      this.innerRingMat.opacity = levels.innerRingOpacity;
     }
-    if (this.rimGlow) this.rimGlow.set(0.55 * fx, 0.9 * fx);
-    if (this.accentGlow) this.accentGlow.set(0.48 * fx, fx);
-    if (this.coreLight) this.coreLight.intensity = 0.85 * fx;
-    if (this.vineMat) this.vineMat.emissiveIntensity = 0.35 * fx;
+    if (this.rimGlow) this.rimGlow.set(levels.rimGlowIntensity, levels.rimGlowScale);
+    if (this.accentGlow) this.accentGlow.set(levels.accentGlowIntensity, levels.accentGlowScale);
+    if (this.coreLight) this.coreLight.intensity = levels.coreLightIntensity;
+    if (this.vineMat) this.vineMat.emissiveIntensity = levels.vineEmissiveIntensity;
 
     for (const part of this.particles) {
-      part.mesh.visible = p > 0.08;
-      part.mesh.scale.setScalar(0.55 * fx);
+      part.mesh.visible = levels.particlesVisible;
+      part.mesh.scale.setScalar(levels.particleScale);
     }
   }
 
