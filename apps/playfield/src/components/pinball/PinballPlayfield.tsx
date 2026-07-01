@@ -43,7 +43,6 @@ import {
   hidePinballmapDecorNodes,
   prepareGltfMaterialsForDisplay,
   createGltfLoader,
-  type BossId,
   CinematicDirector,
   PlayfieldCinematicStrobe,
   cinematicFreezeFeedback,
@@ -65,7 +64,7 @@ import {
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import { NoSignal } from "@pinball/ui";
-import { MeshRoleResolver, LayoutResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
+import { MeshRoleResolver, LayoutResolver, type MapModule, type GameEventListener } from "@pinball/game-engine";
 import type {
   ButtonAction,
   ButtonId,
@@ -111,6 +110,7 @@ import { buildFlipperBodies } from "./physics/buildFlipperBodies";
 import { buildPlungerBody } from "./physics/buildPlungerBody";
 import { createKeyboardRouter } from "./createKeyboardRouter";
 import { DebugMeshManager } from "./debug/DebugMeshManager";
+import { createMapContext } from "./createMapContext";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -813,7 +813,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // que module.setup puisse créer ses systèmes avant qu'ils soient
         // consommés. emit est hoisté (assigné plus bas) → utilisé via closures.
         if (mapModule) {
-          const mapCtx: MapContext = {
+          // MapContext extrait (createMapContext.ts). Les forward-refs
+          // (ball/ballMesh/collisionProcessor/emit, assignés plus bas) sont
+          // passés en getters live-bound.
+          const mapCtx = createMapContext({
             scene,
             root: playfieldRoot,
             camera,
@@ -821,35 +824,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             layout: mapLayout,
             manifest: mapManifest,
             colliderMap,
-            get ball() {
-              return ballPhysicsInst;
-            },
-            get ballMesh() {
-              return ballMesh;
-            },
-            resetPortalTrigger: () => collisionProcessor?.resetPortalTrigger(),
-            completeWorldCycle: () => collisionProcessor?.completeWorldCycle(scoreRef.current),
-            resetStuck: () => stuckDetector.reset(),
-            enterAlternateWorld: () => collisionProcessor?.onAlternateWorldEntered(scoreRef.current),
-            playSound: (id) => {
-              const s = mapManifest.sounds?.[id];
-              if (s) playMapCinematicSound(s.url, s.volume);
-            },
-            refreshScoreSnapshot: () => {
-              const snap = {
-                player: playerRef.current,
-                score: scoreRef.current,
-                combo: comboRef.current,
-                multiplier: multiplierRef.current,
-                lives: livesRef.current,
-                mapState: buildMapState(),
-              };
-              dmd.emitScoreSnapshot(snap);
-              dmd.pushScore(snap);
-            },
-            screenShake: (amount) => screenShakeRef.current?.add(amount),
-            isFeverActive: () => isFeverActive(),
-            gameState: () => gameStateRef.current,
             lighting: {
               renderer,
               ambient: ambientLight,
@@ -857,46 +831,28 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
               dir: dirLight,
               fill: fillLight,
             },
-            resolve: (name) => findObjectByNormalizedName(playfieldRoot, name) ?? null,
-            setPortalGateOpen: (open) => collisionProcessor?.setPortalOpen(open),
-            setBossFightActive: (bossId, active) =>
-              collisionProcessor?.setBossFightActive(bossId as BossId, active),
-            setBossTargetArmed: (bossId, armed) =>
-              collisionProcessor?.setBossTargetArmed(bossId as BossId, armed),
-            bossGateContext: () => ({
-              totalScore: scoreRef.current,
-              alternateWorldActive: collisionProcessor?.isAlternateWorldActive() ?? false,
-              normalWorldScoreBaseline: collisionProcessor?.getNormalWorldScoreBaseline() ?? 0,
-              alternateWorldScoreBaseline: collisionProcessor?.getAlternateWorldScoreBaseline() ?? 0,
-            }),
-            isBossTriggered: (bossId) =>
-              collisionProcessor?.isBossTriggered(bossId as BossId) ?? false,
-            addScore: (points, label) =>
-              emit({ type: "ZONE_HIT", zone: label ?? "", scoreIncrement: points }),
+            getBall: () => ballPhysicsInst,
+            getBallMesh: () => ballMesh,
+            getCollisionProcessor: () => collisionProcessor,
+            emit: (e) => emit(e),
+            scoreRef,
+            comboRef,
+            multiplierRef,
+            livesRef,
+            playerRef,
+            gameStateRef,
+            mapStateExtraRef,
+            atmosphereAlternateRef,
+            dmd,
+            screenShakeAdd: (amount) => screenShakeRef.current?.add(amount),
+            resetStuck: () => stuckDetector.reset(),
+            playCinematicSound: playMapCinematicSound,
             addLife: () => addLife(),
-            lives: () => livesRef.current,
-            totalScore: () => scoreRef.current,
-            setMapState: (patch) => {
-              Object.assign(mapStateExtraRef.current, patch);
-            },
-            forceMultiplier: (_value, durationMs) => startFever(durationMs),
-            pushDmdEvent: (label, points) =>
-              dmd.pushEvent(label, points, {
-                player: playerRef.current,
-                score: scoreRef.current,
-                combo: comboRef.current,
-                multiplier: multiplierRef.current,
-                lives: livesRef.current,
-                mapState: buildMapState(),
-              }),
+            startFever: (durationMs) => startFever(durationMs),
+            isFeverActive: () => isFeverActive(),
             playCinematic: (clipId, opts) => playCinematic(clipId, opts),
-            setAtmosphere: (active) => {
-              dmd.setAtmosphere(active);
-              atmosphereAlternateRef.current = active;
-              // nestMarker géré par le module (réconciliation).
-            },
-            emitGameEvent: (e) => emit(e),
-          };
+            buildMapState: () => buildMapState(),
+          });
           mapModule.setup(mapCtx);
         }
         // Préchargement asynchrone du module (ex. reveals boss) — bloque le
