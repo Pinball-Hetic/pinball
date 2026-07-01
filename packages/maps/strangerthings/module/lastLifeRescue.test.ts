@@ -4,10 +4,11 @@ import { createLastLifeRescue, LAST_LIFE_RESCUE_POINTS } from './lastLifeRescue'
 
 /**
  * Fake ctx + harness reproducing the REAL playfield ordering:
- *   emit(DRAIN) => mapModule.onPreDrain(livesBeforeDrain)  // rescue may grant
+ *   emit(DRAIN) => mapModule.onPreDrain(livesBeforeDrain)  // rescue grants + arms
  *               => handleDrain (decrement, game over if <= 0)
- *               => mapModule.onGameEvent(DRAIN)             // rescue arms/counts
- * ctx.lives() reads the CURRENT (post-decrement during onGameEvent) value.
+ *               => mapModule.onGameEvent(DRAIN)             // no-op for drains
+ * Arming/disarming on a drain is decided in onPreDrain from the EXPLICIT
+ * livesBeforeDrain argument — onGameEvent no longer reads ctx.lives() for it.
  */
 function harness(startLives: number) {
   let lives = startLives
@@ -114,5 +115,47 @@ describe('createLastLifeRescue', () => {
     h.ctx.addLife() // lives 1 -> 2
     h.emit({ type: 'BUMPER_HIT', bumperIndex: 0, scoreIncrement: 100 })
     expect(h.rescue.isArmed()).toBe(false)
+  })
+
+  test('arming is driven by the explicit livesBeforeDrain, NOT by ctx.lives() at onGameEvent time', () => {
+    // Explicit contract: onPreDrain decides arm/disarm from its livesBeforeDrain
+    // argument. onGameEvent(DRAIN) must NOT read ctx.lives(). We prove it by
+    // feeding onGameEvent a ctx whose lives() lies, and asserting the arming
+    // still tracks the explicit pre-decrement count.
+    const rescue = createLastLifeRescue()
+    const events: string[] = []
+    const score = 0
+    // ctx.lives() returns a bogus value that would MISLEAD the old
+    // post-decrement inference (e.g. 99, never "the last life").
+    const ctx = {
+      lives: () => 99,
+      totalScore: () => score,
+      addLife: () => {},
+      pushDmdEvent: (label: string) => events.push(label),
+    } as Pick<MapContext, 'lives' | 'totalScore' | 'addLife' | 'pushDmdEvent'> as MapContext
+
+    // Draining from 2 lives (explicit) → 1 remaining → must arm, despite
+    // ctx.lives() === 99.
+    rescue.onPreDrain(ctx, 2)
+    rescue.onGameEvent(ctx, { type: 'DRAIN' })
+    expect(rescue.isArmed()).toBe(true)
+    expect(events).toEqual(['3000 PTS = VIE'])
+
+    // Draining from 3 lives (explicit) → 2 remaining → must disarm.
+    rescue.onPreDrain(ctx, 3)
+    expect(rescue.isArmed()).toBe(false)
+  })
+
+  test('BOTTOM_OUT behaves identically to DRAIN for arming', () => {
+    const h = harness(2)
+    h.emit({ type: 'BOTTOM_OUT' }) // 2 -> 1, arm
+    expect(h.rescue.isArmed()).toBe(true)
+    expect(h.state().gameOver).toBe(false)
+
+    h.emit({ type: 'BUMPER_HIT', bumperIndex: 0, scoreIncrement: LAST_LIFE_RESCUE_POINTS })
+    h.emit({ type: 'BOTTOM_OUT' }) // rescue grants before decrement
+    expect(h.state().gameOver).toBe(false)
+    expect(h.state().lives).toBe(1)
+    expect(h.rescue.isArmed()).toBe(true)
   })
 })
