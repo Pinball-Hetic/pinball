@@ -27,6 +27,8 @@ export * from './use-cases/BottomOutBall';
 export * from './use-cases/DetectStuckBall';
 export * from './use-cases/DetectBottomOut';
 export * from './use-cases/SnapBallToSurface';
+export * from './use-cases/BallFrameCorrections';
+export * from './use-cases/FlipperLaunchAssist';
 
 // Infrastructure
 export * from './infrastructure/PhysicsWorld';
@@ -38,12 +40,14 @@ export * from './infrastructure/PlayfieldColliderFactory';
 export * from './infrastructure/ColliderSpecPlanner';
 export * from './infrastructure/LauncherLaneBounds';
 export * from './infrastructure/FlipperSplitter';
+export * from './infrastructure/FlipperHullBody';
 export * from './infrastructure/FlipperZones';
 export * from './infrastructure/CollisionEventProcessor';
 export * from './infrastructure/BossFightManager';
 export * from './infrastructure/BossRevealController';
 export * from './infrastructure/BossRevealOrchestrator';
 export * from './infrastructure/BossTargetPulse';
+export * from './infrastructure/FlipperFlash';
 export * from './infrastructure/BossActorAnimator';
 export * from './infrastructure/BossTargetActor';
 export * from './infrastructure/BossTargetMesh';

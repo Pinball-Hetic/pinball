@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import {
   PhysicsWorld,
   BallPhysics,
@@ -15,7 +13,6 @@ import {
   BottomOutBall,
   DetectBottomOut,
   getBallRadius,
-  BALL_MAX_SPEED,
   INITIAL_LIVES,
   PLUNGER_CHARGE_MS,
   plungerChargeProgress,
@@ -24,13 +21,17 @@ import {
   SWING_SMOOTH,
   FLIPPER_RESTITUTION,
   FLIPPER_FRICTION,
-  FLIPPER_MIN_LAUNCH_VZ,
-  FLIPPER_MIN_LAUNCH_ANGVEL,
-  FLIPPER_LAUNCH_VX_ATTENUATION,
   computeSurfaceSnap,
+  computeIdleSpawnLock,
+  computeLaneStraightLock,
+  computeSpeedClamp,
+  computeFlipperLaunchAssist,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   resolvePlayfieldFlippers,
+  buildFlipperHullBody,
+  syncFlipperBody,
+  flipperWorldTransform,
   attachFlipperAtHinge,
   applyFlipperSwing,
   computeFlipperZones,
@@ -44,30 +45,25 @@ import {
   removePinballmapUnusedMeshes,
   hidePinballmapDecorNodes,
   prepareGltfMaterialsForDisplay,
-  configureGltfRenderer,
-  getEnvironmentBlur,
   createGltfLoader,
-  ballCenterOnSurface,
   PlungerPhysics,
   type BossId,
   CinematicDirector,
   ScreenShake,
-  PlayfieldCameraDirector,
-  playfieldCameraUpForMode,
   parsePlayfieldViewMode,
-  refitPlayfieldCamera,
   configureSurfaceCoefficients,
   configureBallRadius,
   DEFAULT_BALL_RADIUS,
-  type PlayfieldCamFit,
-  type PlayfieldCamera,
   DEFAULT_PLAYFIELD_CAMERA_DEBUG_TUNING,
   type PlayfieldCameraDebugTuning,
   BallTrail,
   QualityGovernor,
   ShooterLaneGate,
+  collectFlashMats,
+  applyFlash,
+  FLASH_DURATION,
+  type FlashMat,
 } from "@pinball/game-engine";
-import { getBossById } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import { NoSignal } from "@pinball/ui";
 import { MeshRoleResolver, LayoutResolver, type MapContext, type MapModule, type GameEventListener } from "@pinball/game-engine";
@@ -84,6 +80,10 @@ const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 // fallback si aucun mapId n'est fourni en prop.
 const DEFAULT_RESOLVED_MAP = getMapPackage(MAP_ID);
 
+import { createPlayfieldScene } from "./scene/createPlayfieldScene";
+import { BallDragController } from "./scene/BallDragController";
+import { PlayfieldCameraRig } from "./scene/PlayfieldCameraRig";
+import { createEmitRouter } from "./scene/createEmitRouter";
 import { toGameEvent } from "./toGameEvent";
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
@@ -457,100 +457,34 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     configureBallRadius(mapManifest.ballRadius ?? DEFAULT_BALL_RADIUS);
 
     // ── Three.js setup ───────────────────────────────────────────────────────
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#000000");
+    // Bootstrap scène/renderer/env/lumières/caméra délégué au factory (SRP).
+    const rendering = mapManifest.rendering;
+    const {
+      scene,
+      renderer,
+      camera,
+      cameraTarget,
+      modelRoot,
+      lights: {
+        ambient: ambientLight,
+        hemi: hemiLight,
+        dir: dirLight,
+        fill: fillLight,
+      },
+    } = createPlayfieldScene(mountEl, rendering);
+    const { clientWidth, clientHeight } = mountEl;
     const loader = createGltfLoader();
 
-    const { clientWidth, clientHeight } = mountEl;
-    const viewportAspect = clientWidth / Math.max(clientHeight, 1);
-    const camera: PlayfieldCamera = new THREE.PerspectiveCamera(
-      50,
-      viewportAspect,
-      0.001,
-      100,
-    );
-    const cameraTarget = new THREE.Vector3();
-    let playfieldCamFit: {
-      fit: PlayfieldCamFit;
-      camera: PlayfieldCamera;
-      cameraTarget: THREE.Vector3;
-      distance: number;
-    } | null = null;
-    const camCorners: THREE.Vector3[] = [];
-    let orbitControls: OrbitControls | null = null;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    // Expose + tonemapping depuis la config de la map (pas de valeur globale).
-    const rendering = mapManifest.rendering;
-    configureGltfRenderer(renderer, rendering);
-
-    // Environment map — par map (rendering.useEnvironment). ST : off → métal
-    // éclairé par les directionnels + rim (pas de reflets ambiants). Zelda :
-    // on → or/gemmes très réfléchissants (effet Vectary).
-    if (rendering?.useEnvironment) {
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      pmrem.compileEquirectangularShader();
-      scene.environment = pmrem.fromScene(new RoomEnvironment(), getEnvironmentBlur(rendering)).texture;
-      pmrem.dispose();
-    }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    renderer.setSize(clientWidth, clientHeight);
-    renderer.shadowMap.enabled = false;
-    mountEl.appendChild(renderer.domElement);
-
-    // ─── Lumières — lues depuis manifest.rendering ─────────────────────────
-    // Chaque map contrôle entièrement son setup d'éclairage. Pas de valeur
-    // partagée ici : ST (froide/cinéma) et Zelda (chaude/overhead) divergent.
-    const rl = rendering?.lights;
-    const ambientLight = new THREE.AmbientLight(
-      rl?.ambient.color    ?? 0xffffff,
-      rl?.ambient.intensity ?? 0.35,
-    );
-    scene.add(ambientLight);
-
-    const hemiLight = new THREE.HemisphereLight(
-      rl?.hemi.sky       ?? 0xfff8e8,
-      rl?.hemi.ground    ?? 0x111108,
-      rl?.hemi.intensity ?? 0.2,
-    );
-    scene.add(hemiLight);
-
-    const dirLight = new THREE.DirectionalLight(
-      rl?.dir.color    ?? 0xffffff,
-      rl?.dir.intensity ?? 2.5,
-    );
-    dirLight.position.set(rl?.dir.x ?? 0, rl?.dir.y ?? 0.48, rl?.dir.z ?? 0.88);
-    dirLight.castShadow = false;
-    scene.add(dirLight);
-
-    // Second soleil optionnel (rl.dir2), côté opposé → double éclairage qui
-    // débouche l'ombre du principal. Distinct du fill (réservé à
-    // UpsideDownAtmosphere). Absent dans la config → un seul soleil.
-    if (rl?.dir2) {
-      const dirLight2 = new THREE.DirectionalLight(rl.dir2.color, rl.dir2.intensity);
-      dirLight2.position.set(rl.dir2.x, rl.dir2.y, rl.dir2.z);
-      dirLight2.castShadow = false;
-      scene.add(dirLight2);
-    }
-
-    // Contre-jour optionnel (rl.rim) fond de table → liseré métal vers la
-    // caméra. Coût quasi nul. Absent dans la config → pas de rim.
-    if (rl?.rim) {
-      const rimLight = new THREE.DirectionalLight(rl.rim.color, rl.rim.intensity);
-      rimLight.position.set(rl.rim.x, rl.rim.y, rl.rim.z);
-      rimLight.castShadow = false;
-      scene.add(rimLight);
-    }
-
-    const fillLight = new THREE.DirectionalLight(
-      rl?.fill.color    ?? 0xffeedd,
-      rl?.fill.intensity ?? 0.15,
-    );
-    fillLight.position.set(rl?.fill.x ?? -0.5, rl?.fill.y ?? 1, rl?.fill.z ?? -1);
-    scene.add(fillLight);
-
-    const modelRoot = new THREE.Group();
-    scene.add(modelRoot);
+    const cameraRig = new PlayfieldCameraRig({
+      camera,
+      cameraTarget,
+      viewMode: PLAYFIELD_VIEW_MODE,
+      getDebugTuning: () => cameraDebugTuningRef.current,
+      getViewportSize: () => ({
+        width: mountEl.clientWidth,
+        height: mountEl.clientHeight,
+      }),
+    });
 
     const disposableGeos: THREE.BufferGeometry[] = [];
     const disposableMats: THREE.Material[] = [];
@@ -567,38 +501,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       });
     };
 
-    let cameraDirector: PlayfieldCameraDirector | null = null;
-
-    const captureDirectorBase = (fit: PlayfieldCamFit, distance: number) => {
-      if (!cameraDirector) return;
-      if (cameraDirector.isActive()) cameraDirector.restore();
-      cameraDirector.captureBase({
-        camera,
-        target: cameraTarget,
-        dirToCamera: fit.dirToCamera,
-        cameraUp: fit.cameraUp,
-        distance,
-        aspect: mountEl.clientWidth / Math.max(mountEl.clientHeight, 1),
-      });
-    };
-
-    const syncPlayfieldCamera = (root: THREE.Object3D) => {
-      const aspect = mountEl.clientWidth / Math.max(mountEl.clientHeight, 1);
-      const { fit, distance, frameBox } = refitPlayfieldCamera(
-        camera,
-        root,
-        PLAYFIELD_VIEW_MODE,
-        cameraTarget,
-        camCorners,
-        cameraDebugTuningRef.current,
-        aspect,
-      );
-      playfieldCamFit = { fit, camera, cameraTarget, distance };
-      orbitControls?.target.copy(cameraTarget);
-      captureDirectorBase(fit, distance);
-      return frameBox;
-    };
-    refitCameraRef.current = syncPlayfieldCamera;
+    refitCameraRef.current = (root) => cameraRig.syncToRoot(root);
 
     // ── Flipper visual state ─────────────────────────────────────────────────
     let leftFlipperPivot: FlipperPivot | null = null;
@@ -612,39 +515,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
     // ── Juice : screen shake + hit-flash flippers ───────────────────────────
     const screenShake = screenShakeRef.current!;
-    type FlashMat = { mat: THREE.MeshStandardMaterial; emissive: THREE.Color; intensity: number };
     let leftFlashMats: FlashMat[] = [];
     let rightFlashMats: FlashMat[] = [];
     let leftFlash = 0;
     let rightFlash = 0;
-    const FLASH_DURATION = 0.08; // retour en 80ms
-    const FLASH_INTENSITY = 1.2;
-    const _flashColor = new THREE.Color(0xfff0e0); // blanc chaud
-    const collectFlashMats = (obj: THREE.Object3D): FlashMat[] => {
-      const out: FlashMat[] = [];
-      obj.traverse((c) => {
-        if (!(c instanceof THREE.Mesh)) return;
-        const mats = Array.isArray(c.material) ? c.material : [c.material];
-        for (const m of mats) {
-          if (m instanceof THREE.MeshStandardMaterial) {
-            out.push({ mat: m, emissive: m.emissive.clone(), intensity: m.emissiveIntensity });
-          }
-        }
-      });
-      return out;
-    };
-    const applyFlash = (mats: FlashMat[], t: number) => {
-      const f = t > 0 ? t / FLASH_DURATION : 0;
-      for (const fm of mats) {
-        if (f > 0) {
-          fm.mat.emissive.copy(fm.emissive).lerp(_flashColor, f);
-          fm.mat.emissiveIntensity = fm.intensity + FLASH_INTENSITY * f;
-        } else {
-          fm.mat.emissive.copy(fm.emissive);
-          fm.mat.emissiveIntensity = fm.intensity;
-        }
-      }
-    };
 
     // ── Physics / game objects ───────────────────────────────────────────────
     let ballMesh: THREE.Object3D | null = null;
@@ -718,47 +592,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     // Drag la bille n'importe où sur le tapis pour tester les coincements.
     // Pendant le drag : orbit désactivé, vitesse forcée à 0 (suit le curseur),
     // locks du couloir bypassés. Au relâché : la physique reprend.
-    let ballMoveMode = false;
-    let ballDragging = false;
-    const dragRaycaster = new THREE.Raycaster();
-    const dragPointer = new THREE.Vector2();
-
-    const moveBallToPointer = (clientX: number, clientY: number) => {
-      if (!ballPhysicsInst || !playfieldRootRef) return;
-      const rect = renderer.domElement.getBoundingClientRect();
-      dragPointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      dragPointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-      dragRaycaster.setFromCamera(dragPointer, camera);
-      const hits = dragRaycaster.intersectObject(playfieldRootRef, true);
-      if (!hits.length) return;
-      const p = hits[0].point;
-      ballPhysicsInst.body.setTranslation(
-        { x: p.x, y: ballCenterOnSurface(p.z), z: p.z },
-        true,
-      );
-      ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      if (ballMesh) ballMesh.visible = true;
-    };
-
-    const onBallDragDown = (e: PointerEvent) => {
-      if (!ballMoveMode) return;
-      ballDragging = true;
-      if (orbitControls) orbitControls.enabled = false;
-      moveBallToPointer(e.clientX, e.clientY);
-    };
-    const onBallDragMove = (e: PointerEvent) => {
-      if (!ballDragging) return;
-      moveBallToPointer(e.clientX, e.clientY);
-    };
-    const onBallDragUp = () => {
-      if (!ballDragging) return;
-      ballDragging = false;
-      if (orbitControls) orbitControls.enabled = true;
-    };
-    renderer.domElement.addEventListener("pointerdown", onBallDragDown);
-    window.addEventListener("pointermove", onBallDragMove);
-    window.addEventListener("pointerup", onBallDragUp);
+    const ballDragController = new BallDragController({
+      renderer,
+      camera,
+      getPlayfieldRoot: () => playfieldRootRef,
+      getBall: () => ballPhysicsInst,
+      getBallMesh: () => ballMesh,
+      getOrbitControls: () => cameraRig.orbit,
+    });
+    ballDragController.attach();
 
     // Logs de diagnostic gérés par le toggle HUD `[J]` → silence total en prod.
     const debugLog = (...args: unknown[]) => {
@@ -993,51 +835,11 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           debugColor: number,
         ): { body: RAPIER.RigidBody | null; debugMesh: THREE.Mesh | null; localOffset: THREE.Vector3 } => {
           if (!flipper) return { body: null, debugMesh: null, localOffset: new THREE.Vector3() };
-          flipper.updateMatrixWorld(true);
-          const meshOrigin = new THREE.Vector3();
-          const worldQuat  = new THREE.Quaternion();
-          flipper.getWorldPosition(meshOrigin);
-          flipper.getWorldQuaternion(worldQuat);
-          const invWorldQuat = worldQuat.clone().invert();
-          const posAttr = flipper.geometry.attributes.position as THREE.BufferAttribute;
-          const n = posAttr.count;
-          const v = new THREE.Vector3();
 
-          // Centre géométrique réel (pas l'origine du groupe parent)
-          let wSumX = 0, wSumY = 0, wSumZ = 0;
-          for (let i = 0; i < n; i++) {
-            v.fromBufferAttribute(posAttr, i).applyMatrix4(flipper.matrixWorld);
-            wSumX += v.x; wSumY += v.y; wSumZ += v.z;
-          }
-          const geoCenter = new THREE.Vector3(wSumX / n, wSumY / n, wSumZ / n);
-          const localOffset = geoCenter.clone().sub(meshOrigin).applyQuaternion(invWorldQuat);
-
-          // Vertices en espace body-local (centré sur geoCenter)
-          const localPts: THREE.Vector3[] = [];
-          const raw: number[] = [];
-          for (let i = 0; i < n; i++) {
-            v.fromBufferAttribute(posAttr, i).applyMatrix4(flipper.matrixWorld);
-            v.sub(geoCenter).applyQuaternion(invWorldQuat);
-            localPts.push(v.clone());
-            raw.push(v.x, v.y, v.z);
-          }
-
-          const body = world.createRigidBody(
-            RAPIER.RigidBodyDesc.kinematicPositionBased()
-              .setTranslation(geoCenter.x, geoCenter.y, geoCenter.z)
-              .setRotation({ x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w }),
-          );
-
-          const hullDesc = RAPIER.ColliderDesc.convexHull(new Float32Array(raw));
-          if (hullDesc) {
-            world.createCollider(
-              hullDesc
-                .setRestitution(FLIPPER_RESTITUTION)
-                .setFriction(FLIPPER_FRICTION)
-                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
-              body,
-            );
-          }
+          const { body, localOffset, localPts } = buildFlipperHullBody(world, flipper, {
+            restitution: FLIPPER_RESTITUTION,
+            friction: FLIPPER_FRICTION,
+          });
 
           const convexGeo = new ConvexGeometry(localPts);
           const convexMat = new THREE.MeshBasicMaterial({
@@ -1115,29 +917,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         // ── Caméra cabine fixe (non rotatable) — tapis jouable uniquement ───────
         modelRoot.updateMatrixWorld(true);
-        cameraDirector = new PlayfieldCameraDirector();
-        cameraDirector.setViewMode(PLAYFIELD_VIEW_MODE);
-        cameraDirector.setBosses(mapBosses);
-        const camFrameBox = syncPlayfieldCamera(playfieldRoot);
-        if (camera instanceof THREE.PerspectiveCamera) {
-          const msz = camFrameBox.getSize(new THREE.Vector3());
-          camera.near = Math.max(0.001, Math.min(msz.length() * 0.004, 0.25));
-          camera.far = Math.max(80, msz.length() * 120);
-          camera.updateProjectionMatrix();
-        }
+        cameraRig.director.setBosses(mapBosses);
+        const camFrameBox = cameraRig.syncToRoot(playfieldRoot);
+        cameraRig.applyNearFar(camFrameBox);
         const restoreBossCamera = () => {
-          cameraDirector?.restore();
+          cameraRig.restoreBoss();
         };
 
         // ── OrbitControls — caméra libre ─────────────────────────────────────
-        orbitControls = new OrbitControls(camera, renderer.domElement);
-        orbitControls.target.copy(cameraTarget);
-        orbitControls.enableDamping = true;
-        orbitControls.dampingFactor = 0.08;
-        orbitControls.screenSpacePanning = true;
-        orbitControls.minDistance = 0.05;
-        orbitControls.maxDistance = 5;
-        orbitControls.update();
+        cameraRig.attachOrbit(renderer.domElement);
 
         // ── Use-cases ─────────────────────────────────────────────────────────
         const plunger = new Plunger();
@@ -1153,107 +941,29 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           clearAlternateWorldSession();
         };
         // Réconciliation des marqueurs de nid : gérée par le module de map
-        // (fin de mapModule.onGameEvent, après chaque event).
-        emit = (event) => {
-          // Sauvetage dernière vie : la map peut accorder une vie AVANT le
-          // décrément (handleDrain) pour éviter le game over. On lui passe le
-          // compte de vies pré-décrément (livesRef n'est pas encore modifié).
-          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
-            mapModule?.onPreDrain?.(livesRef.current);
-          }
-          baseEmit(event);
-          if (
-            "scoreIncrement" in event
-            && event.scoreIncrement
-            && gameStateRef.current === "playing"
-          ) {
-            collisionProcessor?.tryAllBossReveals(scoreRef.current, gameStateRef.current);
-          }
-          diag.noteEvent(event.type);
-          if (event.type === "DRAIN") diag.noteReset("drain");
-          if (event.type === "BOTTOM_OUT") diag.noteReset("bottom_out");
-          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
-            restoreBossCamera();
-          }
-          if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
-          // bumperVisuals + garlands : onGameEvent géré par le module de map.
-          // bossReveals + upsideDownPortal + upsideDownAtmosphere : onGameEvent
-          // géré par le module de map.
-          mapModule?.onGameEvent(event);
-
-          // ── Screen shake par event (juice) ───────────────────────────────────
-          if (event.type === "BUMPER_HIT") screenShake.add(0.25);
-          else if (event.type === "SLINGSHOT_HIT") screenShake.add(0.2);
-          else if (event.type === "DROP_TARGET_HIT") screenShake.add(0.35);
-          else if (event.type === "DROP_TARGET_COMPLETE") screenShake.add(0.6);
-          else if (event.type === "BOSS_TARGET_HIT") {
-            // Juice générique : tout hit de cible boss secoue l'écran.
-            screenShake.add(0.5);
-          }
-
-          // BOSS_LOCKED_HIT (flash nid + « ENCORE X PTS ») : géré par le module.
-
-          if (event.type === "BOSS_REVEAL") {
-            cameraDirector?.play(event.bossId);
-          }
-          if (event.type === "BOSS_TARGET_HIT") {
-            const boss = getBossById(mapBosses, event.bossId);
-            if (boss && event.hitCount >= boss.targetHits) {
-              cameraDirector?.playVictory(event.bossId);
-            }
-          }
-          if (event.type === "RETURN_PORTAL_TRANSITION_END" || event.type === "WORLD_CYCLE_COMPLETE") {
-            restoreBossCamera();
-          }
-
-          if (
-            (event.type === "DRAIN" || event.type === "BOTTOM_OUT")
-            && gameStateRef.current === "game_over"
-          ) {
-            collisionProcessor?.resetAllBossFights();
-            collisionProcessor?.resetScoreBaselines();
-            // bossReveals.endAllFights géré par le module (DRAIN/BOTTOM_OUT game-over).
-          }
-          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
-            if (
-              ALTERNATE_WORLD_PERSISTENCE === "until_drain" ||
-              gameStateRef.current === "game_over"
-            ) {
-              releaseAlternateWorld();
-            }
-          }
-          if (event.type === "PORTAL_ENTER") {
-            // Bascule de monde gérée par le module (mapModule.onGameEvent).
-            dmd.pushCinematic("portal_swallow");
-          }
-          if (event.type === "RETURN_PORTAL_ENTER") {
-            dmd.pushCinematic("portal_swallow");
-          }
-          // PORTAL_TRANSITION_END (portail actif + baseline + nid) géré par le
-          // module de map.
-          if (event.type === "BALL_LAUNCHED") {
-            collisionProcessor?.resetPortalTrigger();
-            bottomOutBallUC?.resetLatch();
-          }
-          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
-            shooterLaneGate?.open();
-          }
-          if (event.type === 'DROP_TARGET_HIT') {
-            // Meshes GLB conventionnés en target_<id> (ex. target_left_1) ;
-            // l'id de drop est drop_<id> → on retrouve le mesh visuel.
-            const meshName = event.targetId.replace('drop_', 'target_');
-            const mesh = playfieldRootRef?.getObjectByName(meshName);
-            if (mesh) mesh.visible = false;
-          }
-          if (event.type === 'DROP_TARGET_COMPLETE' || event.type === 'DROP_TARGET_RESET') {
-            for (const dt of mapLayout.dropTargets) {
-              const mesh = playfieldRootRef?.getObjectByName(dt.id.replace('drop_', 'target_'));
-              if (mesh) mesh.visible = true;
-            }
-          }
-
-          // État des marqueurs de nid : recalculé par le module de map.
-        };
+        // (fin de mapModule.onGameEvent, après chaque event). Le routage
+        // (pre-drain, reveals/victory caméra, screen-shake, cinématiques
+        // portail, drop-target mesh, release monde alternatif) est délégué au
+        // factory createEmitRouter — collaborateurs `let` accédés en paresseux.
+        emit = createEmitRouter({
+          baseEmit,
+          mapModule,
+          getCollisionProcessor: () => collisionProcessor,
+          cameraRig,
+          dmd,
+          screenShake,
+          diag,
+          getShooterLaneGate: () => shooterLaneGate,
+          getPlayfieldRoot: () => playfieldRootRef,
+          mapLayout,
+          mapBosses,
+          getBottomOutBallUC: () => bottomOutBallUC,
+          releaseAlternateWorld,
+          livesRef,
+          gameStateRef,
+          scoreRef,
+          ALTERNATE_WORLD_PERSISTENCE,
+        });
         emitRef.current = emit; // expose aux callbacks useGameState (milestone/boss-armed)
         launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
         bumperHitUC = new BumperHit(ballPhysicsInst, emit);
@@ -1459,11 +1169,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             return;
           }
           if (e.key === "m" || e.key === "M") {
-            ballMoveMode = !ballMoveMode;
-            if (!ballMoveMode && ballDragging) {
-              ballDragging = false;
-              if (orbitControls) orbitControls.enabled = true;
-            }
+            ballDragController.toggleMoveMode();
             return;
           }
           if (e.key === "r" || e.key === "R") {
@@ -1508,23 +1214,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
     void init();
 
-    const syncFlipperBody = (
-      body: RAPIER.RigidBody | null,
-      flipper: THREE.Object3D | null,
-      localOffset: THREE.Vector3,
-    ) => {
-      if (!body || !flipper) return;
-      flipper.updateMatrixWorld(true);
-      const wp = new THREE.Vector3();
-      const wq = new THREE.Quaternion();
-      flipper.getWorldPosition(wp);
-      flipper.getWorldQuaternion(wq);
-      const worldOffset = localOffset.clone().applyQuaternion(wq);
-      wp.add(worldOffset);
-      body.setNextKinematicTranslation({ x: wp.x, y: wp.y, z: wp.z });
-      body.setNextKinematicRotation({ x: wq.x, y: wq.y, z: wq.z, w: wq.w });
-    };
-
     // ── Render loop ───────────────────────────────────────────────────────────
     let frameId: number;
 
@@ -1542,7 +1231,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       cinematics.update(time);
       mapModule?.update(dt);
       const bossIntroActive = mapModule?.isIntroHolding?.() ?? false;
-      const cameraCinematicActive = cameraDirector?.isActive() ?? false;
+      const cameraCinematicActive = cameraRig.director.isActive();
       const freezeFrame =
         (mapModule?.shouldFreezePhysics?.() ?? false) || cinematics.shouldFreeze();
 
@@ -1585,16 +1274,16 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         // ── Debug wireframes ─────────────────────────────────────────────────
         if (leftFlipperDebug && leftFlipperObj) {
-          const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
-          leftFlipperObj.getWorldPosition(wp); leftFlipperObj.getWorldQuaternion(wq);
-          wp.add(leftFlipperBodyOffset.clone().applyQuaternion(wq));
-          leftFlipperDebug.position.copy(wp); leftFlipperDebug.quaternion.copy(wq);
+          const { position, quaternion } =
+            flipperWorldTransform(leftFlipperObj, leftFlipperBodyOffset);
+          leftFlipperDebug.position.copy(position);
+          leftFlipperDebug.quaternion.copy(quaternion);
         }
         if (rightFlipperDebug && rightFlipperObj) {
-          const wp = new THREE.Vector3(); const wq = new THREE.Quaternion();
-          rightFlipperObj.getWorldPosition(wp); rightFlipperObj.getWorldQuaternion(wq);
-          wp.add(rightFlipperBodyOffset.clone().applyQuaternion(wq));
-          rightFlipperDebug.position.copy(wp); rightFlipperDebug.quaternion.copy(wq);
+          const { position, quaternion } =
+            flipperWorldTransform(rightFlipperObj, rightFlipperBodyOffset);
+          rightFlipperDebug.position.copy(position);
+          rightFlipperDebug.quaternion.copy(quaternion);
         }
       }
 
@@ -1618,39 +1307,28 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         && flipperZones
       ) {
         const pos = ballPhysicsInst.body.translation();
-        const bx = pos.x;
-        const by = pos.y;
-        const bz = pos.z;
         const { left: lz, right: rz } = flipperZones;
         const angVelL = (leftSwing - prevLeftSwing) / dt;
         const angVelR = (rightSwing - prevRightSwing) / dt;
-        const inLeft =
-          bz > lz.zMin && bz < lz.zMax
-          && bx > lz.xMin && bx < lz.xMax
-          && by >= lz.yMin && by <= lz.yMax;
-        const inRight =
-          bz > rz.zMin && bz < rz.zMax
-          && bx > rz.xMin && bx < rz.xMax
-          && by >= rz.yMin && by <= rz.yMax;
-        if (inLeft && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL) {
-          const vel = ballPhysicsInst.body.linvel();
-          if (vel.z > FLIPPER_MIN_LAUNCH_VZ) {
-            ballPhysicsInst.body.setLinvel(
-              { x: vel.x * FLIPPER_LAUNCH_VX_ATTENUATION, y: vel.y, z: FLIPPER_MIN_LAUNCH_VZ },
-              true,
-            );
-            leftFlash = FLASH_DURATION;
-          }
+        const leftAssist = computeFlipperLaunchAssist({
+          pos,
+          vel: ballPhysicsInst.body.linvel(),
+          zone: lz,
+          angVel: angVelL,
+        });
+        if (leftAssist) {
+          ballPhysicsInst.body.setLinvel(leftAssist.linvel, true);
+          leftFlash = FLASH_DURATION;
         }
-        if (inRight && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL) {
-          const vel = ballPhysicsInst.body.linvel();
-          if (vel.z > FLIPPER_MIN_LAUNCH_VZ) {
-            ballPhysicsInst.body.setLinvel(
-              { x: vel.x * FLIPPER_LAUNCH_VX_ATTENUATION, y: vel.y, z: FLIPPER_MIN_LAUNCH_VZ },
-              true,
-            );
-            rightFlash = FLASH_DURATION;
-          }
+        const rightAssist = computeFlipperLaunchAssist({
+          pos,
+          vel: ballPhysicsInst.body.linvel(),
+          zone: rz,
+          angVel: angVelR,
+        });
+        if (rightAssist) {
+          ballPhysicsInst.body.setLinvel(rightAssist.linvel, true);
+          rightFlash = FLASH_DURATION;
         }
       }
 
@@ -1685,14 +1363,11 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // Balle figée au spawn tant qu'on est idle, Y COMPRIS pendant la charge
         // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
         // mur droit (frottement → ralentissement au lancement).
-        if (gameStateRef.current === "idle" && physicsReady && !ballMoveMode) {
-          const z = mapLayout.spawns.ball.z;
-          ballPhysicsInst.body.setTranslation(
-            { x: mapLayout.spawns.ball.x, y: ballCenterOnSurface(z), z },
-            true,
-          );
-          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        if (gameStateRef.current === "idle" && physicsReady && !ballDragController.isMoveMode) {
+          const lock = computeIdleSpawnLock(mapLayout.spawns.ball);
+          ballPhysicsInst.body.setTranslation(lock.translation, true);
+          ballPhysicsInst.body.setLinvel(lock.linvel, true);
+          ballPhysicsInst.body.setAngvel(lock.angvel, true);
         }
 
         // Verrouillage latéral du couloir : pendant la montée (partie droite du
@@ -1701,27 +1376,26 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // dépendre de la géométrie GLB. La balle est libérée dès qu'elle atteint
         // la zone de sortie (Z <= mapLayout.shooterLane.leftWallTopZ) pour partir
         // naturellement dans le terrain.
-        if (gameStateRef.current === "playing" && !ballMoveMode && !shooterLaneGate?.isClosed()) {
-          const lp = ballPhysicsInst.body.translation();
-          const inLaneStraight =
-            lp.z > mapLayout.shooterLane.leftWallTopZ && lp.x > mapLayout.shooterLane.lockX;
-          if (inLaneStraight) {
-            ballPhysicsInst.body.setTranslation(
-              { x: mapLayout.spawns.ball.x, y: lp.y, z: lp.z },
-              true,
-            );
-            const lv = ballPhysicsInst.body.linvel();
-            ballPhysicsInst.body.setLinvel({ x: 0, y: lv.y, z: lv.z }, true);
-            const av = ballPhysicsInst.body.angvel();
-            ballPhysicsInst.body.setAngvel({ x: av.x, y: 0, z: 0 }, true);
-          } else if (lp.x < mapLayout.shooterLane.exitX) {
+        if (gameStateRef.current === "playing" && !ballDragController.isMoveMode && !shooterLaneGate?.isClosed()) {
+          const laneLock = computeLaneStraightLock(
+            ballPhysicsInst.body.translation(),
+            ballPhysicsInst.body.linvel(),
+            ballPhysicsInst.body.angvel(),
+            mapLayout.shooterLane,
+            mapLayout.spawns.ball.x,
+          );
+          if (laneLock === 'close') {
             shooterLaneGate?.close();
+          } else if (laneLock) {
+            ballPhysicsInst.body.setTranslation(laneLock.translation, true);
+            ballPhysicsInst.body.setLinvel(laneLock.linvel, true);
+            ballPhysicsInst.body.setAngvel(laneLock.angvel, true);
           }
         }
 
         // ── Surface snap : recolle la balle au sol incliné (logique en
         // game-engine, cf. computeSurfaceSnap). On lit pos/vel et on applique.
-        if (gameStateRef.current === "playing" && !ballMoveMode) {
+        if (gameStateRef.current === "playing" && !ballDragController.isMoveMode) {
           const snap = computeSurfaceSnap(
             ballPhysicsInst.body.translation(),
             ballPhysicsInst.body.linvel(),
@@ -1736,18 +1410,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         ballPhysicsInst.syncToMesh(ballMesh);
 
         // Clamp ball speed
-        const bVelClamp = ballPhysicsInst.body.linvel();
-        const speed = Math.sqrt(bVelClamp.x ** 2 + bVelClamp.y ** 2 + bVelClamp.z ** 2);
-        if (speed > BALL_MAX_SPEED) {
-          const scale = BALL_MAX_SPEED / speed;
-          ballPhysicsInst.body.setLinvel(
-            { x: bVelClamp.x * scale, y: bVelClamp.y * scale, z: bVelClamp.z * scale },
-            true,
-          );
-        }
-        if (bVelClamp.y > 1.25) {
-          ballPhysicsInst.body.setLinvel({ x: bVelClamp.x, y: 0.35, z: bVelClamp.z }, true);
-        }
+        const clampedVel = computeSpeedClamp(ballPhysicsInst.body.linvel());
+        if (clampedVel) ballPhysicsInst.body.setLinvel(clampedVel, true);
 
         const bPos = ballPhysicsInst.body.translation();
         const bVel = ballPhysicsInst.body.linvel();
@@ -1819,8 +1483,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       }
 
       // ── OrbitControls update ─────────────────────────────────────────────
-      cameraDirector?.update(dt);
-      if (orbitControls && !freezeFrame && !cameraCinematicActive) orbitControls.update();
+      cameraRig.updateFrame(dt, { freeze: freezeFrame, cinematicActive: cameraCinematicActive });
 
       // ── Rapier debug render (tous colliders) ─────────────────────────────
       if (debugCollidersOn && physicsWorld) {
@@ -1883,10 +1546,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         camera.updateProjectionMatrix();
       }
       if (playfieldRootRef) {
-        syncPlayfieldCamera(playfieldRootRef);
-      } else if (playfieldCamFit) {
-        camera.up.copy(playfieldCameraUpForMode(PLAYFIELD_VIEW_MODE));
-        camera.lookAt(cameraTarget);
+        cameraRig.syncToRoot(playfieldRootRef);
+      } else {
+        cameraRig.applyViewUpFallback();
       }
       renderer.setSize(w, h);
     };
@@ -1904,10 +1566,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("orientationchange", handleResize);
       resizeObserver.disconnect();
-      renderer.domElement.removeEventListener("pointerdown", onBallDragDown);
-      window.removeEventListener("pointermove", onBallDragMove);
-      window.removeEventListener("pointerup", onBallDragUp);
-      orbitControls?.dispose();
+      ballDragController.dispose();
+      cameraRig.dispose();
       const pw = physicsWorld as (PhysicsWorld & { _onKeyDown?: (e: KeyboardEvent) => void; _onKeyUp?: (e: KeyboardEvent) => void }) | null;
       if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
       if (pw?._onKeyUp) document.removeEventListener("keyup", pw._onKeyUp);
@@ -1917,7 +1577,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       ballTrail?.dispose();
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;
-      cameraDirector?.dispose();
       playfieldRootHandleRef.current = null;
       refitCameraRef.current = null;
       disposableGeos.forEach((g) => g.dispose());
