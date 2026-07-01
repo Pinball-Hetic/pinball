@@ -21,12 +21,9 @@ import {
   computeLaneStraightLock,
   computeSpeedClamp,
   computeFlipperLaunchAssist,
-  resolvePlayfieldFlippers,
   syncFlipperBody,
   flipperWorldTransform,
-  attachFlipperAtHinge,
   applyFlipperSwing,
-  computeFlipperZones,
   type FlipperZones,
   type FlipperPivot,
   CollisionEventProcessor,
@@ -34,7 +31,6 @@ import {
   BallDiagnostics,
   type BallDiagnosticsSnapshot,
   type BallResetReason,
-  findObjectByNormalizedName,
   removePinballmapUnusedMeshes,
   hidePinballmapDecorNodes,
   prepareGltfMaterialsForDisplay,
@@ -53,7 +49,6 @@ import {
   BallTrail,
   QualityGovernor,
   ShooterLaneGate,
-  collectFlashMats,
   applyFlash,
   FLASH_DURATION,
   type FlashMat,
@@ -110,6 +105,7 @@ import { createMapContext } from "./createMapContext";
 import { computePlungerVisual } from "./hotLoop/computePlungerVisual";
 import { computeFrameDt, computeTrailIntensity } from "./hotLoop/frameMath";
 import { buildPlayfieldColliders } from "./physics/buildPlayfieldColliders";
+import { setupFlippers } from "./physics/setupFlippers";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -767,39 +763,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         modelRoot.updateMatrixWorld(true);
 
-        const pinballmap =
-          findObjectByNormalizedName(playfieldRoot, 'Pinballmap', 'pinballmap') ?? playfieldRoot;
-
-        // resolvePlayfieldFlippers gère en priorité le nouveau format (flipper-left / flipper-right)
-        // puis le format héritage (flipper.001 unique splitté géométriquement).
-        const flipperSetup = resolvePlayfieldFlippers(playfieldRoot);
-
-        let leftFlipper: THREE.Object3D | null = null;
-        let rightFlipper: THREE.Object3D | null = null;
-
-        if (flipperSetup) {
-          leftFlipper = flipperSetup.left;
-          rightFlipper = flipperSetup.right;
-        }
-
-        leftFlipper?.updateMatrixWorld(true);
-        rightFlipper?.updateMatrixWorld(true);
-
-        if (leftFlipper && (leftFlipper as THREE.Mesh).isMesh) {
-          leftFlipperPivot = attachFlipperAtHinge(leftFlipper, "left", mapLayout.flipperPivots, pinballmap);
-          leftFlipperObj = leftFlipper;
-          leftFlashMats = collectFlashMats(leftFlipper);
-        }
-        if (rightFlipper && (rightFlipper as THREE.Mesh).isMesh) {
-          rightFlipperPivot = attachFlipperAtHinge(rightFlipper, "right", mapLayout.flipperPivots, pinballmap);
-          rightFlipperObj = rightFlipper;
-          rightFlashMats = collectFlashMats(rightFlipper);
-        }
-
-        // Zones de garantie de lancement dérivées des bbox mesh (pose de repos).
-        if (leftFlipperObj && rightFlipperObj) {
-          flipperZones = computeFlipperZones(leftFlipperObj, rightFlipperObj, getBallRadius());
-        }
+        // Résolution + attache des flippers extraite (physics/setupFlippers.ts).
+        const flippers = setupFlippers(playfieldRoot, mapLayout.flipperPivots, getBallRadius());
+        leftFlipperPivot = flippers.leftPivot;
+        rightFlipperPivot = flippers.rightPivot;
+        leftFlipperObj = flippers.leftObj;
+        rightFlipperObj = flippers.rightObj;
+        leftFlashMats = flippers.leftFlashMats;
+        rightFlashMats = flippers.rightFlashMats;
+        if (flippers.zones) flipperZones = flippers.zones;
 
         // ── Physics ──────────────────────────────────────────────────────────
         physicsWorld = await PhysicsWorld.create();
@@ -888,8 +860,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         const flipperBodies = buildFlipperBodies({
           world,
           scene,
-          leftFlipper: leftFlipper as THREE.Mesh | null,
-          rightFlipper: rightFlipper as THREE.Mesh | null,
+          leftFlipper: flippers.leftMesh as THREE.Mesh | null,
+          rightFlipper: flippers.rightMesh as THREE.Mesh | null,
           leftPivot: leftFlipperPivot,
           rightPivot: rightFlipperPivot,
           disposableGeos,
