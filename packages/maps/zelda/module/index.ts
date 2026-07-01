@@ -7,6 +7,7 @@ import {
   handleBossArmed,
   isGameOverDrain,
   isBossTargetDefeated,
+  createBossDefeatTimers,
 } from '@pinball/game-engine'
 import {
   GanondorfReveal,
@@ -34,6 +35,11 @@ export function createModule(): MapModule {
   // Nid : armé depuis (ms) + hint tardif déjà émis, par boss.
   const armedAt: Record<string, number> = {}
   const hintFired = new Set<string>()
+
+  // Timers de restauration du timescale après défaite d'un boss (~400 ms).
+  // Suivis par bossId pour éviter les fuites (annulés au reset/dispose, jamais
+  // empilés). Cf. createBossDefeatTimers (game-engine).
+  const bossDefeatTimers = createBossDefeatTimers()
 
   let ganondorfReveal: GanondorfReveal | null = null
   let darkLinkReveal:  DarkLinkReveal  | null = null
@@ -87,7 +93,7 @@ export function createModule(): MapModule {
         ganondorfs += 1
         ctx.setMapState({ ganondorfs })
         ctx.physics.setTimeScale(1 / 3)
-        window.setTimeout(() => {
+        bossDefeatTimers.schedule('ganondorf', 400, () => {
           ctx.physics.setTimeScale(1)
           // Le portail bleu Sacred Realm s'ouvre dès que le temps reprend.
           portal?.open()
@@ -95,7 +101,7 @@ export function createModule(): MapModule {
             onEnd: () =>
               ctx.ball?.applyEjectionForce({ x: boss.target.x, z: boss.target.z }),
           })
-        }, 400)
+        })
       }
     }
   }
@@ -111,13 +117,13 @@ export function createModule(): MapModule {
         darklinks += 1
         ctx.setMapState({ darklinks })
         ctx.physics.setTimeScale(1 / 3)
-        window.setTimeout(() => {
+        bossDefeatTimers.schedule('darklink', 400, () => {
           ctx.physics.setTimeScale(1)
           ctx.playCinematic('darklink_slain', {
             onEnd: () =>
               ctx.ball?.applyEjectionForce({ x: boss.target.x, z: boss.target.z }),
           })
-        }, 400)
+        })
       }
     }
   }
@@ -316,10 +322,12 @@ export function createModule(): MapModule {
     },
 
     resetWorld(): void {
+      bossDefeatTimers.clearAll()
       sacredRealm?.reset()
     },
 
     onGameReset(): void {
+      bossDefeatTimers.clearAll()
       ganondorfs = 0
       darklinks  = 0
       portals    = 0
@@ -333,6 +341,7 @@ export function createModule(): MapModule {
     },
 
     dispose(): void {
+      bossDefeatTimers.clearAll()
       bossReveals?.dispose()
       bossReveals  = null
       ganondorfReveal = null

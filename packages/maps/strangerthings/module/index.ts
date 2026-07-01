@@ -18,6 +18,7 @@ import {
   handleBossArmed,
   isGameOverDrain,
   isBossTargetDefeated,
+  createBossDefeatTimers,
 } from '@pinball/game-engine'
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 import { grantExtraLife } from './lifeBonus'
@@ -39,6 +40,10 @@ export function createModule(): MapModule {
   // Liste des ids de boss (statique après setup) — hoistée pour éviter une
   // allocation de tableau à chaque tick d'update (hint tardif du nid).
   let bossIds: readonly string[] = []
+  // Timers de restauration du timescale après défaite d'un boss (~200 ms).
+  // Suivis par bossId pour éviter les fuites (annulés au reset/dispose, jamais
+  // empilés). Cf. createBossDefeatTimers (game-engine).
+  const bossDefeatTimers = createBossDefeatTimers()
   let garlands: GarlandLights | null = null
   let bumperVisuals: BumperVisuals | null = null
   let atmosphere: UpsideDownAtmosphere | null = null
@@ -90,13 +95,13 @@ export function createModule(): MapModule {
       const demo = ctx.layout.bosses.find((b) => b.id === 'demogorgon')
       if (demo && isBossTargetDefeated(demo.targetHits, e.hitCount)) {
         ctx.physics.setTimeScale(1 / 3)
-        window.setTimeout(() => {
+        bossDefeatTimers.schedule('demogorgon', 200, () => {
           ctx.physics.setTimeScale(1)
           ctx.playCinematic('demogorgon_slain', {
             onEnd: () =>
               ctx.ball?.applyEjectionForce({ x: demo.target.x, z: demo.target.z }),
           })
-        }, 200)
+        })
       }
     }
   }
@@ -364,11 +369,13 @@ export function createModule(): MapModule {
       vecnaReveal?.endFight()
     },
     resetWorld(): void {
+      bossDefeatTimers.clearAll()
       portal?.reset()
       atmosphere?.reset()
       bossReveals?.endAllFights()
     },
     onGameReset(): void {
+      bossDefeatTimers.clearAll()
       demogorgons = 0
       portals = 0
       hetic = 0
@@ -379,6 +386,7 @@ export function createModule(): MapModule {
       ctxRef?.setMapState({ demogorgons: 0, portals: 0, hetic: 0 })
     },
     dispose(): void {
+      bossDefeatTimers.clearAll()
       bumperVisuals?.dispose()
       garlands?.dispose()
       atmosphere?.dispose()

@@ -230,13 +230,13 @@ export class VecnaReveal implements BossRevealController {
 
   private beginVictory(): void {
     this.vecnaVisual.playVictory();
-    this.onFightEnd?.();
     if (this.targetGroup) this.targetGroup.visible = false;
   }
 
   private hideBoss(): void {
     this.vecnaVisual.hide();
     if (this.targetGroup) this.targetGroup.visible = false;
+    this.onFightEnd?.();
     this.resetAtmosphere();
   }
 

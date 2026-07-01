@@ -469,23 +469,24 @@ export class DemogorgonReveal implements BossRevealController {
   }
 
   private resetTargetMaterials(): void {
+    const def = getBossDefinition('demogorgon').targetMeshTheme;
     if (this.targetRingMat) {
       this.targetRingMat.transparent = false;
       this.targetRingMat.opacity = 1;
-      this.targetRingMat.emissive.setHex(0xff1133);
-      this.targetRingMat.emissiveIntensity = 1.6;
-      this.targetRingMat.color.setHex(0xff2244);
+      this.targetRingMat.emissive.setHex(def.ring.emissive);
+      this.targetRingMat.emissiveIntensity = def.ring.emissiveIntensity;
+      this.targetRingMat.color.setHex(def.ring.color);
     }
     if (this.targetCoreMat) {
       this.targetCoreMat.transparent = false;
       this.targetCoreMat.opacity = 1;
-      this.targetCoreMat.emissive.setHex(0xff4422);
-      this.targetCoreMat.emissiveIntensity = 1.2;
-      this.targetCoreMat.color.setHex(0xffeedd);
+      this.targetCoreMat.emissive.setHex(def.core.emissive);
+      this.targetCoreMat.emissiveIntensity = def.core.emissiveIntensity;
+      this.targetCoreMat.color.setHex(def.core.color);
     }
     if (this.targetLight) {
-      this.targetLight.color.setHex(0xff2244);
-      this.targetLight.intensity = 0.45;
+      this.targetLight.color.setHex(def.light.color);
+      this.targetLight.intensity = def.light.intensity;
     }
     if (this.victoryBurst) this.victoryBurst.scale.setScalar(1);
     if (this.victoryBurstMat) this.victoryBurstMat.opacity = 0;

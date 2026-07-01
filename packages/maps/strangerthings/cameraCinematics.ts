@@ -1,11 +1,11 @@
-import type { BossCameraCinematicConfig } from '@pinball/game-engine'
+import { DEFAULT_BOSS_FACE_DIR, type BossCameraCinematicConfig } from '@pinball/game-engine'
 import {
   VECNA_SPAWN,
   VECNA_WALK_DURATION,
   VECNA_WALK_SETTLE_FACING,
 } from './systems/VecnaConstants'
 
-const BOSS_FACE_DIR = { x: -0.52, y: 0.2, z: 0.83 }
+const BOSS_FACE_DIR = DEFAULT_BOSS_FACE_DIR
 
 export const DEMOGORGON_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
   lookAtLift: 0.06,
