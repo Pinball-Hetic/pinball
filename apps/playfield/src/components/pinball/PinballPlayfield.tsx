@@ -41,6 +41,7 @@ import {
   StuckBallDetector,
   BallDiagnostics,
   type BallDiagnosticsSnapshot,
+  type BallResetReason,
   findObjectByNormalizedName,
   removePinballmapUnusedMeshes,
   hidePinballmapDecorNodes,
@@ -587,6 +588,16 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const bottomOutDetector = new DetectBottomOut();
     const diag = new BallDiagnostics(mapLayout);
     let lastDebugPush = 0;
+
+    // Point de déclenchement UNIQUE du bottom-out : quelle que soit la source de
+    // détection (capteur Rapier, balle perdue, coincée, ou zone géométrique sous
+    // les flippers), c'est ici qu'on décide → un seul execute (idempotent via le
+    // latch de BottomOutBall) + journalisation de la cause. Supprime les trois
+    // sites de déclenchement dupliqués dans la boucle animate.
+    const triggerBottomOut = (reason: BallResetReason) => {
+      bottomOutBallUC?.execute();
+      diag.noteReset(reason);
+    };
 
     // ── Debug : déplacer la bille à la souris (toggle `M`) ───────────────────
     // Drag la bille n'importe où sur le tapis pour tester les coincements.
@@ -1336,8 +1347,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         diag.verbose = debugVisibleRef.current;
         const lost = diag.update(ballPhysicsInst.body, gameStateRef.current);
         if (lost && gameStateRef.current === "playing") {
-          bottomOutBallUC?.execute();
-          diag.noteReset("lost_recovery");
+          triggerBottomOut("lost_recovery");
         }
         if (debugVisibleRef.current && time - lastDebugPush > 100) {
           lastDebugPush = time;
@@ -1423,8 +1433,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           const stuckResult = stuckDetector.update(bSpd, bPos, dt);
           if (stuckResult) {
             if (stuckResult.type === 'force_drain') {
-              bottomOutBallUC?.execute();
-              diag.noteReset('stuck_force_drain');
+              triggerBottomOut('stuck_force_drain');
             } else if (stuckResult.impulse) {
               ballPhysicsInst.body.applyImpulse(stuckResult.impulse, true);
             }
@@ -1438,8 +1447,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           gameStateRef.current === "playing"
           && bottomOutDetector.check(bPos)
         ) {
-          bottomOutBallUC?.execute();
-          diag.noteReset('bottom_out_zone');
+          triggerBottomOut('bottom_out_zone');
         }
 
         // Drain géré par le capteur Rapier bottom_out (CollisionEventProcessor)
