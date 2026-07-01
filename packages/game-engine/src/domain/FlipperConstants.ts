@@ -26,6 +26,13 @@ export const FLIPPER_MIN_LAUNCH_VZ = -2.8;
  * 0.004 rad/frame × 60 = 0.24) → indépendant du fps.
  */
 export const FLIPPER_MIN_LAUNCH_ANGVEL = 0.24;
+/**
+ * Facteur d'atténuation appliqué à la composante X de la vitesse lors d'une
+ * garantie de lancement. Sans lui, le X accumulé produit des lancements
+ * latéraux irréalistes ; on veut un lancement majoritairement vers le haut du
+ * tapis (−Z).
+ */
+export const FLIPPER_LAUNCH_VX_ATTENUATION = 0.3;
 
 // ── Jeu ──────────────────────────────────────────────────────────────────────
 export const INITIAL_LIVES    = 3;

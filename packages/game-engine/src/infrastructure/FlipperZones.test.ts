@@ -38,6 +38,37 @@ describe('computeFlipperZones', () => {
     expect(zones.right.xMax).toBeCloseTo(0.25, 6);
   });
 
+  test('dérive une borne Y depuis la bbox monde du mesh (regression #3)', () => {
+    // Flipper centré en y=1, demi-hauteur 0.05 → bbox Y [0.95, 1.05].
+    const left = boxAt({ x: -0.2, y: 1, z: 0.3 }, 0.05);
+    const right = boxAt({ x: 0.2, y: 1, z: 0.3 }, 0.05);
+
+    const zones = computeFlipperZones(left, right, 0);
+
+    expect(zones.left.yMin).toBeCloseTo(0.95, 6);
+    expect(zones.left.yMax).toBeCloseTo(1.05, 6);
+    expect(zones.right.yMin).toBeCloseTo(0.95, 6);
+    expect(zones.right.yMax).toBeCloseTo(1.05, 6);
+
+    // Une balle nettement au-dessus/en-dessous du plan du flipper est hors zone.
+    const aboveByBallCenter = 2;
+    const belowByBallCenter = 0;
+    expect(aboveByBallCenter <= zones.left.yMax).toBe(false);
+    expect(belowByBallCenter >= zones.left.yMin).toBe(false);
+  });
+
+  test('la marge étend aussi la borne Y', () => {
+    const left = boxAt({ x: 0, y: 0.5, z: 0 }, 0.1);
+    const right = boxAt({ x: 1, y: 0.5, z: 0 }, 0.1);
+    const margin = 0.02;
+
+    const zones = computeFlipperZones(left, right, margin);
+
+    // bbox Y brute = [0.4, 0.6] ; +/- margin → [0.38, 0.62]
+    expect(zones.left.yMin).toBeCloseTo(0.38, 6);
+    expect(zones.left.yMax).toBeCloseTo(0.62, 6);
+  });
+
   test('la marge étend la bbox symétriquement sur X et Z', () => {
     const left = boxAt({ x: 0, y: 0, z: 0 }, 0.1);
     const right = boxAt({ x: 1, y: 0, z: 0 }, 0.1);

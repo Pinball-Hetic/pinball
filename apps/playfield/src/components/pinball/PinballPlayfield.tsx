@@ -26,6 +26,7 @@ import {
   FLIPPER_FRICTION,
   FLIPPER_MIN_LAUNCH_VZ,
   FLIPPER_MIN_LAUNCH_ANGVEL,
+  FLIPPER_LAUNCH_VX_ATTENUATION,
   computeSurfaceSnap,
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
@@ -1609,23 +1610,36 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       ) {
         const pos = ballPhysicsInst.body.translation();
         const bx = pos.x;
+        const by = pos.y;
         const bz = pos.z;
         const { left: lz, right: rz } = flipperZones;
         const angVelL = (leftSwing - prevLeftSwing) / dt;
         const angVelR = (rightSwing - prevRightSwing) / dt;
-        const inLeft = bz > lz.zMin && bz < lz.zMax && bx > lz.xMin && bx < lz.xMax;
-        const inRight = bz > rz.zMin && bz < rz.zMax && bx > rz.xMin && bx < rz.xMax;
+        const inLeft =
+          bz > lz.zMin && bz < lz.zMax
+          && bx > lz.xMin && bx < lz.xMax
+          && by >= lz.yMin && by <= lz.yMax;
+        const inRight =
+          bz > rz.zMin && bz < rz.zMax
+          && bx > rz.xMin && bx < rz.xMax
+          && by >= rz.yMin && by <= rz.yMax;
         if (inLeft && angVelL > FLIPPER_MIN_LAUNCH_ANGVEL) {
           const vel = ballPhysicsInst.body.linvel();
           if (vel.z > FLIPPER_MIN_LAUNCH_VZ) {
-            ballPhysicsInst.body.setLinvel({ x: vel.x, y: vel.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
+            ballPhysicsInst.body.setLinvel(
+              { x: vel.x * FLIPPER_LAUNCH_VX_ATTENUATION, y: vel.y, z: FLIPPER_MIN_LAUNCH_VZ },
+              true,
+            );
             leftFlash = FLASH_DURATION;
           }
         }
         if (inRight && angVelR > FLIPPER_MIN_LAUNCH_ANGVEL) {
           const vel = ballPhysicsInst.body.linvel();
           if (vel.z > FLIPPER_MIN_LAUNCH_VZ) {
-            ballPhysicsInst.body.setLinvel({ x: vel.x, y: vel.y, z: FLIPPER_MIN_LAUNCH_VZ }, true);
+            ballPhysicsInst.body.setLinvel(
+              { x: vel.x * FLIPPER_LAUNCH_VX_ATTENUATION, y: vel.y, z: FLIPPER_MIN_LAUNCH_VZ },
+              true,
+            );
             rightFlash = FLASH_DURATION;
           }
         }

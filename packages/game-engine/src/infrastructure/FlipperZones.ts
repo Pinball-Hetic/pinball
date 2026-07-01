@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 
-export type FlipperZone = { xMin: number; xMax: number; zMin: number; zMax: number };
+export type FlipperZone = {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+  zMin: number;
+  zMax: number;
+};
 export type FlipperZones = { left: FlipperZone; right: FlipperZone };
 
 /**
@@ -22,6 +29,8 @@ export function computeFlipperZones(
     return {
       xMin: min.x - margin,
       xMax: max.x + margin,
+      yMin: min.y - margin,
+      yMax: max.y + margin,
       zMin: min.z - margin,
       zMax: max.z + margin,
     };
