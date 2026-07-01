@@ -16,10 +16,6 @@ import {
   plungerChargeProgress,
   SWING_RAD,
   SWING_SMOOTH,
-  computeSurfaceSnap,
-  computeIdleSpawnLock,
-  computeLaneStraightLock,
-  computeSpeedClamp,
   computeFlipperLaunchAssist,
   syncFlipperBody,
   flipperWorldTransform,
@@ -106,6 +102,7 @@ import { computePlungerVisual } from "./hotLoop/computePlungerVisual";
 import { computeFrameDt, computeTrailIntensity } from "./hotLoop/frameMath";
 import { buildPlayfieldColliders } from "./physics/buildPlayfieldColliders";
 import { setupFlippers } from "./physics/setupFlippers";
+import { stepBallSync } from "./hotLoop/stepBallSync";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -1249,99 +1246,24 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         mapModule?.applyBallMagnet?.();
       }
 
-      // Ball sync
+      // Ball sync (orchestration extraite : hotLoop/stepBallSync.ts).
       if (ballMesh?.visible && ballPhysicsInst) {
-        if (bossIntroActive && gameStateRef.current === "playing") {
-          ballPhysicsInst.body.setTranslation(
-            { x: bossIntroBallPos.x, y: bossIntroBallPos.y, z: bossIntroBallPos.z },
-            true,
-          );
-          ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-          ballPhysicsInst.syncToMesh(ballMesh);
-        } else if (!freezeFrame) {
-        // Balle figée au spawn tant qu'on est idle, Y COMPRIS pendant la charge
-        // du plongeur : sinon la gravité/inclinaison la fait glisser contre le
-        // mur droit (frottement → ralentissement au lancement).
-        if (gameStateRef.current === "idle" && physicsReady && !ballDragController.isMoveMode) {
-          const lock = computeIdleSpawnLock(mapLayout.spawns.ball);
-          ballPhysicsInst.body.setTranslation(lock.translation, true);
-          ballPhysicsInst.body.setLinvel(lock.linvel, true);
-          ballPhysicsInst.body.setAngvel(lock.angvel, true);
-        }
-
-        // Verrouillage latéral du couloir : pendant la montée (partie droite du
-        // couloir, avant l'ouverture de sortie), on fige X sur la ligne de spawn
-        // et on annule la vitesse latérale → lancement parfaitement droit, sans
-        // dépendre de la géométrie GLB. La balle est libérée dès qu'elle atteint
-        // la zone de sortie (Z <= mapLayout.shooterLane.leftWallTopZ) pour partir
-        // naturellement dans le terrain.
-        if (gameStateRef.current === "playing" && !ballDragController.isMoveMode && !shooterLaneGate?.isClosed()) {
-          const laneLock = computeLaneStraightLock(
-            ballPhysicsInst.body.translation(),
-            ballPhysicsInst.body.linvel(),
-            ballPhysicsInst.body.angvel(),
-            mapLayout.shooterLane,
-            mapLayout.spawns.ball.x,
-          );
-          if (laneLock === 'close') {
-            shooterLaneGate?.close();
-          } else if (laneLock) {
-            ballPhysicsInst.body.setTranslation(laneLock.translation, true);
-            ballPhysicsInst.body.setLinvel(laneLock.linvel, true);
-            ballPhysicsInst.body.setAngvel(laneLock.angvel, true);
-          }
-        }
-
-        // ── Surface snap : recolle la balle au sol incliné (logique en
-        // game-engine, cf. computeSurfaceSnap). On lit pos/vel et on applique.
-        if (gameStateRef.current === "playing" && !ballDragController.isMoveMode) {
-          const snap = computeSurfaceSnap(
-            ballPhysicsInst.body.translation(),
-            ballPhysicsInst.body.linvel(),
-            mapLayout.shooterLane,
-          );
-          if (snap) {
-            ballPhysicsInst.body.setTranslation(snap.translation, true);
-            if (snap.linvel) ballPhysicsInst.body.setLinvel(snap.linvel, true);
-          }
-        }
-
-        ballPhysicsInst.syncToMesh(ballMesh);
-
-        // Clamp ball speed
-        const clampedVel = computeSpeedClamp(ballPhysicsInst.body.linvel());
-        if (clampedVel) ballPhysicsInst.body.setLinvel(clampedVel, true);
-
-        const bPos = ballPhysicsInst.body.translation();
-        const bVel = ballPhysicsInst.body.linvel();
-        const bSpd = Math.sqrt(bVel.x ** 2 + bVel.y ** 2 + bVel.z ** 2);
-
-        // Stuck ball detection
-        // Stuck detector — only when NOT in drain zone (Z<0.22)
-        if (gameStateRef.current === "playing" && bPos.z < 0.22) {
-          const stuckResult = stuckDetector.update(bSpd, bPos, dt);
-          if (stuckResult) {
-            if (stuckResult.type === 'force_drain') {
-              triggerBottomOut('stuck_force_drain');
-            } else if (stuckResult.impulse) {
-              ballPhysicsInst.body.applyImpulse(stuckResult.impulse, true);
-            }
-          }
-        } else {
-          stuckDetector.reset();
-        }
-
-        // Bottom-out fallback — zone sous les flippers hors lane de lancement
-        if (
-          gameStateRef.current === "playing"
-          && bottomOutDetector.check(bPos)
-        ) {
-          triggerBottomOut('bottom_out_zone');
-        }
-
-        // Drain géré par le capteur Rapier bottom_out (CollisionEventProcessor)
-        }
+        stepBallSync({
+          ball: ballPhysicsInst,
+          ballMesh,
+          gameState: gameStateRef.current,
+          freezeFrame,
+          physicsReady,
+          isMoveMode: ballDragController.isMoveMode,
+          bossIntroActive,
+          bossIntroBallPos,
+          layout: mapLayout,
+          shooterLaneGate,
+          stuckDetector,
+          bottomOutDetector,
+          triggerBottomOut,
+          dt,
+        });
       }
 
       // Plunger animation + jauge UI
