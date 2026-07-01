@@ -30,6 +30,21 @@ export class CinematicDirector {
     return this.active !== null && this.active.freezePhysics;
   }
 
+  /**
+   * Temps écoulé (ms) depuis le début du clip actif, ou -1 si aucun.
+   * Permet au playfield de piloter un feedback (strobe) pendant le gel sans
+   * dupliquer la mesure de temps du director.
+   */
+  activeElapsedMs(now: number = this.now()): number {
+    if (!this.active) return -1;
+    return now - this.startedAt;
+  }
+
+  /** Durée (ms) du clip actif, ou -1 si aucun. */
+  activeDurationMs(): number {
+    return this.active?.durationMs ?? -1;
+  }
+
   /** joue un clip ; once=true → une seule fois par partie */
   play(spec: CinematicSpec, opts?: { once?: boolean }): boolean {
     if (opts?.once && this.playedThisGame.has(spec.id)) return false;
