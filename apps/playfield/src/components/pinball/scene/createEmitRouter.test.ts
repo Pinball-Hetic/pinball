@@ -4,6 +4,7 @@ import type {
   BallDiagnostics,
   BossDefinition,
   BottomOutBall,
+  DrainBall,
   CollisionEventProcessor,
   GameEvent,
   MapLayout,
@@ -41,6 +42,7 @@ function makeDeps(overrides?: {
     diagResets: [] as string[],
     pushCinematic: [] as string[],
     bottomOutResetLatch: 0,
+    drainResetLatch: 0,
     laneOpen: 0,
     releaseAlternateWorld: 0,
   };
@@ -81,6 +83,10 @@ function makeDeps(overrides?: {
     resetLatch: () => { calls.bottomOutResetLatch++; },
   } as unknown as BottomOutBall;
 
+  const drainBallUC = {
+    resetLatch: () => { calls.drainResetLatch++; },
+  } as unknown as DrainBall;
+
   const mapModule = {
     onPreDrain: (lives: number) => { calls.onPreDrain.push(lives); },
     onGameEvent: (e: GameEvent) => { calls.onGameEvent.push(e); },
@@ -103,6 +109,7 @@ function makeDeps(overrides?: {
     mapLayout,
     mapBosses: overrides?.bosses ?? [],
     getBottomOutBallUC: () => bottomOutBallUC,
+    getDrainBallUC: () => drainBallUC,
     releaseAlternateWorld: () => { calls.releaseAlternateWorld++; },
     livesRef: { current: 3 },
     gameStateRef: { current: overrides?.gameState ?? "playing" },
@@ -262,11 +269,12 @@ describe("createEmitRouter — drop target mesh visibility", () => {
 });
 
 describe("createEmitRouter — BALL_LAUNCHED side effects", () => {
-  it("resets portal trigger + bottom-out latch and notes launch", () => {
+  it("resets portal trigger + bottom-out latch + drain latch and notes launch", () => {
     const { emit, calls } = makeDeps();
     emit({ type: "BALL_LAUNCHED" });
     expect(calls.resetPortalTrigger).toBe(1);
     expect(calls.bottomOutResetLatch).toBe(1);
+    expect(calls.drainResetLatch).toBe(1);
     expect(calls.diagResets).toContain("launch");
   });
 });

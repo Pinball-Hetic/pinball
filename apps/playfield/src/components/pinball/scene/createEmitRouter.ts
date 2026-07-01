@@ -4,6 +4,7 @@ import {
   type BossDefinition,
   type BallDiagnostics,
   type BottomOutBall,
+  type DrainBall,
   type CollisionEventProcessor,
   type GameEvent,
   type GameEventListener,
@@ -37,6 +38,8 @@ export interface EmitRouterDeps {
   mapBosses: BossDefinition[];
   /** Accès paresseux au use-case bottom-out (assigné après le factory). */
   getBottomOutBallUC: () => BottomOutBall | null;
+  /** Accès paresseux au use-case drain (assigné après le factory). */
+  getDrainBallUC: () => DrainBall | null;
   /** Libère le monde alternatif (react-scope : restoreBossCamera + clear session). */
   releaseAlternateWorld: () => void;
   livesRef: { current: number };
@@ -68,6 +71,7 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
     mapLayout,
     mapBosses,
     getBottomOutBallUC,
+    getDrainBallUC,
     releaseAlternateWorld,
     livesRef,
     gameStateRef,
@@ -183,6 +187,7 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
     if (event.type === "BALL_LAUNCHED") {
       collisionProcessor?.resetPortalTrigger();
       getBottomOutBallUC()?.resetLatch();
+      getDrainBallUC()?.resetLatch();
     }
     if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
       getShooterLaneGate()?.open();

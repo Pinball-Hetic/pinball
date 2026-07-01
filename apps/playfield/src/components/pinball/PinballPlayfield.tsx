@@ -143,13 +143,21 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   // Boss, clips et sons dérivés de la map sélectionnée (prop — change au remount).
   const mapBosses = resolvedMap.layout.bosses ?? [];
   const mapClips = resolvedMap.manifest.clips;
-  // Brancher les URLs audio de la map dès le montage du composant.
-  setMapAudioUrls(
+  // Brancher les URLs audio de la map (effet de bord → useEffect, pas dans le
+  // corps de rendu qui rejoue à chaque render).
+  useEffect(() => {
+    setMapAudioUrls(
+      resolvedMap.manifest.ambientMusic,
+      resolvedMap.manifest.gameOverSound,
+      resolvedMap.manifest.alternateWorldMusicUrl,
+      resolvedMap.manifest.alternateWorldMusicVolume,
+    );
+  }, [
     resolvedMap.manifest.ambientMusic,
     resolvedMap.manifest.gameOverSound,
     resolvedMap.manifest.alternateWorldMusicUrl,
     resolvedMap.manifest.alternateWorldMusicVolume,
-  );
+  ]);
   const mapSoundUrls: string[] = [
     ...mapBosses.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
     ...mapBosses.map((b) => b.latePhaseSoundUrl).filter((u): u is string => !!u),
@@ -559,6 +567,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let isChargingPlunger = false;
     let chargeStartTime = 0;
     let physicsReady = false;
+    // Handlers clavier stockés en scope-effet (pas de monkeypatch sur
+    // physicsWorld) → cleanup sûr même si init() est annulé avant le câblage.
+    let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+    let keyupHandler: ((e: KeyboardEvent) => void) | null = null;
     let prevFrameTime = 0;
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
@@ -969,6 +981,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           mapLayout,
           mapBosses,
           getBottomOutBallUC: () => bottomOutBallUC,
+          getDrainBallUC: () => drainBallUC,
           releaseAlternateWorld,
           livesRef,
           gameStateRef,
@@ -1012,6 +1025,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           stuckDetector.reset();
           bottomOutBallUC?.resetLatch();
           if (ballMesh) ballMesh.visible = true;
+          // Reset manuel (touche R / game-over-hide) : réarme le latch drain
+          // pour rester répétable, puis force le drain.
+          drainBallUC.resetLatch();
           drainBallUC.execute();
         };
 
@@ -1029,6 +1045,18 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // Cœur métier : ferme sur les `let` leftTarget/rightTarget (~L600), donc
         // doit vivre dans cette closure (non hoistable). Reçoit l'ACTION jeu
         // (résolue depuis le bouton physique via BUTTON_ACTION), pas l'id brut.
+        // Séquence de redémarrage après game over — identique pour PLUNGE et
+        // START (DRY). Réinitialise l'état jeu, la caméra boss, les combats et
+        // baselines de score, le monde de la map, puis rend la bille visible.
+        const resetGameSequence = () => {
+          resetGame();
+          restoreBossCamera();
+          collisionProcessor?.resetAllBossFights();
+          collisionProcessor?.resetScoreBaselines();
+          mapModule?.resetWorld?.();
+          if (ballMesh) ballMesh.visible = true;
+        };
+
         const applyAction = (action: GameAction, btnAction: ButtonAction) => {
           if (!sessionStartedRef.current) {
             if (
@@ -1058,12 +1086,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
                   `[Plunger] DOWN — gameState=${gameStateRef.current} physicsReady=${physicsReady} charging=${isChargingPlunger}`,
                 );
                 if (gameStateRef.current === "game_over") {
-                  resetGame();
-                  restoreBossCamera();
-                  collisionProcessor?.resetAllBossFights();
-                  collisionProcessor?.resetScoreBaselines();
-                  mapModule?.resetWorld?.();
-                  if (ballMesh) ballMesh.visible = true;
+                  resetGameSequence();
                   return;
                 }
                 if (gameStateRef.current === "idle" && physicsReadyRef.current) {
@@ -1094,12 +1117,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             }
             case "START":
               if (btnAction === "DOWN" && gameStateRef.current === "game_over") {
-                resetGame();
-                restoreBossCamera();
-                collisionProcessor?.resetAllBossFights();
-                collisionProcessor?.resetScoreBaselines();
-                mapModule?.resetWorld?.();
-                if (ballMesh) ballMesh.visible = true;
+                resetGameSequence();
               }
               break;
           }
@@ -1207,9 +1225,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         document.addEventListener("keydown", onKeyDown);
         document.addEventListener("keyup", onKeyUp);
-
-        (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyDown = onKeyDown;
-        (physicsWorld as PhysicsWorld & { _onKeyDown?: typeof onKeyDown; _onKeyUp?: typeof onKeyUp })._onKeyUp = onKeyUp;
+        keydownHandler = onKeyDown;
+        keyupHandler = onKeyUp;
 
         if (ballMesh) ballMesh.visible = false;
         physicsReady = true;
@@ -1576,9 +1593,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       resizeObserver.disconnect();
       ballDragController.dispose();
       cameraRig.dispose();
-      const pw = physicsWorld as (PhysicsWorld & { _onKeyDown?: (e: KeyboardEvent) => void; _onKeyUp?: (e: KeyboardEvent) => void }) | null;
-      if (pw?._onKeyDown) document.removeEventListener("keydown", pw._onKeyDown);
-      if (pw?._onKeyUp) document.removeEventListener("keyup", pw._onKeyUp);
+      if (keydownHandler) document.removeEventListener("keydown", keydownHandler);
+      if (keyupHandler) document.removeEventListener("keyup", keyupHandler);
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
       // bumperVisuals + garlands + bossReveals + nestMarker : dispose géré par
       // mapModule.dispose.
