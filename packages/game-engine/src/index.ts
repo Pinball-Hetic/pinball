@@ -12,6 +12,7 @@ export * from './domain/ScoringConstants';
 export * from './domain/BossRegistry';
 export * from './domain/NestState';
 export * from './domain/HeticProgress';
+export * from './domain/MapEventHelpers';
 export * from './domain/CameraCinematicConstants';
 export * from './domain/MapLayout';
 export * from './domain/MapModule';

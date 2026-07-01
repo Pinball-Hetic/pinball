@@ -1,5 +1,13 @@
 import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
-import { dueLateHints, advanceHetic, selectMilestoneClip } from '@pinball/game-engine'
+import {
+  dueLateHints,
+  advanceHetic,
+  selectMilestoneClip,
+  handleBossLockedHit,
+  handleBossArmed,
+  isGameOverDrain,
+  isBossTargetDefeated,
+} from '@pinball/game-engine'
 import {
   GanondorfReveal,
   DarkLinkReveal,
@@ -34,6 +42,143 @@ export function createModule(): MapModule {
   let portal:          ZeldaPortal     | null = null
   let transition:      ZeldaTransition | null = null
   let bumperVisuals:   BumperVisuals   | null = null
+
+  // ── Handlers onGameEvent (closures sur l'état/systèmes Zelda) ─────────────
+  // Chacun garde le contrat de l'ancien if-block : test de type + effet.
+  function onMilestone(ctx: MapContext, e: GameEvent): void {
+    if (e.type !== 'MILESTONE') return
+    // Palier de score.
+    ctx.playCinematic(selectMilestoneClip(e.threshold), { value: e.threshold })
+    ctx.screenShake(0.4)
+  }
+
+  function onPortalTransitionEnd(ctx: MapContext, e: GameEvent): void {
+    if (e.type !== 'PORTAL_TRANSITION_END') return
+    // Entrée Sacred Realm confirmée (fin de transition). Pattern identique à
+    // ST : reset() d'abord, puis enterAlternateWorld(). Le sensor RETOUR est
+    // créé seulement quand Dark Link est vaincu.
+    portal?.reset()
+    ctx.resetPortalTrigger()
+    ctx.enterAlternateWorld()
+  }
+
+  function onGameOverDrain(ctx: MapContext, e: GameEvent): void {
+    // Game over : fin de tous les combats.
+    if (isGameOverDrain(e, ctx.gameState())) bossReveals?.endAllFights()
+  }
+
+  function onBossArmed(ctx: MapContext, e: GameEvent): void {
+    if (e.type !== 'BOSS_ARMED') return
+    // Le nid s'éveille : bandeau DMD + horodatage hint (partagé) + shake.
+    handleBossArmed(ctx, e, armedAt, performance.now())
+    ctx.screenShake(0.3)
+  }
+
+  function onGanondorf(ctx: MapContext, e: GameEvent): void {
+    // Cinématiques boss Ganondorf.
+    if (e.type === 'BOSS_REVEAL' && e.bossId === 'ganondorf') {
+      // Fanfare one-shot (~5s) via manifest.sounds → ambient reprend après.
+      ctx.playSound('ganondorf_appear')
+      ctx.playCinematic('ganondorf_rises', { once: true })
+    }
+    if (e.type === 'BOSS_TARGET_HIT' && e.bossId === 'ganondorf') {
+      const boss = ctx.layout.bosses.find((b) => b.id === 'ganondorf')
+      if (boss && isBossTargetDefeated(boss.targetHits, e.hitCount)) {
+        ganondorfs += 1
+        ctx.setMapState({ ganondorfs })
+        ctx.physics.setTimeScale(1 / 3)
+        window.setTimeout(() => {
+          ctx.physics.setTimeScale(1)
+          // Le portail bleu Sacred Realm s'ouvre dès que le temps reprend.
+          portal?.open()
+          ctx.playCinematic('ganondorf_slain', {
+            onEnd: () =>
+              ctx.ball?.applyEjectionForce({ x: boss.target.x, z: boss.target.z }),
+          })
+        }, 400)
+      }
+    }
+  }
+
+  function onDarkLink(ctx: MapContext, e: GameEvent): void {
+    // Cinématiques boss Dark Link.
+    if (e.type === 'BOSS_REVEAL' && e.bossId === 'darklink') {
+      ctx.playCinematic('darklink_rises', { once: true })
+    }
+    if (e.type === 'BOSS_TARGET_HIT' && e.bossId === 'darklink') {
+      const boss = ctx.layout.bosses.find((b) => b.id === 'darklink')
+      if (boss && isBossTargetDefeated(boss.targetHits, e.hitCount)) {
+        darklinks += 1
+        ctx.setMapState({ darklinks })
+        ctx.physics.setTimeScale(1 / 3)
+        window.setTimeout(() => {
+          ctx.physics.setTimeScale(1)
+          ctx.playCinematic('darklink_slain', {
+            onEnd: () =>
+              ctx.ball?.applyEjectionForce({ x: boss.target.x, z: boss.target.z }),
+          })
+        }, 400)
+      }
+    }
+  }
+
+  function onDropTargetComplete(ctx: MapContext, e: GameEvent): void {
+    // Compteur HETIC.
+    if (e.type !== 'DROP_TARGET_COMPLETE') return
+    hetic = advanceHetic(ctx, hetic)
+  }
+
+  function onPortalEnter(ctx: MapContext, e: GameEvent): void {
+    if (e.type !== 'PORTAL_ENTER') return
+    // Entrée Sacred Realm.
+    portals += 1
+    ctx.setMapState({ portals })
+    // Le portail disparaît à l'entrée — ne peut pas être repris à l'infini.
+    portal?.hide()
+    const ball = ctx.ball
+    const mesh = ctx.ballMesh
+    if (ball && mesh && transition && !transition.isActive()) {
+      // Son Sacred Realm (même pattern que ST "upside_down_appear").
+      ctx.playSound('sacred_realm_appear')
+      // Téléporte + fige la balle avant le flash.
+      ball.holdAtAlternateWorldSpawn()
+      ball.syncToMesh(mesh)
+      transition.start({ ballMesh: mesh }, () => {
+        // Appelé depuis update() — hors drain Rapier, mutations sûres.
+        ball.spawnFromAlternateWorld()
+        ctx.resetPortalTrigger()
+        ctx.resetStuck()
+        ball.syncToMesh(mesh)
+        mesh.visible = true
+        mesh.scale.setScalar(1)
+        ctx.emitGameEvent({ type: 'PORTAL_TRANSITION_END' })
+      })
+    }
+  }
+
+  function onReturnPortalEnter(ctx: MapContext, e: GameEvent): void {
+    if (e.type !== 'RETURN_PORTAL_ENTER') return
+    // Retour monde normal.
+    const ball = ctx.ball
+    const mesh = ctx.ballMesh
+    if (ball && mesh && transition && !transition.isActive()) {
+      ball.holdAtNormalReturnSpawn()
+      ball.syncToMesh(mesh)
+      transition.start({ ballMesh: mesh }, () => {
+        // Pattern ST : reset() AVANT completeWorldCycle() (qui reset portalTriggered).
+        portal?.reset()
+        bossReveals?.endAllFights()
+        ball.spawnFromNormalReturn()
+        ctx.completeWorldCycle()
+        ctx.resetStuck()
+        ball.syncToMesh(mesh)
+        mesh.visible = true
+        mesh.scale.setScalar(1)
+        ctx.emitGameEvent({ type: 'WORLD_CYCLE_COMPLETE' })
+        ctx.emitGameEvent({ type: 'RETURN_PORTAL_TRANSITION_END' })
+      })
+    }
+  }
 
   return {
     setup(ctx: MapContext): void {
@@ -118,136 +263,17 @@ export function createModule(): MapModule {
       const ctx = ctxRef
       if (!ctx) return
 
-      // ── Cible boss verrouillée frappée ───────────────────────────────────
-      if (e.type === 'BOSS_LOCKED_HIT') {
-        ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0)
-      }
-
-      // ── Palier de score ──────────────────────────────────────────────────
-      if (e.type === 'MILESTONE') {
-        ctx.playCinematic(selectMilestoneClip(e.threshold), { value: e.threshold })
-        ctx.screenShake(0.4)
-      }
-
-      // ── Entrée Sacred Realm confirmée (fin de transition) ────────────────
-      // Pattern identique à ST : reset() d'abord, puis enterAlternateWorld().
-      // Le sensor RETOUR est créé seulement quand Dark Link est vaincu.
-      if (e.type === 'PORTAL_TRANSITION_END') {
-        portal?.reset()
-        ctx.resetPortalTrigger()
-        ctx.enterAlternateWorld()
-      }
-
-      // ── Game over : fin de tous les combats ──────────────────────────────
-      if ((e.type === 'DRAIN' || e.type === 'BOTTOM_OUT') && ctx.gameState() === 'game_over') {
-        bossReveals?.endAllFights()
-      }
-
-      // ── Le nid s'éveille ─────────────────────────────────────────────────
-      if (e.type === 'BOSS_ARMED') {
-        armedAt[e.bossId] = performance.now()
-        ctx.pushDmdEvent('LE NID S EVEILLE', 0)
-        ctx.screenShake(0.3)
-      }
-
-      // ── Cinématiques boss Ganondorf ──────────────────────────────────────
-      if (e.type === 'BOSS_REVEAL' && e.bossId === 'ganondorf') {
-        // Fanfare one-shot (~5s) via manifest.sounds → ambient reprend après.
-        ctx.playSound('ganondorf_appear')
-        ctx.playCinematic('ganondorf_rises', { once: true })
-      }
-      if (e.type === 'BOSS_TARGET_HIT' && e.bossId === 'ganondorf') {
-        const boss = ctx.layout.bosses.find((b) => b.id === 'ganondorf')
-        if (boss && e.hitCount >= boss.targetHits) {
-          ganondorfs += 1
-          ctx.setMapState({ ganondorfs })
-          ctx.physics.setTimeScale(1 / 3)
-          window.setTimeout(() => {
-            ctx.physics.setTimeScale(1)
-            // Le portail bleu Sacred Realm s'ouvre dès que le temps reprend.
-            portal?.open()
-            ctx.playCinematic('ganondorf_slain', {
-              onEnd: () =>
-                ctx.ball?.applyEjectionForce({ x: boss.target.x, z: boss.target.z }),
-            })
-          }, 400)
-        }
-      }
-
-      // ── Cinématiques boss Dark Link ──────────────────────────────────────
-      if (e.type === 'BOSS_REVEAL' && e.bossId === 'darklink') {
-        ctx.playCinematic('darklink_rises', { once: true })
-      }
-      if (e.type === 'BOSS_TARGET_HIT' && e.bossId === 'darklink') {
-        const boss = ctx.layout.bosses.find((b) => b.id === 'darklink')
-        if (boss && e.hitCount >= boss.targetHits) {
-          darklinks += 1
-          ctx.setMapState({ darklinks })
-          ctx.physics.setTimeScale(1 / 3)
-          window.setTimeout(() => {
-            ctx.physics.setTimeScale(1)
-            ctx.playCinematic('darklink_slain', {
-              onEnd: () =>
-                ctx.ball?.applyEjectionForce({ x: boss.target.x, z: boss.target.z }),
-            })
-          }, 400)
-        }
-      }
-
-      // ── Compteur HETIC ───────────────────────────────────────────────────
-      if (e.type === 'DROP_TARGET_COMPLETE') {
-        hetic = advanceHetic(ctx, hetic)
-      }
-
-      // ── Entrée Sacred Realm ───────────────────────────────────────────────
-      if (e.type === 'PORTAL_ENTER') {
-        portals += 1
-        ctx.setMapState({ portals })
-        // Le portail disparaît à l'entrée — ne peut pas être repris à l'infini.
-        portal?.hide()
-        const ball = ctx.ball
-        const mesh = ctx.ballMesh
-        if (ball && mesh && transition && !transition.isActive()) {
-          // Son Sacred Realm (même pattern que ST "upside_down_appear").
-          ctx.playSound('sacred_realm_appear')
-          // Téléporte + fige la balle avant le flash.
-          ball.holdAtAlternateWorldSpawn()
-          ball.syncToMesh(mesh)
-          transition.start({ ballMesh: mesh }, () => {
-            // Appelé depuis update() — hors drain Rapier, mutations sûres.
-            ball.spawnFromAlternateWorld()
-            ctx.resetPortalTrigger()
-            ctx.resetStuck()
-            ball.syncToMesh(mesh)
-            mesh.visible = true
-            mesh.scale.setScalar(1)
-            ctx.emitGameEvent({ type: 'PORTAL_TRANSITION_END' })
-          })
-        }
-      }
-
-      // ── Retour monde normal ───────────────────────────────────────────────
-      if (e.type === 'RETURN_PORTAL_ENTER') {
-        const ball = ctx.ball
-        const mesh = ctx.ballMesh
-        if (ball && mesh && transition && !transition.isActive()) {
-          ball.holdAtNormalReturnSpawn()
-          ball.syncToMesh(mesh)
-          transition.start({ ballMesh: mesh }, () => {
-            // Pattern ST : reset() AVANT completeWorldCycle() (qui reset portalTriggered).
-            portal?.reset()
-            bossReveals?.endAllFights()
-            ball.spawnFromNormalReturn()
-            ctx.completeWorldCycle()
-            ctx.resetStuck()
-            ball.syncToMesh(mesh)
-            mesh.visible = true
-            mesh.scale.setScalar(1)
-            ctx.emitGameEvent({ type: 'WORLD_CYCLE_COMPLETE' })
-            ctx.emitGameEvent({ type: 'RETURN_PORTAL_TRANSITION_END' })
-          })
-        }
-      }
+      // Dispatch ordonné (même ordre, mêmes effets que l'ancien cascade).
+      handleBossLockedHit(ctx, e)
+      onMilestone(ctx, e)
+      onPortalTransitionEnd(ctx, e)
+      onGameOverDrain(ctx, e)
+      onBossArmed(ctx, e)
+      onGanondorf(ctx, e)
+      onDarkLink(ctx, e)
+      onDropTargetComplete(ctx, e)
+      onPortalEnter(ctx, e)
+      onReturnPortalEnter(ctx, e)
     },
 
     update(dt: number): void {
