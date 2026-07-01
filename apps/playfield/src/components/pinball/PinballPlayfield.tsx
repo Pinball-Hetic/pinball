@@ -21,8 +21,6 @@ import {
   computeLaneStraightLock,
   computeSpeedClamp,
   computeFlipperLaunchAssist,
-  PlayfieldTrimeshBuilder,
-  PlayfieldColliderFactory,
   resolvePlayfieldFlippers,
   syncFlipperBody,
   flipperWorldTransform,
@@ -62,7 +60,7 @@ import {
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import { NoSignal } from "@pinball/ui";
-import { MeshRoleResolver, LayoutResolver, type MapModule, type GameEventListener } from "@pinball/game-engine";
+import { type MapModule, type GameEventListener } from "@pinball/game-engine";
 import type {
   ButtonAction,
   ButtonId,
@@ -111,6 +109,7 @@ import { DebugMeshManager } from "./debug/DebugMeshManager";
 import { createMapContext } from "./createMapContext";
 import { computePlungerVisual } from "./hotLoop/computePlungerVisual";
 import { computeFrameDt, computeTrailIntensity } from "./hotLoop/frameMath";
+import { buildPlayfieldColliders } from "./physics/buildPlayfieldColliders";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -866,22 +865,16 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         modelRoot.updateMatrixWorld(true);
 
-        // GLB conventionné role-driven : les murs (wall_/lane_) sont des
-        // trimeshes classés par rôle ; le sol/bumpers/sensors/couloir sont
-        // analytiques (positions du layout).
-        const meshResolver = new MeshRoleResolver(mapManifest.meshAliases);
-        PlayfieldTrimeshBuilder.buildRoleDriven(
-          playfieldRoot,
+        // GLB role-driven : trimeshes (murs/couloir) + drop targets dérivés +
+        // colliders analytiques (sol/bumpers/sensors). Extrait dans
+        // physics/buildPlayfieldColliders.ts (side-effects world + colliderMap).
+        buildPlayfieldColliders({
           world,
-          meshResolver,
-          mapManifest.elements ?? {},
-        );
-        // Phase 3.4 — drop targets dérivés du GLB (deltas ≤ 0.7 mm validés en
-        // jeu) ; bumpers gardés au littéral (centre Box3 ≠ collider tuné). Le
-        // log de comparaison reste actif pour surveiller la dérive au réexport.
-        const derivedLayout = LayoutResolver.deriveAndCompare(playfieldRoot, meshResolver, mapLayout);
-        const resolvedLayout = LayoutResolver.withDerivedDropTargets(mapLayout, derivedLayout);
-        PlayfieldColliderFactory.createForMap(world, resolvedLayout, colliderMap);
+          root: playfieldRoot,
+          manifest: mapManifest,
+          layout: mapLayout,
+          colliderMap,
+        });
 
         // upsideDownTransition créé/possédé par le module (récupéré via le
         // bridge). L'orchestration (isActive/start, cycle de monde) reste ici
