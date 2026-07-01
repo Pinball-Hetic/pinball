@@ -65,10 +65,14 @@ export const manifest: MapManifest = {
     last_chance: { showMs: 2_000, freezeMs: 0 },
     hall_of_fame: { showMs: 25_000, freezeMs: 0 },
     milestone_5k: { showMs: 4_000, freezeMs: 0 },
-    milestone_15k: { showMs: 8_000, freezeMs: 3_000 },
-    milestone_30k: { showMs: 13_000, freezeMs: 5_000 },
-    milestone_big: { showMs: 15_000, freezeMs: 5_000 },
-    hetic_letter: { showMs: 5_000, freezeMs: 2_000 },
+    // Paliers + lettres : PAS de gel physique. Le playfield est l'écran
+    // regardé — on ne fige pas la bille pour un clip DMD/backglass (ignorés).
+    // Le clip joue quand même (showMs), la bille continue de rouler ; le cue
+    // playfield (sweep garland + shake) reste non-bloquant.
+    milestone_15k: { showMs: 8_000, freezeMs: 0 },
+    milestone_30k: { showMs: 13_000, freezeMs: 0 },
+    milestone_big: { showMs: 15_000, freezeMs: 0 },
+    hetic_letter: { showMs: 5_000, freezeMs: 0 },
     hetic_complete: { showMs: 40_000, freezeMs: 10_000, takeoverMs: 10_000 }, // 10s ciné + 30s fever
     skill_shot: { showMs: 5_000, freezeMs: 2_000 },
   },
