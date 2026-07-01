@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import type { DmdDisplay } from '@pinball/shared-types'
 import type { DmdMapContent } from '@pinball/dmd-core'
@@ -27,9 +27,15 @@ const canvasStyle: CSSProperties = {
 // ALTERNATE_PALETTE, BURST_MS sont calculées une fois par montage (la page
 // utilise key={mapId} pour forcer un remontage propre à chaque changement de map).
 export default function DmdCanvas({ display, alternateWorld, mapDmdContent }: Props) {
-  const LAYOUTS = makeLayouts(mapDmdContent)
-  const NORMAL_PALETTE = mapDmdContent.paletteNormal ?? PALETTE_NORMAL
-  const ALTERNATE_PALETTE = mapDmdContent.paletteAlternateWorld ?? PALETTE_NORMAL
+  const LAYOUTS = useMemo(() => makeLayouts(mapDmdContent), [mapDmdContent])
+  const NORMAL_PALETTE = useMemo(
+    () => mapDmdContent.paletteNormal ?? PALETTE_NORMAL,
+    [mapDmdContent],
+  )
+  const ALTERNATE_PALETTE = useMemo(
+    () => mapDmdContent.paletteAlternateWorld ?? PALETTE_NORMAL,
+    [mapDmdContent],
+  )
   const BURST_MS = mapDmdContent.alternateWorldBurstMs ?? 1200
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const displayRef = useRef(display)

@@ -1,4 +1,4 @@
-import { test, expect, describe, afterEach } from 'bun:test'
+import { test, expect, describe, afterEach, spyOn } from 'bun:test'
 import { render, screen, cleanup } from '@testing-library/react'
 import type { LeaderboardEntry } from '@pinball/shared-types'
 import type { Reaction, Reactor } from '@/hooks/useIngameReactor'
@@ -116,5 +116,37 @@ describe('HallOfFame', () => {
     const { container } = render(<HallOfFame entries={[]} reactor={reactor} />)
     emit({ kind: 'event', label: 'BUMPER' })
     expect(container.querySelector('.hof')!.className).not.toContain('hof-shake')
+  })
+
+  // Régression : anonName (server) génère des pseudos "PLAYERxxxx" pouvant
+  // entrer en collision → deux entrées de rangs différents peuvent partager
+  // le même `name`. La key React doit rester unique (basée sur rank), sinon
+  // React râle "same key" et fusionne/glitch les lignes.
+  test('noms dupliqués (collisions anonName) : keys uniques, pas de warning React', () => {
+    const errSpy = spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { container } = render(
+        <HallOfFame
+          entries={[
+            entry({ rank: 1, name: 'PLAYER0042' }),
+            entry({ rank: 2, name: 'PLAYER0042' }),
+            entry({ rank: 3, name: 'PLAYER0042' }),
+          ]}
+        />,
+      )
+      // Les 3 lignes réelles sont rendues distinctement (positionnées par rang).
+      expect(container.querySelectorAll('.hof-row:not(.hof-ghost)').length).toBe(3)
+      // Aucun warning React de type "same key" / "unique key".
+      const keyWarning = errSpy.mock.calls.some((args) =>
+        args.some(
+          (a) =>
+            typeof a === 'string' &&
+            (a.includes('same key') || a.includes('unique "key"')),
+        ),
+      )
+      expect(keyWarning).toBe(false)
+    } finally {
+      errSpy.mockRestore()
+    }
   })
 })

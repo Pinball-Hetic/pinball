@@ -1,4 +1,4 @@
-import { test, expect, describe, mock } from 'bun:test';
+import { test, expect, describe, mock, spyOn } from 'bun:test';
 import {
   createGlobalApiClient,
   type GlobalApiConfig,
@@ -140,6 +140,71 @@ describe('postScore', () => {
 
     expect((await client.postScore(PAYLOAD)).code).toBe('R');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  // Régression (server-abort) : le timer d'abort (setTimeout 10 s) doit être
+  // nettoyé sur CHAQUE sortie, exactement une fois. Avant le fix, les chemins de
+  // throw (4xx définitif, 5xx épuisé) clearaient deux fois (clear eager après
+  // fetch + clear dans le catch) — symptôme d'un cleanup non centralisé. Un
+  // `finally` unique rend le nettoyage invariant : un clear par essai, ni plus,
+  // ni moins. On instrumente setTimeout/clearTimeout globaux, on marque les
+  // timers d'abort (ms === 10_000) et on compte les clears par handle.
+  function countAbortTimerClears(fetchImpl: typeof fetch) {
+    const setSpy = spyOn(globalThis, 'setTimeout');
+    const clearSpy = spyOn(globalThis, 'clearTimeout');
+    const ABORT = Symbol('abort-timer');
+    const created: object[] = [];
+    const clears: object[] = [];
+    setSpy.mockImplementation(((fn: () => void, ms?: number) => {
+      if (ms === 10_000) {
+        const handle = { [ABORT]: true };
+        created.push(handle);
+        return handle as unknown as ReturnType<typeof setTimeout>;
+      }
+      // backoff (500 ms * attempt) : résout tout de suite pour ne pas ralentir.
+      if (typeof fn === 'function') fn();
+      return {} as ReturnType<typeof setTimeout>;
+    }) as unknown as typeof setTimeout);
+    clearSpy.mockImplementation(((handle: unknown) => {
+      if (handle && (handle as Record<symbol, unknown>)[ABORT]) {
+        clears.push(handle as object);
+      }
+    }) as unknown as typeof clearTimeout);
+
+    return {
+      async run() {
+        try {
+          await createGlobalApiClient({ fetch: fetchImpl, config: CONFIG, cache: new Map() })
+            .postScore(PAYLOAD);
+        } catch {
+          // certains chemins jettent (4xx, 5xx épuisé) — attendu.
+        }
+        setSpy.mockRestore();
+        clearSpy.mockRestore();
+        return created.map((h) => clears.filter((c) => c === h).length);
+      },
+    };
+  }
+
+  test('4xx définitif → timer d\'abort cleared exactement une fois', async () => {
+    const counts = await countAbortTimerClears(
+      mock(async () => makeRes({ status: 400, text: 'bad request' })) as never,
+    ).run();
+    expect(counts).toEqual([1]);
+  });
+
+  test('5xx épuisé → chaque timer d\'abort cleared exactement une fois', async () => {
+    const counts = await countAbortTimerClears(
+      mock(async () => makeRes({ status: 503, text: 'down' })) as never,
+    ).run();
+    expect(counts).toEqual([1, 1, 1]);
+  });
+
+  test('201 succès → timer d\'abort cleared exactement une fois', async () => {
+    const counts = await countAbortTimerClears(
+      mock(async () => makeRes({ status: 201, json: { scoreId: 's', code: 'OK', claimUrl: 'u' } })) as never,
+    ).run();
+    expect(counts).toEqual([1]);
   });
 });
 

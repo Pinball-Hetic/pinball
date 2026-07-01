@@ -43,7 +43,6 @@ export function createGlobalApiClient({ fetch, config, cache }: GlobalApiDeps): 
           body,
           signal: ctrl.signal,
         });
-        clearTimeout(t);
         // 200 = replay idempotent (gameId déjà vu), 201 = créé. Même corps.
         if (res.status === 200 || res.status === 201) {
           return (await res.json()) as ScoreRegistered;
@@ -57,11 +56,12 @@ export function createGlobalApiClient({ fetch, config, cache }: GlobalApiDeps): 
         // 5xx → retry. Épuisé au dernier essai.
         if (attempt === MAX) throw new Error(`global /v1/scores ${res.status} (épuisé)`);
       } catch (err) {
-        clearTimeout(t);
         // 4xx définitif → pas de retry. gameId rend timeout/réseau/5xx sûrs à
         // retenter (le global dédoublonne sur gameId → idempotent).
         if ((err as { definitive?: boolean }).definitive) throw err;
         if (attempt === MAX) throw err;
+      } finally {
+        clearTimeout(t);
       }
       await new Promise((r) => setTimeout(r, 500 * attempt)); // backoff
     }

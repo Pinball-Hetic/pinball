@@ -77,7 +77,7 @@ export default function HallOfFame({
             const hot = highlightRank === e.rank
             return (
               <div
-                key={e.name}
+                key={`rank-${e.rank}`}
                 className={`hof-row ${medal ? `hof-${medal}` : ''} ${hot ? 'hof-hot' : ''}`}
                 style={{ top: (e.rank - 1) * ROW_H }}
               >
