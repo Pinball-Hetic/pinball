@@ -191,7 +191,12 @@ export class GarlandLights {
           bulb.material.emissiveIntensity,
           bulb.origIntensity * (0.6 + glow * 2.4),
         );
-        bulb.material.emissive.setHex(glow > 0.6 ? 0xffe08a : 0xff7700);
+        // Flamme de fusée (blanc-chaud → orange vif → rouge), PAS le jaune du
+        // chenillard « celebrate » → lecture « décollage » distincte + cohérente
+        // avec la fusée DMD/backglass.
+        bulb.material.emissive.setHex(
+          glow > 0.8 ? 0xffffff : glow > 0.5 ? 0xff7a1a : 0xff2200,
+        );
       }
     }
   }
