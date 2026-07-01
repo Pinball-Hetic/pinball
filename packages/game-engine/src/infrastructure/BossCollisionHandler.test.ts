@@ -84,7 +84,7 @@ function make(
 ) {
   const events: GameEvent[] = [];
   const world: World = { active: worldActive };
-  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A, BOSS_B]);
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A, BOSS_B], clock);
   const handler = new BossCollisionHandler(
     [BOSS_A, BOSS_B],
     mgr,
@@ -170,16 +170,41 @@ test('pas de locked-hit une fois le boss déclenché (fight en cours)', () => {
   expect(events).toHaveLength(0);
 });
 
-test('délègue la collision de combat : émet BOSS_TARGET_HIT quand armé', async () => {
-  // BossTargetSensor utilise performance.now() interne avec un cooldown 450ms ;
-  // on attend pour éviter une fuite de timing entre tests (cf. BossFightManager.test).
-  await new Promise((r) => setTimeout(r, 500));
+test('délègue la collision de combat : émet BOSS_TARGET_HIT quand armé', () => {
+  // Horloge injectée (départ 5000) partagée handler + sensor : le 1er hit passe
+  // toujours le cooldown (lastHitMs initial = 0), déterministe sans setTimeout.
   const { handler, mgr, events } = make(false, ctx({ totalScore: 3000 }));
   mgr.beginFight('boss_a', true); // fightActive + targetArmed
   handler.handle('a_target', 'playing', true);
   expect(events).toEqual([
     { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 1, scoreIncrement: 250 },
   ]);
+});
+
+test('resetThrottle ré-arme le locked-hit après un reset (régression)', () => {
+  // Régression : sans resetThrottle, un boss ré-armé après reset resterait
+  // muet jusqu'à 2s. Hit à t=5000, reset, hit à t=5001 → doit ré-émettre.
+  const clock = makeClock(5000);
+  const { handler, events } = make(false, ctx({ totalScore: 1000 }), clock.now);
+  handler.handle('a_target', 'playing', true);
+  expect(events).toHaveLength(1);
+
+  handler.resetThrottle(); // clear all
+  clock.set(5001); // 1ms plus tard, bien dans la fenêtre de 2s
+
+  handler.handle('a_target', 'playing', true);
+  expect(events).toHaveLength(2);
+});
+
+test('resetThrottle(id) ne ré-arme que le boss ciblé', () => {
+  const clock = makeClock(5000);
+  const { handler, events } = make(true, ctx({ totalScore: 1000, alternateWorldActive: true }), clock.now);
+  handler.handle('b_target', 'playing', true); // boss_b émet
+  expect(events).toHaveLength(1);
+  handler.resetThrottle('boss_b');
+  clock.set(5001);
+  handler.handle('b_target', 'playing', true);
+  expect(events).toHaveLength(2);
 });
 
 test('horloge par défaut = performance.now quand non injectée (prod)', () => {
