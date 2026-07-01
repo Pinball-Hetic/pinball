@@ -12,18 +12,31 @@
 > | 3 | Plunger visual + kinematic body factory | `physics/buildPlungerBody.ts` | med | smoke | ✅ `2157a10` |
 > | 4 | Keyboard router + debug-mesh facade | `createKeyboardRouter.ts` + `debug/DebugMeshManager.ts` | med | partial | ✅ `e48b249` |
 > | 5 | MapContext factory (~85 L object literal) | `createMapContext.ts` | med | partial | ✅ `509d4e0` |
-> | 6 | Init physique/scène (compo async, fail-fast) | `initPlayfield.ts` | high | smoke | ⏸ dep 2-5 (gate smoke) |
-> | 7 | Animate hot loop (lift ENTIER, order load-bearing) | `HotLoop.ts` | high | smoke | ⏸ dep 6 (gate smoke) |
+> | 6 | Init physique/scène (compo async) | `initPlayfield.ts` | high | smoke | ⛔ DIFFÉRÉ (voir note) |
+> | 7 | Hot loop — stages purs (au lieu du lift monolithique) | `hotLoop/*` | med | pure | ✅ 7a `computePlungerVisual` |
 >
-> **Slices 0-5 FAITES** (2026-07-01/02) : `PinballPlayfield.tsx` 1798→1621 L (−177), 7 modules
-> extraits (644 L dont tests), +37 tests, repo vert. **Slices 6-7 gated sur un smoke de 0-5**
-> (raison : leur classe de bug = *stale live-binding* est INVISIBLE à tsc et non smoke-able par
-> l'agent → un baseline smoké est la seule vérif possible avant de lifter init + hot loop).
+> **Slices 0-5 + 7a FAITES** (2026-07-01/02, smoke 0-5 OK) : `PinballPlayfield.tsx` 1798→1611 L
+> (−187), 9 modules extraits, +43 tests, repo vert.
+>
+> **Slice 7 — décision** : le lift monolithique d'`animate` (~320 L) exigeait un deps-bag de ~60
+> champs live-bound = **relocation pure** avec le failure-mode *stale-binding* (INVISIBLE à tsc,
+> non smoke-able agent) et bénéfice SRP marginal. Réalisé à la place par **extraction de stages
+> purs** (args live/frame = zéro stale-binding, testables). 7a = FSM plunger (clôt aussi le P2
+> `PlungerStateMachine`). **Le reste d'`animate` délègue DÉJÀ à des helpers purs game-engine**
+> (`computeIdleSpawnLock`/`LaneStraightLock`/`SurfaceSnap`/`SpeedClamp`/`FlipperLaunchAssist`/
+> `cinematicFreezeFeedback`) → peu de stages purs restants ; le reste est de l'impératif
+> irréductible (sync body, caméra, render). Stages purs restants candidats : `computeTrailIntensity`.
+>
+> **Slice 6 — DIFFÉRÉ** (pas juste gated) : extraire `initPlayfield` = déplacer ~600 L de setup
+> async ordonné dans un module avec ~50 deps + struct de retour ~30 champs. C'est de la relocation
+> (complexité déplacée, pas réduite) avec le risque *stale-binding* MAX (forward-refs
+> `emit`/`collisionProcessor`/`ballPhysicsInst` assignés mid-init). ROI défavorable vs risque
+> non-vérifiable → à faire en session dédiée avec smoke serré si vraiment voulu, pas en aveugle.
 >
 > **Backlog smells (workflow, dédupliqués)** — au-delà des slices :
 > - **P1** SRP+OCP — décomposer animate en stages ordonnés APRÈS le lift (slice 7 fait le move entier d'abord). `PinballPlayfield.tsx:1270-1592`
 > - **P1** Circular (managed) — documenter le contrat 2-way `CollisionEventProcessor↔emit` aux seams (garde-fou, PAS un refacto). `:1079` + `createEmitRouter.ts:104`
-> - **P2** State Machine — `PlungerStateMachine(now)→{state,progress,meshZ}` (transitions inline dans animate + throttle UI 40ms). `:1507-1540`
+> - ~~**P2** State Machine — `PlungerStateMachine`~~ ✅ FAIT (slice 7a, `hotLoop/computePlungerVisual.ts` — FSM pure + 6 tests). Reste : le throttle UI 40ms (mineur, stateful).
 > - **P2** DIP — `BallLossDetectionOrchestrator` : unifier stuck + bottomOut + drain Rapier (3 détecteurs, latch idempotent) + `ballLockGuard` dupliqué. `:1395-1500`
 > - **P2** Strategy — magic `Z<0.22` (zone drain) → dériver de `mapLayout.sensors`. `:1481`
 > - **P2** OCP/DIP — `AlternateWorldController` : état éclaté sur collisionProcessor/mapModule/useGameState (+ predicate release inline). `:1041` + `createEmitRouter.ts:158`
