@@ -1201,7 +1201,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             ballDragController.toggleMoveMode();
             return;
           }
-          if (e.key === "r" || e.key === "R") {
+          // Reset-balle = aide DEV uniquement (cf. GameOverlay). Absente en prod.
+          if ((e.key === "r" || e.key === "R") && process.env.NODE_ENV !== "production") {
             resetBallRef.current?.();
             return;
           }

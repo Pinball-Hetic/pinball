@@ -8,6 +8,10 @@ import BossHealthBar from "./BossHealthBar";
 import { bossHealthBarTheme } from "./bossHealthHud";
 import StyledQrCode from "./StyledQrCode";
 
+// Reset-balle = aide de DEV uniquement (bouton + hint + touche R). En prod
+// (borne) elle ne doit pas être présente. NODE_ENV est inliné au build Next.
+const IS_DEV = process.env.NODE_ENV !== "production";
+
 export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
 
 interface GameOverlayProps {
@@ -158,7 +162,7 @@ export default function GameOverlay({
   const replayLabel = outro?.replayLabel ?? "START — Rejouer";
 
   const showResetBall =
-    bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
+    IS_DEV && bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
 
   const showAlternateWorldBanner =
     bootPhase === "in_game" && gameState === "playing" && alternateWorldActive;
@@ -199,7 +203,7 @@ export default function GameOverlay({
               <div>Q / ← — Flipper gauche</div>
               <div>D / → — Flipper droit</div>
               <div>ESPACE — Charger / lancer</div>
-              <div>R — Reset balle (−1 vie)</div>
+              {IS_DEV && <div>R — Reset balle (−1 vie)</div>}
               <div>H — Debug colliders</div>
             </div>
           )}
