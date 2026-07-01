@@ -1,5 +1,25 @@
 # Backlog refacto — testabilité & clean architecture
 
+> # 🎮 AXES D'AMÉLIORATION E2E (user, 2026-07-01) — à traiter
+> Décisions user prises :
+> - **A1** (UX) Overlay : retirer le prompt "ESPACE ou START pour jouer" + **auto-spawn la bille**
+>   dans le couloir (map déjà choisie en amont). `GameOverlay.tsx:329`.
+> - **A2** (BUG+UX) DMD vies : `dmd/pages/index.tsx:76` hardcode `TOTAL_LIVES=3` (● only) →
+>   desync avec les vies réelles (rescue/bonus > 3). Fix : afficher ● jusqu'à 3, **nombre "×N" si >3**,
+>   piloté par `livesRemaining` réel (vérifier que le gain de vie propage bien au DMD).
+> - **A3** (BUG) Mort de Vecna → retour monde initial : la bille **respawn au milieu** = injouable.
+>   Respawn dans un endroit rattrapable (couloir/spawn normal), pas au centre.
+> - **A4** (UX) Pause sur gain de lettre HETIC = feeling "bug" → **garder la pause + feedback
+>   playfield** (flash/strobe/texte) pour que ça lise intentionnel + pointe vers le DMD.
+> - **A5** (FEATURE) Paliers de score : **remplacer les lumières jaunes playfield par un effet
+>   fusée** cohérent + déclencher le cinématique fusée **DMD + backglass** (le takeover fusée
+>   existe déjà côté backglass : `strangerthings/backglass/takeover.tsx` `cine-rocket`). Cohérence
+>   3 écrans + incite à regarder DMD/backglass.
+> - **A6** (FEATURE) Écran QR (outro) : **chrono 20 s** — si plus d'interaction, sortir de l'écran
+>   (retour attract/idle) pour ne pas bloquer la borne.
+>
+> ---
+>
 > # ✅ BACKLOG VIDE (convergence atteinte)
 > Après boucle autonome complète : god-component décomposé (SRP), refacto structurels,
 > smells P3, + 4 vagues de fix bugs. **Audit de convergence strict (P1/P2 + God objects) =
