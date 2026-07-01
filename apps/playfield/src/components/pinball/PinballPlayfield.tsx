@@ -393,6 +393,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       dmd.setAtmosphere(alternateWorldActive);
       atmosphereAlternateRef.current = alternateWorldActive;
     },
+    // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
+    // module de map (events MILESTONE / BOSS_ARMED).
+    onMilestone: (threshold) => emitRef.current?.({ type: "MILESTONE", threshold }),
     onBossArmed: (bossId) => emitRef.current?.({ type: "BOSS_ARMED", bossId }),
     // le bonus map (lettres + complete + fever) géré par le module de map.
     onFeverEnd: () => {
@@ -1152,6 +1155,12 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // Réconciliation des marqueurs de nid : gérée par le module de map
         // (fin de mapModule.onGameEvent, après chaque event).
         emit = (event) => {
+          // Sauvetage dernière vie : la map peut accorder une vie AVANT le
+          // décrément (handleDrain) pour éviter le game over. On lui passe le
+          // compte de vies pré-décrément (livesRef n'est pas encore modifié).
+          if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
+            mapModule?.onPreDrain?.(livesRef.current);
+          }
           baseEmit(event);
           if (
             "scoreIncrement" in event
