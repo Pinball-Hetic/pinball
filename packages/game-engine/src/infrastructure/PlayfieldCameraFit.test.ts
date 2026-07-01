@@ -215,6 +215,17 @@ describe('stratégies par mode de vue', () => {
     expect(d1).not.toBe(PLAYFIELD_VIEW_DIR);
   });
 
+  test('cameraUpForMode renvoie un vecteur frais — muter le retour ne corrompt pas la constante', () => {
+    const up1 = playfieldCameraUpForMode('portrait-fill');
+    const up2 = playfieldCameraUpForMode('portrait-fill');
+    expect(up1).not.toBe(up2);
+    expect(up1).not.toBe(PLAYFIELD_PORTRAIT_CAMERA_UP);
+    // Muter le retour ne doit pas toucher la constante partagée.
+    up1.set(9, 9, 9).normalize();
+    expect(PLAYFIELD_PORTRAIT_CAMERA_UP.z).toBe(-1);
+    expect(playfieldCameraUpForMode('portrait-fill').z).toBe(-1);
+  });
+
   test('legacy target = centre de la boîte de cadrage', () => {
     const box = new THREE.Box3(
       new THREE.Vector3(-1, 0, -2),

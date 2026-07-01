@@ -77,7 +77,7 @@ export function playfieldViewDirForMode(viewMode: PlayfieldViewMode): THREE.Vect
 }
 
 export function playfieldCameraUpForMode(viewMode: PlayfieldViewMode): THREE.Vector3 {
-  return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].cameraUp();
+  return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].cameraUp().clone();
 }
 
 export function playfieldCameraTargetForMode(

@@ -64,11 +64,18 @@ export function prepareGltfMaterialsForDisplay(
   const envSemi            = rendering?.envIntensitySemi    ?? DEFAULT_ENV_SEMI;
   const envBase            = rendering?.envIntensityBase    ?? DEFAULT_ENV_BASE;
 
+  // Un même matériau (et son `.color`) peut être partagé par plusieurs meshes.
+  // Sans ce garde, `color.multiplyScalar` s'appliquerait une fois par mesh et
+  // assombrirait la couleur en double. On ne traite chaque matériau qu'une fois.
+  const processed = new Set<THREE.MeshStandardMaterial>();
+
   root.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh)) return;
     const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const material of materials) {
       if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+      if (processed.has(material)) continue;
+      processed.add(material);
 
       // Espaces couleur textures.
       for (const key of TEXTURE_KEYS) {

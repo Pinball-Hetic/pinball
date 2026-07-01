@@ -159,7 +159,7 @@ export class PlayfieldCameraDirector {
 
   private lerpViewDir(t: number): THREE.Vector3 | undefined {
     if (!this.base || !this.faceDir || t <= 0) return undefined;
-    if (t >= 1) return this.faceDir;
+    if (t >= 1) return this.dirScratch.copy(this.faceDir);
     return this.dirScratch.copy(this.base.dirToCamera).lerp(this.faceDir, t).normalize();
   }
 
