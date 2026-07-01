@@ -107,9 +107,10 @@ import {
   createInputState,
   type InputState,
 } from "./createApplyAction";
-import { idForAction, gameKeyToAction, isPreventDefaultKey } from "./keyboardMap";
 import { buildFlipperBodies } from "./physics/buildFlipperBodies";
 import { buildPlungerBody } from "./physics/buildPlungerBody";
+import { createKeyboardRouter } from "./createKeyboardRouter";
+import { DebugMeshManager } from "./debug/DebugMeshManager";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -660,7 +661,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     rapierDebugLines.renderOrder = 1000;
     scene.add(rapierDebugLines);
     disposableMats.push(rapierDebugMat);
-    let debugCollidersOn = false;
+    // Façade des meshes debug (état collidersOn + toggle H) — assignée après la
+    // construction des hulls/pivots flippers (buildFlipperBodies).
+    let debugMeshManager: DebugMeshManager | null = null;
 
     const stuckDetector = new StuckBallDetector();
     const bottomOutDetector = new DetectBottomOut();
@@ -952,6 +955,17 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         leftPivotMarker  = flipperBodies.leftPivotMarker;
         rightPivotMarker = flipperBodies.rightPivotMarker;
 
+        debugMeshManager = new DebugMeshManager(
+          {
+            colliders: rapierDebugLines,
+            leftHull: leftFlipperDebug,
+            rightHull: rightFlipperDebug,
+            leftPivotMarker,
+            rightPivotMarker,
+          },
+          () => ({ left: leftFlipperPivot, right: rightFlipperPivot }),
+        );
+
         ballPhysicsInst.setSpawnPosition(mapLayout.spawns.ball.x, mapLayout.spawns.ball.y, mapLayout.spawns.ball.z);
         ballPhysicsInst.body.wakeUp();
 
@@ -1131,55 +1145,19 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         // Clavier dev : mapping key→action + résolution de l'id physique
         // extraits + testés (keyboardMap.ts, idForAction fail-fast).
-        const onKeyDown = (e: KeyboardEvent) => {
-          if (isPreventDefaultKey(e.key)) e.preventDefault();
-          unlockPinballAudio();
-          if (e.repeat) return;
-          // `H` reste TOUJOURS actif (debug), indépendant du KEYBOARD_MODE.
-          if (e.key === "h" || e.key === "H") {
-            debugCollidersOn = !debugCollidersOn;
-            rapierDebugLines.visible = debugCollidersOn;
-            if (leftFlipperDebug)  leftFlipperDebug.visible  = debugCollidersOn;
-            if (rightFlipperDebug) rightFlipperDebug.visible = debugCollidersOn;
-            if (leftPivotMarker)   leftPivotMarker.visible   = debugCollidersOn;
-            if (rightPivotMarker)  rightPivotMarker.visible  = debugCollidersOn;
-            if (debugCollidersOn && leftFlipperPivot && rightFlipperPivot) {
-              const lp = new THREE.Vector3();
-              const rp = new THREE.Vector3();
-              leftFlipperPivot.pivot.getWorldPosition(lp);
-              rightFlipperPivot.pivot.getWorldPosition(rp);
-              const fmt = (v: THREE.Vector3) => ({
-                x: +v.x.toFixed(4), y: +v.y.toFixed(4), z: +v.z.toFixed(4),
-              });
-              setFlipperPivotCoords({ left: fmt(lp), right: fmt(rp) });
-            } else {
-              setFlipperPivotCoords(null);
-            }
-            return;
-          }
-          if (e.key === "j" || e.key === "J") {
-            debugVisibleRef.current = !debugVisibleRef.current;
-            setDebugVisible(debugVisibleRef.current);
-            return;
-          }
-          if (e.key === "m" || e.key === "M") {
-            ballDragController.toggleMoveMode();
-            return;
-          }
-          // Reset-balle = aide DEV uniquement (cf. GameOverlay). Absente en prod.
-          if ((e.key === "r" || e.key === "R") && process.env.NODE_ENV !== "production") {
-            resetBallRef.current?.();
-            return;
-          }
-          const downAction = gameKeyToAction(e.key);
-          if (downAction) dispatchButton(idForAction(downAction), "DOWN");
-        };
-
-        const onKeyUp = (e: KeyboardEvent) => {
-          if (isPreventDefaultKey(e.key)) e.preventDefault();
-          const upAction = gameKeyToAction(e.key);
-          if (upAction) dispatchButton(idForAction(upAction), "UP");
-        };
+        // Routeur clavier dev extrait (createKeyboardRouter.ts) : jeu (via
+        // keyboardMap) + toggles debug (H via DebugMeshManager, J/M/R).
+        const { onKeyDown, onKeyUp } = createKeyboardRouter({
+          unlockAudio: unlockPinballAudio,
+          dispatchButton,
+          debug: debugMeshManager,
+          setFlipperPivotCoords,
+          debugVisibleRef,
+          setDebugVisible,
+          toggleMoveMode: () => ballDragController.toggleMoveMode(),
+          resetBall: () => resetBallRef.current?.(),
+          isDev: process.env.NODE_ENV !== "production",
+        });
 
         onSessionStartRef.current = () => {
           if (ballMesh) ballMesh.visible = true;
@@ -1485,7 +1463,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       cameraRig.updateFrame(dt, { freeze: freezeFrame, cinematicActive: cameraCinematicActive });
 
       // ── Rapier debug render (tous colliders) ─────────────────────────────
-      if (debugCollidersOn && physicsWorld) {
+      if (debugMeshManager?.collidersOn && physicsWorld) {
         const { vertices, colors } = physicsWorld.world.debugRender();
         const rgb = new Float32Array(vertices.length);
         for (let i = 0, j = 0; i < colors.length; i += 4, j += 3) {
