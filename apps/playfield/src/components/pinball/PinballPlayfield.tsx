@@ -50,6 +50,9 @@ import {
   PlungerPhysics,
   type BossId,
   CinematicDirector,
+  PlayfieldCinematicStrobe,
+  cinematicFreezeFeedback,
+  type CinematicFreezeFeedbackConfig,
   ScreenShake,
   parsePlayfieldViewMode,
   configureSurfaceCoefficients,
@@ -99,7 +102,13 @@ import {
   unlockPinballAudio,
   setMapAudioUrls,
 } from "@/audio/pinballAudio";
-import GameOverlay, { type PlayfieldBootPhase } from "./GameOverlay";
+import GameOverlay from "./GameOverlay";
+import {
+  computeBootPhase,
+  shouldAutoBeginSession,
+  type PlayfieldBootPhase,
+} from "./bootPhase";
+import { createOutroInactivityTimer } from "./outroInactivityTimer";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -230,15 +239,23 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   const beginSessionRef = useRef(beginSession);
   beginSessionRef.current = beginSession;
 
-  const bootPhase: PlayfieldBootPhase = !physicsReady
-    ? "loading"
-    : !sessionStarted
-      ? "attract"
-      : "in_game";
+  const bootPhase: PlayfieldBootPhase = computeBootPhase({
+    physicsReady,
+    sessionStarted,
+  });
 
   useEffect(() => {
     notifyBootPhase(bootPhase);
   }, [bootPhase]);
+
+  // Auto-spawn : la map étant déjà sélectionnée en amont, dès que la physique
+  // est prête on démarre la session sans attendre START/ESPACE. La balle
+  // apparaît alors dans le couloir plongeur, prête à être lancée.
+  useEffect(() => {
+    if (shouldAutoBeginSession({ physicsReady, sessionStarted })) {
+      beginSessionRef.current();
+    }
+  }, [physicsReady, sessionStarted]);
 
   const dmd = useDmdOrchestrator(mapClips, (d) => {
     setGameOverClaimUrl(d.claimUrl);
@@ -353,6 +370,21 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // Dernière vie engagée → respiration 1.2s (pas de gel : bille déjà drainée).
       if (livesRemaining === 1) playCinematic('last_chance');
     },
+    onLifeGained: (lives) => {
+      // Vie gagnée (rescue/bonus map) : rafraîchir immédiatement le DMD avec le
+      // vrai compteur — sans ça le DMD reste sur l'ancien nombre jusqu'au
+      // prochain event de score (désync, surtout au-delà de 3 vies).
+      const snap = {
+        player: playerRef.current,
+        score: scoreRef.current,
+        combo: comboRef.current,
+        multiplier: multiplierRef.current,
+        lives,
+        mapState: buildMapState(),
+      };
+      dmd.emitScoreSnapshot(snap);
+      dmd.pushScore(snap);
+    },
     onGameOver: (finalScore, stats) => {
       setFinalScore(finalScore); // le QR arrive ensuite via le callback (async)
       // Counters spécifiques map : récupérés du mapState (alimenté par le
@@ -367,6 +399,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // Clip poussé à CHAQUE game over ; DMD/backglass décident de
       // l'ampleur (le backglass connaît le rang → fanfare ou recap).
       dmd.pushCinematic('hall_of_fame');
+      // Auto-exit de l'écran outro/QR après 20s sans interaction (libère la
+      // borne). Toute interaction annule le timer (cf. applyAction).
+      armOutroInactivityRef.current?.();
     },
     onGameStart: () => {
       setGameOverClaimUrl(null); // évite un QR périmé qui flashe sur la partie suivante
@@ -453,6 +488,11 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   const handleResetBall = useCallback(() => {
     resetBallRef.current?.();
   }, []);
+
+  // Outro/QR auto-exit : armé à l'entrée en game_over (onGameOver), annulé à
+  // toute interaction. Peuplé par le closure de la boucle animate (accès à
+  // resetGameSequence). Cf. outroInactivityTimer.ts.
+  const armOutroInactivityRef = useRef<(() => void) | null>(null);
 
   const { callbacksRef: physicalInputsRef, simulateButton, isConnectedRef } = usePhysicalInputs();
 
@@ -548,6 +588,18 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let ballTrail: BallTrail | null = null;
     let shooterLaneGate: ShooterLaneGate | null = null;
 
+    // Feedback playfield pendant le gel des cinématiques (ex. gain de lettre
+    // HETIC) : un flash strobé rend le freeze lisible comme intentionnel et
+    // pointe vers le DMD, plutôt qu'une scène morte figée. Flash-only (pas de
+    // voile noir) — le DMD porte le contenu. Tunable via FREEZE_FEEDBACK.
+    const freezeFeedbackStrobe = new PlayfieldCinematicStrobe();
+    const FREEZE_FEEDBACK: CinematicFreezeFeedbackConfig = {
+      hz: 9,
+      maxMix: 0.85,
+      activeFraction: 0.75,
+      fadeOutFraction: 0.4,
+    };
+
     // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
     const quality = new QualityGovernor((tier) => {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, tier.dpr));
@@ -571,6 +623,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     // physicsWorld) → cleanup sûr même si init() est annulé avant le câblage.
     let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
     let keyupHandler: ((e: KeyboardEvent) => void) | null = null;
+    // Annulation du timer outro/QR au cleanup (l'instance vit dans init()).
+    let cancelOutroInactivity: (() => void) | null = null;
     let prevFrameTime = 0;
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
@@ -673,6 +727,20 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // par le module de map (récupérés via le bridge, preload fait là-haut).
         ballTrail = new BallTrail();
         ballTrail.mount(scene);
+
+        // Feedback de gel : flash au centre du playfield. Monté sur modelRoot
+        // (repère scène) pour ne dépendre d'aucun mesh de map.
+        const { leftX, rightX, topZ, bottomZ } = mapLayout.geometry.bounds;
+        freezeFeedbackStrobe.mount(modelRoot, {
+          flashColor: 0xffffff,
+          flashIntensity: 2.6,
+          flashDistance: 0.9,
+          flashPosition: new THREE.Vector3(
+            (leftX + rightX) / 2,
+            1.15,
+            (topZ + bottomZ) / 2,
+          ),
+        });
 
         // ── Ball mesh ────────────────────────────────────────────────────────
         const ballGeo = new THREE.SphereGeometry(getBallRadius(), 24, 24);
@@ -1049,6 +1117,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // START (DRY). Réinitialise l'état jeu, la caméra boss, les combats et
         // baselines de score, le monde de la map, puis rend la bille visible.
         const resetGameSequence = () => {
+          outroInactivity.cancel();
           resetGame();
           restoreBossCamera();
           collisionProcessor?.resetAllBossFights();
@@ -1057,7 +1126,23 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           if (ballMesh) ballMesh.visible = true;
         };
 
+        // Timer d'inactivité de l'outro/QR : après 20s sans interaction, on
+        // rejoue exactement le chemin replay/reset (resetGameSequence) → retour
+        // idle/attract. Timing injecté (window.*) → logique pure testée.
+        const outroInactivity = createOutroInactivityTimer(
+          () => resetGameSequence(),
+          { setTimeout: window.setTimeout, clearTimeout: window.clearTimeout },
+        );
+        armOutroInactivityRef.current = () => outroInactivity.arm();
+        cancelOutroInactivity = () => outroInactivity.cancel();
+
         const applyAction = (action: GameAction, btnAction: ButtonAction) => {
+          // Toute interaction sur l'écran outro/QR annule l'auto-exit (le
+          // replay via PLUNGE/START le fait déjà via resetGameSequence ; ceci
+          // couvre aussi les flips et les UP qui ne redémarrent pas la partie).
+          if (btnAction === "DOWN" && gameStateRef.current === "game_over") {
+            outroInactivity.cancel();
+          }
           if (!sessionStartedRef.current) {
             if (
               btnAction === "DOWN"
@@ -1263,6 +1348,16 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       const cameraCinematicActive = cameraRig.director.isActive();
       const freezeFrame =
         (mapModule?.shouldFreezePhysics?.() ?? false) || cinematics.shouldFreeze();
+
+      // Feedback playfield pendant un gel de cinématique (flash-only strobé) :
+      // rend le freeze lisible + pointe vers le DMD. Piloté par le temps écoulé
+      // du director → 0 quand aucun clip n'est actif (mix retombe, flash retiré).
+      const freezeFb = cinematicFreezeFeedback(
+        cinematics.shouldFreeze() ? cinematics.activeElapsedMs(time) : -1,
+        cinematics.activeDurationMs(),
+        FREEZE_FEEDBACK,
+      );
+      freezeFeedbackStrobe.applyFlashOnly(freezeFb.on, freezeFb.mix);
 
       if (bossIntroActive && !bossIntroHolding && ballPhysicsInst) {
         const p = ballPhysicsInst.body.translation();
@@ -1596,10 +1691,13 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       cameraRig.dispose();
       if (keydownHandler) document.removeEventListener("keydown", keydownHandler);
       if (keyupHandler) document.removeEventListener("keyup", keyupHandler);
+      cancelOutroInactivity?.();
+      armOutroInactivityRef.current = null;
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
       // bumperVisuals + garlands + bossReveals + nestMarker : dispose géré par
       // mapModule.dispose.
       ballTrail?.dispose();
+      freezeFeedbackStrobe.dispose();
       shooterLaneGate?.dispose();
       shooterLaneGateRef.current = null;
       playfieldRootHandleRef.current = null;

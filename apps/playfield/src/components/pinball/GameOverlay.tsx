@@ -7,12 +7,13 @@ import PlungerPowerBar from "./PlungerPowerBar";
 import BossHealthBar from "./BossHealthBar";
 import { bossHealthBarTheme } from "./bossHealthHud";
 import StyledQrCode from "./StyledQrCode";
+import type { PlayfieldBootPhase } from "./bootPhase";
 
 // Reset-balle = aide de DEV uniquement (bouton + hint + touche R). En prod
 // (borne) elle ne doit pas être présente. NODE_ENV est inliné au build Next.
 const IS_DEV = process.env.NODE_ENV !== "production";
 
-export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
+export type { PlayfieldBootPhase };
 
 interface GameOverlayProps {
   lives: number;
@@ -318,28 +319,7 @@ export default function GameOverlay({
               {attractTagline}
             </p>
             <h1 className={layout.attractTitle}>Pinball</h1>
-            <p className={layout.attractSubtitle}>
-              Le plateau est prêt. Entrez dans la partie pour lancer la balle.
-            </p>
           </div>
-
-          <div className="flex flex-col items-center gap-3">
-            <div className={layout.attractPrompt}>
-              <p className="animate-pulse text-sm uppercase tracking-[0.28em] text-amber-200/90">
-                ESPACE ou START pour jouer
-              </p>
-            </div>
-            {layout.attractTapHint && (
-              <p className={layout.attractTapHint}>ou cliquez sur le plateau</p>
-            )}
-          </div>
-
-          {layout.attractControls && (
-            <div className={layout.attractControls}>
-              <p>Q / D — Flippers</p>
-              <p>ESPACE (en jeu) — Charger puis relâcher pour lancer</p>
-            </div>
-          )}
         </div>
       )}
 
