@@ -12,4 +12,5 @@ export * from './effects';
 export * from './AsciiClipPlayer';
 export * from './layoutHelpers';
 export * from './content';
+export * from './livesDisplay';
 export * from './layouts';

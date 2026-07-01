@@ -7,8 +7,26 @@ import { NoSignal } from '@pinball/ui'
 import type { DmdDisplay } from '@pinball/shared-types'
 import { getDmdContent } from '@pinball/maps/dmd'
 import { AVAILABLE_MAPS } from '@pinball/maps'
+import { livesDisplay } from '@pinball/dmd-core'
 
-const TOTAL_LIVES = 3
+function renderLives(livesRemaining: number): ReactElement {
+  const view = livesDisplay(livesRemaining)
+  if (view.kind === 'count') {
+    return (
+      <div className="flex items-center gap-2 text-4xl font-mono tabular-nums">
+        <span>×{view.value}</span>
+        <span>●</span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex gap-3 text-3xl">
+      {Array.from({ length: view.total }).map((_, i) => (
+        <span key={i} style={{ opacity: i < view.filled ? 1 : 0.2 }}>●</span>
+      ))}
+    </div>
+  )
+}
 
 function renderDisplay(d: DmdDisplay): ReactElement {
   switch (d.mode) {
@@ -72,11 +90,7 @@ function renderDisplay(d: DmdDisplay): ReactElement {
           <div className="text-7xl font-mono font-bold uppercase tracking-widest text-red-400 drop-shadow-[0_0_20px_rgba(239,68,68,0.7)]">
             Ball Lost
           </div>
-          <div className="flex gap-3 text-3xl">
-            {Array.from({ length: TOTAL_LIVES }).map((_, i) => (
-              <span key={i} style={{ opacity: i < d.livesRemaining ? 1 : 0.2 }}>●</span>
-            ))}
-          </div>
+          {renderLives(d.livesRemaining)}
         </div>
       )
 

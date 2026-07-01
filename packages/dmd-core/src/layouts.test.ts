@@ -82,6 +82,21 @@ describe('layoutScore', () => {
     expect(livesLit(g1)).toBeLessThan(livesLit(g3));
   });
 
+  test('> 3 vies : compteur compact (pas de plafond à 3, pas d\'emplacements off)', () => {
+    const layouts = makeLayouts();
+    const g1 = newGrid();
+    const g7 = newGrid();
+    layouts.SCORE(g1, scoreDisplay({ lives: 1 }), 0);
+    layouts.SCORE(g7, scoreDisplay({ lives: 7 }), 0);
+    // Mode compteur : la rangée est "N ●" en DOT.lives, sans emplacements off.
+    expect(hasColor(g7, DOT.lives)).toBe(true);
+    // 1 vie (mode pastilles) dessine 2 emplacements off (heticOff) ; 7 vies (mode
+    // compteur) n'en dessine aucun.
+    const offLit = (g: Uint8Array) => [...g].filter((v) => v === DOT.heticOff).length;
+    expect(offLit(g1)).toBeGreaterThan(0);
+    expect(offLit(g7)).toBe(0);
+  });
+
   test('zéro vie : aucun dot de couleur lives', () => {
     const layouts = makeLayouts();
     const grid = newGrid();

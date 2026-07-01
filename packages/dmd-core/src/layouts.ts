@@ -3,6 +3,7 @@ import { mapStateFlag } from '@pinball/shared-types';
 import { FONT_5X7, FONT_12X22, drawText } from './fonts';
 import { GRID_W, GRID_H } from './DmdRenderer';
 import { DOT } from './palette';
+import { livesDisplay } from './livesDisplay';
 import {
   drawCentered,
   drawFlash,
@@ -18,13 +19,19 @@ import type { ClipContext, ClipHandler, DmdMapContent, ScoreDisplay } from './co
 type Variant<M extends DmdDisplay['mode']> = Extract<DmdDisplay, { mode: M }>;
 export type LayoutFn = (grid: Uint8Array, display: DmdDisplay, clockMs: number) => void;
 
-const TOTAL_LIVES = 3;
-
 // Rangée de vies (générique). La rangée HETIC (ST) est dessinée par
-// content.scoreOverlay.
+// content.scoreOverlay. Au-delà de 3 vies (bonus/rescue) on bascule sur un
+// compteur compact "N ●" — piloté par le vrai nombre, jamais plafonné.
 function drawLivesRow(grid: Uint8Array, lives: number, y: number): void {
-  for (let i = 0; i < TOTAL_LIVES; i++) {
-    const color = i < lives ? DOT.lives : DOT.heticOff;
+  const view = livesDisplay(lives);
+  if (view.kind === 'count') {
+    drawText(grid, GRID_W, 2, y, String(view.value), FONT_5X7, DOT.lives);
+    const dotX = 2 + (String(view.value).length * 6);
+    drawText(grid, GRID_W, dotX, y, '●', FONT_5X7, DOT.lives);
+    return;
+  }
+  for (let i = 0; i < view.total; i++) {
+    const color = i < view.filled ? DOT.lives : DOT.heticOff;
     drawText(grid, GRID_W, 2 + i * 7, y, '●', FONT_5X7, color);
   }
 }
