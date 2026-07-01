@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import {
   PhysicsWorld,
   BallPhysics,
@@ -19,8 +18,6 @@ import {
   plungerLaunchFactor,
   SWING_RAD,
   SWING_SMOOTH,
-  FLIPPER_RESTITUTION,
-  FLIPPER_FRICTION,
   computeSurfaceSnap,
   computeIdleSpawnLock,
   computeLaneStraightLock,
@@ -29,7 +26,6 @@ import {
   PlayfieldTrimeshBuilder,
   PlayfieldColliderFactory,
   resolvePlayfieldFlippers,
-  buildFlipperHullBody,
   syncFlipperBody,
   flipperWorldTransform,
   attachFlipperAtHinge,
@@ -113,6 +109,7 @@ import {
   type InputState,
 } from "./createApplyAction";
 import { idForAction, gameKeyToAction, isPreventDefaultKey } from "./keyboardMap";
+import { buildFlipperBodies } from "./physics/buildFlipperBodies";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -933,68 +930,27 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         ballPhysicsInst = new BallPhysics(world, mapLayout);
 
-        // ── Flipper : corps cinématique + convex hull ─────────────────────────
-        const makeFlipperBody = (
-          flipper: THREE.Mesh | null,
-          debugColor: number,
-        ): { body: RAPIER.RigidBody | null; debugMesh: THREE.Mesh | null; localOffset: THREE.Vector3 } => {
-          if (!flipper) return { body: null, debugMesh: null, localOffset: new THREE.Vector3() };
-
-          const { body, localOffset, localPts } = buildFlipperHullBody(world, flipper, {
-            restitution: FLIPPER_RESTITUTION,
-            friction: FLIPPER_FRICTION,
-          });
-
-          const convexGeo = new ConvexGeometry(localPts);
-          const convexMat = new THREE.MeshBasicMaterial({
-            color: debugColor, wireframe: true, transparent: true, opacity: 0.85, depthTest: false,
-          });
-          const debugMesh = new THREE.Mesh(convexGeo, convexMat);
-          debugMesh.renderOrder = 999;
-          debugMesh.visible = false;
-          scene.add(debugMesh);
-          disposableGeos.push(convexGeo);
-          disposableMats.push(convexMat);
-
-          return { body, debugMesh, localOffset };
-        };
-
-        const leftResult  = makeFlipperBody(leftFlipper  as THREE.Mesh | null, 0x00ffff);
-        const rightResult = makeFlipperBody(rightFlipper as THREE.Mesh | null, 0xff00ff);
-        leftFlipperBody  = leftResult.body;
-        rightFlipperBody = rightResult.body;
-        leftFlipperDebug  = leftResult.debugMesh;
-        rightFlipperDebug = rightResult.debugMesh;
-        leftFlipperBodyOffset.copy(leftResult.localOffset);
-        rightFlipperBodyOffset.copy(rightResult.localOffset);
-
-        // ── Pivot debug markers — sphères visibles quand H est actif ─────────
-        {
-          const pivotGeo = new THREE.SphereGeometry(0.008, 12, 12);
-          const pivotMatL = new THREE.MeshBasicMaterial({ color: 0x00ffff, depthTest: false });
-          const pivotMatR = new THREE.MeshBasicMaterial({ color: 0xff00ff, depthTest: false });
-          disposableGeos.push(pivotGeo);
-          disposableMats.push(pivotMatL, pivotMatR);
-
-          if (leftFlipperPivot) {
-            const wp = new THREE.Vector3();
-            leftFlipperPivot.pivot.getWorldPosition(wp);
-            leftPivotMarker = new THREE.Mesh(pivotGeo, pivotMatL);
-            leftPivotMarker.position.copy(wp);
-            leftPivotMarker.renderOrder = 1000;
-            leftPivotMarker.visible = false;
-            scene.add(leftPivotMarker);
-          }
-          if (rightFlipperPivot) {
-            const wp = new THREE.Vector3();
-            rightFlipperPivot.pivot.getWorldPosition(wp);
-            rightPivotMarker = new THREE.Mesh(pivotGeo, pivotMatR);
-            rightPivotMarker.position.copy(wp);
-            rightPivotMarker.renderOrder = 1000;
-            rightPivotMarker.visible = false;
-            scene.add(rightPivotMarker);
-          }
-        }
+        // ── Flipper : corps cinématiques + hulls debug + pivot markers ────────
+        // Construction extraite (physics/buildFlipperBodies.ts) — les refs
+        // retournées sont assignées dans les vars de closure lues par animate.
+        const flipperBodies = buildFlipperBodies({
+          world,
+          scene,
+          leftFlipper: leftFlipper as THREE.Mesh | null,
+          rightFlipper: rightFlipper as THREE.Mesh | null,
+          leftPivot: leftFlipperPivot,
+          rightPivot: rightFlipperPivot,
+          disposableGeos,
+          disposableMats,
+        });
+        leftFlipperBody  = flipperBodies.left.body;
+        rightFlipperBody = flipperBodies.right.body;
+        leftFlipperDebug  = flipperBodies.left.debugMesh;
+        rightFlipperDebug = flipperBodies.right.debugMesh;
+        leftFlipperBodyOffset.copy(flipperBodies.left.offset);
+        rightFlipperBodyOffset.copy(flipperBodies.right.offset);
+        leftPivotMarker  = flipperBodies.leftPivotMarker;
+        rightPivotMarker = flipperBodies.rightPivotMarker;
 
         ballPhysicsInst.setSpawnPosition(mapLayout.spawns.ball.x, mapLayout.spawns.ball.y, mapLayout.spawns.ball.z);
         ballPhysicsInst.body.wakeUp();
