@@ -526,6 +526,16 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         alternateWorldActiveRef.current = false;
         alternateWorldBaselineRef.current = 0;
         bossArmedFiredRef.current.clear();
+        // Retour au monde normal : synchroniser state React + atmosphère (HUD
+        // banner, trail, DMD) — sinon ils restent bloqués en monde alternatif.
+        // Symétrique de RETURN_PORTAL_TRANSITION_END.
+        setAlternateWorldActive(false);
+        setAlternateWorldHint(false);
+        if (alternateWorldHintTimerRef.current !== null) {
+          window.clearTimeout(alternateWorldHintTimerRef.current);
+          alternateWorldHintTimerRef.current = null;
+        }
+        callbacks?.onAtmosphereChange?.(false);
       }
     };
 
