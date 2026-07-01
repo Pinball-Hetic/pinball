@@ -43,8 +43,13 @@ export const layout: MapLayout = {
     ball: { x: 0.2355, y: 1.01, z: 0.161 },
     alternateWorld: { x: -0.0225, z: -0.48 },
     alternateWorldImpulse: { x: 0, y: 0, z: 0.055 },
-    normalReturn: { x: -0.0225, z: -0.12 },
-    normalReturnImpulse: { x: 0, y: 0, z: 0.05 },
+    // Retour monde normal : repositionné près du haut du plateau (comme
+    // alternateWorld) plutôt qu'à z=-0.12 — même plateau physique que ST
+    // (cf. commentaire en tête de fichier), même bug/fix. À z=-0.12 la balle
+    // réapparaissait déjà au niveau des slingshots/flippers et tombait pile
+    // au centre sans rien pour la dévier avant le drain.
+    normalReturn: { x: -0.0225, z: -0.46 },
+    normalReturnImpulse: { x: 0, y: 0, z: 0.06 },
   },
   shooterLane: {
     xMin: 0.206,

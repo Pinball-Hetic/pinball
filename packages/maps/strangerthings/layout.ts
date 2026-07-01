@@ -89,8 +89,15 @@ export const layout: MapLayout = {
     ball: { x: 0.2355, y: 1.01, z: 0.161 },
     alternateWorld: { x: -0.0225, z: -0.48 },
     alternateWorldImpulse: { x: 0, y: 0, z: 0.055 },
-    normalReturn: { x: -0.0225, z: -0.12 },
-    normalReturnImpulse: { x: 0, y: 0, z: 0.05 },
+    // Retour monde normal : repositionné près du haut du plateau (comme
+    // alternateWorld) plutôt qu'à z=-0.12. À cette hauteur basse, la balle
+    // réapparaissait déjà quasiment au niveau des slingshots/flippers, tombait
+    // pile au centre (x=-0.0225) sans que rien ne puisse la dévier avant le
+    // drain → perte de vie inévitable. En la faisant réapparaître en haut,
+    // elle retraverse bumpers/pop zones/slingshots normalement, comme après
+    // un lancement classique.
+    normalReturn: { x: -0.0225, z: -0.46 },
+    normalReturnImpulse: { x: 0, y: 0, z: 0.06 },
   },
   // Couloir plongeur : géométrie analytique (pas de mesh). Littéraux map.
   shooterLane: {

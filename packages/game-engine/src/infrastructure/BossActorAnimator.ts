@@ -110,6 +110,14 @@ export class BossActorAnimator {
     }
     this.animState = 'idle';
     this.hitFlash = 0;
+    // hit/victory tournent en LoopOnce + clampWhenFinished : une fois finies,
+    // elles restent "actives" gelées sur leur dernière frame (poids toujours
+    // dans le blend) au lieu de se couper. Sans ce stop() explicite, la pose
+    // de victoire (boss "mort") continuait de peser au combat suivant — d'où
+    // le boss figé dans une pose bizarre au lieu de repartir en idle propre
+    // (cf. bug Ganondorf coincé après une 1re victoire).
+    this.hitAction?.stop();
+    this.victoryAction?.stop();
     if (this.glowLight) {
       this.glowLight.intensity = 0;
       this.glowLight.removeFromParent();
@@ -142,6 +150,12 @@ export class BossActorAnimator {
   playIdle(): void {
     if (!this.idleAction) return;
     this.animState = 'idle';
+    // Défense en profondeur : garantit qu'aucune pose one-shot gelée (hit ou
+    // victoire d'une partie précédente) ne reste dans le blend quand on
+    // revient à idle, quel que soit le chemin d'appel (show() après hide(),
+    // reveal direct, etc.).
+    this.hitAction?.stop();
+    this.victoryAction?.stop();
     this.idleAction.reset();
     this.idleAction.setLoop(THREE.LoopRepeat, Infinity);
     this.idleAction.fadeIn(0.12).play();

@@ -140,6 +140,9 @@ export default function GameOverlay({
   qrLogo,
 }: GameOverlayProps) {
   void cabinetMode;
+  // Le bouton "Reset balle" (debug) a été retiré de l'affichage ; le
+  // raccourci R reste actif indépendamment (cf. PinballPlayfield.tsx).
+  void onResetBall;
   const layout = overlayLayout(portraitFill);
 
   const showHud = bootPhase === "in_game";
@@ -156,9 +159,6 @@ export default function GameOverlay({
   const title = outro?.title ?? "FIN DE PARTIE";
   const scanLabel = outro?.scanLabel ?? "Scanne pour t'inscrire au classement";
   const replayLabel = outro?.replayLabel ?? "START — Rejouer";
-
-  const showResetBall =
-    bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
 
   const showAlternateWorldBanner =
     bootPhase === "in_game" && gameState === "playing" && alternateWorldActive;
@@ -184,25 +184,14 @@ export default function GameOverlay({
                 </span>
               ))}
             </div>
-            {showResetBall && onResetBall && (
-              <button
-                type="button"
-                onClick={onResetBall}
-                className="pointer-events-auto mt-2 rounded border border-red-500/35 bg-black/60 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-red-300/90 backdrop-blur-sm transition hover:border-red-400/50 hover:bg-black/80 hover:text-red-200 active:scale-[0.98]"
-              >
-                Reset balle — R (−1 vie)
-              </button>
-            )}
+            {/*
+              Le bouton "Reset balle" et la légende clavier sont des aides de
+              debug : elles ne doivent pas apparaître sur la borne (démo du
+              vrai flipper). Les raccourcis restent actifs (R reset, ESPACE
+              lance) — cf. onKeyDown/onKeyUp dans PinballPlayfield.tsx, qui
+              n'ont aucune dépendance sur cet affichage.
+            */}
           </div>
-          {layout.keyboardHints && (
-            <div className={layout.keyboardHints}>
-              <div>Q / ← — Flipper gauche</div>
-              <div>D / → — Flipper droit</div>
-              <div>ESPACE — Charger / lancer</div>
-              <div>R — Reset balle (−1 vie)</div>
-              <div>H — Debug colliders</div>
-            </div>
-          )}
         </header>
       )}
 
@@ -432,26 +421,19 @@ export default function GameOverlay({
         />
       )}
 
-      {showPowerBar && (
-        <div className={`pointer-events-none absolute inset-x-0 ${layout.powerHint} z-10 flex justify-center px-4`}>
-          <p className="animate-pulse font-mono text-[11px] uppercase tracking-[0.22em] text-amber-200/80">
-            Relâcher ESPACE pour lancer
-          </p>
-        </div>
-      )}
-
-      {showLaunchHint && (
+      {/*
+        Les aides "Relâcher ESPACE pour lancer" / "Maintenir ESPACE — relâcher
+        pour lancer" ont été retirées de l'affichage (debug, pas pour la
+        démo du vrai flipper). Le lancement au clavier (ESPACE) reste actif
+        indépendamment — cf. onKeyDown/onKeyUp dans PinballPlayfield.tsx.
+        On garde le décompte de vies restantes, qui est une info de jeu et
+        pas un raccourci clavier.
+      */}
+      {showLaunchHint && lives < initialLives && (
         <div className={`pointer-events-none absolute inset-x-0 ${layout.bottomHint} z-10 flex flex-col items-center gap-2 px-4`}>
-          {lives < initialLives && (
-            <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-              Bille perdue — {lives} vie{lives > 1 ? "s" : ""} restante{lives > 1 ? "s" : ""}
-            </p>
-          )}
-          <div className="rounded-full border border-zinc-700/60 bg-black/55 px-5 py-2 font-mono backdrop-blur-sm">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-300">
-              Maintenir <span className="text-amber-300/90">ESPACE</span> — relâcher pour lancer
-            </p>
-          </div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-500">
+            Bille perdue — {lives} vie{lives > 1 ? "s" : ""} restante{lives > 1 ? "s" : ""}
+          </p>
         </div>
       )}
     </>

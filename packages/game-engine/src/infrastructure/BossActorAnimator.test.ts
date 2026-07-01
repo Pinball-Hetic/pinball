@@ -165,6 +165,65 @@ describe('BossActorAnimator update', () => {
   });
 });
 
+// ── Régression : la pose de victoire ne doit pas contaminer le combat suivant ──
+// `victoryAction` tourne en LoopOnce + clampWhenFinished : une fois finie, elle
+// se fige sur sa dernière frame au lieu de s'arrêter — son poids reste dans le
+// blend. Avant le fix, hide()/playIdle() ne l'arrêtaient jamais explicitement,
+// donc le 2e combat démarrait avec la pose de victoire gelée mélangée à l'idle
+// (Ganondorf bloqué dans une pose bizarre au lieu de repartir en idle propre).
+function makeRotZClip(name: string, endValue: number): THREE.AnimationClip {
+  const track = new THREE.NumberKeyframeTrack('.rotation[z]', [0, 1], [0, endValue]);
+  return new THREE.AnimationClip(name, 1, [track]);
+}
+
+function step(mixer: THREE.AnimationMixer, seconds: number, dt = 1 / 60): void {
+  let t = 0;
+  while (t < seconds) {
+    mixer.update(dt);
+    t += dt;
+  }
+}
+
+function setupVictoryLeakRig() {
+  const root = new THREE.Object3D();
+  const mixer = new THREE.AnimationMixer(root);
+  const idleAction = mixer.clipAction(makeRotZClip('idle', 0.1));
+  idleAction.setLoop(THREE.LoopRepeat, Infinity);
+  const victoryAction = mixer.clipAction(makeRotZClip('victory', 2.0));
+  victoryAction.setLoop(THREE.LoopOnce, 1);
+  victoryAction.clampWhenFinished = true;
+
+  const animator = new BossActorAnimator(GLOW);
+  animator.setActions({ mixer, idleAction, hitAction: null, victoryAction });
+
+  return { root, mixer, idleAction, victoryAction, animator };
+}
+
+describe('BossActorAnimator — victory pose does not leak into the next fight', () => {
+  it('playIdle() after a finished victory produces a clean idle pose, not a blend', () => {
+    const { root, mixer, animator } = setupVictoryLeakRig();
+
+    animator.playIdle();
+    step(mixer, 0.5);
+
+    animator.playVictory();
+    step(mixer, 3); // well past the 1s victory clip → finished & clamped
+
+    // End of fight / game reset.
+    animator.hide(root);
+    // Next game: boss revealed again → show() → playIdle().
+    animator.playIdle();
+    step(mixer, 0.2); // let the 0.12s idle fade-in complete
+    step(mixer, 0.25); // sample a clean quarter-second into the idle ramp
+
+    // A contaminated blend (pre-fix behaviour) lands around rotZ ≈ 1.0+
+    // (averaging idle's ~0.05 with victory's frozen 2.0). A clean idle pose
+    // stays within the idle clip's own range [0, 0.1].
+    expect(root.rotation.z).toBeGreaterThanOrEqual(0);
+    expect(root.rotation.z).toBeLessThan(0.1);
+  });
+});
+
 describe('BossActorAnimator reset', () => {
   it('reset(false) keeps the light disposable later but clears state', () => {
     const a = new BossActorAnimator(GLOW);
