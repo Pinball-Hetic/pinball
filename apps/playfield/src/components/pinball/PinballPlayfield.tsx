@@ -1127,10 +1127,14 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         };
 
         // Timer d'inactivité de l'outro/QR : après 20s sans interaction, on
-        // rejoue exactement le chemin replay/reset (resetGameSequence) → retour
-        // idle/attract. Timing injecté (window.*) → logique pure testée.
+        // recommence le workflow DEPUIS LE DÉBUT (retour à la sélection de map)
+        // pour libérer la borne au joueur suivant. Un reload complet rejoue le
+        // boot pinball.tsx → MapSelectorScreen (multi-map) ou l'attract de la
+        // map forcée (mono-map Fliphetic via NEXT_PUBLIC_MAP_ID), avec un état
+        // moteur/sockets/refs vierge. Le replay instantané reste dispo via
+        // START/PLUNGE (label « START — Rejouer »). Timing injecté (window.*).
         const outroInactivity = createOutroInactivityTimer(
-          () => resetGameSequence(),
+          () => window.location.reload(),
           {
             // Wrap (pas de ref nue) : window.setTimeout appelée hors de window
             // jette "Illegal invocation".
