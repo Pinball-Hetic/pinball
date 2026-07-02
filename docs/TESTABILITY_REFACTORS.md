@@ -47,9 +47,27 @@
 > flipper-cinématique et le bloc flipper-assist. Les extraire exige de threader un objet partagé
 > avec **risque de swap silencieux number↔number** (invisible à tsc, non smoke-able agent). Reporté.
 >
-> **Reste dans PinballPlayfield (candidats, non faits)** : bloc flipper-cinématique + assist (via
-> objet `flipperFrame` partagé — risque swap), câblage use-cases (`LaunchBall`/`BumperHit`/…, couplé
-> à `emit`), GLB load+prepare (~10 L), boss/monde orchestration. + les lifts monolithiques 6/7 (différés).
+> ~~**Reste dans PinballPlayfield (candidats, non faits)**~~ → **Session autonome 3 (2026-07-02,
+> smoke ignoré sur demande user) : TOUS FAITS.** `PinballPlayfield.tsx` **1495 → 1260 L**
+> (total : 1798→1260, **−538 / −30%**). 19 modules extraits, +58 tests cumulés, repo vert
+> (playfield 151, game-engine 903, ST 141, zelda 77).
+> - `hotLoop/flipperFrame.ts` — struct accumulateurs + stepFlipperKinematics/Assist (+6 tests,
+>   math swing 60FPS-normalisé frame-rate-independent)
+> - `hotLoop/rapierDebugRender.ts` — sanitize buffers debug (+3 tests)
+> - `hotLoop/bossIntroHold.ts` — hold rising-edge intro boss
+> - `hotLoop/computePlungerVisual.ts` +createPlungerChargeUi — throttle jauge 25Hz
+> - `wireGameplay.ts` — câblage emit-router + use-cases + processor (cycle processor↔emit
+>   documenté DANS la factory, garde-fou P1 respecté)
+> - `wireInputs.ts` — handlers input:* + dispatchButton 3 modes (+6 tests)
+> - `scene/attachResizeHandler.ts` · `scene/assemblePlayfieldModel.ts` (GLB retry/backoff +
+>   dressing + trail + strobe + ball mesh)
+> - dédupe scoreSnapshot (5 sites → 1 helper) ; structs flipperSetup/flipperRig (12 lets → 2)
+>
+> **animate = délégation nommée ordonnée** (le P1 « decompose animate into stages » est de facto
+> réalisé incrémentalement). **~1260 L ≈ plancher honnête** : le reste = orchestration React
+> légitime (hooks/callbacks/JSX ~490), arg-lists de délégation (= surface de couplage explicite),
+> et l'init séquentiel. Compresser plus = bundler les deps en objets-contexte opaques
+> (obfuscation, pas du clean). ⚠ Sessions 2+3 NON smokées — batterie E2E requise avant PR.
 >
 > **Backlog smells (workflow, dédupliqués)** — au-delà des slices :
 > - **P1** SRP+OCP — décomposer animate en stages ordonnés APRÈS le lift (slice 7 fait le move entier d'abord). `PinballPlayfield.tsx:1270-1592`
