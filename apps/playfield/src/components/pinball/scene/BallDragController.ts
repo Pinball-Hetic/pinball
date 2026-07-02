@@ -48,6 +48,16 @@ export class BallDragController {
     return this.moveMode;
   }
 
+  /**
+   * true UNIQUEMENT pendant un drag actif (pointer down→up). Les locks du game
+   * loop (surface-snap, lane-lock) se désactivent sur ce flag, PAS sur moveMode :
+   * une bille lâchée retrouve immédiatement une physique/interaction libre même
+   * si le mode `M` reste actif (repositionnable plusieurs fois).
+   */
+  get isDragging(): boolean {
+    return this.dragging;
+  }
+
   private moveBallToPointer(clientX: number, clientY: number): void {
     const ball = this.deps.getBall();
     const root = this.deps.getPlayfieldRoot();

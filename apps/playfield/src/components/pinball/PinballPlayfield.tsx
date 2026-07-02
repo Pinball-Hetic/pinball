@@ -962,7 +962,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           gameState: gameStateRef.current,
           freezeFrame,
           physicsReady,
-          isMoveMode: ballDragController.isMoveMode,
+          isDragging: ballDragController.isDragging,
           bossIntroActive,
           bossIntroBallPos: bossIntroHold.pos,
           layout: mapLayout,

@@ -24,7 +24,7 @@ export interface BallSyncDeps {
   gameState: GameState;
   freezeFrame: boolean;
   physicsReady: boolean;
-  isMoveMode: boolean;
+  isDragging: boolean;
   bossIntroActive: boolean;
   bossIntroBallPos: { x: number; y: number; z: number };
   layout: MapLayout;
@@ -56,7 +56,7 @@ export function stepBallSync(d: BallSyncDeps): void {
   if (d.freezeFrame) return;
 
   // Balle figée au spawn en idle (y compris pendant la charge) — évite le glissement.
-  if (gameState === "idle" && d.physicsReady && !d.isMoveMode) {
+  if (gameState === "idle" && d.physicsReady && !d.isDragging) {
     const lock = computeIdleSpawnLock(layout.spawns.ball);
     ball.body.setTranslation(lock.translation, true);
     ball.body.setLinvel(lock.linvel, true);
@@ -64,7 +64,7 @@ export function stepBallSync(d: BallSyncDeps): void {
   }
 
   // Verrouillage latéral du couloir pendant la montée (lancement droit).
-  if (gameState === "playing" && !d.isMoveMode && !d.shooterLaneGate?.isClosed()) {
+  if (gameState === "playing" && !d.isDragging && !d.shooterLaneGate?.isClosed()) {
     const laneLock = computeLaneStraightLock(
       ball.body.translation(),
       ball.body.linvel(),
@@ -82,7 +82,7 @@ export function stepBallSync(d: BallSyncDeps): void {
   }
 
   // Surface snap : recolle la balle au sol incliné.
-  if (gameState === "playing" && !d.isMoveMode) {
+  if (gameState === "playing" && !d.isDragging) {
     const snap = computeSurfaceSnap(ball.body.translation(), ball.body.linvel(), layout.shooterLane);
     if (snap) {
       ball.body.setTranslation(snap.translation, true);
@@ -100,8 +100,9 @@ export function stepBallSync(d: BallSyncDeps): void {
   const bVel = ball.body.linvel();
   const bSpd = Math.sqrt(bVel.x ** 2 + bVel.y ** 2 + bVel.z ** 2);
 
-  // Détecteur balle coincée — seulement hors zone de drain.
-  if (gameState === "playing" && bPos.z < STUCK_ZONE_MAX_Z) {
+  // Détecteur balle coincée — hors zone de drain, et jamais pendant un drag
+  // debug (sinon une bille tenue immobile serait force-drainée = perte de vie).
+  if (gameState === "playing" && !d.isDragging && bPos.z < STUCK_ZONE_MAX_Z) {
     const stuck = d.stuckDetector.update(bSpd, bPos, d.dt);
     if (stuck) {
       if (stuck.type === "force_drain") {
@@ -114,8 +115,9 @@ export function stepBallSync(d: BallSyncDeps): void {
     d.stuckDetector.reset();
   }
 
-  // Bottom-out fallback — zone sous les flippers hors couloir.
-  if (gameState === "playing" && d.bottomOutDetector.check(bPos)) {
+  // Bottom-out fallback — zone sous les flippers hors couloir (pas pendant un
+  // drag debug : on peut traîner la bille à travers la zone sans la drainer).
+  if (gameState === "playing" && !d.isDragging && d.bottomOutDetector.check(bPos)) {
     d.triggerBottomOut("bottom_out_zone");
   }
   // Drain nominal géré par le capteur Rapier bottom_out (CollisionEventProcessor).
