@@ -1,5 +1,22 @@
 # Backlog refacto — testabilité & clean architecture
 
+> ## 🔎 Smells repérés en passant (recherche scoop/collisions, 2026-07-03)
+> - **P2** ISP/encapsulation — `IMapBallPhysics.body` expose le `RigidBody` Rapier **BRUT**
+>   au module de map (`packages/game-engine/src/domain/MapModule.ts`). Les méthodes nommées
+>   (`holdAt…`/`applyEjectionForce`) sont propres, mais `body` court-circuite le contrat : une
+>   map peut faire n'importe quoi (setTranslation/applyImpulse/wakeUp). Reco : ajouter
+>   `holdAt(pos)` + `kick(impulse)` à l'interface, garder `body` interne. (Le scoop va devoir
+>   passer par `body` → aggrave ce smell tant que non fait.)
+> - **P3** OCP — ST `onGameEvent` = cascade manuelle de ~11 `onX(ctx,e)`, chacun guardé
+>   `if (e.type !== 'X') return` (`packages/maps/strangerthings/module/index.ts:307-318`).
+>   Ajouter un event = éditer la cascade. Ordre load-bearing + documenté → table
+>   `Record<GameEvent['type'], handler[]>` possible, pas urgent.
+> - **P3** SRP — le même `onGameEvent` mêle fan-out systèmes visuels (bumperVisuals/garlands/
+>   atmosphere/portal/bossReveals) + dispatch game-logic (2 concerns dans une méthode).
+> - **P3** dette connue — `layout.sensors` = positions littérales + `TODO(blender)` « dériver
+>   du GLB quand les meshes sensor_* existeront » (`packages/maps/strangerthings/layout.ts:73`).
+>   Chaque nouveau capteur (scoop inclus) ajoute un littéral. Déjà TODO en code.
+
 > # 🔥 SMOKE CHECKLIST — prochain test E2E (sessions refacto 2+3+4 NON smokées)
 > Tout est vert tests/tsc/lint, mais le 3D n'est pas vérifiable unitairement.
 > Ordre = un parcours de partie complet couvre presque tout.

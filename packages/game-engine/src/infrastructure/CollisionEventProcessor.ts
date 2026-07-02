@@ -14,6 +14,7 @@ import { BumpCollisionHandler } from './BumpCollisionHandler';
 import { BottomOutCollisionHandler } from './BottomOutCollisionHandler';
 import { SlingshotCollisionHandler } from './SlingshotCollisionHandler';
 import { PopZoneCollisionHandler } from './PopZoneCollisionHandler';
+import { ScoopCollisionHandler } from './ScoopCollisionHandler';
 import { RocketRampCollisionHandler } from './RocketRampCollisionHandler';
 import { DropTargetCollisionHandler } from './DropTargetCollisionHandler';
 import { PortalCollisionHandler } from './PortalCollisionHandler';
@@ -166,6 +167,7 @@ export class CollisionEventProcessor {
       ),
       new SlingshotCollisionHandler(emit),
       new PopZoneCollisionHandler(emit),
+      new ScoopCollisionHandler(emit),
       new RocketRampCollisionHandler(emit),
       this.dropTargetHandler,
       this.portalHandler,

@@ -8,3 +8,4 @@ export const SCORE_POP_ZONE = 50;
 export const SCORE_RAMP = 200;
 export const SCORE_DROP_TARGET = 75;
 export const SCORE_DROP_COMPLETE = 500;
+export const SCORE_SCOOP = 2500; // capture scoop/saucer (gros bonus + récompenses map)

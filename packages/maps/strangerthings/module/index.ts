@@ -24,6 +24,7 @@ import type { MapModule, MapContext, GameEvent } from '@pinball/game-engine'
 import { grantExtraLife } from './lifeBonus'
 import { createLastLifeRescue } from './lastLifeRescue'
 import { playMilestoneCinematic } from './milestoneCinematic'
+import { createScoopCapture } from './scoopCapture'
 
 // Module de comportement Stranger Things. Possède tous ses systèmes en
 // closure ; n'expose que le contrat MapModule (aucun bridge vers le
@@ -54,6 +55,8 @@ export function createModule(): MapModule {
   let demogorgonReveal: DemogorgonReveal | null = null
   let vecnaReveal: VecnaReveal | null = null
   const lastLifeRescue = createLastLifeRescue()
+  // Trou scoop (saucer) : state machine capture → hold → kick.
+  const scoop = createScoopCapture()
 
   // ── Handlers onGameEvent (closures sur l'état/systèmes ST) ────────────────
   // Chacun garde le contrat de l'ancien if-block : test de type + effet.
@@ -63,6 +66,21 @@ export function createModule(): MapModule {
     // montant orange, cohérent avec la fusée DMD/backglass) + shake. Remplace
     // l'ancien chenillard jaune « celebrate » (unité rocket cross-écrans).
     playMilestoneCinematic(ctx, e.threshold, () => garlands?.rocketBurst())
+  }
+
+  function onScoop(ctx: MapContext, e: GameEvent): void {
+    if (e.type !== 'SCOOP_ENTER') return
+    if (scoop.isActive()) return // déjà en capture — ignore un 2e contact
+    scoop.start()
+    // Récompenses immédiates ; le hold + kick sont pilotés dans update(dt).
+    // L'« animation » = flash score DMD (addScore) + vie (addLife → refresh DMD)
+    // + bannière DMD + juice playfield (shake + décollage garlands).
+    ctx.addScore(e.scoreIncrement, 'SCOOP')
+    ctx.addLife()
+    ctx.forceMultiplier(scoop.config.multiplier, scoop.config.multiplierMs)
+    ctx.pushDmdEvent('SCOOP', e.scoreIncrement)
+    ctx.screenShake(0.5)
+    garlands?.rocketBurst()
   }
 
   function onPortalTransitionEnd(ctx: MapContext, e: GameEvent): void {
@@ -307,6 +325,7 @@ export function createModule(): MapModule {
       // Dispatch ordonné (même ordre, mêmes effets que l'ancien cascade).
       handleBossLockedHit(ctx, e)
       onMilestone(ctx, e)
+      onScoop(ctx, e)
       onPortalTransitionEnd(ctx, e)
       onGameOverDrain(ctx, e)
       onBossArmed(ctx, e)
@@ -339,9 +358,33 @@ export function createModule(): MapModule {
           if (hint) ctx.pushDmdEvent(hint, 0)
         }
       }
+
+      // Scoop : tenir la bille au trou pendant la capture, puis la kicker.
+      // NOTE: passe par ctx.ball.body (RigidBody brut) — cf. backlog P2
+      // "IMapBallPhysics.body expose le body brut" (à remplacer par holdAt/kick).
+      const scoopPos = ctx?.layout.sensors.scoop
+      if (ctx?.ball && scoopPos) {
+        const phase = scoop.tick(dt * 1000)
+        if (phase === 'hold') {
+          // Physique gelée pendant la capture (shouldFreezePhysics) → il suffit
+          // de centrer la bille dans le trou, au repos. resetStuck en défensif.
+          ctx.ball.body.setTranslation({ x: scoopPos.x, y: scoopPos.y, z: scoopPos.z }, true)
+          ctx.ball.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+          ctx.ball.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+          ctx.resetStuck()
+        } else if (phase === 'eject') {
+          ctx.ball.body.applyImpulse(scoop.config.kickImpulse, true)
+        }
+      }
     },
     shouldFreezePhysics(): boolean {
-      return (transition?.isActive() ?? false) || (bossReveals?.isGameplayFrozen() ?? false)
+      return (
+        (transition?.isActive() ?? false) ||
+        (bossReveals?.isGameplayFrozen() ?? false) ||
+        // Capture scoop : gel → bille immobile au trou (pas de gravité ni de
+        // surface-snap/stuck-detector qui lutteraient), jusqu'au kick.
+        scoop.isActive()
+      )
     },
     isIntroHolding(): boolean {
       return bossReveals?.isGameplayFrozen() ?? false
@@ -378,6 +421,7 @@ export function createModule(): MapModule {
     },
     onGameReset(): void {
       bossDefeatTimers.clearAll()
+      scoop.reset()
       demogorgons = 0
       portals = 0
       hetic = 0

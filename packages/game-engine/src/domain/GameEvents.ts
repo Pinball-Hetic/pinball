@@ -8,6 +8,7 @@ export type GameEvent =
   | { type: 'DROP_TARGET_COMPLETE'; side: 'left' | 'right'; scoreIncrement: number }
   | { type: 'DROP_TARGET_RESET' }
   | { type: 'ZONE_HIT'; zone: string; scoreIncrement: number }
+  | { type: 'SCOOP_ENTER'; scoreIncrement: number }
   | { type: 'BOSS_REVEAL'; bossId: BossId; scoreIncrement: number }
   | { type: 'BOSS_TARGET_HIT'; bossId: BossId; hitCount: number; scoreIncrement: number }
   | { type: 'BOSS_FIGHT_END'; bossId: BossId }

@@ -28,6 +28,7 @@ export interface SensorLayout {
   rocket: MapPoint3; // capteur de rampe
   bossReveal: MapPoint3; // ancre de flash du reveal boss (monde normal)
   portal: MapPoint3; // ancre du portail monde alternatif
+  scoop?: MapPoint3; // trou capteur (saucer) : capture → récompenses → kick. Optionnel.
 }
 
 export interface SpawnLayout {

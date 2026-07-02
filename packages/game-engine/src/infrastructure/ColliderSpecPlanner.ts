@@ -247,12 +247,26 @@ export function planBottomOutSensor(layout: MapLayout): ColliderSpec {
   };
 }
 
-/** Tous les sensors (slingshots + pop-zones + rocket + boss + drop + bottom-out). */
+// Capteur du trou scoop (saucer). Optionnel : uniquement si la map le déclare.
+export function planScoopSensor(layout: MapLayout): ColliderSpec[] {
+  const scoop = layout.sensors.scoop;
+  if (!scoop) return [];
+  return [{
+    shape: { kind: 'cuboid', halfExtents: { x: 0.014, y: 0.012, z: 0.014 } },
+    translation: { x: scoop.x, y: scoop.y, z: scoop.z },
+    sensor: true,
+    collisionEvents: true,
+    role: 'scoop',
+  }];
+}
+
+/** Tous les sensors (slingshots + pop-zones + rocket + scoop + boss + drop + bottom-out). */
 export function planSensors(layout: MapLayout): ColliderSpec[] {
   return [
     ...planSlingshotSensors(),
     ...planPopZoneSensors(layout),
     planRocketSensor(layout),
+    ...planScoopSensor(layout),
     ...planBossTargets(layout),
     ...planDropTargets(layout),
     planBottomOutSensor(layout),
