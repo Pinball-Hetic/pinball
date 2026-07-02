@@ -14,6 +14,7 @@ import {
   resolveNestState,
   dueLateHints,
   advanceHetic,
+  ballCenterOnSurface,
   handleBossLockedHit,
   handleBossArmed,
   isGameOverDrain,
@@ -373,7 +374,16 @@ export function createModule(): MapModule {
           ctx.ball.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
           ctx.resetStuck()
         } else if (phase === 'eject') {
-          ctx.ball.body.applyImpulse(scoop.config.kickImpulse, true)
+          // Téléport-eject : replace la bille au bord du trou, posée sur la
+          // surface, avec une vitesse de sortie directe (cf. ScoopConfig).
+          const off = scoop.config.ejectOffset
+          const ez = scoopPos.z + off.z
+          ctx.ball.body.setTranslation(
+            { x: scoopPos.x + off.x, y: ballCenterOnSurface(ez), z: ez },
+            true,
+          )
+          ctx.ball.body.setLinvel(scoop.config.ejectVelocity, true)
+          ctx.ball.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
         }
       }
     },

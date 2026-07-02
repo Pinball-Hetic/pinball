@@ -10,17 +10,27 @@ export interface ScoopConfig {
   multiplier: number;
   /** durée du multiplicateur (ms) */
   multiplierMs: number;
-  /** impulsion de sortie (à-coup) appliquée au body à l'éjection — À TUNER au smoke */
-  kickImpulse: { x: number; y: number; z: number };
+  /**
+   * Téléport-eject (standard flipper) : à l'éjection la bille est REPLACÉE au
+   * bord du trou (offset x/z depuis le capteur, posée sur la surface) avec une
+   * vitesse de sortie directe. Aucune impulse ne sort d'un trou GLB profond
+   * (~2 mm de montée pour une impulse raisonnable) — on ne lutte pas contre la
+   * géométrie. Même pattern que les portails (spawnFromAlternateWorld).
+   */
+  ejectOffset: { x: number; z: number };
+  /** vitesse de sortie (m/s) posée telle quelle (setLinvel) — À TUNER au smoke */
+  ejectVelocity: { x: number; y: number; z: number };
 }
 
-// Défauts tunables au smoke : capture 1.5 s, ×2 pendant 5 s, kick vers le
-// terrain (−x léger, +y pour décoller du trou, +z vers les flippers).
+// Défauts tunables au smoke : capture 1.5 s, ×2 pendant 5 s. Sortie : bille
+// replacée ~3 cm côté terrain (−x, le trou est près du mur droit) puis poussée
+// vers les flippers (+z) avec une composante vers le centre (−x).
 export const DEFAULT_SCOOP_CONFIG: ScoopConfig = {
   holdMs: 1500,
   multiplier: 2,
   multiplierMs: 5000,
-  kickImpulse: { x: -0.02, y: 0.015, z: 0.06 },
+  ejectOffset: { x: -0.03, z: 0.01 },
+  ejectVelocity: { x: -0.4, y: 0, z: 0.7 },
 };
 
 export type ScoopPhase = 'idle' | 'hold' | 'eject';
