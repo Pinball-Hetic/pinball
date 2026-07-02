@@ -14,12 +14,6 @@ import {
   getBallRadius,
   INITIAL_LIVES,
   plungerChargeProgress,
-  SWING_RAD,
-  SWING_SMOOTH,
-  computeFlipperLaunchAssist,
-  syncFlipperBody,
-  flipperWorldTransform,
-  applyFlipperSwing,
   type FlipperZones,
   type FlipperPivot,
   CollisionEventProcessor,
@@ -45,8 +39,6 @@ import {
   BallTrail,
   QualityGovernor,
   ShooterLaneGate,
-  applyFlash,
-  FLASH_DURATION,
   type FlashMat,
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
@@ -103,6 +95,11 @@ import { computeFrameDt, computeTrailIntensity } from "./hotLoop/frameMath";
 import { buildPlayfieldColliders } from "./physics/buildPlayfieldColliders";
 import { setupFlippers } from "./physics/setupFlippers";
 import { stepBallSync } from "./hotLoop/stepBallSync";
+import {
+  createFlipperFrameState,
+  stepFlipperKinematics,
+  stepFlipperAssist,
+} from "./hotLoop/flipperFrame";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -565,8 +562,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let leftFlipperObj: THREE.Object3D | null = null;
     let rightFlipperObj: THREE.Object3D | null = null;
     let flipperZones: FlipperZones | null = null;
-    let leftSwing = 0, rightSwing = 0;
-    let prevLeftSwing = 0, prevRightSwing = 0;
+    // Accumulateurs de frame flippers (swing lissé + hit-flash) — un seul objet,
+    // muté par les steps du hot loop. Cf. hotLoop/flipperFrame.ts.
+    const flipperFrame = createFlipperFrameState();
     // État d'entrée mutable partagé (flippers + plunger) — possédé ici, muté par
     // applyAction ET lu par la boucle animate. Cf. createApplyAction.ts.
     const inputState: InputState = createInputState();
@@ -575,8 +573,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const screenShake = screenShakeRef.current!;
     let leftFlashMats: FlashMat[] = [];
     let rightFlashMats: FlashMat[] = [];
-    let leftFlash = 0;
-    let rightFlash = 0;
 
     // ── Physics / game objects ───────────────────────────────────────────────
     let ballMesh: THREE.Object3D | null = null;
@@ -1149,40 +1145,22 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       }
 
       if (!freezeFrame) {
-        // ── Flipper cinématique : Three.js → Rapier ───────────────────────────
-        // Lissage normalisé à 60 FPS : Math.pow(1 - SWING_SMOOTH, dt * 60)
-        // reproduit exactement le comportement 60 Hz sur tous les écrans
-        // (120 Hz → decay plus petit par frame, même vitesse angulaire réelle).
-        prevLeftSwing  = leftSwing;
-        prevRightSwing = rightSwing;
-        const swingDecay = 1 - Math.pow(1 - SWING_SMOOTH, dt * 60);
-        leftSwing  += (inputState.leftTarget  * SWING_RAD - leftSwing)  * swingDecay;
-        rightSwing += (inputState.rightTarget * SWING_RAD - rightSwing) * swingDecay;
-        if (leftFlipperPivot)  applyFlipperSwing(leftFlipperPivot,  leftSwing);
-        if (rightFlipperPivot) applyFlipperSwing(rightFlipperPivot, rightSwing);
-
-        syncFlipperBody(leftFlipperBody,  leftFlipperObj,  leftFlipperBodyOffset);
-        syncFlipperBody(rightFlipperBody, rightFlipperObj, rightFlipperBodyOffset);
-
-        // Décroissance + application du hit-flash flippers.
-        if (leftFlash > 0) leftFlash = Math.max(0, leftFlash - dt);
-        if (rightFlash > 0) rightFlash = Math.max(0, rightFlash - dt);
-        applyFlash(leftFlashMats, leftFlash);
-        applyFlash(rightFlashMats, rightFlash);
-
-        // ── Debug wireframes ─────────────────────────────────────────────────
-        if (leftFlipperDebug && leftFlipperObj) {
-          const { position, quaternion } =
-            flipperWorldTransform(leftFlipperObj, leftFlipperBodyOffset);
-          leftFlipperDebug.position.copy(position);
-          leftFlipperDebug.quaternion.copy(quaternion);
-        }
-        if (rightFlipperDebug && rightFlipperObj) {
-          const { position, quaternion } =
-            flipperWorldTransform(rightFlipperObj, rightFlipperBodyOffset);
-          rightFlipperDebug.position.copy(position);
-          rightFlipperDebug.quaternion.copy(quaternion);
-        }
+        // ── Flipper cinématique : Three.js → Rapier (hotLoop/flipperFrame) ────
+        stepFlipperKinematics(flipperFrame, {
+          input: inputState,
+          leftPivot: leftFlipperPivot,
+          rightPivot: rightFlipperPivot,
+          leftObj: leftFlipperObj,
+          rightObj: rightFlipperObj,
+          leftBody: leftFlipperBody,
+          rightBody: rightFlipperBody,
+          leftOffset: leftFlipperBodyOffset,
+          rightOffset: rightFlipperBodyOffset,
+          leftFlashMats,
+          rightFlashMats,
+          leftDebug: leftFlipperDebug,
+          rightDebug: rightFlipperDebug,
+        }, dt);
       }
 
       if (physicsWorld && !freezeFrame) {
@@ -1204,30 +1182,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         && gameStateRef.current === 'playing'
         && flipperZones
       ) {
-        const pos = ballPhysicsInst.body.translation();
-        const { left: lz, right: rz } = flipperZones;
-        const angVelL = (leftSwing - prevLeftSwing) / dt;
-        const angVelR = (rightSwing - prevRightSwing) / dt;
-        const leftAssist = computeFlipperLaunchAssist({
-          pos,
-          vel: ballPhysicsInst.body.linvel(),
-          zone: lz,
-          angVel: angVelL,
-        });
-        if (leftAssist) {
-          ballPhysicsInst.body.setLinvel(leftAssist.linvel, true);
-          leftFlash = FLASH_DURATION;
-        }
-        const rightAssist = computeFlipperLaunchAssist({
-          pos,
-          vel: ballPhysicsInst.body.linvel(),
-          zone: rz,
-          angVel: angVelR,
-        });
-        if (rightAssist) {
-          ballPhysicsInst.body.setLinvel(rightAssist.linvel, true);
-          rightFlash = FLASH_DURATION;
-        }
+        // Assistance de lancement (hotLoop/flipperFrame).
+        stepFlipperAssist(flipperFrame, ballPhysicsInst, flipperZones, dt);
       }
 
       if (ballPhysicsInst && !freezeFrame) {
