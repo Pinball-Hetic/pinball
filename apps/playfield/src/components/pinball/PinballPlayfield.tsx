@@ -45,6 +45,7 @@ import type {
   ButtonAction,
   ButtonId,
   CinematicClip,
+  ScoreUpdate,
 } from "@pinball/shared-types";
 import { BUTTON_ACTION, clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
 
@@ -325,14 +326,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     addLife,
   } = useGameState({
     onScoreEvent: ({ event, finalPoints, previousMultiplier, newMultiplier }) => {
-      const snap = {
-        player: playerRef.current,
-        score: scoreRef.current,
-        combo: comboRef.current,
-        multiplier: multiplierRef.current,
-        lives: livesRef.current,
-        mapState: buildMapState(),
-      };
+      const snap = scoreSnapshot();
 
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
@@ -350,15 +344,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       }
     },
     onLifeLost: (livesRemaining) => {
-      const snap = {
-        player: playerRef.current,
-        score: scoreRef.current,
-        combo: 0,
-        multiplier: 1,
-        lives: livesRemaining,
-        mapState: buildMapState(),
-      };
-      dmd.emitScoreSnapshot(snap);
+      dmd.emitScoreSnapshot(scoreSnapshot({ combo: 0, multiplier: 1, lives: livesRemaining }));
       dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
       // Dernière vie engagée → respiration 1.2s (pas de gel : bille déjà drainée).
       if (livesRemaining === 1) playCinematic('last_chance');
@@ -367,14 +353,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // Vie gagnée (rescue/bonus map) : rafraîchir immédiatement le DMD avec le
       // vrai compteur — sans ça le DMD reste sur l'ancien nombre jusqu'au
       // prochain event de score (désync, surtout au-delà de 3 vies).
-      const snap = {
-        player: playerRef.current,
-        score: scoreRef.current,
-        combo: comboRef.current,
-        multiplier: multiplierRef.current,
-        lives,
-        mapState: buildMapState(),
-      };
+      const snap = scoreSnapshot({ lives });
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
     },
@@ -399,14 +378,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       setGameOverClaimUrl(null); // évite un QR périmé qui flashe sur la partie suivante
       setGameOverCode(null);
       dmd.emitGameStart(playerRef.current);
-      const snap = {
-        player: playerRef.current,
-        score: scoreRef.current,
-        combo: 0,
-        multiplier: 1,
-        lives: livesRef.current,
-        mapState: buildMapState(),
-      };
+      const snap = scoreSnapshot({ combo: 0, multiplier: 1 });
       dmd.emitScoreSnapshot(snap);
       dmd.pushScore(snap);
     },
@@ -416,14 +388,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       mapModuleRef.current?.onGameReset();
       shooterLaneGateRef.current?.open();
       dmd.pushIntro(playerRef.current);
-      dmd.emitScoreSnapshot({
-        player: playerRef.current,
-        score: 0,
-        combo: 0,
-        multiplier: 1,
-        lives: 3,
-        mapState: buildMapState(false),
-      });
+      dmd.emitScoreSnapshot(
+        scoreSnapshot({ score: 0, combo: 0, multiplier: 1, lives: 3, mapState: buildMapState(false) }),
+      );
     },
     onAtmosphereChange: (alternateWorldActive) => {
       dmd.setAtmosphere(alternateWorldActive);
@@ -465,6 +432,19 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   const buildMapState = (fever: boolean = isFeverActive()) => ({
     ...mapStateExtraRef.current,
     fever,
+  });
+
+  // Snapshot score courant (DMD/backglass) — `over` écrase les champs quand la
+  // valeur fraîche n'est pas encore dans la ref (ex. vies juste décrémentées).
+  // Référencé par les callbacks useGameState (exécutés post-render → TDZ ok).
+  const scoreSnapshot = (over: Partial<ScoreUpdate> = {}): ScoreUpdate => ({
+    player: playerRef.current,
+    score: scoreRef.current,
+    combo: comboRef.current,
+    multiplier: multiplierRef.current,
+    lives: livesRef.current,
+    mapState: buildMapState(),
+    ...over,
   });
 
   const shooterLaneGateRef = useRef<ShooterLaneGate | null>(null);
