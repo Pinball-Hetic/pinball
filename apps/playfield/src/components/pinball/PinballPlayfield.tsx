@@ -54,6 +54,7 @@ const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 const DEFAULT_RESOLVED_MAP = getMapPackage(MAP_ID);
 
 import { createPlayfieldScene } from "./scene/createPlayfieldScene";
+import { attachResizeHandler } from "./scene/attachResizeHandler";
 import { BallDragController } from "./scene/BallDragController";
 import { PlayfieldCameraRig } from "./scene/PlayfieldCameraRig";
 import { toGameEvent } from "./toGameEvent";
@@ -1261,36 +1262,21 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
     frameId = requestAnimationFrame(animate);
 
-    // ── Resize ────────────────────────────────────────────────────────────────
-    const handleResize = () => {
-      if (!mountEl) return;
-      const { clientWidth: w, clientHeight: h } = mountEl;
-      if (w < 1 || h < 1) return;
-      if (camera instanceof THREE.PerspectiveCamera) {
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      }
-      if (playfieldRootRef) {
-        cameraRig.syncToRoot(playfieldRootRef);
-      } else {
-        cameraRig.applyViewUpFallback();
-      }
-      renderer.setSize(w, h);
-    };
-    const resizeObserver = new ResizeObserver(() => handleResize());
-    resizeObserver.observe(mountEl);
-    window.addEventListener("resize", handleResize);
-    window.addEventListener("orientationchange", handleResize);
-    requestAnimationFrame(handleResize);
+    // ── Resize (extrait : scene/attachResizeHandler.ts) ──────────────────────
+    const detachResize = attachResizeHandler({
+      mountEl,
+      camera,
+      renderer,
+      cameraRig,
+      getPlayfieldRoot: () => playfieldRootRef,
+    });
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     return () => {
       cancelled = true;
       cancelAnimationFrame(frameId);
       mapModule?.dispose();
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("orientationchange", handleResize);
-      resizeObserver.disconnect();
+      detachResize();
       ballDragController.dispose();
       cameraRig.dispose();
       if (keydownHandler) document.removeEventListener("keydown", keydownHandler);
