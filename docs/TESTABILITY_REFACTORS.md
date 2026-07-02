@@ -1,5 +1,48 @@
 # Backlog refacto — testabilité & clean architecture
 
+> # 🔥 SMOKE CHECKLIST — prochain test E2E (sessions refacto 2+3+4 NON smokées)
+> Tout est vert tests/tsc/lint, mais le 3D n'est pas vérifiable unitairement.
+> Ordre = un parcours de partie complet couvre presque tout.
+>
+> **Boot & scène** (assemblePlayfieldModel, buildPlayfieldColliders)
+> - [ ] Sélecteur de map → la map charge (GLB, matériaux, décor ok, meshes inutiles absents)
+> - [ ] Bille visible au spawn dans le couloir ; colliders présents (la bille ne traverse ni murs ni rampes)
+> - [ ] Redimensionner la fenêtre / rotation → canvas + caméra se recadrent (attachResizeHandler)
+>
+> **Inputs** (wireInputs, createKeyboardRouter, createApplyAction)
+> - [ ] Flippers Q/D + flèches répondent (DOWN tient, UP relâche) — mode `direct` ET `simulate-esp32`
+> - [ ] ESPACE : charge plunger (jauge monte ~25Hz, recul visuel) → relâche = lancement, force ∝ charge
+> - [ ] Lancement droit dans le couloir (lane lock), la bille entre en jeu
+> - [ ] Touches debug : `H` (wireframes colliders + hulls flippers + sphères pivot + coords overlay), `J` (diagnostics), `M` (drag bille), `R` (reset bille, dev only)
+>
+> **Gameplay & physique** (flipperFrame, stepBallSync, bossIntroHold, wireGameplay)
+> - [ ] Flippers : swing fluide, la bille est frappée avec de la force (launch assist) + hit-flash visible
+> - [ ] Bumpers/slingshots réagissent (impulsion + score) ; drop targets comptent
+> - [ ] Bille coincée → nudge automatique puis force-drain si insistance
+> - [ ] Drain → vie perdue, bille respawn ; bottom-out hors couloir → pareil
+> - [ ] Intro boss : bille figée pendant l'intro, relâchée après (une seule capture par intro)
+> - [ ] Portail monde alternatif : entrée/retour, respawn catchable, cycle complet
+>
+> **DMD/backglass** (dmdScoreCallbacks — logique désormais testée mais jamais vue en 3D)
+> - [ ] Score temps réel ; priorité affichage : event labellisé (RAMP/DROP/boss) > multiplier flash > combo flash
+> - [ ] Vie perdue → snapshot vies correct ; dernière vie → clip `last_chance`
+> - [ ] Vie gagnée (rescue) → compteur DMD à jour immédiatement
+> - [ ] Milestone 5k/15k/30k : clip rocket DMD + effet playfield (flamme garland, PAS de gel physique)
+> - [ ] Lettres HETIC : cinématique lettre SANS gel de bille
+> - [ ] Game over → `hall_of_fame` + leaderboard backglass avec counters map (hetic…)
+>
+> **Fin de partie** (useOutroAutoExit — fix jamais re-testé après le bug 20s)
+> - [ ] Outro/QR : score figé + QR claim s'affiche
+> - [ ] **20s sans toucher → reload → retour SÉLECTEUR de map** (le fix précédent n'a jamais été confirmé)
+> - [ ] START ou PLUNGE sur l'outro → reload → sélecteur aussi
+> - [ ] Nouvelle partie : état vierge (score 0, 3 vies, pas de QR périmé, musique intro)
+>
+> **Audio** (useMapAudio)
+> - [ ] Musique d'ambiance au boot, sons boss/cinématiques, musique monde alternatif, son game over
+>
+> **Perf** (hot loop restructuré en steps)
+> - [ ] Pas de stutter en jeu normal ; frame stable pendant cascades bumpers + trail combo/fever
+
 > # 🧩 DÉCOMPOSITION God-component `PinballPlayfield.tsx` (2026-07-01)
 > Plan de slices (workflow d'analyse `w5wj6iobk`, risk-ascending, animate en dernier).
 > Slice 0 (inputs → `createApplyAction`) ✅ FAITE. Slices 1-5 ne touchent PAS le hot
