@@ -296,7 +296,7 @@ export default function GameOverlay({
       })}
 
       {bootPhase === "loading" && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-[#0a0e18]/92 backdrop-blur-sm">
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-black">
           <div
             className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-amber-400/90"
             aria-hidden
