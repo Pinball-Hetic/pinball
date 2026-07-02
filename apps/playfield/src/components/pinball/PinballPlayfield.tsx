@@ -4,10 +4,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import {
   PhysicsWorld,
   BallPhysics,
-  Plunger,
   LaunchBall,
-  BumperHit,
-  BumpHit,
   DrainBall,
   BottomOutBall,
   DetectBottomOut,
@@ -59,7 +56,6 @@ const DEFAULT_RESOLVED_MAP = getMapPackage(MAP_ID);
 import { createPlayfieldScene } from "./scene/createPlayfieldScene";
 import { BallDragController } from "./scene/BallDragController";
 import { PlayfieldCameraRig } from "./scene/PlayfieldCameraRig";
-import { createEmitRouter } from "./scene/createEmitRouter";
 import { toGameEvent } from "./toGameEvent";
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
@@ -101,6 +97,7 @@ import {
   stepFlipperAssist,
 } from "./hotLoop/flipperFrame";
 import { updateRapierDebugGeometry } from "./hotLoop/rapierDebugRender";
+import { wireGameplay } from "./wireGameplay";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -581,8 +578,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let physicsWorld: PhysicsWorld | null = null;
     let ballPhysicsInst: BallPhysics | null = null;
     let launchBallUC: LaunchBall | null = null;
-    let bumperHitUC: BumperHit | null = null;
-    let bumpHitUC: BumpHit | null = null;
     let drainBallUC: DrainBall | null = null;
     let bottomOutBallUC: BottomOutBall | null = null;
     let collisionProcessor: CollisionEventProcessor | null = null;
@@ -910,60 +905,39 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // ── OrbitControls — caméra libre ─────────────────────────────────────
         cameraRig.attachOrbit(renderer.domElement);
 
-        // ── Use-cases ─────────────────────────────────────────────────────────
-        const plunger = new Plunger();
-
-        const baseEmit = buildEmit(() => {
-          if (ballMesh) ballMesh.visible = false;
-          diag.noteReset("game_over_hide");
-        });
-        const releaseAlternateWorld = () => {
-          restoreBossCamera();
-          mapModule?.releaseWorld?.();
-          collisionProcessor?.resetAlternateWorldSession();
-          clearAlternateWorldSession();
-        };
-        // Réconciliation des marqueurs de nid : gérée par le module de map
-        // (fin de mapModule.onGameEvent, après chaque event). Le routage
-        // (pre-drain, reveals/victory caméra, screen-shake, cinématiques
-        // portail, drop-target mesh, release monde alternatif) est délégué au
-        // factory createEmitRouter — collaborateurs `let` accédés en paresseux.
-        emit = createEmitRouter({
-          baseEmit,
+        // ── Use-cases + routeur d'events : câblage extrait (wireGameplay.ts).
+        // Le cycle intentionnel processor↔emit vit dans la factory. Les résultats
+        // sont assignés dans les `let` de closure lus par animate/applyAction/ctx.
+        const wiring = wireGameplay({
+          ball: ballPhysicsInst,
+          colliderMap,
+          mapLayout,
+          mapBosses,
           mapModule,
-          getCollisionProcessor: () => collisionProcessor,
           cameraRig,
           dmd,
           screenShake,
           diag,
+          buildEmit,
+          hideBallMesh: () => {
+            if (ballMesh) ballMesh.visible = false;
+          },
+          restoreBossCamera,
+          clearAlternateWorldSession,
           getShooterLaneGate: () => shooterLaneGate,
           getPlayfieldRoot: () => playfieldRootRef,
-          mapLayout,
-          mapBosses,
-          getBottomOutBallUC: () => bottomOutBallUC,
-          getDrainBallUC: () => drainBallUC,
-          releaseAlternateWorld,
           livesRef,
           gameStateRef,
           scoreRef,
-          ALTERNATE_WORLD_PERSISTENCE,
+          alternateWorldPersistence: ALTERNATE_WORLD_PERSISTENCE,
         });
+        const plunger = wiring.plunger;
+        emit = wiring.emit;
         emitRef.current = emit; // expose aux callbacks useGameState (milestone/boss-armed)
-        launchBallUC = new LaunchBall(ballPhysicsInst, plunger, emit);
-        bumperHitUC = new BumperHit(ballPhysicsInst, emit);
-        bumpHitUC = new BumpHit(ballPhysicsInst, emit);
-        drainBallUC = new DrainBall(ballPhysicsInst, emit);
-        bottomOutBallUC = new BottomOutBall(ballPhysicsInst, emit);
-
-        collisionProcessor = new CollisionEventProcessor(
-          mapLayout,
-          colliderMap,
-          bumperHitUC,
-          bumpHitUC,
-          drainBallUC,
-          bottomOutBallUC,
-          emit,
-        );
+        launchBallUC = wiring.launchBallUC;
+        drainBallUC = wiring.drainBallUC;
+        bottomOutBallUC = wiring.bottomOutBallUC;
+        collisionProcessor = wiring.collisionProcessor;
 
         // upsideDownPortal créé/possédé par le module de map (récupéré plus
         // haut via le bridge). Ses resets / setAlternateWorldActive / aimant
