@@ -91,6 +91,7 @@ import {
   stepFlipperAssist,
 } from "./hotLoop/flipperFrame";
 import { updateRapierDebugGeometry } from "./hotLoop/rapierDebugRender";
+import { createBossIntroHoldState, stepBossIntroHold } from "./hotLoop/bossIntroHold";
 import { wireGameplay } from "./wireGameplay";
 import { createPhysicalInputHandlers, createDispatchButton } from "./wireInputs";
 import CinematicOverlay from "./CinematicOverlay";
@@ -599,8 +600,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let prevFrameTime = 0;
     let lastPlungerChargeUiPush = 0;
     let plungerChargeUiActive = false;
-    let bossIntroHolding = false;
-    const bossIntroBallPos = { x: 0, y: 0, z: 0 };
+    const bossIntroHold = createBossIntroHoldState();
 
 
     // ── Flipper collider debug wireframes ────────────────────────────────────
@@ -1021,20 +1021,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       );
       freezeFeedbackStrobe.applyFlashOnly(freezeFb.on, freezeFb.mix);
 
-      if (bossIntroActive && !bossIntroHolding && ballPhysicsInst) {
-        const p = ballPhysicsInst.body.translation();
-        bossIntroBallPos.x = p.x;
-        bossIntroBallPos.y = p.y;
-        bossIntroBallPos.z = p.z;
-        bossIntroHolding = true;
-        inputState.leftTarget = 0;
-        inputState.rightTarget = 0;
-        ballPhysicsInst.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        ballPhysicsInst.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      }
-      if (!bossIntroActive) {
-        bossIntroHolding = false;
-      }
+      // Hold d'intro boss (rising-edge : capture + gel de la bille) —
+      // hotLoop/bossIntroHold.ts.
+      stepBossIntroHold(bossIntroHold, bossIntroActive, ballPhysicsInst, inputState);
 
       if (!freezeFrame) {
         // ── Flipper cinématique : Three.js → Rapier (hotLoop/flipperFrame) ────
@@ -1104,7 +1093,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           physicsReady,
           isMoveMode: ballDragController.isMoveMode,
           bossIntroActive,
-          bossIntroBallPos,
+          bossIntroBallPos: bossIntroHold.pos,
           layout: mapLayout,
           shooterLaneGate,
           stuckDetector,
