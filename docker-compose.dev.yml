@@ -61,6 +61,9 @@ services:
     volumes:
       - ./apps/playfield/src:/app/apps/playfield/src
       - ./apps/playfield/public:/app/apps/playfield/public
+      # next.config monté → un restart recharge un edit config (sinon baké dans
+      # l'image = rebuild requis). next dev le relit au démarrage du process.
+      - ./apps/playfield/next.config.js:/app/apps/playfield/next.config.js
       - ./packages/game-engine/src:/app/packages/game-engine/src
       - ./packages/shared-types/src:/app/packages/shared-types/src
       - ./packages/maps:/app/packages/maps
@@ -93,6 +96,7 @@ services:
       - "3335:3000"
     volumes:
       - ./apps/dmd/src:/app/apps/dmd/src
+      - ./apps/dmd/next.config.js:/app/apps/dmd/next.config.js
       - ./packages/shared-types/src:/app/packages/shared-types/src
     depends_on:
       server:
@@ -123,6 +127,7 @@ services:
       - "3336:3000"
     volumes:
       - ./apps/backglass/src:/app/apps/backglass/src
+      - ./apps/backglass/next.config.js:/app/apps/backglass/next.config.js
       - ./packages/shared-types/src:/app/packages/shared-types/src
     depends_on:
       server:
