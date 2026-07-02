@@ -14,6 +14,19 @@ const nextConfig = {
   // async". On les déclare externes pour SSR : Node.js les résout depuis
   // node_modules à l'exécution (jamais appelés côté serveur de toute façon).
   serverExternalPackages: ['@dimforge/rapier3d-compat'],
+  async redirects() {
+    return [
+      {
+        // La racine mène directement au jeu : le kiosque Fliphetic ouvre
+        // l'URL résolue de l'écran — ceinture (path="/pinball" dans
+        // fliphetic.toml) + bretelles (ce redirect si le path est omis).
+        // permanent:false → pas de cache 308 navigateur si la cible change.
+        source: '/',
+        destination: '/pinball',
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

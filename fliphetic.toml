@@ -9,7 +9,9 @@ strategy = "branch"
 ref      = "dev"
 
 [screens]
-playfield = { service = "playfield", port = 3000 }
+# path : le kiosque ouvre directement la page jeu (la racine `/` de l'app
+# playfield redirige aussi vers /pinball — double sécurité, cf. next.config.js).
+playfield = { service = "playfield", port = 3000, path = "/pinball" }
 backglass = { service = "backglass", port = 3000 }
 dmd       = { service = "dmd",       port = 3000 }
 
