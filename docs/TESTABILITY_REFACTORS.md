@@ -64,10 +64,20 @@
 > - dédupe scoreSnapshot (5 sites → 1 helper) ; structs flipperSetup/flipperRig (12 lets → 2)
 >
 > **animate = délégation nommée ordonnée** (le P1 « decompose animate into stages » est de facto
-> réalisé incrémentalement). **~1260 L ≈ plancher honnête** : le reste = orchestration React
-> légitime (hooks/callbacks/JSX ~490), arg-lists de délégation (= surface de couplage explicite),
-> et l'init séquentiel. Compresser plus = bundler les deps en objets-contexte opaques
-> (obfuscation, pas du clean). ⚠ Sessions 2+3 NON smokées — batterie E2E requise avant PR.
+> réalisé incrémentalement).
+>
+> **Session 4 (2026-07-02, palier ~1000)** : `PinballPlayfield.tsx` **1260 → 1165 L**
+> (total : 1798→1165, **−633 / −35%**). +17 tests (playfield **162**).
+> - `dmdScoreCallbacks.ts` — les 8 callbacks useGameState→DMD (priorité EVENT>MULTI>COMBO,
+>   vies, game over counters, reset idle, fever) → factory à **déps lazy** (getDeps() à
+>   l'invocation, post-render — TDZ-safe) + **11 tests** (spies dmd).
+> - `hooks/useOutroAutoExit.ts` · `hooks/useMapAudio.ts` (+collectMapSoundUrls).
+>
+> **~1165 L ≈ plancher atteint** avec cette archi : reste = orchestration React légitime,
+> arg-lists de délégation (= surface de couplage explicite), init séquentiel. Paliers
+> inférieurs documentés : ~700-800 exige slice 6 (initPlayfield, stale-binding max, session
+> dédiée + smoke serré) ; ~350-450 = déménagement de complexité, déconseillé.
+> ⚠ Sessions 2+3+4 NON smokées — batterie E2E requise avant PR.
 >
 > **Backlog smells (workflow, dédupliqués)** — au-delà des slices :
 > - **P1** SRP+OCP — décomposer animate en stages ordonnés APRÈS le lift (slice 7 fait le move entier d'abord). `PinballPlayfield.tsx:1270-1592`
