@@ -22,15 +22,19 @@ export interface ScoopConfig {
   ejectVelocity: { x: number; y: number; z: number };
 }
 
-// Défauts tunables au smoke : capture 1.5 s, ×2 pendant 5 s. Sortie : bille
-// replacée ~3 cm côté terrain (−x, le trou est près du mur droit) puis poussée
-// vers les flippers (+z) avec une composante vers le centre (−x).
+// Défauts tunables au smoke : capture 1.5 s, ×2 pendant 5 s.
+// Sortie CALCULÉE depuis les bbox monde du GLB (pas au hasard) : le trou
+// (0.192, −0.061) est une poche dans le massif wall_middle_right
+// (x[0.133,0.219], z[−0.267,+0.023]) — sortie −x bloquée par les drop targets
+// (target_right_1 : x[0.149,0.166], z[−0.058,−0.024]). Le massif finit à
+// z=+0.023 → on ressort AU SUD dans l'axe du couloir (même x), à z=+0.04,
+// zone dégagée qui débouche vers le flipper droit.
 export const DEFAULT_SCOOP_CONFIG: ScoopConfig = {
   holdMs: 1500,
   multiplier: 2,
   multiplierMs: 5000,
-  ejectOffset: { x: -0.03, z: 0.01 },
-  ejectVelocity: { x: -0.4, y: 0, z: 0.7 },
+  ejectOffset: { x: 0, z: 0.101 }, // −0.061 + 0.101 = z +0.04, x inchangé (0.192)
+  ejectVelocity: { x: -0.2, y: 0, z: 0.6 },
 };
 
 export type ScoopPhase = 'idle' | 'hold' | 'eject';
