@@ -10,7 +10,6 @@ import {
   DetectBottomOut,
   getBallRadius,
   INITIAL_LIVES,
-  plungerChargeProgress,
   type FlipperZones,
   type FlipperPivot,
   CollisionEventProcessor,
@@ -80,7 +79,7 @@ import { buildPlungerBody } from "./physics/buildPlungerBody";
 import { createKeyboardRouter } from "./createKeyboardRouter";
 import { DebugMeshManager } from "./debug/DebugMeshManager";
 import { createMapContext } from "./createMapContext";
-import { computePlungerVisual } from "./hotLoop/computePlungerVisual";
+import { computePlungerVisual, createPlungerChargeUi } from "./hotLoop/computePlungerVisual";
 import { computeFrameDt, computeTrailIntensity } from "./hotLoop/frameMath";
 import { buildPlayfieldColliders } from "./physics/buildPlayfieldColliders";
 import { setupFlippers } from "./physics/setupFlippers";
@@ -598,8 +597,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
     let keyupHandler: ((e: KeyboardEvent) => void) | null = null;
     let prevFrameTime = 0;
-    let lastPlungerChargeUiPush = 0;
-    let plungerChargeUiActive = false;
+    const plungerChargeUi = createPlungerChargeUi((v) => setPlungerCharge(v));
     const bossIntroHold = createBossIntroHoldState();
 
 
@@ -1103,18 +1101,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         });
       }
 
-      // Plunger animation + jauge UI
-      if (inputState.isChargingPlunger) {
-        const t = plungerChargeProgress(time, inputState.chargeStartTime);
-        plungerChargeUiActive = true;
-        if (time - lastPlungerChargeUiPush > 40) {
-          lastPlungerChargeUiPush = time;
-          setPlungerCharge(t);
-        }
-      } else if (plungerChargeUiActive) {
-        plungerChargeUiActive = false;
-        setPlungerCharge(null);
-      }
+      // Jauge UI de charge du plongeur (throttle extrait : computePlungerVisual).
+      plungerChargeUi.step(time, inputState.isChargingPlunger, inputState.chargeStartTime);
 
       if (plungerMesh && plungerRestZ > 0) {
         // FSM visuelle extraite (hotLoop/computePlungerVisual, pure + testée).

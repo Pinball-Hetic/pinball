@@ -1,6 +1,33 @@
 import { plungerChargeProgress, plungerLaunchFactor, PLUNGER_CHARGE_MS } from "@pinball/game-engine";
 import type { PlungerState } from "../createApplyAction";
 
+// Throttle de la jauge UI de charge (React setState max ~25 Hz pour ne pas
+// re-render à 60/120 Hz), + reset à null au relâchement. Stateful par design
+// (dernier push + jauge affichée) — possédé par la closure d'init.
+export const PLUNGER_CHARGE_UI_INTERVAL_MS = 40;
+
+export function createPlungerChargeUi(push: (charge: number | null) => void) {
+  let lastPushTime = 0;
+  let active = false;
+
+  return {
+    step(time: number, isCharging: boolean, chargeStartTime: number): void {
+      if (isCharging) {
+        active = true;
+        if (time - lastPushTime > PLUNGER_CHARGE_UI_INTERVAL_MS) {
+          lastPushTime = time;
+          push(plungerChargeProgress(time, chargeStartTime));
+        }
+        return;
+      }
+      if (active) {
+        active = false;
+        push(null);
+      }
+    },
+  };
+}
+
 export interface PlungerVisualInput {
   isChargingPlunger: boolean;
   plungerState: PlungerState;
