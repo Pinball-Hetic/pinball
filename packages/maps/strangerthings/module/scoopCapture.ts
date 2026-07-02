@@ -11,30 +11,28 @@ export interface ScoopConfig {
   /** durée du multiplicateur (ms) */
   multiplierMs: number;
   /**
-   * Téléport-eject (standard flipper) : à l'éjection la bille est REPLACÉE au
-   * bord du trou (offset x/z depuis le capteur, posée sur la surface) avec une
+   * Téléport-eject (standard flipper) : à l'éjection la bille est REPLACÉE à
+   * `ejectPos` (absolu, posée sur la surface via ballCenterOnSurface) avec une
    * vitesse de sortie directe. Aucune impulse ne sort d'un trou GLB profond
    * (~2 mm de montée pour une impulse raisonnable) — on ne lutte pas contre la
    * géométrie. Même pattern que les portails (spawnFromAlternateWorld).
    */
-  ejectOffset: { x: number; z: number };
+  ejectPos: { x: number; z: number };
   /** vitesse de sortie (m/s) posée telle quelle (setLinvel) — À TUNER au smoke */
   ejectVelocity: { x: number; y: number; z: number };
 }
 
 // Défauts tunables au smoke : capture 1.5 s, ×2 pendant 5 s.
-// Sortie CALCULÉE depuis les bbox monde du GLB (pas au hasard) : le trou
-// (0.192, −0.061) est une poche dans le massif wall_middle_right
-// (x[0.133,0.219], z[−0.267,+0.023]) — sortie −x bloquée par les drop targets
-// (target_right_1 : x[0.149,0.166], z[−0.058,−0.024]). Le massif finit à
-// z=+0.023 → on ressort AU SUD dans l'axe du couloir (même x), à z=+0.04,
-// zone dégagée qui débouche vers le flipper droit.
+// Sortie : position pointée EN 3D par l'auteur de la map (0.143, −0.172) —
+// nord-ouest du massif wall_middle_right — projetée vers la GAUCHE (−x),
+// vers le centre du terrain. (y noté 1.041 en jeu = ballCenterOnSurface(−0.172)
+// → formule conservée.)
 export const DEFAULT_SCOOP_CONFIG: ScoopConfig = {
   holdMs: 1500,
   multiplier: 2,
   multiplierMs: 5000,
-  ejectOffset: { x: 0, z: 0.101 }, // −0.061 + 0.101 = z +0.04, x inchangé (0.192)
-  ejectVelocity: { x: -0.2, y: 0, z: 0.6 },
+  ejectPos: { x: 0.143, z: -0.172 },
+  ejectVelocity: { x: -0.6, y: 0, z: 0 },
 };
 
 export type ScoopPhase = 'idle' | 'hold' | 'eject';

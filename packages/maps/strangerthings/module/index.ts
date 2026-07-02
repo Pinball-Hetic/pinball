@@ -374,12 +374,11 @@ export function createModule(): MapModule {
           ctx.ball.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
           ctx.resetStuck()
         } else if (phase === 'eject') {
-          // Téléport-eject : replace la bille au bord du trou, posée sur la
-          // surface, avec une vitesse de sortie directe (cf. ScoopConfig).
-          const off = scoop.config.ejectOffset
-          const ez = scoopPos.z + off.z
+          // Téléport-eject : replace la bille au point de sortie (absolu, posée
+          // sur la surface) avec une vitesse de sortie directe (cf. ScoopConfig).
+          const p = scoop.config.ejectPos
           ctx.ball.body.setTranslation(
-            { x: scoopPos.x + off.x, y: ballCenterOnSurface(ez), z: ez },
+            { x: p.x, y: ballCenterOnSurface(p.z), z: p.z },
             true,
           )
           ctx.ball.body.setLinvel(scoop.config.ejectVelocity, true)
