@@ -48,7 +48,7 @@ import { loadPlayfieldGlb, assemblePlayfieldModel } from "./scene/assemblePlayfi
 import { BallDragController } from "./scene/BallDragController";
 import { PlayfieldCameraRig } from "./scene/PlayfieldCameraRig";
 import { useGameState } from "@/hooks/useGameState";
-import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
+import { useDmdOrchestrator } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import { playfieldToScreenPercentForMode } from "@/utils/playfieldScreen";
 import {
@@ -90,6 +90,7 @@ import { updateRapierDebugGeometry } from "./hotLoop/rapierDebugRender";
 import { createBossIntroHoldState, stepBossIntroHold } from "./hotLoop/bossIntroHold";
 import { wireGameplay } from "./wireGameplay";
 import { createPhysicalInputHandlers, createDispatchButton } from "./wireInputs";
+import { createDmdScoreCallbacks } from "./dmdScoreCallbacks";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -315,95 +316,34 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     buildEmit,
     addLife,
   } = useGameState({
-    onScoreEvent: ({ event, finalPoints, previousMultiplier, newMultiplier }) => {
-      const snap = scoreSnapshot();
-
-      dmd.emitScoreSnapshot(snap);
-      dmd.pushScore(snap);
-
-      // Chaque event fait switcher l'affichage. Exclusif, par priorité
-      // décroissante : event labellisé → EVENT ; nouveau multiplier →
-      // MULTI ; sinon combo en cours → COMBO.
-      const label = eventLabel(event, mapBosses);
-      if (label) {
-        dmd.pushEvent(label, finalPoints, snap);
-      } else if (previousMultiplier !== newMultiplier) {
-        dmd.pushMultiFlash(newMultiplier, snap.combo, snap);
-      } else if (snap.combo > 1) {
-        dmd.pushComboFlash(snap.combo, snap.multiplier, snap);
-      }
-    },
-    onLifeLost: (livesRemaining) => {
-      dmd.emitScoreSnapshot(scoreSnapshot({ combo: 0, multiplier: 1, lives: livesRemaining }));
-      dmd.pushLifeLost(livesRemaining, scoreRef.current, playerRef.current);
-      // Dernière vie engagée → respiration 1.2s (pas de gel : bille déjà drainée).
-      if (livesRemaining === 1) playCinematic('last_chance');
-    },
-    onLifeGained: (lives) => {
-      // Vie gagnée (rescue/bonus map) : rafraîchir immédiatement le DMD avec le
-      // vrai compteur — sans ça le DMD reste sur l'ancien nombre jusqu'au
-      // prochain event de score (désync, surtout au-delà de 3 vies).
-      const snap = scoreSnapshot({ lives });
-      dmd.emitScoreSnapshot(snap);
-      dmd.pushScore(snap);
-    },
-    onGameOver: (finalScore, stats) => {
-      setFinalScore(finalScore); // le QR arrive ensuite via le callback (async)
-      // Counters spécifiques map : récupérés du mapState (alimenté par le
-      // module). useGameState ne compte plus rien de ST.
-      const counters: Record<string, number> = {};
-      for (const [k, v] of Object.entries(mapStateExtraRef.current)) {
-        if (typeof v === "number") counters[k] = v;
-      }
-      // Pas d'affichage GAME_OVER sur le DMD : on garde le dernier SCORE
-      // jusqu'au reset (INTRO). emitGameOver sert au backglass/leaderboard.
-      dmd.emitGameOver(playerRef.current, finalScore, mapManifest.id, { ...stats, counters });
-      // Clip poussé à CHAQUE game over ; DMD/backglass décident de
-      // l'ampleur (le backglass connaît le rang → fanfare ou recap).
-      dmd.pushCinematic('hall_of_fame');
-      // L'auto-exit de l'outro/QR (20s → reload → sélecteur) est géré par un
-      // effet React sur gameState (cf. plus bas), pas ici.
-    },
-    onGameStart: () => {
-      setGameOverClaimUrl(null); // évite un QR périmé qui flashe sur la partie suivante
-      setGameOverCode(null);
-      dmd.emitGameStart(playerRef.current);
-      const snap = scoreSnapshot({ combo: 0, multiplier: 1 });
-      dmd.emitScoreSnapshot(snap);
-      dmd.pushScore(snap);
-    },
-    onIdleReset: () => {
-      cinematics.resetGame();
-      resetPinballAudioForNewGame();
-      mapModuleRef.current?.onGameReset();
-      shooterLaneGateRef.current?.open();
-      dmd.pushIntro(playerRef.current);
-      dmd.emitScoreSnapshot(
-        scoreSnapshot({ score: 0, combo: 0, multiplier: 1, lives: 3, mapState: buildMapState(false) }),
-      );
-    },
-    onAtmosphereChange: (alternateWorldActive) => {
-      dmd.setAtmosphere(alternateWorldActive);
-      atmosphereAlternateRef.current = alternateWorldActive;
-    },
+    // Callbacks DMD/backglass extraits + testés (dmdScoreCallbacks.ts). Déps
+    // résolues paresseusement (lambda) : scoreSnapshot/mapStateExtraRef/… sont
+    // déclarés plus bas (TDZ au render sinon), les callbacks courent post-render.
+    ...createDmdScoreCallbacks(() => ({
+      dmd,
+      mapBosses,
+      mapId: mapManifest.id,
+      snapshot: scoreSnapshot,
+      buildMapState,
+      playCinematic,
+      playerRef,
+      scoreRef,
+      atmosphereAlternateRef,
+      getMapCounters: () => mapStateExtraRef.current,
+      setFinalScore,
+      clearClaimQr: () => {
+        setGameOverClaimUrl(null);
+        setGameOverCode(null);
+      },
+      resetCinematics: () => cinematics.resetGame(),
+      resetAudio: resetPinballAudioForNewGame,
+      resetMapModule: () => mapModuleRef.current?.onGameReset(),
+      openShooterLaneGate: () => shooterLaneGateRef.current?.open(),
+    })),
     // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
     // module de map (events MILESTONE / BOSS_ARMED).
     onMilestone: (threshold) => emitRef.current?.({ type: "MILESTONE", threshold }),
     onBossArmed: (bossId) => emitRef.current?.({ type: "BOSS_ARMED", bossId }),
-    // le bonus map (lettres + complete + fever) géré par le module de map.
-    onFeverEnd: () => {
-      // Re-émet un snapshot fever:false pour que DMD/backglass retombent.
-      const snap = {
-        player: playerRef.current,
-        score: scoreRef.current,
-        combo: comboRef.current,
-        multiplier: multiplierRef.current,
-        lives: livesRef.current,
-        mapState: buildMapState(false),
-      };
-      dmd.emitScoreSnapshot(snap);
-      dmd.pushScore(snap);
-    },
   }, {
     portalAnchor: mapLayout.sensors.portal,
     bumperAnchors: mapLayout.bumpers,
