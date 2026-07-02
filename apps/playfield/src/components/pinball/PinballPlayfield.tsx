@@ -100,6 +100,7 @@ import {
   stepFlipperKinematics,
   stepFlipperAssist,
 } from "./hotLoop/flipperFrame";
+import { updateRapierDebugGeometry } from "./hotLoop/rapierDebugRender";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -1252,22 +1253,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // ── OrbitControls update ─────────────────────────────────────────────
       cameraRig.updateFrame(dt, { freeze: freezeFrame, cinematicActive: cameraCinematicActive });
 
-      // ── Rapier debug render (tous colliders) ─────────────────────────────
+      // ── Rapier debug render (tous colliders) — hotLoop/rapierDebugRender ──
       if (debugMeshManager?.collidersOn && physicsWorld) {
-        const { vertices, colors } = physicsWorld.world.debugRender();
-        const rgb = new Float32Array(vertices.length);
-        for (let i = 0, j = 0; i < colors.length; i += 4, j += 3) {
-          rgb[j] = colors[i]; rgb[j + 1] = colors[i + 1]; rgb[j + 2] = colors[i + 2];
-        }
-        // Certains colliders renvoient des sommets non finis (NaN/Infinity) :
-        // on les écrase à 0 pour éviter les pics parasites + l'erreur
-        // computeBoundingSphere (radius NaN).
-        for (let i = 0; i < vertices.length; i++) {
-          if (!Number.isFinite(vertices[i])) vertices[i] = 0;
-        }
-        rapierDebugGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-        rapierDebugGeo.setAttribute('color',    new THREE.BufferAttribute(rgb, 3));
-        rapierDebugGeo.computeBoundingSphere();
+        updateRapierDebugGeometry(rapierDebugGeo, physicsWorld.world.debugRender());
       }
 
       // ── Gouverneur de qualité (frame time → crans) ──────────────────────
