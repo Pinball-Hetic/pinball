@@ -18,9 +18,6 @@ import {
   BallDiagnostics,
   type BallDiagnosticsSnapshot,
   type BallResetReason,
-  removePinballmapUnusedMeshes,
-  hidePinballmapDecorNodes,
-  prepareGltfMaterialsForDisplay,
   createGltfLoader,
   CinematicDirector,
   PlayfieldCinematicStrobe,
@@ -51,6 +48,7 @@ const DEFAULT_RESOLVED_MAP = getMapPackage(MAP_ID);
 
 import { createPlayfieldScene } from "./scene/createPlayfieldScene";
 import { attachResizeHandler } from "./scene/attachResizeHandler";
+import { loadPlayfieldGlb, assemblePlayfieldModel } from "./scene/assemblePlayfieldModel";
 import { BallDragController } from "./scene/BallDragController";
 import { PlayfieldCameraRig } from "./scene/PlayfieldCameraRig";
 import { useGameState } from "@/hooks/useGameState";
@@ -666,65 +664,30 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let plungerMesh: THREE.Mesh | null = null;
     let plungerRestZ = 0;
 
-    const loadPlayfieldGlb = async () => {
-      const maxAttempts = 3;
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          return await loader.loadAsync(playfieldUrl);
-        } catch (err) {
-          console.warn(`[Playfield] GLB load attempt ${attempt}/${maxAttempts} failed`, err);
-          if (attempt === maxAttempts) throw err;
-          await new Promise((r) => setTimeout(r, 1500 * attempt));
-        }
-      }
-      throw new Error('[Playfield] GLB load failed');
-    };
 
     // ── GLTF + Physics setup ─────────────────────────────────────────────────
     const init = async () => {
       try {
-        const gltf = await loadPlayfieldGlb();
+        const gltf = await loadPlayfieldGlb(loader, playfieldUrl);
         if (cancelled) return; // StrictMode : démontage du 1er mount en vol
-        const playfieldRoot = gltf.scene;
+        // Assemblage scène (GLB dressing + trail + flash de gel + mesh bille)
+        // extrait : scene/assemblePlayfieldModel.ts. garlands/bumperVisuals/
+        // nestMarker/reveals : créés par le module de map (bridge, plus bas).
+        const assembled = assemblePlayfieldModel(gltf, {
+          scene,
+          modelRoot,
+          rendering,
+          layout: mapLayout,
+          freezeFeedbackStrobe,
+          collectDisposables,
+          disposableGeos,
+          disposableMats,
+        });
+        const playfieldRoot = assembled.playfieldRoot;
         playfieldRootRef = playfieldRoot;
         playfieldRootHandleRef.current = playfieldRoot;
-        collectDisposables(playfieldRoot);
-        modelRoot.add(playfieldRoot);
-        removePinballmapUnusedMeshes(playfieldRoot);
-        hidePinballmapDecorNodes(playfieldRoot);
-        prepareGltfMaterialsForDisplay(playfieldRoot, rendering);
-
-        // garlands + bumperVisuals créés par le module de map (cluster visuals),
-        // récupérés après mapModule.setup (plus bas, après le monde physique).
-        // nestMarker + reveals boss + bossReveals : créés/possédés
-        // par le module de map (récupérés via le bridge, preload fait là-haut).
-        ballTrail = new BallTrail();
-        ballTrail.mount(scene);
-
-        // Feedback de gel : flash au centre du playfield. Monté sur modelRoot
-        // (repère scène) pour ne dépendre d'aucun mesh de map.
-        const { leftX, rightX, topZ, bottomZ } = mapLayout.geometry.bounds;
-        freezeFeedbackStrobe.mount(modelRoot, {
-          flashColor: 0xffffff,
-          flashIntensity: 2.6,
-          flashDistance: 0.9,
-          flashPosition: new THREE.Vector3(
-            (leftX + rightX) / 2,
-            1.15,
-            (topZ + bottomZ) / 2,
-          ),
-        });
-
-        // ── Ball mesh ────────────────────────────────────────────────────────
-        const ballGeo = new THREE.SphereGeometry(getBallRadius(), 24, 24);
-        const ballMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d4, metalness: 0.95, roughness: 0.08 });
-        const ballSphere = new THREE.Mesh(ballGeo, ballMat);
-        ballSphere.castShadow = true;
-        disposableGeos.push(ballGeo);
-        disposableMats.push(ballMat);
-        scene.add(ballSphere);
-        ballMesh = ballSphere;
-        ballMesh.visible = false;
+        ballMesh = assembled.ballMesh;
+        ballTrail = assembled.ballTrail;
 
         modelRoot.updateMatrixWorld(true);
 
