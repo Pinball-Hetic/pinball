@@ -10,8 +10,6 @@ import {
   DetectBottomOut,
   getBallRadius,
   INITIAL_LIVES,
-  type FlipperZones,
-  type FlipperPivot,
   CollisionEventProcessor,
   StuckBallDetector,
   BallDiagnostics,
@@ -32,7 +30,6 @@ import {
   BallTrail,
   QualityGovernor,
   ShooterLaneGate,
-  type FlashMat,
 } from "@pinball/game-engine";
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import { NoSignal } from "@pinball/ui";
@@ -74,7 +71,7 @@ import {
   createInputState,
   type InputState,
 } from "./createApplyAction";
-import { buildFlipperBodies } from "./physics/buildFlipperBodies";
+import { buildFlipperBodies, type FlipperBodiesResult } from "./physics/buildFlipperBodies";
 import { buildPlungerBody } from "./physics/buildPlungerBody";
 import { createKeyboardRouter } from "./createKeyboardRouter";
 import { DebugMeshManager } from "./debug/DebugMeshManager";
@@ -82,7 +79,7 @@ import { createMapContext } from "./createMapContext";
 import { computePlungerVisual, createPlungerChargeUi } from "./hotLoop/computePlungerVisual";
 import { computeFrameDt, computeTrailIntensity } from "./hotLoop/frameMath";
 import { buildPlayfieldColliders } from "./physics/buildPlayfieldColliders";
-import { setupFlippers } from "./physics/setupFlippers";
+import { setupFlippers, type FlipperSetupResult } from "./physics/setupFlippers";
 import { stepBallSync } from "./hotLoop/stepBallSync";
 import {
   createFlipperFrameState,
@@ -529,11 +526,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     refitCameraRef.current = (root) => cameraRig.syncToRoot(root);
 
     // ── Flipper visual state ─────────────────────────────────────────────────
-    let leftFlipperPivot: FlipperPivot | null = null;
-    let rightFlipperPivot: FlipperPivot | null = null;
-    let leftFlipperObj: THREE.Object3D | null = null;
-    let rightFlipperObj: THREE.Object3D | null = null;
-    let flipperZones: FlipperZones | null = null;
+    // Résolution/attache des flippers (setupFlippers) — un seul struct
+    // (meshes/pivots/objs/flashMats/zones) au lieu de vars éparpillées.
+    let flipperSetup: FlipperSetupResult | null = null;
     // Accumulateurs de frame flippers (swing lissé + hit-flash) — un seul objet,
     // muté par les steps du hot loop. Cf. hotLoop/flipperFrame.ts.
     const flipperFrame = createFlipperFrameState();
@@ -541,10 +536,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     // applyAction ET lu par la boucle animate. Cf. createApplyAction.ts.
     const inputState: InputState = createInputState();
 
-    // ── Juice : screen shake + hit-flash flippers ───────────────────────────
+    // ── Juice : screen shake ─────────────────────────────────────────────────
     const screenShake = screenShakeRef.current!;
-    let leftFlashMats: FlashMat[] = [];
-    let rightFlashMats: FlashMat[] = [];
 
     // ── Physics / game objects ───────────────────────────────────────────────
     let ballMesh: THREE.Object3D | null = null;
@@ -585,12 +578,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       ballTrail?.setMaxSprites(tier.trailMax);
       mapModuleRef.current?.setSporesEnabled?.(tier.sporesOn);
     });
-    let leftFlipperBody: RAPIER.RigidBody | null = null;
-    let rightFlipperBody: RAPIER.RigidBody | null = null;
-    // Offset local (mesh-origin → geoCenter) — positionne le body cinématique
-    // au vrai centre géométrique du mesh et pas à l'origine du groupe parent.
-    const leftFlipperBodyOffset  = new THREE.Vector3();
-    const rightFlipperBodyOffset = new THREE.Vector3();
+    // Corps cinématiques + hulls/pivot markers debug (buildFlipperBodies) —
+    // un seul struct au lieu de 8 vars éparpillées.
+    let flipperRig: FlipperBodiesResult | null = null;
     let physicsReady = false;
     // Handlers clavier stockés en scope-effet (pas de monkeypatch sur
     // physicsWorld) → cleanup sûr même si init() est annulé avant le câblage.
@@ -600,14 +590,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const plungerChargeUi = createPlungerChargeUi((v) => setPlungerCharge(v));
     const bossIntroHold = createBossIntroHoldState();
 
-
-    // ── Flipper collider debug wireframes ────────────────────────────────────
-    let leftFlipperDebug: THREE.Mesh | null = null;
-    let rightFlipperDebug: THREE.Mesh | null = null;
-
-    // ── Flipper pivot debug markers (sphères visibles avec H) ────────────────
-    let leftPivotMarker: THREE.Mesh | null = null;
-    let rightPivotMarker: THREE.Mesh | null = null;
 
     // ── Rapier debug renderer — tous les colliders ───────────────────────────
     const rapierDebugGeo = new THREE.BufferGeometry();
@@ -691,13 +673,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         // Résolution + attache des flippers extraite (physics/setupFlippers.ts).
         const flippers = setupFlippers(playfieldRoot, mapLayout.flipperPivots, getBallRadius());
-        leftFlipperPivot = flippers.leftPivot;
-        rightFlipperPivot = flippers.rightPivot;
-        leftFlipperObj = flippers.leftObj;
-        rightFlipperObj = flippers.rightObj;
-        leftFlashMats = flippers.leftFlashMats;
-        rightFlashMats = flippers.rightFlashMats;
-        if (flippers.zones) flipperZones = flippers.zones;
+        flipperSetup = flippers;
 
         // ── Physics ──────────────────────────────────────────────────────────
         physicsWorld = await PhysicsWorld.create();
@@ -783,34 +759,26 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         // ── Flipper : corps cinématiques + hulls debug + pivot markers ────────
         // Construction extraite (physics/buildFlipperBodies.ts) — les refs
         // retournées sont assignées dans les vars de closure lues par animate.
-        const flipperBodies = buildFlipperBodies({
+        flipperRig = buildFlipperBodies({
           world,
           scene,
           leftFlipper: flippers.leftMesh as THREE.Mesh | null,
           rightFlipper: flippers.rightMesh as THREE.Mesh | null,
-          leftPivot: leftFlipperPivot,
-          rightPivot: rightFlipperPivot,
+          leftPivot: flippers.leftPivot,
+          rightPivot: flippers.rightPivot,
           disposableGeos,
           disposableMats,
         });
-        leftFlipperBody  = flipperBodies.left.body;
-        rightFlipperBody = flipperBodies.right.body;
-        leftFlipperDebug  = flipperBodies.left.debugMesh;
-        rightFlipperDebug = flipperBodies.right.debugMesh;
-        leftFlipperBodyOffset.copy(flipperBodies.left.offset);
-        rightFlipperBodyOffset.copy(flipperBodies.right.offset);
-        leftPivotMarker  = flipperBodies.leftPivotMarker;
-        rightPivotMarker = flipperBodies.rightPivotMarker;
 
         debugMeshManager = new DebugMeshManager(
           {
             colliders: rapierDebugLines,
-            leftHull: leftFlipperDebug,
-            rightHull: rightFlipperDebug,
-            leftPivotMarker,
-            rightPivotMarker,
+            leftHull: flipperRig.left.debugMesh,
+            rightHull: flipperRig.right.debugMesh,
+            leftPivotMarker: flipperRig.leftPivotMarker,
+            rightPivotMarker: flipperRig.rightPivotMarker,
           },
-          () => ({ left: leftFlipperPivot, right: rightFlipperPivot }),
+          () => ({ left: flippers.leftPivot, right: flippers.rightPivot }),
         );
 
         ballPhysicsInst.setSpawnPosition(mapLayout.spawns.ball.x, mapLayout.spawns.ball.y, mapLayout.spawns.ball.z);
@@ -1023,22 +991,22 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // hotLoop/bossIntroHold.ts.
       stepBossIntroHold(bossIntroHold, bossIntroActive, ballPhysicsInst, inputState);
 
-      if (!freezeFrame) {
+      if (!freezeFrame && flipperSetup && flipperRig) {
         // ── Flipper cinématique : Three.js → Rapier (hotLoop/flipperFrame) ────
         stepFlipperKinematics(flipperFrame, {
           input: inputState,
-          leftPivot: leftFlipperPivot,
-          rightPivot: rightFlipperPivot,
-          leftObj: leftFlipperObj,
-          rightObj: rightFlipperObj,
-          leftBody: leftFlipperBody,
-          rightBody: rightFlipperBody,
-          leftOffset: leftFlipperBodyOffset,
-          rightOffset: rightFlipperBodyOffset,
-          leftFlashMats,
-          rightFlashMats,
-          leftDebug: leftFlipperDebug,
-          rightDebug: rightFlipperDebug,
+          leftPivot: flipperSetup.leftPivot,
+          rightPivot: flipperSetup.rightPivot,
+          leftObj: flipperSetup.leftObj,
+          rightObj: flipperSetup.rightObj,
+          leftBody: flipperRig.left.body,
+          rightBody: flipperRig.right.body,
+          leftOffset: flipperRig.left.offset,
+          rightOffset: flipperRig.right.offset,
+          leftFlashMats: flipperSetup.leftFlashMats,
+          rightFlashMats: flipperSetup.rightFlashMats,
+          leftDebug: flipperRig.left.debugMesh,
+          rightDebug: flipperRig.right.debugMesh,
         }, dt);
       }
 
@@ -1059,10 +1027,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         !freezeFrame
         && ballPhysicsInst
         && gameStateRef.current === 'playing'
-        && flipperZones
+        && flipperSetup?.zones
       ) {
         // Assistance de lancement (hotLoop/flipperFrame).
-        stepFlipperAssist(flipperFrame, ballPhysicsInst, flipperZones, dt);
+        stepFlipperAssist(flipperFrame, ballPhysicsInst, flipperSetup.zones, dt);
       }
 
       if (ballPhysicsInst && !freezeFrame) {
