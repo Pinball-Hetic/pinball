@@ -49,6 +49,8 @@ import { BallDragController } from "./scene/BallDragController";
 import { PlayfieldCameraRig } from "./scene/PlayfieldCameraRig";
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator } from "@/hooks/useDmdOrchestrator";
+import { useOutroAutoExit } from "@/hooks/useOutroAutoExit";
+import { useMapAudio, collectMapSoundUrls } from "@/hooks/useMapAudio";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 import { playfieldToScreenPercentForMode } from "@/utils/playfieldScreen";
 import {
@@ -58,7 +60,6 @@ import {
   warmMapSounds,
   resetPinballAudioForNewGame,
   unlockPinballAudio,
-  setMapAudioUrls,
 } from "@/audio/pinballAudio";
 import GameOverlay from "./GameOverlay";
 import {
@@ -114,10 +115,6 @@ const KEYBOARD_MODE: KeyboardMode =
 const PLAYFIELD_VIEW_MODE = parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE);
 const IS_PORTRAIT_FILL = PLAYFIELD_VIEW_MODE === 'portrait-fill';
 
-// Délai d'inactivité sur l'écran outro/QR avant de recommencer le workflow
-// depuis le début (reload → sélecteur de map). Libère la borne au joueur suivant.
-const OUTRO_IDLE_TIMEOUT_MS = 20_000;
-
 type PinballPlayfieldProps = {
   /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
   cabinetMode?: boolean;
@@ -138,28 +135,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   // Boss, clips et sons dérivés de la map sélectionnée (prop — change au remount).
   const mapBosses = resolvedMap.layout.bosses ?? [];
   const mapClips = resolvedMap.manifest.clips;
-  // Brancher les URLs audio de la map (effet de bord → useEffect, pas dans le
-  // corps de rendu qui rejoue à chaque render).
-  useEffect(() => {
-    setMapAudioUrls(
-      resolvedMap.manifest.ambientMusic,
-      resolvedMap.manifest.gameOverSound,
-      resolvedMap.manifest.alternateWorldMusicUrl,
-      resolvedMap.manifest.alternateWorldMusicVolume,
-    );
-  }, [
-    resolvedMap.manifest.ambientMusic,
-    resolvedMap.manifest.gameOverSound,
-    resolvedMap.manifest.alternateWorldMusicUrl,
-    resolvedMap.manifest.alternateWorldMusicVolume,
-  ]);
-  const mapSoundUrls: string[] = [
-    ...mapBosses.map((b) => b.revealSoundUrl).filter((u): u is string => !!u),
-    ...mapBosses.map((b) => b.latePhaseSoundUrl).filter((u): u is string => !!u),
-    ...mapBosses.map((b) => b.victoryMusicUrl).filter((u): u is string => !!u),
-    ...(resolvedMap.manifest.alternateWorldMusicUrl ? [resolvedMap.manifest.alternateWorldMusicUrl] : []),
-    ...Object.values(resolvedMap.manifest.sounds ?? {}).map((s) => s.url),
-  ];
+  // Audio de la map (branchement URLs + liste de préchauffe) : hooks/useMapAudio.
+  useMapAudio(resolvedMap.manifest);
+  const mapSoundUrls = collectMapSoundUrls(resolvedMap);
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -391,21 +369,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     resetBallRef.current?.();
   }, []);
 
-  // Outro/QR auto-exit : après 20s en game_over, on recommence le workflow
-  // depuis le début (reload → sélecteur de map, ou attract de la map forcée en
-  // mono-map). Effet React sur `gameState` → robuste : contrairement à
-  // l'ancien timer dans la closure animate, il n'est PAS annulé par les echos
-  // de boutons réseau (simulate-esp32) qui arrivaient après le game_over. Le
-  // cleanup ne s'exécute qu'à la sortie réelle de game_over (donc jamais tant
-  // qu'on est sur l'outro).
-  useEffect(() => {
-    if (gameState !== "game_over") return;
-    const handle = window.setTimeout(
-      () => window.location.reload(),
-      OUTRO_IDLE_TIMEOUT_MS,
-    );
-    return () => window.clearTimeout(handle);
-  }, [gameState]);
+  // Auto-exit outro/QR 20s → reload → sélecteur (hooks/useOutroAutoExit).
+  useOutroAutoExit(gameState);
 
   const { callbacksRef: physicalInputsRef, simulateButton, isConnectedRef } = usePhysicalInputs();
 
