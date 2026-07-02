@@ -41,13 +41,8 @@ import {
 import { getMapPackage, type ResolvedMap } from "@pinball/maps";
 import { NoSignal } from "@pinball/ui";
 import { type MapModule, type GameEventListener } from "@pinball/game-engine";
-import type {
-  ButtonAction,
-  ButtonId,
-  CinematicClip,
-  ScoreUpdate,
-} from "@pinball/shared-types";
-import { BUTTON_ACTION, clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
+import type { CinematicClip, ScoreUpdate } from "@pinball/shared-types";
+import { clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
 
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
 // Résolu au niveau module (MAP_ID = constante build-time) — utilisé comme
@@ -58,7 +53,6 @@ import { createPlayfieldScene } from "./scene/createPlayfieldScene";
 import { attachResizeHandler } from "./scene/attachResizeHandler";
 import { BallDragController } from "./scene/BallDragController";
 import { PlayfieldCameraRig } from "./scene/PlayfieldCameraRig";
-import { toGameEvent } from "./toGameEvent";
 import { useGameState } from "@/hooks/useGameState";
 import { useDmdOrchestrator, eventLabel } from "@/hooks/useDmdOrchestrator";
 import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
@@ -100,6 +94,7 @@ import {
 } from "./hotLoop/flipperFrame";
 import { updateRapierDebugGeometry } from "./hotLoop/rapierDebugRender";
 import { wireGameplay } from "./wireGameplay";
+import { createPhysicalInputHandlers, createDispatchButton } from "./wireInputs";
 import CinematicOverlay from "./CinematicOverlay";
 import BallDebugOverlay from "./BallDebugOverlay";
 import DebugPanel from "./DebugPanel";
@@ -978,43 +973,21 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           debugLog,
         });
 
-        physicalInputsRef.current = {
-          onButton: (data) => {
-            const action = BUTTON_ACTION[data.id];
-            if (!action) return; // bouton physique non mappé → ignoré
-            applyAction(action, data.action);
-          },
-          onTilt: (data) => {
-            console.log("[playfield] tilt reçu:", data, "— logique non implémentée");
-          },
-          onSensor: (data) => {
-            console.log("[playfield] sensor reçu:", data, "— logique non implémentée");
-          },
-          onDevEvent: (d) => {
-            // Injecte dans le emit wrapper EXISTANT → chaîne complète
-            // (cinématiques, gel, DMD, backglass). DRAIN/BOTTOM_OUT
-            // appellent les vrais use-cases → la bille reset réellement.
-            const ev = toGameEvent(d, mapBosses);
-            if (ev) emit(ev);
-          },
-        };
+        // Handlers réseau (input:*) + routage clavier→bouton extraits + testés
+        // (wireInputs.ts).
+        physicalInputsRef.current = createPhysicalInputHandlers({
+          applyAction,
+          emit: (e) => emit(e),
+          mapBosses,
+        });
 
-        const dispatchButton = (id: ButtonId, action: ButtonAction) => {
-          if (KEYBOARD_MODE === "disabled") return;
-          if (KEYBOARD_MODE === "simulate-esp32") {
-            if (isConnectedRef.current) {
-              simulateButton({ id, action });
-            } else {
-              // Fallback si le socket n'est pas prêt (évite un plongeur mort).
-              physicalInputsRef.current.onButton?.({ id, action });
-            }
-            return;
-          }
-          physicalInputsRef.current.onButton?.({ id, action });
-        };
+        const dispatchButton = createDispatchButton({
+          mode: KEYBOARD_MODE,
+          isConnectedRef,
+          simulateButton,
+          onButton: (data) => physicalInputsRef.current.onButton?.(data),
+        });
 
-        // Clavier dev : mapping key→action + résolution de l'id physique
-        // extraits + testés (keyboardMap.ts, idForAction fail-fast).
         // Routeur clavier dev extrait (createKeyboardRouter.ts) : jeu (via
         // keyboardMap) + toggles debug (H via DebugMeshManager, J/M/R).
         const { onKeyDown, onKeyUp } = createKeyboardRouter({
