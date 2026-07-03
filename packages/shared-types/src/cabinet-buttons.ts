@@ -17,7 +17,10 @@ export const CABINET_BUTTONS: readonly CabinetButton[] = [
   { id: 'FRONT_LEFT_RED', gpio: 19, activeLow: true },
   { id: 'BLACK_RIGHT', gpio: 13, activeLow: true },
   { id: 'WHITE_RIGHT', gpio: 25, activeLow: true, action: 'FLIP_RIGHT' },
-  { id: 'FRONT_WHITE', gpio: 33, activeLow: true, action: 'START' },
+  // PLUNGE (et non START) : plunger de SECOURS si le bouton PLUNGER physique
+  // lâche. Sur-ensemble strict de l'ancien START : valide le sélecteur de map,
+  // relance au game over (PLUNGE fait les deux), ET charge/lance la bille.
+  { id: 'FRONT_WHITE', gpio: 33, activeLow: true, action: 'PLUNGE' },
   { id: 'PLUNGER', gpio: 32, activeLow: true, action: 'PLUNGE' },
 ]
 
