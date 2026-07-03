@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { MapMeta } from "@pinball/maps";
+import { BUTTON_ACTION } from "@pinball/shared-types";
+import { usePhysicalInputs } from "@/hooks/usePhysicalInputs";
 
 interface Props {
   maps: MapMeta[];
@@ -117,6 +119,25 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [go, confirm]);
+
+  // Boutons physiques de la borne (ESP32 → server → input:button). Le hook
+  // usePhysicalInputs n'est monté que dans PinballPlayfield — pas encore rendu
+  // ici → sans cet abonnement, le sélecteur est muet aux boutons physiques.
+  // Mapping par ACTION jeu (BUTTON_ACTION), pas par id : flip gauche/droite =
+  // naviguer, PLUNGE/START = valider. DOWN uniquement (pas de répétition UP).
+  const { callbacksRef } = usePhysicalInputs();
+  useEffect(() => {
+    callbacksRef.current = {
+      onButton: (data) => {
+        if (data.action !== "DOWN") return;
+        const action = BUTTON_ACTION[data.id];
+        if (action === "FLIP_LEFT") go(-1);
+        else if (action === "FLIP_RIGHT") go(1);
+        else if (action === "PLUNGE" || action === "START")
+          setCursor((c) => { confirm(c); return c; });
+      },
+    };
+  }, [callbacksRef, go, confirm]);
 
   useEffect(() => {
     videoRefs.current.forEach((vid, i) => {
