@@ -19,6 +19,7 @@ export * from './domain/MapLayout';
 export * from './domain/MapModule';
 export * from './domain/LiveGameSnapshot';
 export * from './domain/AtmosphereBlend';
+export * from './domain/RevealCountdown';
 
 // Use-cases
 export * from './use-cases/LaunchBall';

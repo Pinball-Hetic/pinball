@@ -30,3 +30,11 @@ export const DARK_LINK_WALK_FADE_OUT      = 0.2
 
 // Point de départ (hors champ, Sacred Realm)
 export const DARK_LINK_SPAWN = { x: 0, z: -0.32 } as const
+
+/**
+ * Délai (s) d'activation du portail RETOUR après la défaite de Dark Link : au
+ * coup fatal la bille est collée au boss — activer immédiatement l'aspirerait
+ * instantanément au lieu de la laisser en jeu (même fix que côté ST).
+ */
+export const RETURN_PORTAL_REVEAL_DELAY_S = 5
+

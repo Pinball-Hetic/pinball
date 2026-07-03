@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import * as THREE from 'three';
 import { UpsideDownPortal } from './UpsideDownPortal';
+import { RETURN_PORTAL_REVEAL_DELAY_S } from './UpsideDownConstants';
 
 // Le state machine d'ouverture (`opening` / `revealing`) partage `revealT`.
 // On vérifie ici que `update(dt)` n'avance `revealT` qu'UNE fois par frame,
@@ -79,19 +80,39 @@ describe('UpsideDownPortal open idempotency', () => {
     return portal as unknown as OpeningState;
   }
 
-  test('notifyBossDefeated then onGameEvent for same defeat opens once', () => {
+  test('notifyBossDefeated then onGameEvent for same defeat opens once, après le délai', () => {
     const portal = new UpsideDownPortal();
     (portal as unknown as { portalGroup: THREE.Group }).portalGroup =
       new THREE.Group();
 
     // vecna : unlocksReturnPortal, requiert alternateWorldActive.
+    // Reveal différé : rien ne s'ouvre au coup fatal (bille collée au boss).
     portal.notifyBossDefeated('vecna', true);
-    const afterNotify = { ...opening(portal) };
-    expect(afterNotify.revealing).toBe(true);
-    expect(afterNotify.revealed).toBe(true);
+    expect(opening(portal).revealing).toBe(false);
+    expect(opening(portal).revealed).toBe(false);
 
-    // Second chemin d'ouverture (le bug) : doit être neutralisé par le garde.
+    // Second chemin d'ouverture (le bug) : ne doit ni ouvrir ni relancer le délai.
     portal.onGameEvent({ type: 'BOSS_TARGET_HIT', bossId: 'vecna', hitCount: 10 });
-    expect(opening(portal)).toEqual(afterNotify);
+    expect(opening(portal).revealed).toBe(false);
+
+    // Écoule le délai frame par frame → une seule ouverture.
+    for (let t = 0; t <= RETURN_PORTAL_REVEAL_DELAY_S; t += 0.1) portal.update(0.1);
+    const afterDelay = { ...opening(portal) };
+    expect(afterDelay.revealed).toBe(true);
+
+    portal.onGameEvent({ type: 'BOSS_TARGET_HIT', bossId: 'vecna', hitCount: 10 });
+    expect(opening(portal)).toEqual(afterDelay);
+  });
+
+  test('quitter le monde alternatif pendant le délai annule le reveal retour', () => {
+    const portal = new UpsideDownPortal();
+    (portal as unknown as { portalGroup: THREE.Group }).portalGroup =
+      new THREE.Group();
+
+    portal.notifyBossDefeated('vecna', true);
+    portal.setUpsideDownActive(false);
+    for (let t = 0; t <= RETURN_PORTAL_REVEAL_DELAY_S; t += 0.1) portal.update(0.1);
+    expect(opening(portal).revealed).toBe(false);
+    expect(opening(portal).revealing).toBe(false);
   });
 });

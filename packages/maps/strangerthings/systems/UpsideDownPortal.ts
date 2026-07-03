@@ -9,10 +9,12 @@ import {
 import { layout } from '../layout';
 import { PLAYFIELD_TILT, surfaceYAtZ } from '@pinball/game-engine';
 import {
+  RETURN_PORTAL_REVEAL_DELAY_S,
   UPSIDE_DOWN_PORTAL_ANCHOR_NAMES,
   UPSIDE_DOWN_PORTAL_OPEN_POLISH,
   UPSIDE_DOWN_PORTAL_VINE_COUNT,
 } from './UpsideDownConstants';
+import { RevealCountdown } from '@pinball/game-engine';
 import { mapPortalRevealProgress, portalRevealTotalDuration } from './PortalRevealCurve';
 import {
   portalMagnetImpulse,
@@ -100,6 +102,7 @@ export class UpsideDownPortal {
   private pulseT = 0;
   private baseY = 0;
   private suckBoost = 0;
+  private returnRevealCountdown = new RevealCountdown();
 
   setup(config: SetupConfig): void {
     this.dispose();
@@ -137,6 +140,8 @@ export class UpsideDownPortal {
 
   setUpsideDownActive(active: boolean): void {
     this.alternateWorldActive = active;
+    // Sortie du monde alternatif : un reveal retour en attente n'a plus de sens.
+    if (!active) this.returnRevealCountdown.cancel();
   }
 
   onGameEvent(event: GameEvent): void {
@@ -159,7 +164,9 @@ export class UpsideDownPortal {
       return;
     }
     if (def.unlocksReturnPortal && this.alternateWorldActive) {
-      this.beginReveal();
+      // Reveal différé : au coup fatal la bille colle au boss (= au portail),
+      // ouvrir immédiatement l'aspirerait sans laisser jouer.
+      this.returnRevealCountdown.start(RETURN_PORTAL_REVEAL_DELAY_S);
     }
   }
 
@@ -193,6 +200,13 @@ export class UpsideDownPortal {
   }
 
   update(dt: number): void {
+    if (this.returnRevealCountdown.tick(dt)) {
+      // Re-vérifie les gardes : le monde a pu être quitté pendant le délai.
+      if (!this.revealed && !this.revealing && !this.opening && this.alternateWorldActive) {
+        this.beginReveal();
+      }
+    }
+
     this.pulseT += dt;
 
     if (this.opening && !this.revealed) {
@@ -263,6 +277,7 @@ export class UpsideDownPortal {
   }
 
   reset(): void {
+    this.returnRevealCountdown.cancel();
     if (!this.world) return;
     if (!this.revealed && !this.revealing && !this.opening) {
       this.setGlbPortalVisible(true);
@@ -295,6 +310,7 @@ export class UpsideDownPortal {
   }
 
   dispose(): void {
+    this.returnRevealCountdown.cancel();
     this.removePortalSensor();
     if (this.portalGroup) this.portalGroup.parent?.remove(this.portalGroup);
     this.rimGlow?.dispose();

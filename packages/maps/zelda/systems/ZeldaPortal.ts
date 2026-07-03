@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { MapLayout } from '@pinball/game-engine';
-import { easeOut } from '@pinball/game-engine';
+import { easeOut, RevealCountdown } from '@pinball/game-engine';
+import { RETURN_PORTAL_REVEAL_DELAY_S } from './DarkLinkConstants';
 
 // ── Dimensions ─────────────────────────────────────────────────────────────
 const PORTAL_SENSOR_RADIUS = 0.014;
@@ -56,6 +57,7 @@ export class ZeldaPortal {
   private isOpening = false;
   private openT     = 0;
   private animT     = 0;
+  private returnCountdown = new RevealCountdown();
 
   // ── API ──────────────────────────────────────────────────────────────────
 
@@ -97,22 +99,24 @@ export class ZeldaPortal {
    * Appelé dès que la balle entre dans le portail — impossible de le reprendre.
    */
   hide(): void {
+    this.returnCountdown.cancel();
     if (this.portalGroup) this.portalGroup.visible = false;
     this.removeSensor();
     this.onOpenChangeCb?.(false);
   }
 
   /**
-   * Recrée le sensor pour le portail RETOUR (Sacred Realm → monde normal).
-   * Appelé après PORTAL_TRANSITION_END quand alternateWorldActive = true.
+   * Programme le sensor pour le portail RETOUR (Sacred Realm → monde normal).
+   * Différé : au coup fatal la bille colle à Dark Link — activer immédiatement
+   * l'aspirerait sans laisser jouer. Le sensor est créé par update(dt).
    */
   enableReturn(): void {
-    this.createSensor();
-    this.onOpenChangeCb?.(true);
+    this.returnCountdown.start(RETURN_PORTAL_REVEAL_DELAY_S);
   }
 
   /** Réinitialise complètement le portail (game reset). */
   reset(): void {
+    this.returnCountdown.cancel();
     this.openState = false;
     this.isOpening = false;
     this.openT     = 0;
@@ -130,6 +134,13 @@ export class ZeldaPortal {
   }
 
   update(dt: number): void {
+    // Avant le early-return visuel : le groupe est invisible dans le Sacred
+    // Realm, mais le countdown retour doit quand même s'écouler.
+    if (this.returnCountdown.tick(dt)) {
+      this.createSensor();
+      this.onOpenChangeCb?.(true);
+    }
+
     if (!this.portalGroup?.visible) return;
 
     if (this.isOpening) {
@@ -162,6 +173,7 @@ export class ZeldaPortal {
   }
 
   dispose(): void {
+    this.returnCountdown.cancel();
     this.removeSensor();
     if (this.coreLight) {
       this.coreLight.dispose();

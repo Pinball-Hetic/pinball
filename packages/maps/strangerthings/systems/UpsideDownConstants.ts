@@ -18,6 +18,12 @@ export const UPSIDE_DOWN_TRANSITION_HOLD =
   - UPSIDE_DOWN_TRANSITION_RESTORE;
 
 export const UPSIDE_DOWN_PORTAL_REVEAL_DELAY = 3;
+/**
+ * Délai (s) d'apparition du portail RETOUR après la défaite du boss : au coup
+ * fatal la bille est collée au boss (= au portail) — ouvrir immédiatement
+ * l'aspirerait instantanément au lieu de la laisser en jeu.
+ */
+export const RETURN_PORTAL_REVEAL_DELAY_S = 5;
 export const UPSIDE_DOWN_PORTAL_OPEN_DURATION = 2.5;
 export const UPSIDE_DOWN_PORTAL_OPEN_POLISH = 0.2;
 export const UPSIDE_DOWN_PORTAL_ANCHOR_NAMES = [
