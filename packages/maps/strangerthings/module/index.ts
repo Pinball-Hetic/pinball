@@ -273,6 +273,9 @@ export function createModule(): MapModule {
           ctx.emitGameEvent({ type: 'BOSS_FIGHT_END', bossId: 'demogorgon' });
         },
         onTargetReady: () => ctx.setBossTargetArmed('demogorgon', true),
+        // Gate assist Eleven : hors 'playing' (drain, attente relance) le
+        // sous-timer est suspendu — sinon +100 pts en boucle sans jouer.
+        isPlaying: () => ctx.gameState() === 'playing',
       })
       demogorgonReveal.setEmit(ctx.emitGameEvent)
       vecnaReveal = new VecnaReveal()

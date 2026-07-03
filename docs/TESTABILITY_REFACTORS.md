@@ -1,5 +1,22 @@
 # Backlog refacto — testabilité & clean architecture
 
+> ## 🔎 Smells repérés en passant (patch glitch assist, 2026-07-03, sub-agent)
+> - **P2** SRP/cohésion — `ASSIST_SCORE`/`ASSIST_INTERVAL` (contenu boss ST) vivent dans
+>   `game-engine/src/domain/Ball.ts:65-66` alors que `ELEVEN_ASSIST_FIRST/ANIM` sont dans la map
+>   (`DemogorgonReveal.ts:29-30`). Config assist éclatée entre 2 packages + frôle « pas de contenu
+>   ST dans le core ». Regrouper côté map (BossDefinition ?).
+> - **P2** God class/SRP — `DemogorgonReveal.ts:53-79` cumule renderer + assist FX + victory anim +
+>   adapter events ; `dispose()` recrée des instances neuves pour « reset » (piégeux). 1er pas :
+>   extraire `ElevenAssistFx` (fire/render/hide, lignes ~371-415 déjà cohésives).
+> - **P2** Primitive obsession — `MapModule.ts:43` `gameState(): string` = stringly-typed ;
+>   `GameState` existe dans `apps/playfield/src/hooks/useGameState.ts:23` mais pas partagé →
+>   le déplacer dans shared-types pour tuer les magic strings des modules de map.
+> - **P3** Long method/State pattern — `BlackoutFightPhaseMachine.tick()` (:193-288) = chaîne de if
+>   par phase ; descriptor fourre-tout 14 champs (ISP ségrégable).
+> - **P3** Typo — `FIGHT_FLINKER_DIP` (→ FLICKER), `DemogorgonReveal.ts:37` + dupliquée en test.
+> - **P3** Indirection morte — `BossRevealOrchestrator.ts:1` + `BossRevealController.ts:1` = pure
+>   re-exports one-line de game-engine (façade voulue ou à importer direct ?).
+>
 > ## 🔎 Smells repérés en passant (recherche scoop/collisions, 2026-07-03)
 > - **P2** ISP/encapsulation — `IMapBallPhysics.body` expose le `RigidBody` Rapier **BRUT**
 >   au module de map (`packages/game-engine/src/domain/MapModule.ts`). Les méthodes nommées

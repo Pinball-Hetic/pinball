@@ -48,6 +48,13 @@ export type DemogorgonSetup = {
   bumperVisuals: BumperVisuals | null;
   onFightEnd?: () => void;
   onTargetReady?: () => void;
+  /**
+   * Jeu en cours ? (gameState === 'playing'). Injecté par le module — sert à
+   * suspendre l'assist Eleven quand la bille est drainée : sans ce gate,
+   * l'assist continue de scorer +100 toutes les ~4 s pendant l'attente au
+   * spawn. Absent (tests, legacy) → considéré toujours en jeu.
+   */
+  isPlaying?: () => boolean;
 };
 
 export class DemogorgonReveal implements BossRevealController {
@@ -57,6 +64,7 @@ export class DemogorgonReveal implements BossRevealController {
   private bumperVisuals: BumperVisuals | null = null;
   private onFightEnd: (() => void) | null = null;
   private onTargetReady: (() => void) | null = null;
+  private isPlaying: (() => boolean) | null = null;
   private emit: GameEventListener | null = null;
 
   private cinematicStrobe = new PlayfieldCinematicStrobe();
@@ -135,6 +143,7 @@ export class DemogorgonReveal implements BossRevealController {
     this.bumperVisuals = config.bumperVisuals;
     this.onFightEnd = config.onFightEnd ?? null;
     this.onTargetReady = config.onTargetReady ?? null;
+    this.isPlaying = config.isPlaying ?? null;
     this.root = config.root;
 
     this.cinematicStrobe.mount(
@@ -244,7 +253,11 @@ export class DemogorgonReveal implements BossRevealController {
       this.machine.isVictory(),
     );
 
-    const d = this.machine.tick(dt);
+    // Assist gelé hors 'playing' (voir DemogorgonSetup.isPlaying) ; les autres
+    // effets du combat (strobe, flicker, phases) continuent comme avant.
+    const d = this.machine.tick(dt, {
+      suspendAssist: this.isPlaying ? !this.isPlaying() : false,
+    });
 
     if (d.phase === 'idle') {
       this.garlandLights?.setStrobe(false, false);
@@ -325,6 +338,7 @@ export class DemogorgonReveal implements BossRevealController {
     this.bumperVisuals = null;
     this.onFightEnd = null;
     this.onTargetReady = null;
+    this.isPlaying = null;
     this.emit = null;
     this.cinematicStrobe = new PlayfieldCinematicStrobe();
     this.billboard = new CameraBillboardSprite();

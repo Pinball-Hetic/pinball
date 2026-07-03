@@ -138,3 +138,39 @@ describe('DemogorgonReveal resetTargetMaterials (regression)', () => {
     }
   });
 });
+
+describe('DemogorgonReveal assist gate hors playing (regression score gratuit)', () => {
+  // Bug d'origine : bille drainée (gameState 'idle'), combat encore actif →
+  // l'assist Eleven continuait d'émettre ASSIST (+100) toutes les ~4 s.
+  function makeReveal(isPlaying: () => boolean) {
+    const reveal = new DemogorgonReveal();
+    const emitted: GameEvent[] = [];
+    reveal.setup({
+      root: new THREE.Group(),
+      scene: new THREE.Scene(),
+      camera: new THREE.PerspectiveCamera(),
+      garlandLights: null,
+      bumperVisuals: null,
+      isPlaying,
+    });
+    reveal.setEmit((e) => emitted.push(e));
+    reveal.onGameEvent(REVEAL_EVENT);
+    reveal.update(BLACKOUT + 0.001);
+    reveal.update(REVEAL + 0.001); // → flicker, assist armé
+    return { reveal, emitted };
+  }
+
+  test("n'émet aucun ASSIST quand isPlaying() est false", () => {
+    const { reveal, emitted } = makeReveal(() => false);
+    for (let i = 0; i < 100; i++) reveal.update(0.1); // 10 s hors playing
+    expect(emitted.filter((e) => e.type === 'ASSIST')).toHaveLength(0);
+    reveal.dispose();
+  });
+
+  test('émet ASSIST normalement quand isPlaying() est true', () => {
+    const { reveal, emitted } = makeReveal(() => true);
+    reveal.update(0.6); // > ELEVEN_ASSIST_FIRST (0.55)
+    expect(emitted.filter((e) => e.type === 'ASSIST')).toHaveLength(1);
+    reveal.dispose();
+  });
+});

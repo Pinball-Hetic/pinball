@@ -217,6 +217,77 @@ describe('eleven assist (Demogorgon only)', () => {
     expect(d.assistFinished).toBe(true);
   });
 
+  test('suspendAssist: no fire outside playing, even over many seconds', () => {
+    const m = demogorgon();
+    m.onReveal();
+    m.tick(BLACKOUT);
+    m.tick(REVEAL); // flicker, assistNextIn = 0.55
+    // 10 s suspendus — largement au-delà de first + plusieurs intervals.
+    for (let i = 0; i < 100; i++) {
+      const d = m.tick(0.1, { suspendAssist: true });
+      expect(d.assistFired).toBe(false);
+      expect(d.assist).toBeNull();
+    }
+  });
+
+  test('suspendAssist: countdown frozen — no catch-up fire on resume', () => {
+    const m = demogorgon();
+    m.onReveal();
+    m.tick(BLACKOUT);
+    m.tick(REVEAL);
+    // 5 s suspendus : sans gel du compteur, l'assist tirerait dès la reprise.
+    m.tick(5.0, { suspendAssist: true });
+    // Reprise : il faut ré-écouler les 0.55 s de first en temps de jeu réel.
+    let d = m.tick(0.5);
+    expect(d.assistFired).toBe(false);
+    d = m.tick(0.1); // cumul playing = 0.6 >= 0.55
+    expect(d.assistFired).toBe(true);
+  });
+
+  test('suspendAssist: in-flight assist animation is frozen, resumes where it was', () => {
+    const m = demogorgon();
+    m.onReveal();
+    m.tick(BLACKOUT);
+    m.tick(REVEAL);
+    m.tick(0.55); // fire : trigger reset elevenAssistT à 0 puis += 0.55 même tick
+    const before = m.tick(0.1).assist;
+    expect(before).not.toBeNull();
+    // Suspension : l'enveloppe ne progresse pas (dt gelé), pas de finished.
+    const frozen = m.tick(2.0, { suspendAssist: true });
+    expect(frozen.assist?.elapsed).toBeCloseTo(before?.elapsed ?? -1, 10);
+    expect(frozen.assistFired).toBe(false);
+    expect(frozen.assistFinished).toBe(false);
+    // Reprise : l'anim repart de là où elle était.
+    const resumed = m.tick(0.1).assist;
+    expect(resumed?.elapsed).toBeCloseTo((before?.elapsed ?? 0) + 0.1, 10);
+  });
+
+  test('suspendAssist: false (or omitted) keeps the playing behavior identical', () => {
+    const a = demogorgon();
+    const b = demogorgon();
+    for (const m of [a, b]) {
+      m.onReveal();
+      m.tick(BLACKOUT);
+      m.tick(REVEAL);
+    }
+    const da = a.tick(0.6);
+    const db = b.tick(0.6, { suspendAssist: false });
+    expect(da.assistFired).toBe(true);
+    expect(db.assistFired).toBe(true);
+    expect(db.assist?.elapsed).toBeCloseTo(da.assist?.elapsed ?? -1, 10);
+  });
+
+  test('Ganondorf: suspendAssist is a no-op with a null assistCfg', () => {
+    const m = ganondorf();
+    m.onReveal();
+    m.tick(BLACKOUT);
+    m.tick(REVEAL);
+    const d = m.tick(2.0, { suspendAssist: true });
+    expect(d.phase).toBe('flicker');
+    expect(d.assistFired).toBe(false);
+    expect(d.assist).toBeNull();
+  });
+
   test('Ganondorf has no assist sub-machine', () => {
     const m = ganondorf();
     m.onReveal();

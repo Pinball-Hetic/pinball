@@ -190,7 +190,14 @@ export class BlackoutFightPhaseMachine {
     return clamp(raw, this.flicker.clampMin, this.flicker.clampMax);
   }
 
-  tick(dt: number): BlackoutFightDescriptor {
+  /**
+   * @param opts.suspendAssist true quand le jeu n'est pas en cours (bille
+   * drainée, partie non relancée). Le sous-timer assist est alors GELÉ (le dt
+   * ne s'écoule pas) : un simple « ne pas émettre » laisserait le compteur
+   * descendre et l'assist tirerait à l'instant du relancement (rattrapage).
+   * Le reste du combat (strobe, flicker, phases) continue normalement.
+   */
+  tick(dt: number, opts?: { suspendAssist?: boolean }): BlackoutFightDescriptor {
     // pulseT advances every frame (verbatim: even in idle for Demogorgon).
     this.pulseT += dt;
 
@@ -249,14 +256,18 @@ export class BlackoutFightPhaseMachine {
     if (this.phase === 'flicker') {
       const flickerShade = this.computeFlickerShade();
       const flickerBlink = strobeOn(this.strobeT, this.config.fightFlickerHz);
+      // Hors playing : assist suspendu (compteur ET enveloppe d'anim gelés),
+      // sinon l'assist score +100 en boucle pendant que la bille est au spawn.
+      const suspendAssist = opts?.suspendAssist === true;
+      const assistDt = suspendAssist ? 0 : dt;
       let assistFired = false;
-      if (this.assistCfg && !this.elevenAssistActive) {
+      if (this.assistCfg && !suspendAssist && !this.elevenAssistActive) {
         this.assistNextIn -= dt;
         if (this.assistNextIn <= 0) {
           assistFired = this.triggerElevenAssist();
         }
       }
-      const { frame, finished } = this.updateElevenAssist(dt);
+      const { frame, finished } = this.updateElevenAssist(assistDt);
       return {
         ...base,
         phase: 'flicker',
