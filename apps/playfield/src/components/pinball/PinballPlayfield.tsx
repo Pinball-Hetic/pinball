@@ -816,6 +816,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           mapBosses,
           getCollisionProcessor: () => collisionProcessor,
           getGameState: () => gameStateRef.current,
+          // Cheat-code borne : 3 boutons façade gauche simultanés → reset bille
+          // (même chemin que la touche R — resetBall se garde tout seul :
+          // no-op hors session ou en game_over).
+          onCheatReset: () => resetBallRef.current?.(),
         });
 
         const dispatchButton = createDispatchButton({

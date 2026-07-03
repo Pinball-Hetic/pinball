@@ -15,6 +15,37 @@ import type { GameState } from "@/hooks/useGameState";
 type KeyboardMode = "direct" | "simulate-esp32" | "disabled";
 type Bosses = ResolvedMap["layout"]["bosses"];
 
+// Boutons du cheat-code reset-bille : les 3 boutons de façade gauche (non
+// mappés à une action jeu) pressés SIMULTANÉMENT → reset de la bille. Secours
+// borne quand la bille est coincée hors de portée du stuck-detector.
+export const RESET_CHORD: readonly ButtonId[] = [
+  "FRONT_LEFT_GREEN",
+  "FRONT_LEFT_YELLOW",
+  "FRONT_LEFT_RED",
+];
+
+/**
+ * Détecteur d'accord (chord) : suit l'état DOWN/UP des boutons donnés et tire
+ * `onFire` sur le FRONT MONTANT du « tous enfoncés ». Ne re-tire pas tant
+ * qu'au moins un bouton n'est pas relâché (pas de répétition en maintien). Pur.
+ */
+export function createButtonChord(ids: readonly ButtonId[], onFire: () => void) {
+  const down = new Set<ButtonId>();
+  let fired = false;
+  return (data: ButtonInput): void => {
+    if (!ids.includes(data.id)) return;
+    if (data.action === "DOWN") down.add(data.id);
+    else down.delete(data.id);
+    const all = down.size === ids.length;
+    if (all && !fired) {
+      fired = true;
+      onFire();
+    } else if (!all) {
+      fired = false;
+    }
+  };
+}
+
 export interface PhysicalInputHandlersDeps {
   applyAction: (action: GameAction, btnAction: ButtonAction) => void;
   emit: (e: GameEvent) => void;
@@ -22,6 +53,8 @@ export interface PhysicalInputHandlersDeps {
   /** live — assigné après le câblage gameplay ; requis pour les triggers boss debug */
   getCollisionProcessor: () => CollisionEventProcessor | null;
   getGameState: () => GameState;
+  /** cheat-code RESET_CHORD (3 boutons façade gauche simultanés) → reset bille */
+  onCheatReset: () => void;
 }
 
 // Handlers des events physiques réseau (input:*). onButton traduit l'id
@@ -31,8 +64,12 @@ export interface PhysicalInputHandlersDeps {
 // DRAIN/BOTTOM_OUT passent par les vrais use-cases. Tilt/sensor : loggés
 // (logique non implémentée — TODO Fliphetic).
 export function createPhysicalInputHandlers(d: PhysicalInputHandlersDeps) {
+  const resetChord = createButtonChord(RESET_CHORD, d.onCheatReset);
   return {
     onButton: (data: ButtonInput) => {
+      // Cheat-code AVANT le filtre « non mappé » : les boutons de l'accord
+      // n'ont volontairement pas d'action jeu.
+      resetChord(data);
       const action = BUTTON_ACTION[data.id];
       if (!action) return; // bouton physique non mappé → ignoré
       d.applyAction(action, data.action);

@@ -5,6 +5,8 @@ import type { CollisionEventProcessor } from "@pinball/game-engine";
 import {
   createPhysicalInputHandlers,
   createDispatchButton,
+  createButtonChord,
+  RESET_CHORD,
   type PhysicalInputHandlersDeps,
 } from "./wireInputs";
 
@@ -16,6 +18,7 @@ function handlersHarness(over: Partial<PhysicalInputHandlersDeps> = {}) {
     emitted: [] as unknown[],
     reveals: [] as string[],
     hits: [] as string[],
+    cheatResets: 0,
   };
   const processor = {
     debugRevealBoss: (id: string) => calls.reveals.push(id),
@@ -27,6 +30,7 @@ function handlersHarness(over: Partial<PhysicalInputHandlersDeps> = {}) {
     mapBosses: [{ id: "demogorgon" } as PhysicalInputHandlersDeps["mapBosses"][number]],
     getCollisionProcessor: () => processor,
     getGameState: () => "playing",
+    onCheatReset: () => (calls.cheatResets += 1),
     ...over,
   });
   return { h, calls };
@@ -116,5 +120,49 @@ describe("createDispatchButton", () => {
     const off = spy();
     createDispatchButton({ mode: "simulate-esp32", isConnectedRef: { current: false }, ...off })(id, "DOWN");
     expect(off.calls).toEqual({ sim: 0, local: 1 });
+  });
+});
+
+describe("cheat-code RESET_CHORD (3 boutons façade gauche simultanés)", () => {
+  const [G, Y, R] = RESET_CHORD;
+
+  test("createButtonChord : tire sur le front montant du « tous enfoncés », une fois", () => {
+    let fires = 0;
+    const chord = createButtonChord(RESET_CHORD, () => (fires += 1));
+    chord({ id: G, action: "DOWN" });
+    chord({ id: Y, action: "DOWN" });
+    expect(fires).toBe(0); // 2/3 seulement
+    chord({ id: R, action: "DOWN" });
+    expect(fires).toBe(1); // accord complet
+    chord({ id: R, action: "DOWN" }); // répétition DOWN en maintien → pas de re-tir
+    expect(fires).toBe(1);
+  });
+
+  test("re-tir seulement après relâchement d'au moins un bouton", () => {
+    let fires = 0;
+    const chord = createButtonChord(RESET_CHORD, () => (fires += 1));
+    for (const id of RESET_CHORD) chord({ id, action: "DOWN" });
+    expect(fires).toBe(1);
+    chord({ id: Y, action: "UP" });
+    chord({ id: Y, action: "DOWN" });
+    expect(fires).toBe(2);
+  });
+
+  test("boutons hors accord ignorés (ne comptent pas, ne cassent pas l'état)", () => {
+    let fires = 0;
+    const chord = createButtonChord(RESET_CHORD, () => (fires += 1));
+    chord({ id: G, action: "DOWN" });
+    chord({ id: Y, action: "DOWN" });
+    chord({ id: "WHITE_LEFT", action: "DOWN" });
+    expect(fires).toBe(0);
+    chord({ id: R, action: "DOWN" });
+    expect(fires).toBe(1);
+  });
+
+  test("intégré à onButton : l'accord déclenche onCheatReset, les boutons restent non mappés (pas d'applyAction)", () => {
+    const { h, calls } = handlersHarness();
+    for (const id of RESET_CHORD) h.onButton({ id, action: "DOWN" });
+    expect(calls.cheatResets).toBe(1);
+    expect(calls.apply.length).toBe(0); // non mappés → aucune action jeu
   });
 });
