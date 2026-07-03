@@ -1,5 +1,11 @@
 const DEFAULT_HIT_COOLDOWN_MS = 450;
 
+export type BossHitOptions = {
+  maxHits: number;
+  onHit: (hitCount: number) => void;
+  hitCooldownMs?: number;
+};
+
 export class BossTargetSensor {
   fightActive = false;
   targetArmed = false;
@@ -43,20 +49,14 @@ export class BossTargetSensor {
   handleCollision(
     started: boolean,
     gameState: string,
-    options: {
-      maxHits: number;
-      onHit: (hitCount: number) => void;
-      hitCooldownMs?: number;
-    },
+    options: BossHitOptions,
   ): void {
-    // Sortie de balle : on nettoie l'état et on s'arrête.
     if (!started) {
       this.ballInside = false;
       this.latchIgnore = false;
       return;
     }
 
-    // Entrée de balle : on valide les conditions, puis on délègue le comptage.
     this.ballInside = true;
     if (gameState !== 'playing' || !this.fightActive || !this.targetArmed) return;
     if (this.latchIgnore) return;
@@ -64,11 +64,7 @@ export class BossTargetSensor {
     this.registerHit(options);
   }
 
-  private registerHit(options: {
-    maxHits: number;
-    onHit: (hitCount: number) => void;
-    hitCooldownMs?: number;
-  }): void {
+  private registerHit(options: BossHitOptions): void {
     const cooldown = options.hitCooldownMs ?? DEFAULT_HIT_COOLDOWN_MS;
     const now = performance.now();
     if (now - this.lastHitMs < cooldown) return;
