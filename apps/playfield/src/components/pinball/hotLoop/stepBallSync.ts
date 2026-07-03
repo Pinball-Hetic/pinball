@@ -33,6 +33,9 @@ export interface BallSyncDeps {
   bottomOutDetector: DetectBottomOut;
   triggerBottomOut: (reason: BallResetReason) => void;
   dt: number;
+  /** Fraction vers le prochain step physique (PhysicsWorld.interpolationAlpha)
+   * — lisse le rendu de la bille sur écran 120 Hz (physique à 60 steps/s). */
+  alpha: number;
 }
 
 // Synchronisation bille ↔ physique pour une frame (appelée quand bille visible +
@@ -49,7 +52,7 @@ export function stepBallSync(d: BallSyncDeps): void {
     ball.body.setTranslation({ x: p.x, y: p.y, z: p.z }, true);
     ball.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     ball.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    ball.syncToMesh(ballMesh);
+    ball.syncToMeshInterpolated(ballMesh, d.alpha);
     return;
   }
 
@@ -90,7 +93,7 @@ export function stepBallSync(d: BallSyncDeps): void {
     }
   }
 
-  ball.syncToMesh(ballMesh);
+  ball.syncToMeshInterpolated(ballMesh, d.alpha);
 
   // Clamp vitesse.
   const clampedVel = computeSpeedClamp(ball.body.linvel());

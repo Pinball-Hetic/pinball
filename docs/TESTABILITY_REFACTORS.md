@@ -1,5 +1,16 @@
 # Backlog refacto — testabilité & clean architecture
 
+> ## 🔎 Smells repérés en passant (interpolation rendu bille, 2026-07-03, sub-agent)
+> - **P2** fail-fast — `PhysicsWorld.update()` (:94-112) ne garde pas sur `this.crashed` : après
+>   panique WASM, chaque frame re-tente `world.step()` (spam console + coût throw). Early-return.
+> - **P2** encapsulation/Demeter — `IMapBallPhysics.body` (Rapier brut) → téléports `setTranslation`
+>   non interceptables partout ; a forcé le garde-fou distance de l'interpolation. Une méthode
+>   `teleport(pos)` centraliserait (déjà tracé, confirmé une 3e fois — priorité montante).
+> - **P3** perf hot loop — `QualityGovernor.frame()` : `samples.reduce` O(WINDOW)/frame → somme
+>   glissante O(1). · `stepBallSync` : `body.translation()/linvel()` 4-5×/frame (chaque appel
+>   Rapier alloue) → mutualiser en une lecture.
+> - **P3** DRY — `BallPhysics.holdAt*Spawn` ×2 identiques au spawn près → privé `holdAt(spawn)`.
+>
 > ## 🔎 Smells repérés en passant (patch glitch assist, 2026-07-03, sub-agent)
 > - **P2** SRP/cohésion — `ASSIST_SCORE`/`ASSIST_INTERVAL` (contenu boss ST) vivent dans
 >   `game-engine/src/domain/Ball.ts:65-66` alors que `ELEVEN_ASSIST_FIRST/ANIM` sont dans la map

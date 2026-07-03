@@ -85,10 +85,10 @@ describe('QualityGovernor', () => {
   test('ne descend jamais sous le dernier cran', () => {
     const onChange = mock<(t: QualityTier) => void>();
     const g = new QualityGovernor(onChange);
-    // Beaucoup de frames très lentes, largement de quoi épuiser les 4 crans.
-    feed(g, 500, WINDOW + 4 * 30);
+    // Beaucoup de frames très lentes, largement de quoi épuiser les 6 crans.
+    feed(g, 500, WINDOW + 6 * 30);
     const last = g.current();
-    expect(last).toEqual({ dpr: 1.0, trailMax: 12, sporesOn: false });
+    expect(last).toEqual({ dpr: 0.7, trailMax: 8, sporesOn: false });
     // Encore des frames lentes : reste au dernier cran, plus d'onChange.
     const calls = onChange.mock.calls.length;
     feed(g, 500, 30);

@@ -923,6 +923,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           dt,
           () => {
             collisionProcessor?.process(world.eventQueue, gameStateRef.current);
+            // Capture la position post-step pour l'interpolation de rendu
+            // (bornes prev/curr du lerp dans syncToMeshInterpolated).
+            ballPhysicsInst?.noteStepped();
           },
           () => {
             collisionProcessor?.flushPendingPhysics();
@@ -973,6 +976,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           bottomOutDetector,
           triggerBottomOut,
           dt,
+          alpha: physicsWorld?.interpolationAlpha ?? 1,
         });
       }
 

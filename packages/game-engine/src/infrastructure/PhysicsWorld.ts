@@ -84,6 +84,22 @@ export class PhysicsWorld implements IPhysicsWorld {
   }
 
   /**
+   * Fraction du chemin déjà parcourue vers le prochain step physique, pour
+   * interpoler le rendu entre deux états physiques (bille fluide à 120 Hz
+   * alors que la physique reste à 60 steps/s). Purement visuel — ne change
+   * rien à la simulation.
+   */
+  get interpolationAlpha(): number {
+    return PhysicsWorld.interpolationAlphaFor(this.accumulator);
+  }
+
+  /** Logique pure de l'alpha (testable sans WASM) : accumulator/STEP_INTERVAL clampé [0,1]. */
+  static interpolationAlphaFor(accumulator: number): number {
+    const a = accumulator / PhysicsWorld.STEP_INTERVAL;
+    return a < 0 ? 0 : a > 1 ? 1 : a;
+  }
+
+  /**
    * @param dt Temps écoulé depuis la dernière frame en secondes (cappé à 0.05
    *           dans le render loop — protège contre les freezes d'onglet).
    * @param onStep Appelé après CHAQUE world.step() — sert à drainer les events

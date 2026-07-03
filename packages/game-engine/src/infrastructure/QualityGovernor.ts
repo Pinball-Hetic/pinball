@@ -13,6 +13,10 @@ const TIERS: QualityTier[] = [
   { dpr: 1.25, trailMax: 24, sporesOn: true },
   { dpr: 1.0, trailMax: 24, sporesOn: true },
   { dpr: 1.0, trailMax: 12, sporesOn: false },
+  // Crans basse-résolution : sous forte charge le gouverneur descend jusqu'à
+  // dpr 0.7 — quasi indiscernable sur l'écran borne, gros gain fill-rate.
+  { dpr: 0.85, trailMax: 12, sporesOn: false },
+  { dpr: 0.7, trailMax: 8, sporesOn: false },
 ];
 
 const WINDOW = 60; // frames

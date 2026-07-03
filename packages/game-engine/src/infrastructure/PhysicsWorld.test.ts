@@ -45,6 +45,15 @@ test('sub-interval accumulator yields no step', () => {
   expect(remainder).toBeCloseTo(1 / 120, 6);
 });
 
+test('interpolation alpha: fraction of the way to the next step, clamped [0,1]', () => {
+  expect(PhysicsWorld.interpolationAlphaFor(0)).toBe(0);
+  expect(PhysicsWorld.interpolationAlphaFor(STEP / 2)).toBeCloseTo(0.5, 6);
+  expect(PhysicsWorld.interpolationAlphaFor(STEP)).toBe(1);
+  // Hors bornes (backlog résiduel / valeur négative) → clamp, jamais d'extrapolation.
+  expect(PhysicsWorld.interpolationAlphaFor(STEP * 3)).toBe(1);
+  expect(PhysicsWorld.interpolationAlphaFor(-STEP)).toBe(0);
+});
+
 test('caps steps per frame (anti spiral-of-death) on a huge dt spike', () => {
   // 10 s d'un coup (onglet refocus) → borné à 5 steps, pas une avalanche.
   const { steps, remainder } = PhysicsWorld.planSteps(10);
