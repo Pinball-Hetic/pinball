@@ -15,6 +15,7 @@ import {
   dueLateHints,
   advanceHetic,
   ballCenterOnSurface,
+  SCORE_SCOOP,
   handleBossLockedHit,
   handleBossArmed,
   isGameOverDrain,
@@ -69,17 +70,20 @@ export function createModule(): MapModule {
     playMilestoneCinematic(ctx, e.threshold, () => garlands?.rocketBurst())
   }
 
-  function onScoop(ctx: MapContext, e: GameEvent): void {
+  function onScoop(_ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'SCOOP_ENTER') return
-    if (scoop.isActive()) return // déjà en capture — ignore un 2e contact
-    scoop.start()
-    // Récompenses immédiates ; le hold + kick sont pilotés dans update(dt).
-    // L'« animation » = flash score DMD (addScore) + vie (addLife → refresh DMD)
-    // + bannière DMD + juice playfield (shake + décollage garlands).
-    ctx.addScore(e.scoreIncrement, 'SCOOP')
+    // Contact capteur = ARME seulement. La capture (et les récompenses) n'a
+    // lieu que si la bille SE POSE dans la zone (dwell, cf. scoopCapture.ts) —
+    // une bille qui traverse le couloir ressort sans aucun effet.
+    scoop.arm()
+  }
+
+  // Récompenses + juice à l'instant de la capture (phase 'capture', une frame).
+  function grantScoopRewards(ctx: MapContext): void {
+    ctx.addScore(SCORE_SCOOP, 'SCOOP')
     ctx.addLife()
     ctx.forceMultiplier(scoop.config.multiplier, scoop.config.multiplierMs)
-    ctx.pushDmdEvent('SCOOP', e.scoreIncrement)
+    ctx.pushDmdEvent('SCOOP', SCORE_SCOOP)
     ctx.screenShake(0.5)
     garlands?.rocketBurst()
   }
@@ -360,14 +364,24 @@ export function createModule(): MapModule {
         }
       }
 
-      // Scoop : tenir la bille au trou pendant la capture, puis la kicker.
+      // Scoop : dwell (bille posée dans la zone ?) → capture → hold → kick.
       // NOTE: passe par ctx.ball.body (RigidBody brut) — cf. backlog P2
       // "IMapBallPhysics.body expose le body brut" (à remplacer par holdAt/kick).
       const scoopPos = ctx?.layout.sensors.scoop
       if (ctx?.ball && scoopPos) {
-        const phase = scoop.tick(dt * 1000)
-        if (phase === 'hold') {
-          // Physique gelée pendant la capture (shouldFreezePhysics) → il suffit
+        const bp = ctx.ball.body.translation()
+        const bv = ctx.ball.body.linvel()
+        const dx = bp.x - scoopPos.x
+        const dz = bp.z - scoopPos.z
+        const speed = Math.sqrt(bv.x * bv.x + bv.y * bv.y + bv.z * bv.z)
+        const phase = scoop.tick(dt * 1000, {
+          inZone: dx * dx + dz * dz <= scoop.config.captureRadius ** 2,
+          slow: speed <= scoop.config.settleSpeed,
+        })
+        if (phase === 'capture') {
+          grantScoopRewards(ctx)
+        } else if (phase === 'hold') {
+          // Physique gelée pendant le hold (shouldFreezePhysics) → il suffit
           // de centrer la bille dans le trou, au repos. resetStuck en défensif.
           ctx.ball.body.setTranslation({ x: scoopPos.x, y: scoopPos.y, z: scoopPos.z }, true)
           ctx.ball.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
@@ -390,9 +404,10 @@ export function createModule(): MapModule {
       return (
         (transition?.isActive() ?? false) ||
         (bossReveals?.isGameplayFrozen() ?? false) ||
-        // Capture scoop : gel → bille immobile au trou (pas de gravité ni de
+        // Hold scoop : gel → bille immobile au trou (pas de gravité ni de
         // surface-snap/stuck-detector qui lutteraient), jusqu'au kick.
-        scoop.isActive()
+        // (PAS pendant 'armed' : la bille doit pouvoir rouler/se poser.)
+        scoop.isHolding()
       )
     },
     isIntroHolding(): boolean {
