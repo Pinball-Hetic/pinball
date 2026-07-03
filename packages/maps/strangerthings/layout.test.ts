@@ -1,26 +1,29 @@
 import { describe, expect, test } from 'bun:test'
 import { layout } from './layout'
 
-// Régression A3-vecna-respawn : au retour du monde normal (Vecna vaincu /
-// RETURN_PORTAL_TRANSITION_END), la bille était respawnée au CENTRE du terrain
-// (x≈0, z≈-0.12) → injouable. Elle doit revenir dans le couloir plongeur
-// (= spawns.ball), catchable et jouable.
+// Régression retour monde normal (Vecna vaincu / RETURN_PORTAL_TRANSITION_END).
+// Historique des deux bugs successifs :
+//  - v1 : respawn au CENTRE du terrain, sans vitesse → bille injouable.
+//  - v2 (fix A3) : respawn dans le couloir plongeur → EMPRISONNÉE : en
+//    `playing` le plunger ne se charge pas (idle only) et la porte du couloir
+//    est fermée après le lancement initial.
+// Contrat actuel : la bille SORT DU PORTAIL (= sensors.portal) avec une
+// poussée vers les flippers (+z).
 describe('spawns.normalReturn (retour monde normal)', () => {
-  const { normalReturn, ball } = layout.spawns
+  const { normalReturn, normalReturnImpulse } = layout.spawns
   const lane = layout.shooterLane
+  const portal = layout.sensors.portal
 
-  test('atterrit dans le couloir plongeur (X dans [xMin, xMax])', () => {
-    expect(normalReturn.x).toBeGreaterThanOrEqual(lane.xMin)
-    expect(normalReturn.x).toBeLessThanOrEqual(lane.xMax)
+  test('sort du portail (= sensors.portal)', () => {
+    expect(normalReturn.x).toBe(portal.x)
+    expect(normalReturn.z).toBe(portal.z)
   })
 
-  test("n'est PAS au centre du terrain (l'ancien bug)", () => {
-    const centerX = (layout.geometry.bounds.leftX + layout.geometry.bounds.rightX) / 2
-    expect(Math.abs(normalReturn.x - centerX)).toBeGreaterThan(0.1)
+  test("n'atterrit PAS dans le couloir plongeur (bille emprisonnée : porte fermée + plunger idle-only)", () => {
+    expect(normalReturn.x).toBeLessThan(lane.xMin)
   })
 
-  test('reprend la position du spawn couloir plongeur (spawns.ball)', () => {
-    expect(normalReturn.x).toBe(ball.x)
-    expect(normalReturn.z).toBe(ball.z)
+  test('poussée de sortie non nulle vers les flippers (+z), pas de bille morte sur le capteur', () => {
+    expect(normalReturnImpulse.z).toBeGreaterThan(0)
   })
 })

@@ -92,10 +92,13 @@ export const layout: MapLayout = {
     ball: { x: 0.2355, y: 1.01, z: 0.161 },
     alternateWorld: { x: -0.0225, z: -0.48 },
     alternateWorldImpulse: { x: 0, y: 0, z: 0.055 },
-    // Retour monde normal → couloir plongeur (= spawns.ball), catchable/jouable.
-    // Anciennement { x: -0.0225, z: -0.12 } = centre du terrain → bille injouable.
-    normalReturn: { x: 0.2355, z: 0.161 },
-    normalReturnImpulse: { x: 0, y: 0, z: 0 },
+    // Retour monde normal → la bille SORT DU PORTAIL (= sensors.portal) avec
+    // une poussée vers les flippers. Pas le couloir plongeur : en `playing` le
+    // plunger ne se charge pas (idle only) et la porte du couloir est fermée
+    // → bille emprisonnée. Pas de re-trigger : le portail est refermé après le
+    // cycle (portalOpen=false tant qu'un boss ne le rouvre pas).
+    normalReturn: { x: -0.000751, z: -0.064818 },
+    normalReturnImpulse: { x: 0, y: 0, z: 0.055 },
   },
   // Couloir plongeur : géométrie analytique (pas de mesh). Littéraux map.
   shooterLane: {
