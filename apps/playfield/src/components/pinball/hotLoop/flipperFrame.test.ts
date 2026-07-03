@@ -1,9 +1,13 @@
 import { test, expect, describe } from "bun:test";
-import { SWING_RAD } from "@pinball/game-engine";
+import * as THREE from "three";
+import type RAPIER from "@dimforge/rapier3d-compat";
+import { SWING_RAD, PhysicsWorld, type FlipperPivot } from "@pinball/game-engine";
 import {
   computeSwingStep,
   decayFlash,
   createFlipperFrameState,
+  stepFlipperPhysics,
+  type FlipperPhysicsDeps,
 } from "./flipperFrame";
 
 describe("computeSwingStep", () => {
@@ -49,10 +53,99 @@ describe("createFlipperFrameState", () => {
     expect(s).toEqual({
       leftSwing: 0,
       rightSwing: 0,
-      prevLeftSwing: 0,
-      prevRightSwing: 0,
+      physLeftSwing: 0,
+      physRightSwing: 0,
+      physPrevLeft: 0,
+      physPrevRight: 0,
       leftFlash: 0,
       rightFlash: 0,
     });
+  });
+});
+
+// ── stepFlipperPhysics ───────────────────────────────────────────────────────
+
+const STEP = PhysicsWorld.STEP_INTERVAL;
+
+function makeBodyStub() {
+  const calls = { translations: 0, rotations: 0 };
+  const body = {
+    setNextKinematicTranslation: () => { calls.translations += 1; },
+    setNextKinematicRotation: () => { calls.rotations += 1; },
+  };
+  return { body: body as unknown as RAPIER.RigidBody, calls };
+}
+
+function makePivot(side: "left" | "right"): FlipperPivot {
+  const pivot = new THREE.Group();
+  const mesh = new THREE.Object3D();
+  pivot.add(mesh);
+  return { pivot, mesh, side, axis: "y" };
+}
+
+function makeDeps(overrides: Partial<FlipperPhysicsDeps> = {}): FlipperPhysicsDeps {
+  return {
+    input: { leftTarget: 0, rightTarget: 0 },
+    leftPivot: null,
+    rightPivot: null,
+    leftObj: null,
+    rightObj: null,
+    leftBody: null,
+    rightBody: null,
+    leftOffset: new THREE.Vector3(),
+    rightOffset: new THREE.Vector3(),
+    ...overrides,
+  };
+}
+
+describe("stepFlipperPhysics", () => {
+  test("le phys-swing converge vers SWING_RAD quand target=1", () => {
+    const s = createFlipperFrameState();
+    const d = makeDeps({ input: { leftTarget: 1, rightTarget: 0 } });
+    for (let i = 0; i < 200; i++) stepFlipperPhysics(s, d, STEP);
+    expect(s.physLeftSwing).toBeCloseTo(SWING_RAD, 3);
+    expect(s.physRightSwing).toBe(0);
+  });
+
+  test("physPrev mémorise le step précédent → delta/stepDt = angVel > 0 en montée", () => {
+    const s = createFlipperFrameState();
+    const d = makeDeps({ input: { leftTarget: 1, rightTarget: 1 } });
+    stepFlipperPhysics(s, d, STEP);
+    const afterOne = s.physLeftSwing;
+    expect(s.physPrevLeft).toBe(0);
+    stepFlipperPhysics(s, d, STEP);
+    expect(s.physPrevLeft).toBe(afterOne);
+    expect((s.physLeftSwing - s.physPrevLeft) / STEP).toBeGreaterThan(0);
+    // Cohérence avec l'intégrateur partagé (même modèle que le visuel).
+    expect(s.physLeftSwing).toBeCloseTo(computeSwingStep(afterOne, 1, STEP), 10);
+  });
+
+  test("ne touche pas au swing visuel ni aux flashes", () => {
+    const s = createFlipperFrameState();
+    s.leftSwing = 0.1;
+    s.rightSwing = 0.2;
+    s.leftFlash = 0.05;
+    const d = makeDeps({ input: { leftTarget: 1, rightTarget: 1 } });
+    stepFlipperPhysics(s, d, STEP);
+    expect(s.leftSwing).toBe(0.1);
+    expect(s.rightSwing).toBe(0.2);
+    expect(s.leftFlash).toBe(0.05);
+  });
+
+  test("pose le pivot et pousse UNE cible kinématique par appel (par step)", () => {
+    const s = createFlipperFrameState();
+    const left = makePivot("left");
+    const stub = makeBodyStub();
+    const d = makeDeps({
+      input: { leftTarget: 1, rightTarget: 0 },
+      leftPivot: left,
+      leftObj: left.mesh,
+      leftBody: stub.body,
+    });
+    stepFlipperPhysics(s, d, STEP);
+    stepFlipperPhysics(s, d, STEP);
+    expect(stub.calls.translations).toBe(2);
+    expect(stub.calls.rotations).toBe(2);
+    expect(left.pivot.rotation.y).toBeCloseTo(s.physLeftSwing, 10);
   });
 });

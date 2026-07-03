@@ -16,14 +16,25 @@ import {
 } from "@pinball/game-engine";
 import type { InputState } from "../createApplyAction";
 
-// Accumulateurs de frame des flippers (swing lissé + hit-flash), partagés entre
-// le pas cinématique et le pas d'assistance de lancement. Un seul objet possédé
-// par la closure d'init — remplace 6 `let` éparpillés.
+// Accumulateurs des flippers, partagés entre le pas physique (par step Rapier),
+// le pas visuel (par frame de rendu) et l'assistance de lancement.
+//
+// Deux intégrateurs distincts sur le MÊME modèle (computeSwingStep, même cible) :
+// - phys* avance à STEP_INTERVAL dans onBeforeStep → les corps kinématiques
+//   balayent un arc constant par step (anti-tunneling, cf. PhysicsUpdateHooks) ;
+// - leftSwing/rightSwing avance au dt de rendu → pose Three affichée fluide au
+//   refresh rate. Divergence bornée (convergence exponentielle vers la même
+//   cible) : l'écart visuel/physique reste imperceptible.
 export interface FlipperFrameState {
+  /** Swing VISUEL (rendu), radians. */
   leftSwing: number;
   rightSwing: number;
-  prevLeftSwing: number;
-  prevRightSwing: number;
+  /** Swing PHYSIQUE (par step), radians — source des cibles kinématiques. */
+  physLeftSwing: number;
+  physRightSwing: number;
+  /** Swing physique du step précédent — sert à l'angVel vue par la physique. */
+  physPrevLeft: number;
+  physPrevRight: number;
   leftFlash: number;
   rightFlash: number;
 }
@@ -32,8 +43,10 @@ export function createFlipperFrameState(): FlipperFrameState {
   return {
     leftSwing: 0,
     rightSwing: 0,
-    prevLeftSwing: 0,
-    prevRightSwing: 0,
+    physLeftSwing: 0,
+    physRightSwing: 0,
+    physPrevLeft: 0,
+    physPrevRight: 0,
     leftFlash: 0,
     rightFlash: 0,
   };
@@ -52,7 +65,7 @@ export function decayFlash(flash: number, dt: number): number {
   return flash > 0 ? Math.max(0, flash - dt) : flash;
 }
 
-export interface FlipperKinematicsDeps {
+export interface FlipperPhysicsDeps {
   input: Pick<InputState, "leftTarget" | "rightTarget">;
   leftPivot: FlipperPivot | null;
   rightPivot: FlipperPivot | null;
@@ -62,29 +75,57 @@ export interface FlipperKinematicsDeps {
   rightBody: RAPIER.RigidBody | null;
   leftOffset: THREE.Vector3;
   rightOffset: THREE.Vector3;
+}
+
+// Pas PHYSIQUE flippers, appelé dans onBeforeStep AVANT chaque world.step()
+// avec stepDt = PhysicsWorld.STEP_INTERVAL : avance le phys-swing, pose le
+// pivot Three (transform monde = source de la cible kinématique) puis pousse
+// la cible au corps Rapier. Une cible par step → arc balayé constant, quel que
+// soit le refresh rate (anti-tunneling, cf. PhysicsUpdateHooks).
+// applyFlipperSwing fait un rotation.set absolu (pas d'accumulation) : le rendu
+// peut réappliquer le swing visuel après les steps sans corrompre la physique.
+export function stepFlipperPhysics(
+  s: FlipperFrameState,
+  d: FlipperPhysicsDeps,
+  stepDt: number,
+): void {
+  s.physPrevLeft = s.physLeftSwing;
+  s.physPrevRight = s.physRightSwing;
+  s.physLeftSwing = computeSwingStep(s.physLeftSwing, d.input.leftTarget, stepDt);
+  s.physRightSwing = computeSwingStep(s.physRightSwing, d.input.rightTarget, stepDt);
+  if (d.leftPivot) applyFlipperSwing(d.leftPivot, s.physLeftSwing);
+  if (d.rightPivot) applyFlipperSwing(d.rightPivot, s.physRightSwing);
+
+  syncFlipperBody(d.leftBody, d.leftObj, d.leftOffset);
+  syncFlipperBody(d.rightBody, d.rightObj, d.rightOffset);
+}
+
+export interface FlipperKinematicsDeps {
+  input: Pick<InputState, "leftTarget" | "rightTarget">;
+  leftPivot: FlipperPivot | null;
+  rightPivot: FlipperPivot | null;
+  leftObj: THREE.Object3D | null;
+  rightObj: THREE.Object3D | null;
+  leftOffset: THREE.Vector3;
+  rightOffset: THREE.Vector3;
   leftFlashMats: FlashMat[];
   rightFlashMats: FlashMat[];
   leftDebug: THREE.Mesh | null;
   rightDebug: THREE.Mesh | null;
 }
 
-// Pas cinématique flippers : swing lissé Three.js → corps Rapier, décroissance +
-// application du hit-flash, alignement des wireframes debug. Args live/frame.
-// Ordre préservé 1:1.
+// Pas VISUEL flippers (rendu, après les steps physiques) : swing lissé Three.js,
+// décroissance + application du hit-flash, alignement des wireframes debug.
+// Ne touche PLUS aux corps Rapier — pilotés par stepFlipperPhysics (par step).
 export function stepFlipperKinematics(
   s: FlipperFrameState,
   d: FlipperKinematicsDeps,
   dt: number,
 ): void {
-  s.prevLeftSwing = s.leftSwing;
-  s.prevRightSwing = s.rightSwing;
   s.leftSwing = computeSwingStep(s.leftSwing, d.input.leftTarget, dt);
   s.rightSwing = computeSwingStep(s.rightSwing, d.input.rightTarget, dt);
   if (d.leftPivot) applyFlipperSwing(d.leftPivot, s.leftSwing);
   if (d.rightPivot) applyFlipperSwing(d.rightPivot, s.rightSwing);
-
-  syncFlipperBody(d.leftBody, d.leftObj, d.leftOffset);
-  syncFlipperBody(d.rightBody, d.rightObj, d.rightOffset);
 
   s.leftFlash = decayFlash(s.leftFlash, dt);
   s.rightFlash = decayFlash(s.rightFlash, dt);
@@ -105,16 +146,18 @@ export function stepFlipperKinematics(
 
 // Assistance de lancement : si la balle est dans la zone d'un flipper qui monte,
 // garantit une vitesse de sortie (helper pur game-engine) + déclenche le
-// hit-flash. Appelé seulement en jeu, hors gel. Args live/frame.
+// hit-flash. Appelé seulement en jeu, hors gel. L'angVel vient des deltas
+// PHYSIQUES par step (stepDt = STEP_INTERVAL) — c'est la vitesse de flipper que
+// Rapier voit réellement, pas celle du swing visuel au refresh rate.
 export function stepFlipperAssist(
   s: FlipperFrameState,
   ball: BallPhysics,
   zones: FlipperZones,
-  dt: number,
+  stepDt: number,
 ): void {
   const pos = ball.body.translation();
-  const angVelL = (s.leftSwing - s.prevLeftSwing) / dt;
-  const angVelR = (s.rightSwing - s.prevRightSwing) / dt;
+  const angVelL = (s.physLeftSwing - s.physPrevLeft) / stepDt;
+  const angVelR = (s.physRightSwing - s.physPrevRight) / stepDt;
 
   const leftAssist = computeFlipperLaunchAssist({
     pos,

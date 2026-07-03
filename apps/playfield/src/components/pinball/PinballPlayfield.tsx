@@ -84,6 +84,7 @@ import { setupFlippers, type FlipperSetupResult } from "./physics/setupFlippers"
 import { stepBallSync } from "./hotLoop/stepBallSync";
 import {
   createFlipperFrameState,
+  stepFlipperPhysics,
   stepFlipperKinematics,
   stepFlipperAssist,
 } from "./hotLoop/flipperFrame";
@@ -898,16 +899,52 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // hotLoop/bossIntroHold.ts.
       stepBossIntroHold(bossIntroHold, bossIntroActive, ballPhysicsInst, inputState);
 
+      if (physicsWorld && !freezeFrame) {
+        const world = physicsWorld;
+        world.update(dt, {
+          onBeforeStep: () => {
+            // ── Flipper physique : cibles kinématiques posées PAR STEP ──────
+            // Avancer le swing au rythme du rendu faisait balayer un arc
+            // double par step à 120 Hz → le hull sautait par-dessus la bille
+            // (tunneling, pas de CCD sur les kinématiques). Ici : un pas de
+            // swing par world.step(), stepDt fixe → arc constant.
+            if (flipperSetup && flipperRig) {
+              stepFlipperPhysics(flipperFrame, {
+                input: inputState,
+                leftPivot: flipperSetup.leftPivot,
+                rightPivot: flipperSetup.rightPivot,
+                leftObj: flipperSetup.leftObj,
+                rightObj: flipperSetup.rightObj,
+                leftBody: flipperRig.left.body,
+                rightBody: flipperRig.right.body,
+                leftOffset: flipperRig.left.offset,
+                rightOffset: flipperRig.right.offset,
+              }, PhysicsWorld.STEP_INTERVAL);
+            }
+          },
+          onStep: () => {
+            collisionProcessor?.process(world.eventQueue, gameStateRef.current);
+            // Capture la position post-step pour l'interpolation de rendu
+            // (bornes prev/curr du lerp dans syncToMeshInterpolated).
+            ballPhysicsInst?.noteStepped();
+          },
+          onAfterSteps: () => {
+            collisionProcessor?.flushPendingPhysics();
+          },
+        });
+      }
+
       if (!freezeFrame && flipperSetup && flipperRig) {
-        // ── Flipper cinématique : Three.js → Rapier (hotLoop/flipperFrame) ────
+        // ── Flipper visuel (hotLoop/flipperFrame) — APRÈS les steps : la pose
+        // Three affichée suit le swing lissé au refresh rate ; au prochain step
+        // physique, stepFlipperPhysics repose le pivot depuis le phys-swing
+        // (applyFlipperSwing = rotation.set absolu, pas d'accumulation).
         stepFlipperKinematics(flipperFrame, {
           input: inputState,
           leftPivot: flipperSetup.leftPivot,
           rightPivot: flipperSetup.rightPivot,
           leftObj: flipperSetup.leftObj,
           rightObj: flipperSetup.rightObj,
-          leftBody: flipperRig.left.body,
-          rightBody: flipperRig.right.body,
           leftOffset: flipperRig.left.offset,
           rightOffset: flipperRig.right.offset,
           leftFlashMats: flipperSetup.leftFlashMats,
@@ -917,30 +954,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         }, dt);
       }
 
-      if (physicsWorld && !freezeFrame) {
-        const world = physicsWorld;
-        world.update(
-          dt,
-          () => {
-            collisionProcessor?.process(world.eventQueue, gameStateRef.current);
-            // Capture la position post-step pour l'interpolation de rendu
-            // (bornes prev/curr du lerp dans syncToMeshInterpolated).
-            ballPhysicsInst?.noteStepped();
-          },
-          () => {
-            collisionProcessor?.flushPendingPhysics();
-          },
-        );
-      }
-
       if (
         !freezeFrame
         && ballPhysicsInst
         && gameStateRef.current === 'playing'
         && flipperSetup?.zones
       ) {
-        // Assistance de lancement (hotLoop/flipperFrame).
-        stepFlipperAssist(flipperFrame, ballPhysicsInst, flipperSetup.zones, dt);
+        // Assistance de lancement (hotLoop/flipperFrame). angVel dérivée des
+        // deltas physiques par step → stepDt fixe, pas le dt de rendu.
+        stepFlipperAssist(flipperFrame, ballPhysicsInst, flipperSetup.zones, PhysicsWorld.STEP_INTERVAL);
       }
 
       if (ballPhysicsInst && !freezeFrame) {

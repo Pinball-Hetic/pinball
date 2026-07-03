@@ -1,6 +1,28 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { IPhysicsWorld } from '../domain/IPhysicsWorld';
 
+/** Hooks du cycle de steps physiques d'une frame (cf. PhysicsWorld.update). */
+export interface PhysicsUpdateHooks {
+  /**
+   * Appelé AVANT chaque world.step(). C'est là que les cibles des corps
+   * cinématiques (flippers) doivent être posées : Rapier infère la vitesse
+   * d'un kinématique de l'écart cible/pose au moment du step. Poser la cible
+   * au rythme du RENDU faisait balayer au flipper un arc double par step à
+   * 120 Hz (tunneling — Rapier ne CCD pas le mouvement des kinématiques) et
+   * un arc nul un step sur deux à 60 Hz. Une cible par step = arc constant.
+   */
+  onBeforeStep?: () => void;
+  /**
+   * Appelé après CHAQUE world.step() — sert à drainer les events de collision
+   * par step. Indispensable avec le multi-step : Rapier ne conserve pas les
+   * events d'un step à l'autre, drainer une seule fois par frame perdrait les
+   * collisions des steps intermédiaires.
+   */
+  onStep?: () => void;
+  /** Appelé une fois par frame, après tous les steps (0 inclus). */
+  onAfterSteps?: () => void;
+}
+
 
 export class PhysicsWorld implements IPhysicsWorld {
   public readonly world: RAPIER.World;
@@ -29,7 +51,7 @@ export class PhysicsWorld implements IPhysicsWorld {
    *   spiraler. Avec dt cappé à 0.05 dans le render loop, une frame normale ne
    *   demande jamais plus de 3 steps.
    */
-  private static readonly STEP_INTERVAL = 1 / 60;
+  public static readonly STEP_INTERVAL = 1 / 60;
   private static readonly SIM_TIMESTEP  = 1 / 98;
   private static readonly MAX_STEPS_PER_FRAME = 5;
   private accumulator = 0;
@@ -102,16 +124,16 @@ export class PhysicsWorld implements IPhysicsWorld {
   /**
    * @param dt Temps écoulé depuis la dernière frame en secondes (cappé à 0.05
    *           dans le render loop — protège contre les freezes d'onglet).
-   * @param onStep Appelé après CHAQUE world.step() — sert à drainer les events
-   *           de collision par step. Indispensable avec le multi-step : Rapier
-   *           ne conserve pas les events d'un step à l'autre, drainer une seule
-   *           fois par frame perdrait les collisions des steps intermédiaires.
+   * @param hooks Cycle par step : onBeforeStep (cibles kinématiques) →
+   *           world.step() → onStep (drain des events), puis onAfterSteps une
+   *           fois la frame drainée. Cf. PhysicsUpdateHooks pour le POURQUOI.
    */
-  update(dt: number, onStep?: () => void, onAfterSteps?: () => void): void {
+  update(dt: number, hooks?: PhysicsUpdateHooks): void {
     this.accumulator += dt * this.timeScale;
     const { steps, remainder } = PhysicsWorld.planSteps(this.accumulator);
     this.accumulator = remainder;
     for (let i = 0; i < steps; i += 1) {
+      hooks?.onBeforeStep?.();
       try {
         this.world.step(this.eventQueue);
       } catch (e) {
@@ -122,8 +144,8 @@ export class PhysicsWorld implements IPhysicsWorld {
         console.error('[Rapier] world.step() panic — physics halted:', e);
         return;
       }
-      onStep?.();
+      hooks?.onStep?.();
     }
-    onAfterSteps?.();
+    hooks?.onAfterSteps?.();
   }
 }

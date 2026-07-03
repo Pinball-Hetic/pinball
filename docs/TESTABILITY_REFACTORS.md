@@ -1,5 +1,17 @@
 # Backlog refacto — testabilité & clean architecture
 
+> ## 🔎 Smells repérés en passant (flippers steppés par pas physique, 2026-07-03, sub-agent)
+> - **P2** code mort — `game-engine/src/use-cases/DetectFlipperHit.ts` = commentaire + `export {}`,
+>   zéro référence (même en tests) ; son commentaire décrit une archi disparue (joint revolute) et
+>   CLAUDE.md le documente encore comme vivant → supprimer + purger CLAUDE.md.
+> - **P2** même classe de bug que les flippers — le **plunger** kinématique
+>   (`PinballPlayfield.tsx:~986`, `setNextKinematicTranslation`) est posé au rythme du RENDU, hors
+>   `onBeforeStep` → risque tunneling au release rapide à 120 Hz. Candidat follow-up direct du fix flippers.
+> - **P3** alloc hot path — `FlipperHullBody.flipperWorldTransform` alloue Vector3/Quaternion+clone
+>   par appel, 2×/step. · **P3** ISP/DIP — `IPhysicsWorld` anémique, playfield dépend du concret.
+> - **P3** panique Rapier — `PhysicsWorld.update` saute `onAfterSteps` sur panic (flush jamais appelé,
+>   monde mort de toute façon). · **P3** duplication littéraux deps flippers entre les 2 call-sites.
+>
 > ## 🔎 Smells repérés en passant (interpolation rendu bille, 2026-07-03, sub-agent)
 > - **P2** fail-fast — `PhysicsWorld.update()` (:94-112) ne garde pas sur `this.crashed` : après
 >   panique WASM, chaque frame re-tente `world.step()` (spam console + coût throw). Early-return.
