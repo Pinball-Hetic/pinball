@@ -17,8 +17,7 @@ export class BossFightManager {
   private readonly byId = new Map<BossId, BossDefinition>();
   private readonly byRole = new Map<string, BossDefinition>();
 
-  // Définitions de boss injectées par la map (layout.bosses) — le moteur ne
-  // connaît plus de boss en dur.
+ 
   constructor(
     private readonly emit: GameEventListener,
     private readonly bosses: BossDefinition[],
@@ -58,15 +57,11 @@ export class BossFightManager {
     state.sensor.beginFight(targetArmed);
   }
 
-  /** True si le combat du boss est déclenché (reveal consommé, nid « ouvert »). */
   isTriggered(id: BossId): boolean {
     return this.states.get(id)?.triggered ?? false;
   }
 
-  /** True if any boss OTHER than `except` is currently in an active (scoreable)
-   *  fight. Used to keep at most one boss armed at a time — the boss target
-   *  sensors physically overlap, so two simultaneously-armed bosses would let a
-   *  single ball pass double-credit hits. */
+
   private anyOtherFightActive(except: BossId): boolean {
     for (const [id, state] of this.states) {
       if (id !== except && state.sensor.fightActive) return true;
@@ -80,7 +75,7 @@ export class BossFightManager {
     if (!def || !state) return;
     if (context.gameState !== 'playing') return;
     if (state.triggered) return;
-    // One boss fight at a time — don't reveal while another is still active.
+    
     if (this.anyOtherFightActive(id)) return;
     if (!bossThresholdMet(def, context)) return;
 
