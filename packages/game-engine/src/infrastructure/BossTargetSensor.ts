@@ -49,25 +49,37 @@ export class BossTargetSensor {
       hitCooldownMs?: number;
     },
   ): void {
-    const cooldown = options.hitCooldownMs ?? DEFAULT_HIT_COOLDOWN_MS;
-    if (started) {
-      this.ballInside = true;
-      if (gameState !== 'playing' || !this.fightActive || !this.targetArmed) return;
-      if (this.latchIgnore) return;
-
-      const now = performance.now();
-      if (now - this.lastHitMs < cooldown) return;
-      this.lastHitMs = now;
-      this.hits += 1;
-      options.onHit(this.hits);
-      if (this.hits >= options.maxHits) {
-        this.fightActive = false;
-        this.targetArmed = false;
-      }
+    // Sortie de balle : on nettoie l'état et on s'arrête.
+    if (!started) {
+      this.ballInside = false;
+      this.latchIgnore = false;
       return;
     }
 
-    this.ballInside = false;
-    this.latchIgnore = false;
+    // Entrée de balle : on valide les conditions, puis on délègue le comptage.
+    this.ballInside = true;
+    if (gameState !== 'playing' || !this.fightActive || !this.targetArmed) return;
+    if (this.latchIgnore) return;
+
+    this.registerHit(options);
+  }
+
+  private registerHit(options: {
+    maxHits: number;
+    onHit: (hitCount: number) => void;
+    hitCooldownMs?: number;
+  }): void {
+    const cooldown = options.hitCooldownMs ?? DEFAULT_HIT_COOLDOWN_MS;
+    const now = performance.now();
+    if (now - this.lastHitMs < cooldown) return;
+
+    this.lastHitMs = now;
+    this.hits += 1;
+    options.onHit(this.hits);
+
+    if (this.hits >= options.maxHits) {
+      this.fightActive = false;
+      this.targetArmed = false;
+    }
   }
 }
