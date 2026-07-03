@@ -119,6 +119,56 @@ export class BossFightManager {
     }
   }
 
+  /**
+   * DEBUG (/debug) : reveal par le VRAI chemin d'état — beginFight + emit,
+   * comme tryReveal, mais sans le gate de seuil de score. Garde les autres
+   * invariants (playing, pas déjà déclenché, un seul combat à la fois) : le
+   * boss apparaît ARMÉ et ses colliders créditent réellement les billes,
+   * contrairement à un event BOSS_REVEAL brut (visuels seuls, boss fantôme).
+   */
+  forceReveal(id: BossId, gameState: string): void {
+    const def = this.byId.get(id);
+    const state = this.states.get(id);
+    if (!def || !state) return;
+    if (gameState !== 'playing') return;
+    if (state.triggered) return;
+    if (this.anyOtherFightActive(id)) return;
+
+    this.beginFight(id, false);
+    this.emit({
+      type: 'BOSS_REVEAL',
+      bossId: id,
+      scoreIncrement: def.reveal.scoreIncrement,
+    });
+  }
+
+  /**
+   * DEBUG (/debug) : crédite UN hit par le vrai sensor (compteur réel,
+   * cooldown ignoré — bouton, pas rebond physique). Le boss meurt donc
+   * réellement après targetHits clics, états/resets cohérents.
+   */
+  forceTargetHit(id: BossId, gameState: string): void {
+    const def = this.byId.get(id);
+    const sensor = this.states.get(id)?.sensor;
+    if (!def || !sensor) return;
+    const opts = {
+      maxHits: def.targetHits,
+      hitCooldownMs: 0,
+      onHit: (hitCount: number) => {
+        this.emit({
+          type: 'BOSS_TARGET_HIT',
+          bossId: def.id,
+          hitCount,
+          scoreIncrement: def.scoreTargetHit,
+        });
+      },
+    };
+    // Simule un passage complet de bille : contact puis sortie (le sensor
+    // exige la fin de contact avant de recompter).
+    sensor.handleCollision(true, gameState, opts);
+    sensor.handleCollision(false, gameState, opts);
+  }
+
   handleTargetCollision(role: string, started: boolean, gameState: string): boolean {
     const def = this.byRole.get(role);
     if (!def) return false;

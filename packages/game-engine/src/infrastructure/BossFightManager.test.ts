@@ -211,3 +211,46 @@ test('sensor factory is injectable: one sensor built per boss, wired to the cloc
     { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 2, scoreIncrement: 250 },
   ]);
 });
+
+// ── Triggers debug (/debug) : vrai chemin d'état, pas d'event fantôme ────────
+
+test('forceReveal: arme le VRAI combat (isTriggered) + émet BOSS_REVEAL, sans gate de seuil', () => {
+  const events: GameEvent[] = [];
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 0);
+  // Aucun score marqué (seuil 3000 PAS atteint) → tryReveal refuserait.
+  mgr.forceReveal('boss_a', 'playing');
+  expect(mgr.isTriggered('boss_a')).toBe(true);
+  expect(events).toEqual([
+    { type: 'BOSS_REVEAL', bossId: 'boss_a', scoreIncrement: 150 },
+  ]);
+});
+
+test('forceReveal: garde les invariants — pas hors jeu, pas de double reveal', () => {
+  const events: GameEvent[] = [];
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 0);
+  mgr.forceReveal('boss_a', 'game_over');
+  expect(mgr.isTriggered('boss_a')).toBe(false);
+  mgr.forceReveal('boss_a', 'playing');
+  mgr.forceReveal('boss_a', 'playing'); // no-op
+  expect(events.filter((e) => e.type === 'BOSS_REVEAL')).toHaveLength(1);
+});
+
+test('forceTargetHit: crédite le vrai compteur (cooldown ignoré) → défaite réelle à maxHits', () => {
+  const events: GameEvent[] = [];
+  // Horloge FIGÉE : le cooldown 450ms bloquerait des hits répétés — forceTargetHit doit passer outre.
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 1000);
+  mgr.forceReveal('boss_a', 'playing');
+  mgr.setTargetArmed('boss_a', true); // le module arme la cible après l'anim de reveal
+  for (let i = 0; i < 5; i++) mgr.forceTargetHit('boss_a', 'playing');
+  const hits = events.filter((e) => e.type === 'BOSS_TARGET_HIT');
+  expect(hits).toHaveLength(5);
+  expect(hits[4]).toMatchObject({ hitCount: 5 });
+});
+
+test('forceTargetHit: sans cible armée (anim de reveal pas finie) → aucun crédit', () => {
+  const events: GameEvent[] = [];
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 1000);
+  mgr.forceReveal('boss_a', 'playing'); // beginFight(targetArmed=false)
+  mgr.forceTargetHit('boss_a', 'playing');
+  expect(events.filter((e) => e.type === 'BOSS_TARGET_HIT')).toHaveLength(0);
+});

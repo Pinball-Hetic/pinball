@@ -109,6 +109,16 @@ export class CollisionEventProcessor {
     });
   }
 
+  /** DEBUG (/debug) : reveal par le vrai chemin d'état (boss armé, pas fantôme). */
+  debugRevealBoss(id: BossId, gameState: string): void {
+    this.bossFights.forceReveal(id, gameState);
+  }
+
+  /** DEBUG (/debug) : crédite un hit par le vrai sensor (compteur/défaite réels). */
+  debugBossTargetHit(id: BossId, gameState: string): void {
+    this.bossFights.forceTargetHit(id, gameState);
+  }
+
   constructor(
     private readonly layout: MapLayout,
     private readonly colliderMap: Map<number, string>,

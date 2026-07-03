@@ -813,6 +813,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           applyAction,
           emit: (e) => emit(e),
           mapBosses,
+          getCollisionProcessor: () => collisionProcessor,
+          getGameState: () => gameStateRef.current,
         });
 
         const dispatchButton = createDispatchButton({
