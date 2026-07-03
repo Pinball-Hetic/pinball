@@ -2,6 +2,7 @@ import type * as THREE from 'three';
 import { type BossId } from '../domain/BossRegistry';
 import type { GameEvent } from '../domain/GameEvents';
 import type { BossRevealController } from './BossRevealController';
+import { prewarmPointLightProgramVariants } from './SkinnedModelWarmup';
 
 export class BossRevealOrchestrator {
   private readonly reveals = new Map<BossId, BossRevealController>();
@@ -25,6 +26,21 @@ export class BossRevealOrchestrator {
         reveal.preload(renderer, scene, camera).catch(() => undefined),
       ),
     );
+
+    // Variantes d'éclairage : tout compte de PointLights jamais rencontré
+    // déclenche une recompilation de TOUS les matériaux éclairés à la frame du
+    // reveal (freeze). On pré-compile 0..max+1 — le +1 absorbe une lumière
+    // dynamique concurrente hors reveal (ex. cœur de portail actif pendant un
+    // combat).
+    const maxLights = Math.max(
+      0,
+      ...[...this.reveals.values()].map((r) => r.dynamicPointLightCount?.() ?? 0),
+    );
+    if (maxLights > 0) {
+      await prewarmPointLightProgramVariants(renderer, scene, camera, maxLights + 1).catch(
+        () => undefined,
+      );
+    }
   }
 
   onGameEvent(event: GameEvent): void {

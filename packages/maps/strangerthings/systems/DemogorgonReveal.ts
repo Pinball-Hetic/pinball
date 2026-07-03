@@ -136,6 +136,14 @@ export class DemogorgonReveal implements BossRevealController {
     if (sprite) await renderer.compileAsync(sprite, camera, scene);
   }
 
+  // PointLights ajoutées dynamiquement pendant le combat : flash strobe +
+  // glow du Demogorgon + lumière de la cible + flash assist Eleven. Chaque
+  // compte jamais vu recompilerait tous les shaders éclairés à la frame du
+  // reveal — le preloadAll pré-compile ces variantes (cf. orchestrator).
+  dynamicPointLightCount(): number {
+    return 4;
+  }
+
   setup(config: DemogorgonSetup): void {
     this.dispose();
     this.camera = config.camera;

@@ -1,5 +1,16 @@
 # Backlog refacto — testabilité & clean architecture
 
+> ## 🔎 Smells repérés en passant (perf reveal boss, 2026-07-03, sub-agent)
+> - **P2** dup cross-map — `GanondorfReveal:224-338` vs `DemogorgonReveal:362-529` :
+>   buildTargetMesh/initTargetPulse/updateVictoryAnim/resetTargetMaterials/beginRestore quasi
+>   verbatim (~150 L, hex magiques inline) ; idem Vecna vs DarkLink. Candidat composition
+>   game-engine (même traitement que WalkBossTargetActor).
+> - **P3** contrats `preload()` asymétriques entre reveals (Demogorgon compilait target+sprite,
+>   Vecna/DarkLink rien au-delà du visuel) — masqué par le prewarm k=0, à uniformiser (base-controller).
+> - **P3** règle repo — `setCinematicClip` re-rend tout PinballPlayfield à l'instant du reveal
+>   (contenu par les refs, mais en tension avec « pas de re-render playfield ») → portal/état
+>   local à CinematicOverlay.
+>
 > ## 🔎 Smells repérés en passant (flippers steppés par pas physique, 2026-07-03, sub-agent)
 > - **P2** code mort — `game-engine/src/use-cases/DetectFlipperHit.ts` = commentaire + `export {}`,
 >   zéro référence (même en tests) ; son commentaire décrit une archi disparue (joint revolute) et

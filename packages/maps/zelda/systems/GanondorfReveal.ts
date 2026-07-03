@@ -83,6 +83,13 @@ export class GanondorfReveal implements BossRevealController {
     if (this.targetGroup) await renderer.compileAsync(this.targetGroup, camera, scene);
   }
 
+  // PointLights ajoutées dynamiquement pendant le combat : flash strobe +
+  // glow de Ganondorf + lumière de la cible. Sert au prewarm des variantes de
+  // shaders au preload (cf. BossRevealOrchestrator.preloadAll).
+  dynamicPointLightCount(): number {
+    return 3;
+  }
+
   setup(config: GanondorfSetup): void {
     this.dispose();
     this.camera = config.camera;

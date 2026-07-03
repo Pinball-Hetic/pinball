@@ -48,6 +48,9 @@ export const manifest: MapManifest = {
     mapAsset('playfield/demogorgon.glb'),
     mapAsset('playfield/demogorgon.png'),
     mapAsset('playfield/fin_combat_vecna.png'),
+    // GLB Vecna (~28 Mo) : le fetch démarre dès la page (link rel=preload) au
+    // lieu d'attendre le mount du module — sinon il rallonge le preload boss.
+    mapAsset('playfield/vecna.glb'),
   ],
   // Sons d'event de la map (joués via ctx.playSound(id)).
   sounds: {

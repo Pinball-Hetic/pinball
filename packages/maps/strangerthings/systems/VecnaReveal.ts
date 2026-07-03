@@ -62,6 +62,13 @@ export class VecnaReveal implements BossRevealController {
     await this.vecnaVisual.warmup(renderer, scene, camera);
   }
 
+  // PointLights ajoutées dynamiquement pendant le combat : flash strobe +
+  // glow de Vecna + lumière de la cible. Sert au prewarm des variantes de
+  // shaders au preload (cf. BossRevealOrchestrator.preloadAll).
+  dynamicPointLightCount(): number {
+    return 3;
+  }
+
   setup(config: VecnaSetup): void {
     this.dispose();
     this.garlandLights = config.garlandLights;

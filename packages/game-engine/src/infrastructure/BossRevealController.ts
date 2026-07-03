@@ -10,6 +10,13 @@ export interface BossRevealController {
     camera: THREE.Camera,
   ): Promise<void>;
   onGameEvent(event: GameEvent): void;
+  /**
+   * Nombre max de PointLights que CE reveal ajoute dynamiquement à la scène
+   * pendant son combat (flash strobe, glow boss, lumière de cible, assist…).
+   * Sert au pré-chauffage des variantes de shaders — voir
+   * BossRevealOrchestrator.preloadAll / prewarmPointLightProgramVariants.
+   */
+  dynamicPointLightCount?(): number;
   endFight(): void;
   update(dt: number): void;
   dispose(): void;

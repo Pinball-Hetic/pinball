@@ -1,11 +1,14 @@
 import { test, expect, mock } from 'bun:test';
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { BossRevealOrchestrator } from './BossRevealOrchestrator';
 import type { BossRevealController } from './BossRevealController';
 import type { GameEvent } from '../domain/GameEvents';
 
 // Faux reveal minimal : implémente le contrat avec des spies, sans Three réel.
-function makeFake(bossId: string, opts: { frozen?: boolean } = {}) {
+function makeFake(
+  bossId: string,
+  opts: { frozen?: boolean; dynamicLights?: number } = {},
+) {
   const spy = {
     preload: mock(() => Promise.resolve()),
     onGameEvent: mock((_e: GameEvent) => undefined),
@@ -22,6 +25,9 @@ function makeFake(bossId: string, opts: { frozen?: boolean } = {}) {
     update: spy.update,
     dispose: spy.dispose,
     isGameplayFrozen: spy.isGameplayFrozen,
+    ...(opts.dynamicLights !== undefined
+      ? { dynamicPointLightCount: () => opts.dynamicLights! }
+      : {}),
   };
   return { controller, spy };
 }
@@ -55,6 +61,34 @@ test('preloadAll preloads every reveal with renderer/scene/camera', async () => 
   expect(a.spy.preload).toHaveBeenCalledTimes(1);
   expect(a.spy.preload).toHaveBeenCalledWith(RENDERER, SCENE, CAMERA);
   expect(b.spy.preload).toHaveBeenCalledTimes(1);
+});
+
+test('preloadAll ne pré-chauffe pas les shaders si aucun reveal ne déclare de lumières', async () => {
+  const orch = new BossRevealOrchestrator();
+  orch.register(makeFake('demogorgon').controller);
+  const compileAsync = mock(() => Promise.resolve());
+  const renderer = { compileAsync } as unknown as THREE.WebGLRenderer;
+  const scene = new THREE.Scene();
+
+  await orch.preloadAll(renderer, scene, CAMERA);
+
+  expect(compileAsync).not.toHaveBeenCalled();
+});
+
+test('preloadAll pré-chauffe les variantes 0..max+1 lumières et nettoie la scène', async () => {
+  const orch = new BossRevealOrchestrator();
+  orch.register(makeFake('demogorgon', { dynamicLights: 4 }).controller);
+  orch.register(makeFake('vecna', { dynamicLights: 3 }).controller);
+  const compileAsync = mock(() => Promise.resolve());
+  const renderer = { compileAsync } as unknown as THREE.WebGLRenderer;
+  const scene = new THREE.Scene();
+
+  await orch.preloadAll(renderer, scene, CAMERA);
+
+  // max(4, 3) + 1 de marge = 5 lumières factices → 6 passes (k = 0..5).
+  expect(compileAsync).toHaveBeenCalledTimes(6);
+  // Les lumières factices ne restent pas dans la scène après le preload.
+  expect(scene.children.length).toBe(0);
 });
 
 test('preloadAll swallows a rejected preload (others still complete)', async () => {
