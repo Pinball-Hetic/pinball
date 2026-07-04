@@ -6,12 +6,12 @@ import { setMapAudioUrls } from "@/audio/pinballAudio";
 // musique du monde alternatif) — effet de bord isolé du corps de rendu.
 export function useMapAudio(manifest: ResolvedMap["manifest"]): void {
   useEffect(() => {
-    setMapAudioUrls(
-      manifest.ambientMusic,
-      manifest.gameOverSound,
-      manifest.alternateWorldMusicUrl,
-      manifest.alternateWorldMusicVolume,
-    );
+    setMapAudioUrls({
+      ambientMusic: manifest.ambientMusic,
+      gameOverSound: manifest.gameOverSound,
+      alternateWorldMusicUrl: manifest.alternateWorldMusicUrl,
+      alternateWorldMusicVolume: manifest.alternateWorldMusicVolume,
+    });
   }, [
     manifest.ambientMusic,
     manifest.gameOverSound,

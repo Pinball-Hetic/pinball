@@ -1,0 +1,6 @@
+# Force LF line endings for shell scripts (prevent CRLF breakage in Alpine Docker)
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Auto-detect everything else
+* text=auto
