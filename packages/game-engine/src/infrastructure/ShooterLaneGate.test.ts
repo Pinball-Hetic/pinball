@@ -43,19 +43,20 @@ function makeColliderDesc() {
   return desc;
 }
 
-mock.module('@dimforge/rapier3d-compat', () => ({
-  default: {
-    RigidBodyDesc: {
-      fixed: () => makeRigidBodyDesc(),
-    },
-    ColliderDesc: {
-      cuboid: (hx: number, hy: number, hz: number) => {
-        captured.cuboid = { hx, hy, hz };
-        return makeColliderDesc();
-      },
+const rapierStub = {
+  RigidBodyDesc: {
+    fixed: () => makeRigidBodyDesc(),
+  },
+  ColliderDesc: {
+    cuboid: (hx: number, hy: number, hz: number) => {
+      captured.cuboid = { hx, hy, hz };
+      return makeColliderDesc();
     },
   },
-}));
+};
+// Expose the factories as named exports (the SUT uses `import * as RAPIER`) and
+// under default, so the mock works regardless of import style.
+mock.module('@dimforge/rapier3d-compat', () => ({ ...rapierStub, default: rapierStub }));
 
 // ── Stub world ───────────────────────────────────────────────────────────────
 class FakeWorld {

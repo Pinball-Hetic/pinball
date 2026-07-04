@@ -1,4 +1,4 @@
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import type { BossId } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import type { MapLayout } from '../domain/MapLayout';

@@ -1,11 +1,10 @@
 import { test, expect, beforeAll, beforeEach } from 'bun:test';
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import { PlungerPhysics } from './PlungerPhysics';
 
 beforeAll(async () => {
-  // rapier3d-compat lazy-loads its WASM: on a fresh install (CI/Linux) the
-  // RigidBodyDesc static builders only exist after init(). Don't depend on
-  // another test file having init'd the shared module singleton first.
+  // Init the WASM once so the test is self-sufficient, not reliant on another
+  // file (shared bun-test module singleton) having done it first.
   await RAPIER.init();
 });
 

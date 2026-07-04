@@ -1,4 +1,4 @@
-import RAPIER from "@dimforge/rapier3d-compat";
+import * as RAPIER from "@dimforge/rapier3d-compat";
 import type { IPhysicsWorld } from '../domain/IPhysicsWorld';
 
 /** Hooks for the per-frame physics step cycle (see PhysicsWorld.update). */

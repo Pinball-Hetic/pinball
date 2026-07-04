@@ -2,40 +2,11 @@ import { test, expect, describe } from 'bun:test';
 import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
 import { layout } from '../layout';
+import { installDomStub } from './testDomStub';
 
-// GlowSprite (gltf/base) creates a radial canvas. No happy-dom in this
-// package: stub the minimum of document.createElement('canvas') so the
-// texture constructor passes, deterministically.
-type StubCanvas = {
-  width: number;
-  height: number;
-  getContext: () => StubContext;
-};
-type StubContext = {
-  createRadialGradient: () => { addColorStop: () => void };
-  fillRect: () => void;
-  fillStyle: unknown;
-};
-
-type StubDoc = {
-  createElement: (tag: string) => StubCanvas;
-  createElementNS: (ns: string, tag: string) => StubCanvas;
-};
-const g = globalThis as { document?: StubDoc };
-if (typeof g.document === 'undefined') {
-  const makeCanvas = (): StubCanvas => ({
-    width: 0,
-    height: 0,
-    getContext: (): StubContext => ({
-      createRadialGradient: () => ({ addColorStop: () => {} }),
-      fillRect: () => {},
-      fillStyle: undefined,
-    }),
-  });
-  // createElementNS is also provided so this shared global document isn't
-  // incomplete for a later test file (bun test shares the module singleton).
-  g.document = { createElement: makeCanvas, createElementNS: makeCanvas };
-}
+// GlowSprite (gltf/base) creates a radial canvas at construction. Install the
+// stub before importing the SUT.
+installDomStub();
 
 // Import AFTER the stub (GlowSprite builds its shared texture on first ctor).
 const { BumperVisuals } = await import('./BumperVisuals');

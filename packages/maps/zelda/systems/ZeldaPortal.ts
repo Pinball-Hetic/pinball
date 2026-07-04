@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import type { MapLayout } from '@pinball/game-engine';
 import { easeOut, RevealCountdown } from '@pinball/game-engine';
 import { RETURN_PORTAL_REVEAL_DELAY_S } from './DarkLinkConstants';

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import * as THREE from "three";
-import RAPIER from "@dimforge/rapier3d-compat";
+import * as RAPIER from "@dimforge/rapier3d-compat";
 import {
   PhysicsWorld,
   BallPhysics,

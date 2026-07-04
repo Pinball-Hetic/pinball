@@ -3,58 +3,11 @@ import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
 import { getBossDefinition } from '../bosses';
 import type { DemogorgonReveal as DemogorgonRevealType } from './DemogorgonReveal';
+import { installDomStub } from './testDomStub';
 
-// No happy-dom in this package. DemogorgonReveal mounts a CameraBillboardSprite
-// whose THREE.TextureLoader touches document/Image. Stub the minimum so the
-// texture load fails gracefully (error path resolves to null) instead of
-// throwing an unhandled ReferenceError between tests.
-type G = {
-  document?: { createElement: (t: string) => unknown; createElementNS: (ns: string, t: string) => unknown };
-  Image?: unknown;
-};
-const g = globalThis as G;
-const stubEl = () => {
-  const listeners: Record<string, Array<() => void>> = {};
-  return {
-    width: 0,
-    height: 0,
-    style: {},
-    setAttribute: () => {},
-    removeAttribute: () => {},
-    addEventListener: (type: string, cb: () => void) => {
-      (listeners[type] ??= []).push(cb);
-      // ImageLoader waits for load/error; simulate a failed decode so its
-      // error path runs and resolves (loader catch → texture null).
-      if (type === 'error') queueMicrotask(() => cb());
-    },
-    removeEventListener: () => {},
-    getContext: () => ({
-      createRadialGradient: () => ({ addColorStop: () => {} }),
-      fillRect: () => {},
-      drawImage: () => {},
-      getImageData: () => ({ data: [] }),
-      fillStyle: undefined,
-    }),
-    set src(_v: string) {},
-  };
-};
-if (typeof g.document === 'undefined') {
-  g.document = { createElement: stubEl, createElementNS: stubEl };
-} else if (typeof g.document.createElementNS !== 'function') {
-  // A prior test file (bun test shares the module singleton) may have installed
-  // an incomplete document stub. three's ImageLoader needs createElementNS —
-  // patch it in rather than trust the pre-existing doc.
-  g.document.createElementNS = stubEl;
-}
-if (typeof g.Image === 'undefined') {
-  g.Image = class {
-    onload: (() => void) | null = null;
-    onerror: (() => void) | null = null;
-    set src(_v: string) {
-      queueMicrotask(() => this.onerror?.());
-    }
-  };
-}
+// DemogorgonReveal mounts a CameraBillboardSprite whose THREE.TextureLoader
+// touches document/Image. Install the stub before importing the SUT.
+installDomStub();
 
 // Import AFTER the stub (the texture loader is touched at mount).
 const { DemogorgonReveal } = await import('./DemogorgonReveal');

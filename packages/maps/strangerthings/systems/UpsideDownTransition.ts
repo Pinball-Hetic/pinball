@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import { layout } from '../layout';
 import {
   PORTAL_ENTER_TEXTURE_URL,

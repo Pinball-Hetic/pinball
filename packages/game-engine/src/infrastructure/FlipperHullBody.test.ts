@@ -1,5 +1,5 @@
 import { test, expect, beforeAll, beforeEach } from 'bun:test';
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import {
   buildFlipperHullBody,

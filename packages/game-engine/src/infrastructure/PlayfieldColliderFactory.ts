@@ -1,5 +1,5 @@
 import type * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import type { MapLayout } from '../domain/MapLayout';
 import { computeLauncherLaneZBounds } from './LauncherLaneBounds';
 import { hasPinballmapRoot } from './GltfNodeNames';

@@ -1,4 +1,4 @@
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import type { MapLayout } from '../domain/MapLayout';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
