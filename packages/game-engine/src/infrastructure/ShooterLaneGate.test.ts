@@ -1,4 +1,5 @@
-import { test, expect, describe, mock, beforeEach } from 'bun:test';
+import { test, expect, describe, mock, beforeAll, afterAll, beforeEach } from 'bun:test';
+import * as actualRapier from '@dimforge/rapier3d-compat';
 import { surfaceYAtZ, resetSurfaceCoefficients } from '../domain/PlayfieldGeometry';
 
 // ── Mock RAPIER (wasm) ───────────────────────────────────────────────────────
@@ -54,9 +55,16 @@ const rapierStub = {
     },
   },
 };
-// Expose the factories as named exports (the SUT uses `import * as RAPIER`) and
-// under default, so the mock works regardless of import style.
-mock.module('@dimforge/rapier3d-compat', () => ({ ...rapierStub, default: rapierStub }));
+// bun's mock.module is process-global and persists across test files. Scope it
+// to this file's lifecycle so it can't poison sibling files (PlungerPhysics /
+// FlipperHullBody rely on the real Rapier). Expose the factories as named
+// exports (the SUT uses `import * as RAPIER`) and under default.
+beforeAll(() => {
+  mock.module('@dimforge/rapier3d-compat', () => ({ ...rapierStub, default: rapierStub }));
+});
+afterAll(() => {
+  mock.module('@dimforge/rapier3d-compat', () => ({ ...actualRapier, default: actualRapier }));
+});
 
 // ── Stub world ───────────────────────────────────────────────────────────────
 class FakeWorld {
