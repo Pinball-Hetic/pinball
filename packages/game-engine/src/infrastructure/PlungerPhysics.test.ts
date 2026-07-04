@@ -1,6 +1,13 @@
-import { test, expect, beforeEach } from 'bun:test';
+import { test, expect, beforeAll, beforeEach } from 'bun:test';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { PlungerPhysics } from './PlungerPhysics';
+
+beforeAll(async () => {
+  // rapier3d-compat lazy-loads its WASM: on a fresh install (CI/Linux) the
+  // RigidBodyDesc static builders only exist after init(). Don't depend on
+  // another test file having init'd the shared module singleton first.
+  await RAPIER.init();
+});
 
 // Minimal Rapier world stub: captures the passed descriptors without
 // instantiating a real World (Rapier desc builders are pure, no init()).

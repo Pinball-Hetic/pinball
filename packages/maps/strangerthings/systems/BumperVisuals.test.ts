@@ -17,19 +17,24 @@ type StubContext = {
   fillStyle: unknown;
 };
 
-const g = globalThis as { document?: { createElement: (tag: string) => StubCanvas } };
+type StubDoc = {
+  createElement: (tag: string) => StubCanvas;
+  createElementNS: (ns: string, tag: string) => StubCanvas;
+};
+const g = globalThis as { document?: StubDoc };
 if (typeof g.document === 'undefined') {
-  g.document = {
-    createElement: (): StubCanvas => ({
-      width: 0,
-      height: 0,
-      getContext: (): StubContext => ({
-        createRadialGradient: () => ({ addColorStop: () => {} }),
-        fillRect: () => {},
-        fillStyle: undefined,
-      }),
+  const makeCanvas = (): StubCanvas => ({
+    width: 0,
+    height: 0,
+    getContext: (): StubContext => ({
+      createRadialGradient: () => ({ addColorStop: () => {} }),
+      fillRect: () => {},
+      fillStyle: undefined,
     }),
-  };
+  });
+  // createElementNS is also provided so this shared global document isn't
+  // incomplete for a later test file (bun test shares the module singleton).
+  g.document = { createElement: makeCanvas, createElementNS: makeCanvas };
 }
 
 // Import AFTER the stub (GlowSprite builds its shared texture on first ctor).
