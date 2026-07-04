@@ -6,7 +6,8 @@
   "types": "src/index.ts",
   "scripts": {
     "lint": "eslint src --ext .ts,.tsx",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "test": "bun test"
   },
   "peerDependencies": {
     "react": "^19.0.0"

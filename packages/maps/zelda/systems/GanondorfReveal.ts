@@ -3,9 +3,10 @@ import type { GameEvent, GameEventListener } from '@pinball/game-engine';
 import { getBossDefinition, GANONDORF_TARGET } from '../bosses';
 import { layout } from '../layout';
 import { PLAYFIELD_TILT } from '@pinball/game-engine';
-import { easeIn, easeOut, strobeOn } from '@pinball/game-engine';
+import { easeIn, easeOut } from '@pinball/game-engine';
 import { createBossTargetMesh } from '@pinball/game-engine';
 import { BossTargetPulse } from '@pinball/game-engine';
+import { BlackoutFightPhaseMachine } from '@pinball/game-engine';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { GanondorfTargetVisual } from './GanondorfTargetVisual';
 import type { BossRevealController } from './BossRevealController';
@@ -20,10 +21,8 @@ const FIGHT_FLICKER_HZ = 3;
 const FIGHT_FLASH_MIX = 0.45;
 const FLASH_INTENSITY = 1.5;
 
-// Flash violet Ganondorf.
+// Ganondorf purple flash.
 const FLASH_COLOR = 0x9900ff;
-
-type Phase = 'idle' | 'blackout' | 'reveal' | 'flicker' | 'victory' | 'restore';
 
 export type GanondorfSetup = {
   root: THREE.Object3D;
@@ -53,10 +52,22 @@ export class GanondorfReveal implements BossRevealController {
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
 
-  private phase: Phase = 'idle';
-  private elapsed = 0;
-  private strobeT = 0;
-  private pulseT = 0;
+  // Ganondorf has no shade (flash-only) and no eleven assist; the flicker shade
+  // config is all-zero (renderer passes a literal 0 to applyFightFlicker, exactly
+  // as before) and the assist sub-machine is disabled (null).
+  private machine = new BlackoutFightPhaseMachine(
+    {
+      blackout: BLACKOUT,
+      reveal: REVEAL,
+      restore: RESTORE,
+      victory: VICTORY,
+      strobeHzIntro: STROBE_HZ_INTRO,
+      fightFlickerHz: FIGHT_FLICKER_HZ,
+      targetHits: getBossDefinition('ganondorf').targetHits,
+    },
+    { base: 0, breatheAmp: 0, breatheSpeed: 0, dip: 0, lift: 0, clampMin: 0, clampMax: 0 },
+    null,
+  );
 
   setEmit(listener: GameEventListener): void {
     this.emit = listener;
@@ -70,6 +81,13 @@ export class GanondorfReveal implements BossRevealController {
     await this.ganondorfVisual.ensureReady();
     await this.ganondorfVisual.warmup(renderer, scene, camera);
     if (this.targetGroup) await renderer.compileAsync(this.targetGroup, camera, scene);
+  }
+
+  // PointLights added dynamically during the fight: strobe flash +
+  // Ganondorf glow + target light. Used to prewarm shader variants at
+  // preload (see BossRevealOrchestrator.preloadAll).
+  dynamicPointLightCount(): number {
+    return 3;
   }
 
   setup(config: GanondorfSetup): void {
@@ -105,19 +123,16 @@ export class GanondorfReveal implements BossRevealController {
 
   onGameEvent(event: GameEvent): void {
     if (event.type === 'BOSS_REVEAL' && event.bossId === 'ganondorf') {
-      if (this.phase !== 'idle') return;
-      this.phase = 'blackout';
-      this.elapsed = 0;
-      this.strobeT = 0;
-      this.pulseT = 0;
+      if (!this.machine.onReveal()) return;
       if (this.targetGroup) this.targetGroup.visible = true;
       return;
     }
     if (event.type === 'BOSS_TARGET_HIT' && event.bossId === 'ganondorf') {
-      if (this.phase === 'idle' || this.phase === 'restore' || this.phase === 'victory') return;
+      const res = this.machine.onHit(event.hitCount);
+      if (!res.accepted) return;
       this.targetPulse?.flashHit();
       this.ganondorfVisual.playHit();
-      if (event.hitCount >= getBossDefinition('ganondorf').targetHits) {
+      if (res.victory) {
         this.beginVictory();
       }
       return;
@@ -134,67 +149,52 @@ export class GanondorfReveal implements BossRevealController {
 
   update(dt: number): void {
     this.ganondorfVisual.update(dt);
-    this.pulseT += dt;
     this.targetPulse?.update(
       dt,
       this.targetGroup?.visible ?? false,
-      this.phase === 'victory',
+      this.machine.isVictory(),
     );
 
-    if (this.phase === 'idle') return;
+    const d = this.machine.tick(dt);
 
-    this.elapsed += dt;
-    this.strobeT += dt;
+    if (d.phase === 'idle') return;
 
-    const on = strobeOn(this.strobeT, STROBE_HZ_INTRO);
-    const darkMix = this.phase === 'restore'
-      ? 1 - easeIn(Math.min(1, this.elapsed / RESTORE))
-      : 1;
-
-    if (this.phase === 'blackout') {
-      // Flash violet sans voile noir.
-      this.cinematicStrobe.applyFlashOnly(on, darkMix * easeOut(Math.min(1, this.elapsed / BLACKOUT)));
-      if (this.elapsed >= BLACKOUT) {
-        this.phase = 'reveal';
-        this.elapsed = 0;
-      }
+    if (d.phase === 'blackout') {
+      // Purple flash without black veil.
+      this.cinematicStrobe.applyFlashOnly(d.on, d.blackoutMix);
       return;
     }
 
-    if (this.phase === 'reveal') {
-      this.cinematicStrobe.applyFlashOnly(on, 1);
-      if (this.elapsed >= REVEAL) {
-        this.phase = 'flicker';
-        this.elapsed = 0;
+    if (d.phase === 'reveal') {
+      this.cinematicStrobe.applyFlashOnly(d.on, 1);
+      if (d.enteredFlicker) {
         this.ganondorfVisual.show();
         this.onTargetReady?.();
       }
       return;
     }
 
-    if (this.phase === 'flicker') {
-      // Pas de shade, seulement le flash violet au rythme du flicker.
-      const blink = strobeOn(this.strobeT, FIGHT_FLICKER_HZ);
-      this.cinematicStrobe.applyFightFlicker(0, blink ? FIGHT_FLASH_MIX : 0);
+    if (d.phase === 'flicker') {
+      // No shade, only the purple flash at the flicker rhythm.
+      this.cinematicStrobe.applyFightFlicker(0, d.flickerBlink ? FIGHT_FLASH_MIX : 0);
       return;
     }
 
-    if (this.phase === 'victory') {
-      const t = Math.min(1, this.elapsed / VICTORY);
+    if (d.phase === 'victory') {
       this.cinematicStrobe.stop();
-      this.updateVictoryAnim(t);
-      if (t >= 1) {
+      this.updateVictoryAnim(d.victoryT);
+      if (d.finishedVictory) {
         this.beginRestore();
       }
       return;
     }
 
-    if (this.phase === 'restore') {
-      if (darkMix <= 0) {
+    if (d.phase === 'restore') {
+      if (d.finishedRestore) {
         this.resetAtmosphere();
         return;
       }
-      // Pas de shade pendant la restauration.
+      // No shade during restore.
       this.cinematicStrobe.stop();
     }
   }
@@ -225,8 +225,7 @@ export class GanondorfReveal implements BossRevealController {
     this.victoryBurst = null;
     this.victoryBurstMat = null;
     this.root = null;
-    this.phase = 'idle';
-    this.elapsed = 0;
+    this.machine.reset();
   }
 
   private buildTargetMesh(): THREE.Group {
@@ -252,15 +251,11 @@ export class GanondorfReveal implements BossRevealController {
   }
 
   private beginVictory(): void {
-    this.phase = 'victory';
-    this.elapsed = 0;
     this.ganondorfVisual.playVictory();
     if (this.targetGroup) this.targetGroup.visible = true;
   }
 
   private beginRestore(): void {
-    this.phase = 'restore';
-    this.elapsed = 0;
     if (this.targetGroup) {
       this.targetGroup.visible = false;
       this.targetGroup.scale.setScalar(1);
@@ -331,11 +326,8 @@ export class GanondorfReveal implements BossRevealController {
   }
 
   private resetAtmosphere(): void {
-    const wasActive = this.phase !== 'idle';
-    this.phase = 'idle';
-    this.elapsed = 0;
-    this.strobeT = 0;
-    this.pulseT = 0;
+    const wasActive = this.machine.getPhase() !== 'idle';
+    this.machine.reset();
 
     this.cinematicStrobe.stop();
     this.ganondorfVisual.hide();

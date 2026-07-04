@@ -1,10 +1,10 @@
 import * as strangerthings from '@pinball/map-strangerthings/backglass'
 import * as zelda from '@pinball/map-zelda/backglass'
 
-// Surface backglass du registry. Entrypoint séparé de l'index core : seul le
-// backglass tire ce module (React + art de la map), jamais le playfield.
-// BackglassContent = forme de référence ST (les deux maps exposent la même
-// interface). TODO: extraire une interface commune explicite.
+// Registry backglass surface. Separate entrypoint from the core index: only
+// the backglass pulls this module (React + map art), never the playfield.
+// BackglassContent = ST reference shape (both maps expose the same
+// interface). TODO: extract an explicit shared interface.
 export type BackglassContent = typeof strangerthings
 
 const BY_ID: Record<string, BackglassContent> = {
@@ -12,8 +12,8 @@ const BY_ID: Record<string, BackglassContent> = {
   zelda: zelda as unknown as BackglassContent,
 }
 
-// Résout le contenu backglass d'une map par id (null = pas de backglass dédié,
-// l'app affiche alors le moteur générique / NO SIGNAL).
+// Resolves a map's backglass content by id (null = no dedicated backglass,
+// the app then shows the generic engine / NO SIGNAL).
 export function getBackglassContent(id: string): BackglassContent | null {
   return BY_ID[id] ?? null
 }

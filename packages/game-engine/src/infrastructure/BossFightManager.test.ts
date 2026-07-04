@@ -1,10 +1,11 @@
 import { test, expect } from 'bun:test';
 import { BossFightManager } from './BossFightManager';
+import { BossTargetSensor } from './BossTargetSensor';
 import type { BossDefinition } from '../domain/BossRegistry';
 import type { GameEvent } from '../domain/GameEvents';
 
-// Définitions de boss FIXTURES génériques (pas de contenu ST) : la mécanique
-// du moteur doit marcher sur n'importe quelles définitions injectées.
+// Generic FIXTURE boss definitions (no ST content): the engine mechanics must
+// work on any injected definitions.
 function boss(over: Partial<BossDefinition> & Pick<BossDefinition, 'id' | 'colliderRole'>): BossDefinition {
   return {
     target: { x: 0, y: 1, z: 0 },
@@ -46,9 +47,9 @@ function boss(over: Partial<BossDefinition> & Pick<BossDefinition, 'id' | 'colli
   };
 }
 
-// boss_a : monde normal, palier 3000, +150 reveal, 5 hits @250.
+// boss_a: normal world, threshold 3000, +150 reveal, 5 hits @250.
 const BOSS_A = boss({ id: 'boss_a', colliderRole: 'a_target', unlocksPortal: true });
-// boss_b : monde alternatif, palier 3000, +200 reveal, 10 hits @300.
+// boss_b: alternate world, threshold 3000, +200 reveal, 10 hits @300.
 const BOSS_B = boss({
   id: 'boss_b',
   colliderRole: 'b_target',
@@ -58,9 +59,9 @@ const BOSS_B = boss({
   unlocksReturnPortal: true,
 });
 
-function make() {
+function make(now: () => number = () => 0) {
   const events: GameEvent[] = [];
-  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A, BOSS_B]);
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A, BOSS_B], now);
   return { mgr, events };
 }
 
@@ -141,16 +142,115 @@ test('mutual exclusion: cannot reveal a second boss while another fight is activ
   expect(events[1]).toEqual({ type: 'BOSS_REVEAL', bossId: 'boss_b', scoreIncrement: 200 });
 });
 
-test('handleTargetCollision routes by collider role and emits a hit', async () => {
-  await new Promise((r) => setTimeout(r, 500));
-  const { mgr, events } = make();
+test('handleTargetCollision routes by collider role and emits a hit', () => {
+  // Injected clock (start at 0, no wall-clock leak between tests) — the first
+  // hit always passes the cooldown since lastHitMs starts at 0.
+  const { mgr, events } = make(() => 1000);
   mgr.beginFight('boss_a', true); // fightActive + targetArmed
   const handled = mgr.handleTargetCollision('a_target', true, 'playing');
   expect(handled).toBe(true);
   expect(events).toEqual([{ type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 1, scoreIncrement: 250 }]);
 });
 
+test('handleTargetCollision: two hits across the cooldown boundary via injected clock', () => {
+  const clock = { t: 1000 };
+  const { mgr, events } = make(() => clock.t);
+  mgr.beginFight('boss_a', true);
+  mgr.handleTargetCollision('a_target', true, 'playing'); // 1st hit (t=1000)
+  mgr.handleTargetCollision('a_target', false, 'playing'); // ball leaves
+  clock.t = 1000 + 450; // exactly at the 450ms cooldown boundary
+  mgr.handleTargetCollision('a_target', true, 'playing'); // 2nd hit
+  expect(events).toEqual([
+    { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 1, scoreIncrement: 250 },
+    { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 2, scoreIncrement: 250 },
+  ]);
+});
+
+test('resetAlternateWorldBosses resets only alternate-world bosses', () => {
+  const { mgr } = make();
+  mgr.beginFight('boss_a', false); // normal-world boss triggered
+  mgr.beginFight('boss_b', false); // alternate-world boss triggered
+  expect(mgr.isTriggered('boss_a')).toBe(true);
+  expect(mgr.isTriggered('boss_b')).toBe(true);
+
+  mgr.resetAlternateWorldBosses();
+  expect(mgr.isTriggered('boss_a')).toBe(true); // normal-world boss untouched
+  expect(mgr.isTriggered('boss_b')).toBe(false); // alternate-world boss reset
+});
+
 test('handleTargetCollision ignores unknown roles', () => {
   const { mgr } = make();
   expect(mgr.handleTargetCollision('not_a_boss', true, 'playing')).toBe(false);
+});
+
+test('sensor factory is injectable: one sensor built per boss, wired to the clock', () => {
+  const built: BossTargetSensor[] = [];
+  const clock = { t: 1000 };
+  const events: GameEvent[] = [];
+  const mgr = new BossFightManager(
+    (e) => events.push(e),
+    [BOSS_A, BOSS_B],
+    () => clock.t,
+    (now) => {
+      const s = new BossTargetSensor(now);
+      built.push(s);
+      return s;
+    },
+  );
+  // One sensor instantiated per injected boss definition.
+  expect(built).toHaveLength(2);
+  // Behaviour identical to the default factory: the injected clock still drives
+  // the cooldown, so a first hit lands then a second lands at the boundary.
+  mgr.beginFight('boss_a', true);
+  mgr.handleTargetCollision('a_target', true, 'playing');
+  mgr.handleTargetCollision('a_target', false, 'playing');
+  clock.t = 1000 + 450;
+  mgr.handleTargetCollision('a_target', true, 'playing');
+  expect(events).toEqual([
+    { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 1, scoreIncrement: 250 },
+    { type: 'BOSS_TARGET_HIT', bossId: 'boss_a', hitCount: 2, scoreIncrement: 250 },
+  ]);
+});
+
+// ── Debug triggers (/debug): real state path, no phantom event ──────────────
+
+test('forceReveal: arme le VRAI combat (isTriggered) + émet BOSS_REVEAL, sans gate de seuil', () => {
+  const events: GameEvent[] = [];
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 0);
+  // No score earned (threshold 3000 NOT reached) → tryReveal would refuse.
+  mgr.forceReveal('boss_a', 'playing');
+  expect(mgr.isTriggered('boss_a')).toBe(true);
+  expect(events).toEqual([
+    { type: 'BOSS_REVEAL', bossId: 'boss_a', scoreIncrement: 150 },
+  ]);
+});
+
+test('forceReveal: garde les invariants — pas hors jeu, pas de double reveal', () => {
+  const events: GameEvent[] = [];
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 0);
+  mgr.forceReveal('boss_a', 'game_over');
+  expect(mgr.isTriggered('boss_a')).toBe(false);
+  mgr.forceReveal('boss_a', 'playing');
+  mgr.forceReveal('boss_a', 'playing'); // no-op
+  expect(events.filter((e) => e.type === 'BOSS_REVEAL')).toHaveLength(1);
+});
+
+test('forceTargetHit: crédite le vrai compteur (cooldown ignoré) → défaite réelle à maxHits', () => {
+  const events: GameEvent[] = [];
+  // FROZEN clock: the 450ms cooldown would block repeated hits — forceTargetHit must bypass it.
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 1000);
+  mgr.forceReveal('boss_a', 'playing');
+  mgr.setTargetArmed('boss_a', true); // le module arme la cible après l'anim de reveal
+  for (let i = 0; i < 5; i++) mgr.forceTargetHit('boss_a', 'playing');
+  const hits = events.filter((e) => e.type === 'BOSS_TARGET_HIT');
+  expect(hits).toHaveLength(5);
+  expect(hits[4]).toMatchObject({ hitCount: 5 });
+});
+
+test('forceTargetHit: sans cible armée (anim de reveal pas finie) → aucun crédit', () => {
+  const events: GameEvent[] = [];
+  const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 1000);
+  mgr.forceReveal('boss_a', 'playing'); // beginFight(targetArmed=false)
+  mgr.forceTargetHit('boss_a', 'playing');
+  expect(events.filter((e) => e.type === 'BOSS_TARGET_HIT')).toHaveLength(0);
 });

@@ -7,10 +7,8 @@ import {
 } from '../domain/CameraCinematicConstants';
 import type { PlayfieldViewMode } from '../domain/PlayfieldViewMode';
 import { DEFAULT_PLAYFIELD_VIEW_MODE } from '../domain/PlayfieldViewMode';
-import { easeInOut, easeOut } from './CinematicEasing';
+import { CinematicPhaseMachine } from './CinematicPhaseMachine';
 import { applyPlayfieldOrthoTopDown } from './PlayfieldCameraFit';
-
-type Phase = 'idle' | 'zoomIn' | 'hold' | 'zoomOut';
 
 type BaseView = {
   target: THREE.Vector3;
@@ -35,8 +33,7 @@ export class PlayfieldCameraDirector {
   private base: BaseView | null = null;
   private config: BossCameraCinematicConfig | null = null;
   private viewMode: PlayfieldViewMode = DEFAULT_PLAYFIELD_VIEW_MODE;
-  private phase: Phase = 'idle';
-  private elapsed = 0;
+  private readonly machine = new CinematicPhaseMachine();
   private zoomedDistance = 0;
   private faceDir: THREE.Vector3 | null = null;
   private readonly lookAt = new THREE.Vector3();
@@ -65,7 +62,7 @@ export class PlayfieldCameraDirector {
   }
 
   isActive(): boolean {
-    return this.phase !== 'idle';
+    return this.machine.isActive();
   }
 
   play(bossId: BossId): void {
@@ -76,48 +73,23 @@ export class PlayfieldCameraDirector {
     this.begin(bossId, 'victory');
   }
 
-  private readonly phaseTick: Partial<Record<Phase, () => void>> = {
-    zoomIn: () => this.tickZoomIn(),
-    hold: () => this.tickHold(),
-    zoomOut: () => this.tickZoomOut(),
-  };
-
   update(dt: number): void {
-    if (!this.camera || !this.base || !this.config || this.phase === 'idle') return;
-    this.elapsed += dt;
-    this.phaseTick[this.phase]?.();
-  }
-
-  private tickZoomIn(): void {
-    if (!this.base || !this.config) return;
-    const t = Math.min(1, this.elapsed / this.config.zoomInDuration);
-    const e = this.config.panEasing === 'linear' ? t : easeInOut(t);
-    this.lookAt.lerpVectors(this.panFrom, this.bossFocus, e);
-    const dist = THREE.MathUtils.lerp(this.base.distance, this.zoomedDistance, e);
-    this.applyView(this.lookAt, dist, this.lerpViewDir(e));
-    if (t >= 1) {
-      this.phase = 'hold';
-      this.elapsed = 0;
+    if (!this.camera || !this.base || !this.config || !this.machine.isActive()) return;
+    const tick = this.machine.tick(dt, this.config);
+    if (tick.phase === 'zoomIn') {
+      this.lookAt.lerpVectors(this.panFrom, this.bossFocus, tick.blend.lookAtT);
+      const dist = THREE.MathUtils.lerp(this.base.distance, this.zoomedDistance, tick.blend.distanceT);
+      this.applyView(this.lookAt, dist, this.lerpViewDir(tick.blend.dirT));
+      return;
     }
-  }
-
-  private tickHold(): void {
-    if (!this.config) return;
-    this.applyView(this.bossFocus, this.zoomedDistance, this.faceDir ?? undefined);
-    if (this.elapsed >= this.config.holdDuration) {
-      this.phase = 'zoomOut';
-      this.elapsed = 0;
+    if (tick.phase === 'hold') {
+      this.applyView(this.bossFocus, this.zoomedDistance, this.faceDir ?? undefined);
+      return;
     }
-  }
-
-  private tickZoomOut(): void {
-    if (!this.base || !this.config) return;
-    const t = Math.min(1, this.elapsed / this.config.zoomOutDuration);
-    const e = easeOut(t);
-    this.lookAt.lerpVectors(this.bossFocus, this.base.target, e);
-    const dist = THREE.MathUtils.lerp(this.zoomedDistance, this.base.distance, e);
-    this.applyView(this.lookAt, dist, this.lerpViewDir(1 - e));
-    if (t >= 1) this.finish();
+    this.lookAt.lerpVectors(this.bossFocus, this.base.target, tick.blend.lookAtT);
+    const dist = THREE.MathUtils.lerp(this.zoomedDistance, this.base.distance, tick.blend.distanceT);
+    this.applyView(this.lookAt, dist, this.lerpViewDir(tick.blend.dirT));
+    if (tick.done) this.finish();
   }
 
   restore(): void {
@@ -136,7 +108,7 @@ export class PlayfieldCameraDirector {
   }
 
   private begin(bossId: BossId, kind: 'reveal' | 'victory'): void {
-    if (!this.camera || !this.base || this.phase !== 'idle') return;
+    if (!this.camera || !this.base || this.machine.isActive()) return;
     const def = getBossById(this.bosses, bossId);
     if (!def) return;
     const cinematic = kind === 'reveal' ? def.cameraCinematic : def.victoryCameraCinematic;
@@ -145,8 +117,7 @@ export class PlayfieldCameraDirector {
     this.resolvePanFrom(cinematic, kind);
     this.zoomedDistance = cinematicZoomDistance(this.base.distance, cinematic.distanceScale, this.viewMode === 'portrait-fill');
     this.resolveFaceDir(cinematic);
-    this.phase = 'zoomIn';
-    this.elapsed = 0;
+    this.machine.start();
   }
 
   private resolvePanFrom(cinematic: BossCameraCinematicConfig, kind: 'reveal' | 'victory'): void {
@@ -174,22 +145,23 @@ export class PlayfieldCameraDirector {
   }
 
   private finish(): void {
-    if (this.base) {
-      this.applyView(this.base.target, this.base.distance);
-    }
+    // No applyView here: `finish()` is only called by `update()` on the final
+    // zoomOut tick, where `blend = { lookAtT: 1, distanceT: 1, dirT: 0 }`. That
+    // tick already ran `applyView(base.target, base.distance)` (lerp at t=1 →
+    // exact base, lerpViewDir(0) → base dir); replaying it is a provable no-op.
+    // `restore()` keeps its own applyView (independent path).
     this.resetState();
   }
 
   private resetState(): void {
-    this.phase = 'idle';
-    this.elapsed = 0;
+    this.machine.reset();
     this.config = null;
     this.faceDir = null;
   }
 
   private lerpViewDir(t: number): THREE.Vector3 | undefined {
     if (!this.base || !this.faceDir || t <= 0) return undefined;
-    if (t >= 1) return this.faceDir;
+    if (t >= 1) return this.dirScratch.copy(this.faceDir);
     return this.dirScratch.copy(this.base.dirToCamera).lerp(this.faceDir, t).normalize();
   }
 

@@ -6,17 +6,17 @@ export interface ServerToClientEvents {
   'input:button': (data: ButtonInput) => void
   'input:tilt': (data: TiltInput) => void
   'input:sensor': (data: SensorInput) => void
-  // Routé par le server uniquement à la room `input-bridge` (mode
-  // `simulate-esp32`). Pas un event broadcasté aux frontends.
+  // Routed by the server only to the `input-bridge` room (`simulate-esp32`
+  // mode). Not broadcast to frontends.
   'dev:simulate-button': (data: ButtonInput) => void
   'dmd:display': (data: DmdDisplay) => void
-  // Page /debug → injecte un GameEvent dans le playfield (chaîne complète).
+  // /debug page → injects a GameEvent into the playfield (full chain).
   'dev:trigger-game-event': (data: DevGameEventTrigger) => void
-  // Émis au seul socket émetteur du game:over (pas un broadcast).
+  // Emitted only to the socket that sent game:over (not a broadcast).
   'game:registered': (data: GameRegistered) => void
-  // Broadcast à tous les clients quand la map active change (sélecteur de map
-  // → DMD + backglass basculent dynamiquement). Aussi émis en unicast à chaque
-  // nouveau connecté pour lui communiquer la map courante.
+  // Broadcast to all clients when the active map changes (map selector →
+  // DMD + backglass switch dynamically). Also sent as unicast to each new
+  // connection to communicate the current map.
   'map:selected': (data: { mapId: string }) => void
 }
 
@@ -27,18 +27,18 @@ export interface ClientToServerEvents {
   'input:button': (data: ButtonInput) => void
   'input:tilt': (data: TiltInput) => void
   'input:sensor': (data: SensorInput) => void
-  // Émis uniquement par les frontends en mode `simulate-esp32` (clavier
-  // → réseau pour valider la chaîne sans hardware). Le server le
-  // retransforme en `input:button` broadcast à TOUS (y compris émetteur).
+  // Emitted only by frontends in `simulate-esp32` mode (keyboard → network to
+  // validate the chain without hardware). The server turns it back into an
+  // `input:button` broadcast to ALL clients (sender included).
   'dev:simulate-button': (data: ButtonInput) => void
   'dmd:display': (data: DmdDisplay) => void
   'dev:trigger-game-event': (data: DevGameEventTrigger) => void
-  // Émis par le playfield quand l'utilisateur valide une map dans le sélecteur.
-  // Le server met à jour son état et broadcast `map:selected` à tous.
+  // Emitted by the playfield when the user confirms a map in the selector.
+  // The server updates its state and broadcasts `map:selected` to everyone.
   'map:select': (data: { mapId: string }) => void
 }
 
-// Sous-ensemble injectable de GameEvent (sérialisé simple) — émis par /debug.
+// Injectable subset of GameEvent (plain serialized) — emitted by /debug.
 export interface DevGameEventTrigger {
   type:
     | 'BUMPER_HIT'
@@ -52,18 +52,18 @@ export interface DevGameEventTrigger {
     | 'BOTTOM_OUT'
     | 'BALL_LAUNCHED'
     | 'ASSIST'
-    | 'DEBUG_ADD_SCORE' // injecte du score brut (franchir les paliers)
-  bossId?: string // pour BOSS_REVEAL / BOSS_TARGET_HIT (id de boss de la map)
-  hitCount?: number // pour BOSS_TARGET_HIT
-  amount?: number // pour DEBUG_ADD_SCORE
+    | 'DEBUG_ADD_SCORE' // injects raw score (to cross thresholds)
+  bossId?: string // for BOSS_REVEAL / BOSS_TARGET_HIT (map boss id)
+  hitCount?: number // for BOSS_TARGET_HIT
+  amount?: number // for DEBUG_ADD_SCORE
 }
 
-// Sac d'état spécifique à la map (ST : hetic, fever — une autre map aura
-// d'autres clés, ex. wanted). Le core ne connaît aucune clé : il transporte
-// et theming/affichage sont fournis par le contenu de la map (phase 5).
+// Map-specific state bag (ST: hetic, fever — another map will have other keys,
+// e.g. wanted). The core knows no keys: it only transports them; theming and
+// display are provided by the map content.
 export type MapState = Record<string, number | boolean>
 
-// Lecture sûre : une clé absente ne casse jamais l'affichage.
+// Safe reads: an absent key never breaks the display.
 export const mapStateNumber = (s: MapState, k: string): number => {
   const v = s[k]
   return typeof v === 'number' ? v : 0
@@ -79,18 +79,15 @@ export interface ScoreUpdate {
   mapState: MapState
 }
 
-// Identifiant de clip cinématique. Type ouvert (string) : une map définit
-// ses propres clips sans éditer shared-types. Les noms ci-dessous (ST) ne
-// sont plus une union fermée — ils vivent désormais dans les tables de
-// timing, qui migreront dans le package map en phase 5.
+// Cinematic clip identifier. Open type (string): a map defines its own clips
+// without editing shared-types.
 export type ClipId = string
 
-// Alias transitoire (limite le churn des imports existants). À retirer
-// quand tous les consommateurs auront migré vers ClipId.
+// Transitional alias (limits churn on existing imports). Remove once all
+// consumers have migrated to ClipId.
 export type CinematicClip = ClipId
 
-// Champs partagés par les variantes "snapshot" (SCORE/EVENT/COMBO/MULTI).
-// alternateWorld (monde alternatif) ; mapState remplace les compteurs map.
+// Fields shared by the "snapshot" variants (SCORE/EVENT/COMBO/MULTI).
 interface SnapshotFields {
   player: string
   score: number
@@ -118,11 +115,10 @@ export interface GameStart {
 export interface GameStats {
   maxCombo: number
   maxMultiplier: number
-  // Compteurs spécifiques à la map (ST : demogorgons, portals, hetic). Une
-  // autre map aura d'autres clés. Les libellés d'affichage viennent du contenu
-  // de la map (phase 5).
+  // Map-specific counters (ST: demogorgons, portals, hetic). Another map will
+  // have other keys. Display labels come from the map content.
   counters: Record<string, number>
-  durationS: number // durée de la partie en secondes
+  durationS: number // game duration in seconds
 }
 
 export interface GameOver {
@@ -130,17 +126,17 @@ export interface GameOver {
   finalScore: number
   mapId: string
   stats: GameStats
-  // Émis depuis /debug → relay seul, PAS de persistence (ne pollue pas le leaderboard).
+  // Emitted from /debug → relay only, NO persistence (keeps the leaderboard clean).
   debug?: boolean
 }
 
 export interface GameRegistered {
-  code: string // token de claim
-  claimUrl: string // URL encodée dans le QR (rendu client-side)
+  code: string // claim token
+  claimUrl: string // URL encoded in the QR (rendered client-side)
 }
 
-// Limite d'affichage du pseudo (tronqué par les écrans). Le max réel de
-// saisie sera défini côté API globale.
+// Pseudo display limit (truncated by the screens). The actual input max is
+// defined by the global API.
 export const PSEUDO_MAX_DISPLAY = 12
 
 export interface LeaderboardEntry {
@@ -152,8 +148,8 @@ export interface LeaderboardEntry {
 
 export interface GlobalStats {
   totalGames: number
-  // Totaux génériques par compteur (key = clé du counter, label fourni par la
-  // map en phase 5, value = somme). Remplace totalDemogorgons/totalPortals.
+  // Generic per-counter totals (key = counter key, label provided by the map,
+  // value = sum).
   totals: { key: string; label: string; value: number }[]
   bestCombo: { value: number; player: string } | null
   bestToday: { score: number; player: string } | null
@@ -185,26 +181,26 @@ export interface SensorInput {
   value: number
 }
 
-// Timings d'un clip cinématique, fournis par la map (manifest.clips) :
-//   showMs   — durée du SHOW : combien de temps DMD/backglass jouent le clip
-//              (peut dépasser le gel → célébration pendant que le jeu a repris).
-//   freezeMs — durée du GEL physique playfield (0 = pas de pause du gameplay).
-//   takeoverMs — durée d'occupation plein écran de la pile DMD (défaut showMs ;
-//              surchargé quand le visuel est plus court, ex. hetic_complete :
-//              10s de cinématique puis fever en mode SCORE).
+// Cinematic clip timings, provided by the map (manifest.clips):
+//   showMs   — SHOW duration: how long DMD/backglass play the clip
+//              (may exceed the freeze → celebration while gameplay has resumed).
+//   freezeMs — playfield physics FREEZE duration (0 = no gameplay pause).
+//   takeoverMs — full-screen takeover duration of the DMD stack (default showMs;
+//              overridden when the visual is shorter, e.g. hetic_complete:
+//              10s of cinematic then fever in SCORE mode).
 export interface ClipTimings {
   showMs: number
   freezeMs: number
   takeoverMs?: number
 }
 
-// Durée SHOW par défaut pour un clip absent de manifest.clips (clip inconnu
-// ou map sans timing explicite). Le jeu ne crashe jamais : visuel générique
-// pendant cette durée.
+// Default SHOW duration for a clip missing from manifest.clips (unknown clip
+// or map without explicit timing). The game never crashes: generic visual for
+// this duration.
 export const DEFAULT_CLIP_SHOW_MS = 4_000
 
-// Lookups génériques sur la table de clips d'une map (manifest.clips). Un clip
-// absent retombe sur des valeurs sûres (jamais undefined → jamais de NaN).
+// Generic lookups on a map's clip table (manifest.clips). A missing clip falls
+// back to safe values (never undefined → never NaN).
 export function clipShowMs(clips: Record<string, ClipTimings> | undefined, id: ClipId): number {
   return clips?.[id]?.showMs ?? DEFAULT_CLIP_SHOW_MS
 }

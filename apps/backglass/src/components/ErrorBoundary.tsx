@@ -1,12 +1,12 @@
 import { Component, type CSSProperties, type ErrorInfo, type ReactNode } from 'react'
 
-const RELOAD_MS = 15_000 // délai avant rechargement auto après un crash
-const STABLE_MS = 30_000 // page stable ce délai → on considère la boucle rompue
-const MAX_RELOADS = 3 // au-delà : on cesse de recharger, on reste sur le filet
-const CRASH_KEY = 'eb_crash_count' // persiste À TRAVERS les reloads (sessionStorage)
+const RELOAD_MS = 15_000 // delay before auto-reload after a crash
+const STABLE_MS = 30_000 // page stable for this long → crash loop considered broken
+const MAX_RELOADS = 3 // beyond this: stop reloading, stay on the safety net
+const CRASH_KEY = 'eb_crash_count' // persists ACROSS reloads (sessionStorage)
 
-// Styles inline : si la feuille de style est elle-même la cause du crash,
-// le filet reste affichable (aucune dépendance externe).
+// Inline styles: if the stylesheet itself caused the crash, the safety net
+// stays renderable (no external dependency).
 const fallbackStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
@@ -28,10 +28,10 @@ interface State {
   failed: boolean
 }
 
-// Filet kiosk : un crash de rendu n'affiche jamais un écran blanc. On
-// montre une scène minimale, on log la stack, et on recharge la borne au
-// bout de 15s (auto-récupération sans intervention humaine). Anti-boucle :
-// si le crash persiste à travers les reloads, on arrête de recharger.
+// Kiosk safety net: a render crash never shows a white screen. Show a minimal
+// scene, log the stack, and reload the cabinet after 15s (self-recovery
+// without human intervention). Anti-loop: if the crash persists across
+// reloads, stop reloading.
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { failed: false }
   private timer = 0
@@ -41,16 +41,16 @@ export default class ErrorBoundary extends Component<Props, State> {
     return { failed: true }
   }
 
-  // Page tenue stable STABLE_MS → crash isolé, pas une boucle : on remet le
-  // compteur à zéro pour qu'un incident futur puisse de nouveau recharger.
-  // (On NE reset PAS à chaque mount, sinon le compteur ne survivrait jamais
-  // à un reload et la détection de boucle serait inopérante.)
+  // Page held stable for STABLE_MS → isolated crash, not a loop: reset the
+  // counter so a future incident can reload again.
+  // (Do NOT reset on every mount, otherwise the counter would never survive
+  // a reload and loop detection would be inoperative.)
   componentDidMount() {
     this.resetTimer = window.setTimeout(() => {
       try {
         sessionStorage.removeItem(CRASH_KEY)
       } catch {
-        /* sessionStorage indisponible (mode privé) : sans gravité */
+        /* sessionStorage unavailable (private mode): harmless */
       }
     }, STABLE_MS)
   }
@@ -58,14 +58,14 @@ export default class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[backglass] render crash', error, info.componentStack)
     if (this.timer) window.clearTimeout(this.timer)
-    // Un reload toutes les 15s à l'infini est pire qu'un écran de repli
-    // stable : au-delà de MAX_RELOADS crashs rapprochés, on s'arrête.
+    // Reloading every 15s forever is worse than a stable fallback screen:
+    // beyond MAX_RELOADS crashes in a row, stop.
     let count = 1
     try {
       count = Number(sessionStorage.getItem(CRASH_KEY) ?? 0) + 1
       sessionStorage.setItem(CRASH_KEY, String(count))
     } catch {
-      /* sessionStorage indisponible : on recharge quand même une fois */
+      /* sessionStorage unavailable: still reload once */
     }
     if (count <= MAX_RELOADS) {
       this.timer = window.setTimeout(() => window.location.reload(), RELOAD_MS)

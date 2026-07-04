@@ -65,3 +65,11 @@ apps/*/public/maps/
 firmware/.pio/
 !firmware/build/
 !firmware/build/firmware.bin
+
+# Test coverage artifacts (local runs)
+.cov/
+.cov-audio/
+.cov-aggregate.ts
+lcov.info
+**/.cov/
+**/.cov-audio/

@@ -8,6 +8,10 @@ export class BossTargetSensor {
   private hits = 0;
   private lastHitMs = 0;
 
+  // Injected clock: defaults to performance.now in production, a controllable
+  // fake in tests — makes the per-hit cooldown deterministic.
+  constructor(private readonly now: () => number = () => performance.now()) {}
+
   setFightActive(active: boolean): void {
     this.fightActive = active;
     if (!active) {
@@ -55,7 +59,7 @@ export class BossTargetSensor {
       if (gameState !== 'playing' || !this.fightActive || !this.targetArmed) return;
       if (this.latchIgnore) return;
 
-      const now = performance.now();
+      const now = this.now();
       if (now - this.lastHitMs < cooldown) return;
       this.lastHitMs = now;
       this.hits += 1;

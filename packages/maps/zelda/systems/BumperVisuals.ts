@@ -1,40 +1,25 @@
 import * as THREE from 'three';
-import type { GameEvent } from '@pinball/game-engine';
-import { normalizeGltfName } from '@pinball/game-engine';
+import type { GameEvent, BumperMatchRule } from '@pinball/game-engine';
+import { collectBumperParts, tickPunchTimers, applyPunchScale } from '@pinball/game-engine';
 import { layout } from '../layout';
 
-// Matche vis_bumper, vis_bumper.001, vis_bumper.002, vis_bumper_1, etc.
+// Matches vis_bumper, vis_bumper.001, vis_bumper.002, vis_bumper_1, etc.
 const VIS_BUMPER = /^vis_bumper/;
 
-const PUNCH_DURATION = 0.18; // secondes
-const PUNCH_PEAK     = 0.28; // +28% scale au pic
+type BumperKind = 'vis';
 
-// easeOutBack : monte vite, léger dépassement, retour fluide.
-function easeOutBack(t: number): number {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-}
+const MATCH_RULES: readonly BumperMatchRule<BumperKind>[] = [
+  { pattern: VIS_BUMPER, result: { action: 'part', kind: 'vis' } },
+];
+
+const PUNCH_DURATION = 0.18; // seconds
+const PUNCH_PEAK     = 0.28; // +28% scale at peak
 
 type BumperPart = {
   mesh: THREE.Mesh;
   bumperIndex: number;
   baseScale: THREE.Vector3;
 };
-
-function nearestBumperIndex(pos: THREE.Vector3): number {
-  let best     = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < layout.bumpers.length; i++) {
-    const p  = layout.bumpers[i]!;
-    const dx = pos.x - p.x;
-    const dy = pos.y - p.y;
-    const dz = pos.z - p.z;
-    const d  = dx * dx + dy * dy + dz * dz;
-    if (d < bestDist) { bestDist = d; best = i; }
-  }
-  return best;
-}
 
 export class BumperVisuals {
   private parts: BumperPart[]            = [];
@@ -43,19 +28,20 @@ export class BumperVisuals {
   setup(root: THREE.Object3D): void {
     this.dispose();
 
-    const wp = new THREE.Vector3();
+    this.parts = collectBumperParts(root, layout.bumpers, MATCH_RULES, (ctx) => ({
+      mesh:        ctx.mesh,
+      bumperIndex: ctx.bumperIndex,
+      baseScale:   ctx.baseScale,
+    }));
 
-    root.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
-      if (!VIS_BUMPER.test(normalizeGltfName(obj.name))) return;
-
-      obj.getWorldPosition(wp);
-      this.parts.push({
-        mesh:        obj,
-        bumperIndex: nearestBumperIndex(wp),
-        baseScale:   obj.scale.clone(),
-      });
-    });
+    // Fail loudly: no matched mesh = bumper effects silently dead (GLB
+    // naming convention changed). Diagnostic parity with ST.
+    if (this.parts.length === 0) {
+      console.warn(
+        '[BumperVisuals] aucun mesh bumper reconnu (VIS_BUMPER) — ' +
+          'vérifier les noms de meshes du GLB.',
+      );
+    }
   }
 
   onGameEvent(event: GameEvent): void {
@@ -64,30 +50,13 @@ export class BumperVisuals {
   }
 
   update(dt: number): void {
-    // Tick des timers.
-    for (const [idx, t] of this.punchTimers) {
-      const next = t - dt;
-      if (next <= 0) this.punchTimers.delete(idx);
-      else           this.punchTimers.set(idx, next);
-    }
-
-    // Animation scale : 1 → 1+PEAK → 1 avec easeOutBack.
-    for (const part of this.parts) {
-      const pt = this.punchTimers.get(part.bumperIndex) ?? 0;
-      let factor = 1;
-      if (pt > 0) {
-        const prog = 1 - pt / PUNCH_DURATION; // 0 → 1
-        const env  = prog < 0.5
-          ? easeOutBack(prog * 2)
-          : 1 - (prog - 0.5) * 2;
-        factor = 1 + PUNCH_PEAK * Math.max(0, env);
-      }
-      part.mesh.scale.copy(part.baseScale).multiplyScalar(factor);
-    }
+    tickPunchTimers(this.punchTimers, dt);
+    // Scale animation: 1 → 1+PEAK → 1 with easeOutBack.
+    applyPunchScale(this.parts, this.punchTimers, PUNCH_DURATION, PUNCH_PEAK);
   }
 
   dispose(): void {
-    // Remet les scales à leur valeur d'origine avant de vider.
+    // Restore scales to their original value before clearing.
     for (const part of this.parts) {
       part.mesh.scale.copy(part.baseScale);
     }

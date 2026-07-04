@@ -7,9 +7,9 @@ import { DEFAULT_MAP_ID } from '@pinball/shared-types';
 
 const INTRO: DmdDisplay = { mode: 'INTRO', player: '—', alternateWorld: false };
 
-// Si NEXT_PUBLIC_MAP_ID est forcé (prod Fliphetic mono-map), on l'utilise comme
-// valeur initiale et on n'en change pas (le sélecteur n'est pas affiché côté
-// playfield dans ce cas, donc aucun map:selected n'arrivera).
+// If NEXT_PUBLIC_MAP_ID is forced (Fliphetic single-map prod), use it as the
+// initial value and never change it (the playfield selector is hidden in that
+// case, so no map:selected will ever arrive).
 const FORCED_MAP_ID = process.env.NEXT_PUBLIC_MAP_ID;
 
 export function useDmdState() {
@@ -25,8 +25,8 @@ export function useDmdState() {
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
     socket.on('dmd:display', (data) => setDisplay(data));
-    // Synchro dynamique de la map : émis par le server à la connexion (état
-    // courant) puis à chaque sélection. Ignoré si NEXT_PUBLIC_MAP_ID est forcé.
+    // Dynamic map sync: emitted by the server on connect (current state) then
+    // on every selection. Ignored when NEXT_PUBLIC_MAP_ID is forced.
     socket.on('map:selected', ({ mapId: id }) => {
       if (!FORCED_MAP_ID) setMapId(id);
     });
@@ -36,7 +36,7 @@ export function useDmdState() {
     };
   }, []);
 
-  // Dérivé du dernier display reçu — state-driven, pas d'event séparé.
+  // Derived from the last received display — state-driven, no separate event.
   const alternateWorld = display.alternateWorld;
 
   return { display, alternateWorld, connected, mapId };

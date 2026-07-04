@@ -1,4 +1,5 @@
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
+import { kinematicPositionBasedDesc } from './RapierCompat';
 
 export class PlungerPhysics {
   static createBody(
@@ -6,8 +7,7 @@ export class PlungerPhysics {
     position: { x: number; y: number; z: number },
   ): RAPIER.RigidBody {
     const body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.kinematicPositionBased()
-        .setTranslation(position.x, position.y, position.z),
+      kinematicPositionBasedDesc().setTranslation(position.x, position.y, position.z),
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(0.015, 0.015, 0.02)

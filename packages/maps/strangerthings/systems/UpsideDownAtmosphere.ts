@@ -27,27 +27,24 @@ import {
 } from './UpsideDownConstants';
 import type { BumperVisuals } from './BumperVisuals';
 import type { GarlandLights } from './GarlandLights';
-import { PlayfieldShadeOverlay } from '@pinball/game-engine';
+import {
+  AtmosphereBlend,
+  AtmosphereFog,
+  LightingSnapshot,
+  PlayfieldShadeOverlay,
+  applyColorTint,
+  applyLightTint,
+  applyMaterialTint,
+  collectAtmosphereMaterials,
+  seedSpores,
+  stepSporeField,
+} from '@pinball/game-engine';
+import type { AtmosphereMaterialEntry, SceneLighting, SporeParticle } from '@pinball/game-engine';
 import { canonicalGltfName, isFlipperGltfMesh, isPinballmapRailMesh, normalizeGltfName } from '@pinball/game-engine';
 
 type MaterialKind = 'surface' | 'wall' | 'decor' | 'default';
 
-type MaterialSnapshot = {
-  material: THREE.MeshStandardMaterial;
-  color: THREE.Color;
-  emissive: THREE.Color;
-  emissiveIntensity: number;
-  kind: MaterialKind;
-};
-
-type SceneLighting = {
-  scene: THREE.Scene;
-  renderer: THREE.WebGLRenderer;
-  ambient: THREE.AmbientLight;
-  hemi: THREE.HemisphereLight;
-  dir: THREE.DirectionalLight;
-  fill: THREE.DirectionalLight;
-};
+type MaterialSnapshot = AtmosphereMaterialEntry<{ kind: MaterialKind }>;
 
 type SetupConfig = {
   root: THREE.Object3D;
@@ -56,19 +53,8 @@ type SetupConfig = {
   bumperVisuals: BumperVisuals | null;
 };
 
-type SporeParticle = {
-  anchorX: number;
-  anchorZ: number;
-  baseY: number;
-  angle: number;
-  radius: number;
-  speed: number;
-  drift: number;
-};
-
-const _lerpColor = new THREE.Color();
-
-function sporeTexture(): THREE.CanvasTexture {
+function sporeTexture(): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
   c.width = 16;
   c.height = 16;
@@ -178,49 +164,21 @@ export class UpsideDownAtmosphere {
   private sporeMat: THREE.PointsMaterial | null = null;
   private sporeTex: THREE.CanvasTexture | null = null;
   private sporesEnabled = true;
-  private mix = 0;
-  private targetMix = 0;
-  private lastAppliedMix = -1;
-  private visited = false;
-  private pulseT = 0;
+  private blend = new AtmosphereBlend(UPSIDE_DOWN_ATMOSPHERE_BLEND);
   private revealLift = 0;
 
-  private origBg = new THREE.Color();
-  private origExposure = 1.45;
-  private origAmbientColor = new THREE.Color();
-  private origAmbientIntensity = 1;
-  private origHemiSky = new THREE.Color();
-  private origHemiGround = new THREE.Color();
-  private origHemiIntensity = 1;
-  private origDirColor = new THREE.Color();
-  private origDirIntensity = 1;
-  private origFillColor = new THREE.Color();
-  private origFillIntensity = 1;
-  private savedFog: THREE.Fog | THREE.FogExp2 | null = null;
-  private upsideDownFog: THREE.FogExp2 | null = null;
+  private snapshot = new LightingSnapshot();
+  private upsideDownFog: AtmosphereFog | null = null;
 
   setup(config: SetupConfig): void {
     this.dispose();
     this.lighting = config.lighting;
     this.garlandLights = config.garlandLights;
     this.bumperVisuals = config.bumperVisuals;
-    this.materials = [];
 
-    config.root.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
-      if (skipAtmosphereTint(obj)) return;
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      for (const mat of mats) {
-        if (!(mat instanceof THREE.MeshStandardMaterial)) continue;
-        if (this.materials.some((entry) => entry.material === mat)) continue;
-        this.materials.push({
-          material: mat,
-          color: mat.color.clone(),
-          emissive: mat.emissive.clone(),
-          emissiveIntensity: mat.emissiveIntensity,
-          kind: atmosphereMaterialKind(obj),
-        });
-      }
+    this.materials = collectAtmosphereMaterials(config.root, {
+      skip: skipAtmosphereTint,
+      extra: (obj) => ({ kind: atmosphereMaterialKind(obj) }),
     });
 
     this.playfieldShade.mount(config.root, {
@@ -230,85 +188,51 @@ export class UpsideDownAtmosphere {
 
     this.buildSpores(config.root);
 
-    const bg = config.lighting.scene.background;
-    if (bg instanceof THREE.Color) this.origBg.copy(bg);
-    this.origExposure = config.lighting.renderer.toneMappingExposure;
+    this.snapshot.capture(config.lighting);
+    this.upsideDownFog = new AtmosphereFog(UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR);
+    this.upsideDownFog.save(config.lighting.scene);
 
-    this.origAmbientColor.copy(config.lighting.ambient.color);
-    this.origAmbientIntensity = config.lighting.ambient.intensity;
-    this.origHemiSky.copy(config.lighting.hemi.color);
-    this.origHemiGround.copy(config.lighting.hemi.groundColor);
-    this.origHemiIntensity = config.lighting.hemi.intensity;
-    this.origDirColor.copy(config.lighting.dir.color);
-    this.origDirIntensity = config.lighting.dir.intensity;
-    this.origFillColor.copy(config.lighting.fill.color);
-    this.origFillIntensity = config.lighting.fill.intensity;
-
-    this.savedFog = config.lighting.scene.fog;
-    this.upsideDownFog = new THREE.FogExp2(UPSIDE_DOWN_ATMOSPHERE_FOG_COLOR, 0);
-
-    this.mix = 0;
-    this.targetMix = 0;
-    this.visited = false;
-    this.pulseT = 0;
+    this.blend.reset();
   }
 
   onGameEvent(event: GameEvent): void {
     if (event.type !== 'PORTAL_TRANSITION_END') return;
-    this.visited = true;
-    this.targetMix = 1;
+    this.blend.visited = true;
+    this.blend.targetMix = 1;
   }
 
   update(dt: number): void {
-    const fullyActive = this.mix >= 1 && this.targetMix >= 1;
-    if (this.mix === this.targetMix && this.targetMix === 0 && !this.visited && !fullyActive) return;
+    if (this.blend.isIdle()) return;
 
-    this.pulseT += dt;
+    const tick = this.blend.step(dt);
 
-    const step = dt / UPSIDE_DOWN_ATMOSPHERE_BLEND;
-    if (this.mix < this.targetMix) {
-      this.mix = Math.min(this.targetMix, this.mix + step);
-    } else if (this.mix > this.targetMix) {
-      this.mix = Math.max(this.targetMix, this.mix - step);
-    }
+    this.applyMix(tick.mix);
 
-    this.applyMix(this.mix);
-
-    if (fullyActive) {
+    if (tick.fullyActivePre) {
       this.applyLivePulse();
     }
 
-    let sporeIntensity = 0;
-    if (this.mix > 0) {
-      if (this.targetMix >= 1) {
-        sporeIntensity = this.mix >= 1 ? 1 : Math.max(0, (this.mix - 0.85) / 0.15);
-      } else {
-        sporeIntensity = this.mix;
-      }
-    }
-    this.updateSpores(dt, sporeIntensity);
+    this.updateSpores(dt, tick.sporeIntensity);
 
-    if (this.mix === 0 && this.targetMix === 0) {
-      this.visited = false;
-    }
+    this.blend.releaseVisitedIfAtRest();
   }
 
   reset(): void {
-    this.targetMix = 0;
+    this.blend.targetMix = 0;
     this.revealLift = 0;
   }
 
   setRevealLift(lift: number): void {
     this.revealLift = THREE.MathUtils.clamp(lift, 0, 1);
-    if (this.mix > 0) {
-      this.applyMix(this.mix);
+    if (this.blend.mix > 0) {
+      this.applyMix(this.blend.mix);
     }
   }
 
   debugForceActive(): void {
-    this.visited = true;
-    this.targetMix = 1;
-    this.mix = 1;
+    this.blend.visited = true;
+    this.blend.targetMix = 1;
+    this.blend.mix = 1;
     this.applyMix(1);
     this.updateSpores(0, 1);
   }
@@ -336,12 +260,8 @@ export class UpsideDownAtmosphere {
     this.spores = [];
     this.sporeMat = null;
     this.sporeTex = null;
-    this.savedFog = null;
     this.upsideDownFog = null;
-    this.mix = 0;
-    this.targetMix = 0;
-    this.visited = false;
-    this.pulseT = 0;
+    this.blend.reset();
     this.revealLift = 0;
   }
 
@@ -349,8 +269,8 @@ export class UpsideDownAtmosphere {
     this.sporesEnabled = enabled;
   }
 
-  // Toutes les spores en UN THREE.Points (1 draw call) — l'animation met à
-  // jour l'attribut position.
+  // All spores in ONE THREE.Points (1 draw call) — the animation updates
+  // the position attribute.
   private buildSpores(root: THREE.Object3D): void {
     const n = UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT;
     this.sporePositions = new Float32Array(n * 3);
@@ -373,17 +293,7 @@ export class UpsideDownAtmosphere {
     this.sporePoints.visible = false;
     this.sporePoints.renderOrder = 520;
 
-    for (let i = 0; i < n; i++) {
-      this.spores.push({
-        anchorX: THREE.MathUtils.lerp(-0.22, 0.22, ((i * 0.37) % 1)),
-        anchorZ: THREE.MathUtils.lerp(-0.48, 0.32, ((i * 0.53 + 0.11) % 1)),
-        baseY: 1.035 + (i % 6) * 0.009,
-        angle: (i / n) * Math.PI * 2,
-        radius: 0.014 + (i % 5) * 0.006,
-        speed: 0.32 + (i % 7) * 0.1,
-        drift: 0.55 + (i % 4) * 0.18,
-      });
-    }
+    this.spores = seedSpores(n);
 
     root.add(this.sporePoints);
   }
@@ -396,23 +306,13 @@ export class UpsideDownAtmosphere {
     this.sporeMat.opacity = 0.72 * intensity;
     if (!active) return;
 
-    const pos = this.sporePositions;
-    for (let i = 0; i < this.spores.length; i++) {
-      const spore = this.spores[i];
-      spore.angle += spore.speed * dt;
-      const r = spore.radius * (0.9 + Math.sin(this.pulseT * 2.4 + spore.angle) * 0.1);
-      const lift = Math.sin(this.pulseT * spore.drift + spore.angle) * 0.014;
-      const wander = Math.sin(this.pulseT * 1.6 + spore.angle * 2.1) * 0.006;
-      pos[i * 3] = spore.anchorX + Math.cos(spore.angle) * r + wander;
-      pos[i * 3 + 1] = spore.baseY + lift + Math.sin(this.pulseT * 0.35 + spore.angle) * 0.018;
-      pos[i * 3 + 2] = spore.anchorZ + Math.sin(spore.angle) * r - wander * 0.6;
-    }
+    stepSporeField(this.spores, dt, this.blend.pulseT, this.sporePositions);
     this.sporeGeo.attributes.position.needsUpdate = true;
   }
 
   private applyLivePulse(): void {
     if (!this.lighting) return;
-    const wave = 0.5 + Math.sin(this.pulseT * UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED) * 0.5;
+    const wave = 0.5 + Math.sin(this.blend.pulseT * UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_SPEED) * 0.5;
     const minExp = THREE.MathUtils.lerp(
       UPSIDE_DOWN_ATMOSPHERE_PULSE_EXPOSURE_MIN,
       1.48,
@@ -427,29 +327,24 @@ export class UpsideDownAtmosphere {
   }
 
   private applyMix(t: number): void {
-    // Early return : ne retoucher les matériaux/lumières que si mix a bougé.
-    if (Math.abs(t - this.lastAppliedMix) < 0.001) return;
-    this.lastAppliedMix = t;
+    // Early return: only touch materials/lights when mix changed.
+    if (!this.blend.shouldApply(t)) return;
 
-    const ease = t * t * (3 - 2 * t);
-    const fullyActive = t >= 1 && this.targetMix >= 1;
+    const ease = AtmosphereBlend.ease(t);
+    const fullyActive = t >= 1 && this.blend.targetMix >= 1;
 
     for (const entry of this.materials) {
       const targets = materialTintTargets(entry.kind);
 
-      entry.material.color.copy(entry.color);
-      _lerpColor.set(targets.tint);
-      entry.material.color.lerp(_lerpColor, ease * 0.5);
-      entry.material.color.multiplyScalar(1 - ease * targets.darken);
-
-      entry.material.emissive.copy(entry.emissive);
-      _lerpColor.set(targets.emissive);
-      entry.material.emissive.lerp(_lerpColor, ease * 0.35);
-      entry.material.emissiveIntensity = THREE.MathUtils.lerp(
-        entry.emissiveIntensity,
-        entry.emissiveIntensity * targets.emissiveMul + targets.emissiveAdd,
-        ease,
-      );
+      applyMaterialTint(entry, ease, {
+        tint: targets.tint,
+        tintK: 0.5,
+        darken: targets.darken,
+        emissive: targets.emissive,
+        emissiveK: 0.35,
+        emissiveMul: targets.emissiveMul,
+        emissiveAdd: targets.emissiveAdd,
+      });
     }
 
     this.playfieldShade.setOpacity(
@@ -460,37 +355,41 @@ export class UpsideDownAtmosphere {
       const { scene, renderer, ambient, hemi, dir, fill } = this.lighting;
 
       if (scene.background instanceof THREE.Color) {
-        scene.background.copy(this.origBg);
-        _lerpColor.set(UPSIDE_DOWN_ATMOSPHERE_BG);
-        (scene.background as THREE.Color).lerp(_lerpColor, ease);
+        applyColorTint(scene.background, this.snapshot.bg, UPSIDE_DOWN_ATMOSPHERE_BG, ease, 1);
       }
 
       if (!fullyActive) {
-        renderer.toneMappingExposure = THREE.MathUtils.lerp(this.origExposure, UPSIDE_DOWN_ATMOSPHERE_EXPOSURE, ease);
+        renderer.toneMappingExposure = THREE.MathUtils.lerp(this.snapshot.exposure, UPSIDE_DOWN_ATMOSPHERE_EXPOSURE, ease);
       }
 
-      ambient.color.copy(this.origAmbientColor);
-      _lerpColor.set(0xccb8d8);
-      ambient.color.lerp(_lerpColor, ease * 0.45);
-      ambient.intensity = THREE.MathUtils.lerp(this.origAmbientIntensity, UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY, ease);
+      applyLightTint(
+        ambient,
+        { color: this.snapshot.ambientColor, intensity: this.snapshot.ambientIntensity },
+        ease,
+        { color: 0xccb8d8, colorK: 0.45, intensity: UPSIDE_DOWN_ATMOSPHERE_AMBIENT_INTENSITY },
+      );
 
-      hemi.color.copy(this.origHemiSky);
-      _lerpColor.set(0x443366);
-      hemi.color.lerp(_lerpColor, ease * 0.6);
-      hemi.groundColor.copy(this.origHemiGround);
-      _lerpColor.set(0x1a0a14);
-      hemi.groundColor.lerp(_lerpColor, ease * 0.65);
-      hemi.intensity = THREE.MathUtils.lerp(this.origHemiIntensity, UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY, ease);
+      applyLightTint(
+        hemi,
+        { color: this.snapshot.hemiSky, intensity: this.snapshot.hemiIntensity },
+        ease,
+        { color: 0x443366, colorK: 0.6, intensity: UPSIDE_DOWN_ATMOSPHERE_HEMI_INTENSITY },
+      );
+      applyColorTint(hemi.groundColor, this.snapshot.hemiGround, 0x1a0a14, ease, 0.65);
 
-      dir.color.copy(this.origDirColor);
-      _lerpColor.set(0xd8c8e8);
-      dir.color.lerp(_lerpColor, ease * 0.35);
-      dir.intensity = THREE.MathUtils.lerp(this.origDirIntensity, UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY, ease);
+      applyLightTint(
+        dir,
+        { color: this.snapshot.dirColor, intensity: this.snapshot.dirIntensity },
+        ease,
+        { color: 0xd8c8e8, colorK: 0.35, intensity: UPSIDE_DOWN_ATMOSPHERE_DIR_INTENSITY },
+      );
 
-      fill.color.copy(this.origFillColor);
-      _lerpColor.set(0x8866aa);
-      fill.color.lerp(_lerpColor, ease * 0.4);
-      fill.intensity = THREE.MathUtils.lerp(this.origFillIntensity, UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY, ease);
+      applyLightTint(
+        fill,
+        { color: this.snapshot.fillColor, intensity: this.snapshot.fillIntensity },
+        ease,
+        { color: 0x8866aa, colorK: 0.4, intensity: UPSIDE_DOWN_ATMOSPHERE_FILL_INTENSITY },
+      );
 
       if (this.revealLift > 0 && fullyActive) {
         ambient.intensity += 0.34 * this.revealLift;
@@ -514,19 +413,12 @@ export class UpsideDownAtmosphere {
 
   private applyFog(ease: number): void {
     if (!this.lighting || !this.upsideDownFog) return;
-
-    const scene = this.lighting.scene;
-    if (ease <= 0) {
-      this.restoreFog();
-      return;
-    }
-
-    this.upsideDownFog.density = UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY * ease * (1 - this.revealLift * 0.8);
-    if (scene.fog !== this.upsideDownFog) scene.fog = this.upsideDownFog;
+    const density = UPSIDE_DOWN_ATMOSPHERE_FOG_DENSITY * ease * (1 - this.revealLift * 0.8);
+    this.upsideDownFog.apply(this.lighting.scene, ease, density);
   }
 
   private restoreFog(): void {
-    if (!this.lighting) return;
-    this.lighting.scene.fog = this.savedFog;
+    if (!this.lighting || !this.upsideDownFog) return;
+    this.upsideDownFog.restore(this.lighting.scene);
   }
 }

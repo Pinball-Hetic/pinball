@@ -3,10 +3,10 @@ import { useEffect, useRef } from 'react'
 import type { Reactor } from './reactor'
 
 interface SideArtProps {
-  // API générique (normal / monde alternatif) : l'app ne connaît pas l'Upside
-  // Down. Le rendu ST est interne à la map.
+  // Generic API (normal / alternate world): the app does not know about the
+  // Upside Down. The ST rendering is internal to the map.
   mood: 'normal' | 'alternate'
-  agitation: number // 0..1 — vitesse/amplitude des animations
+  agitation: number // 0..1 — animation speed/amplitude
   reactor?: Reactor
 }
 
@@ -20,12 +20,12 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
       if (r.kind === 'event' && r.label === 'RAMP' && beamRef.current) {
         const el = beamRef.current
         el.classList.remove(cx('ramp-beam-on'))
-        void el.offsetWidth // reflow → relance l'animation
+        void el.offsetWidth // reflow → restarts the animation
         el.classList.add(cx('ramp-beam-on'))
       }
     })
   }, [reactor])
-  const swayDur = 6 - agitation * 4 // plus agité = plus rapide
+  const swayDur = 6 - agitation * 4 // more agitated = faster
   const glow = upside ? '#b14dff' : '#ff2d2d'
   const amp = 2 + agitation * 6
 
@@ -55,7 +55,7 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
 
         <rect x="0" y="0" width="320" height="660" fill="url(#demoGrad)" />
 
-        {/* Silhouette demogorgon — corps + tête en pétales */}
+        {/* Demogorgon silhouette — body + petal head */}
         <g
           className={cx('demo-body')}
           fill="#050505"
@@ -65,7 +65,7 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
         >
           <path d="M160 250 C120 300 120 470 150 600 L170 600 C200 470 200 300 160 250 Z" />
           <ellipse cx="160" cy="235" rx="42" ry="54" />
-          {/* tête-fleur : pétales ouverts */}
+          {/* flower head: open petals */}
           {Array.from({ length: 6 }).map((_, i) => {
             const a = (Math.PI * (i - 2.5)) / 5
             const x = 160 + Math.cos(a - Math.PI / 2) * 60
@@ -79,12 +79,12 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
               />
             )
           })}
-          {/* bras maigres */}
+          {/* thin arms */}
           <path d="M150 290 C100 320 70 400 80 470" fill="none" strokeWidth="6" />
           <path d="M170 290 C220 320 250 400 240 470" fill="none" strokeWidth="6" />
         </g>
 
-        {/* Vignes animées (sway lent) */}
+        {/* Animated vines (slow sway) */}
         {[40, 110, 200, 280].map((x, i) => (
           <path
             key={x}

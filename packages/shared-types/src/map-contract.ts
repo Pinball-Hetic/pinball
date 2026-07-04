@@ -1,37 +1,36 @@
 import type { ClipId, ClipTimings } from './socket-events'
 
-// Contrat de données SÉRIALISABLE d'une map. Aucune dépendance Three/React/
-// game-engine : shared-types reste neutre. Les interfaces runtime (MapModule,
-// MapContext, contenus DMD/backglass) vivent dans game-engine et les apps
-// (phases 2-5).
+// SERIALIZABLE data contract for a map. No Three/React/game-engine dependency:
+// shared-types stays neutral. Runtime interfaces (MapModule, MapContext,
+// DMD/backglass content) live in game-engine and the apps.
 export type CinematicFamily = 'boss' | 'collect' | 'milestone' | 'other'
 
-// Id de map par défaut (pas de sélecteur de map : NEXT_PUBLIC_MAP_ID non défini
-// → cette map). SEUL endroit où le littéral vit côté apps/serveur ; les
-// consommateurs l'importent au lieu de hardcoder. Whitelisté par le grep-guard.
+// Default map id (no map selector: NEXT_PUBLIC_MAP_ID undefined → this map).
+// ONLY place where the literal lives on the apps/server side; consumers import
+// it instead of hardcoding.
 export const DEFAULT_MAP_ID = 'strangerthings'
 
-// URL publique d'un asset de map. Les assets vivent dans le package de map
-// (packages/maps/<id>/assets/) et sont synchronisés vers
-// apps/<app>/public/maps/<id>/ au build (scripts/sync-map-assets.sh). Le
-// préfixe est dérivé de l'id de map — aucun chemin littéral côté consommateur.
+// Public URL of a map asset. Assets live in the map package
+// (packages/maps/<id>/assets/) and are synced to apps/<app>/public/maps/<id>/
+// at build time (scripts/sync-map-assets.sh). The prefix is derived from the
+// map id — no literal path on the consumer side.
 export function mapAssetUrl(mapId: string, relPath: string): string {
   return `/maps/${mapId}/${relPath.replace(/^\/+/, '')}`
 }
 
-// ─── Rendering per-map ────────────────────────────────────────────────────────
-// Tous les paramètres visuels qui varient d'une map à l'autre. Le moteur
-// (game-engine + PinballPlayfield) lira ces valeurs au lieu de constantes
-// globales. Aucune dépendance Three.js ici : couleurs = hex numbers.
+// ─── Per-map rendering ───────────────────────────────────────────────────────
+// All visual parameters that vary between maps. The engine (game-engine +
+// PinballPlayfield) reads these instead of global constants. No Three.js
+// dependency here: colors = hex numbers.
 
 export interface MapLightConfig {
-  /** Couleur de la lumière en hex (ex. 0xffffff). */
+  /** Light color as hex (e.g. 0xffffff). */
   color: number;
   intensity: number;
 }
 
 export interface MapDirLightConfig extends MapLightConfig {
-  /** Position normalisée (magnitude indifférente, direction compte). */
+  /** Normalized position (magnitude irrelevant, only direction matters). */
   x: number;
   y: number;
   z: number;
@@ -44,40 +43,40 @@ export interface MapHemiLightConfig {
 }
 
 export interface MapRenderingConfig {
-  /** Active l'environment map (RoomEnvironment + PMREMGenerator).
-   *  Nécessaire pour les matériaux métalliques vifs (or, gemmes).
-   *  false = pas de scene.environment → matériaux sans reflets ambiants (état original ST). */
+  /** Enables the environment map (RoomEnvironment + PMREMGenerator).
+   *  Required for vivid metallic materials (gold, gems).
+   *  false = no scene.environment → materials without ambient reflections (original ST look). */
   useEnvironment: boolean;
-  /** renderer.toneMappingExposure — luminosité globale post tone-mapping. */
+  /** renderer.toneMappingExposure — global brightness after tone mapping. */
   toneMappingExposure: number;
-  /** Facteur de darken appliqué aux matériaux de surface (table, murs, plastic).
-   *  1.0 = aucun changement, 0.9 = légère assombrissement. */
+  /** Darken factor applied to surface materials (table, walls, plastic).
+   *  1.0 = no change, 0.9 = slight darkening. */
   colorDarken: number;
-  /** Flou de l'environment RoomEnvironment.
-   *  0 = reflets ultra-nets, 0.04 = reflets doux (défaut Three.js). */
+  /** RoomEnvironment blur.
+   *  0 = razor-sharp reflections, 0.04 = soft reflections (Three.js default). */
   environmentBlur: number;
-  /** envMapIntensity pour matériaux très métalliques (metalness ≥ 0.5).
-   *  1.0 = standard, 2–3 = reflets vifs type or/gemmes Zelda. */
+  /** envMapIntensity for highly metallic materials (metalness ≥ 0.5).
+   *  1.0 = standard, 2–3 = vivid reflections, e.g. Zelda gold/gems. */
   envIntensityMetallic: number;
-  /** envMapIntensity pour matériaux semi-métalliques (metalness 0.2–0.5). */
+  /** envMapIntensity for semi-metallic materials (metalness 0.2–0.5). */
   envIntensitySemi: number;
-  /** envMapIntensity de base pour matériaux non-métalliques (metalness < 0.2). */
+  /** Base envMapIntensity for non-metallic materials (metalness < 0.2). */
   envIntensityBase: number;
   lights: {
-    /** Lumière ambiante omnidirectionnelle — dose minimale pour les zones d'ombre. */
+    /** Omnidirectional ambient light — minimal dose for shadowed areas. */
     ambient: MapLightConfig;
-    /** HemisphereLight ciel/sol — teinte chaude/froide depuis le volume. */
+    /** Sky/ground HemisphereLight — warm/cool tint from the volume. */
     hemi: MapHemiLightConfig;
-    /** Directionnel principal — source du contraste et des ombres portées. */
+    /** Main directional — source of contrast and cast shadows. */
     dir: MapDirLightConfig;
-    /** Second directionnel optionnel, côté opposé au principal → double
-     *  éclairage qui débouche l'ombre du `dir` sans le fill (réservé à
-     *  UpsideDownAtmosphere). Absent → un seul soleil. */
+    /** Optional second directional, opposite side of the main one → dual
+     *  lighting that lifts the `dir` shadow without the fill (reserved for
+     *  UpsideDownAtmosphere). Absent → single sun. */
     dir2?: MapDirLightConfig;
-    /** Contre-jour optionnel (fond de table, vers la caméra) → liseré sur les
-     *  bords métal. Absent → pas de rim. */
+    /** Optional backlight (table rear, toward the camera) → highlight edge on
+     *  metal rims. Absent → no rim. */
     rim?: MapDirLightConfig;
-    /** Fill léger — débouche les zones d'ombre sans écraser le contraste. */
+    /** Light fill — lifts shadowed areas without flattening contrast. */
     fill: MapDirLightConfig;
   };
 }
@@ -86,45 +85,45 @@ export interface MapManifest {
   id: string
   name: string
   version: number
-  /** Sous-titre d'écran d'attract (branding de la map, ex. lab fictif). */
+  /** Attract-screen subtitle (map branding, e.g. fictional lab). */
   attractTagline?: string
-  /** Mapping clipId → famille de cinématique générique (boss/collect/milestone/other). */
+  /** Mapping clipId → generic cinematic family (boss/collect/milestone/other). */
   clipFamilies?: Record<string, CinematicFamily>
-  /** Variables CSS de thème (ex. couleurs de flair) appliquées sur le stage. */
+  /** Theme CSS variables (e.g. flair colors) applied on the stage. */
   theme?: Record<string, string>
-  /** Wording + assets de l'écran outro game-over (défauts FR neutres si absent). */
+  /** Wording + assets for the game-over outro screen (neutral FR defaults if absent). */
   outro?: {
-    title?: string // défaut "FIN DE PARTIE"
-    scanLabel?: string // défaut "Scanne pour t'inscrire au classement"
-    replayLabel?: string // défaut "START — Rejouer"
-    qrLogo?: string // URL asset logo centre QR (absent → pas de logo)
+    title?: string // default "FIN DE PARTIE"
+    scanLabel?: string // default "Scanne pour t'inscrire au classement"
+    replayLabel?: string // default "START — Rejouer"
+    qrLogo?: string // asset URL for the QR center logo (absent → no logo)
   }
-  /** Assets à précharger (chemins relatifs à public/) — consommé par la page. */
+  /** Assets to preload (paths relative to public/) — consumed by the page. */
   preload?: string[]
-  /** Vidéos/images d'overlay cinématique par clipId (sinon fallback CSS). */
+  /** Cinematic overlay videos/images by clipId (otherwise CSS fallback). */
   overlayFiles?: Record<string, string>
-  /** Sons d'event de la map par id (joués via ctx.playSound(id)). */
+  /** Map event sounds by id (played via ctx.playSound(id)). */
   sounds?: Record<string, { url: string; volume?: number }>
-  /** Musique ambiante en boucle (attract + in-game). Fallback : /audio/early-sound.mp3 */
+  /** Looping ambient music (attract + in-game). Fallback: /audio/early-sound.mp3 */
   ambientMusic?: string
-  /** Son game over. Fallback : /audio/sound-lost.mp3 */
+  /** Game-over sound. Fallback: /audio/sound-lost.mp3 */
   gameOverSound?: string
   /**
-   * Musique en boucle jouée dans le monde alternatif (entre PORTAL_TRANSITION_END
-   * et BOSS_REVEAL du boss alternatif). S'arrête dès que la musique de combat prend
-   * le relais, ou à WORLD_CYCLE_COMPLETE si aucun boss n'a été reveal.
+   * Looping music played in the alternate world (between PORTAL_TRANSITION_END
+   * and the alternate boss's BOSS_REVEAL). Stops as soon as the combat music
+   * takes over, or at WORLD_CYCLE_COMPLETE if no boss was revealed.
    */
   alternateWorldMusicUrl?: string
   alternateWorldMusicVolume?: number
-  /** Libellés des compteurs (GameStats.counters) par id, pour le recap backglass. */
+  /** Counter labels (GameStats.counters) by id, for the backglass recap. */
   counterLabels?: Record<string, string>
-  /** Clés de mapState pilotables par l'outil de debug (dev). Permet au debug
-   *  d'éditer le mapState d'une map sans clés en dur. */
+  /** mapState keys drivable by the debug tool (dev). Lets debug edit a map's
+   *  mapState without hardcoded keys. */
   debugMapState?: { numbers?: string[]; flags?: string[] }
-  /** Rayon de la balle (m). Absent = DEFAULT_BALL_RADIUS (ST : 0.01374). */
+  /** Ball radius (m). Absent = DEFAULT_BALL_RADIUS (ST: 0.01374). */
   ballRadius?: number
-  glb: string // relatif au dossier assets/ du package
-  scoring: Record<string, number> // points par rôle (bumper, slingshot, target…)
+  glb: string // relative to the package's assets/ folder
+  scoring: Record<string, number> // points per role (bumper, slingshot, target…)
   rules: {
     lives: number
     multiplierThresholds: number[]
@@ -132,21 +131,20 @@ export interface MapManifest {
     milestoneRepeatEvery: number
     comboDecayMs: number
   }
-  elements?: Record<string, Record<string, number | string>> // tuning par id d'élément
-  meshAliases?: Record<string, string> // nom GLB legacy → nom conventionnel
-  clips?: Record<ClipId, ClipTimings> // timings des clips de la map
-  forbiddenInCore?: string[] // termes pour le grep-guard anti-fuite
-  /** Configuration de rendu Three.js spécifique à la map.
-   *  Absent → le moteur utilise ses propres valeurs par défaut. */
+  elements?: Record<string, Record<string, number | string>> // per-element-id tuning
+  meshAliases?: Record<string, string> // legacy GLB name → conventional name
+  clips?: Record<ClipId, ClipTimings> // clip timings for the map
+  forbiddenInCore?: string[] // terms for the anti-leak grep guard
+  /** Map-specific Three.js rendering configuration.
+   *  Absent → the engine uses its own defaults. */
   rendering?: MapRenderingConfig
 }
 
-// Paquet de map résolu par la composition root (packages/maps/index.ts).
-// Les modules runtime sont chargés plus tard (phases 4-5) ; ici on n'expose
-// que des drapeaux de capacité.
+// Map package resolved by the composition root (packages/maps/index.ts).
+// Runtime modules are loaded later; only capability flags are exposed here.
 export interface MapPackage {
   manifest: MapManifest
-  hasModule: boolean // comportement playfield custom (chargé en phase 4)
-  hasDmd: boolean // contenu DMD fourni (phase 5) — sinon NO SIGNAL
-  hasBackglass: boolean // idem backglass
+  hasModule: boolean // custom playfield behavior
+  hasDmd: boolean // DMD content provided — otherwise NO SIGNAL
+  hasBackglass: boolean // same for backglass
 }

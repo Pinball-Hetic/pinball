@@ -129,3 +129,34 @@ test('uses eased reveal pan by default', () => {
   expect(latest).toBeDefined();
   expect(latest!.x).toBeCloseTo(0.5, 6);
 });
+
+test('camera lands exactly on base view after a full cinematic (finish no-op invariant)', () => {
+  const definition = boss({
+    cameraCinematic: {
+      lookAtLift: 0,
+      panFrom: { x: 4, y: 0, z: 0 },
+      zoomInDuration: 1,
+      holdDuration: 0.2,
+      zoomOutDuration: 1,
+      distanceScale: 0.5,
+    },
+  });
+  const { director, lookAtCalls } = setupDirector(definition);
+
+  director.play('boss_a');
+  // Zoom in, hold, then fully complete zoom out (drives machine to done → finish()).
+  director.update(1); // zoomIn → hold
+  director.update(0.2); // hold → zoomOut
+  director.update(1); // zoomOut done → finish()
+
+  expect(director.isActive()).toBe(false);
+
+  // Base view: target (0,0,0), dirToCamera (0,0,1), distance 10 → camera at (0,0,10),
+  // lookAt at origin. The final zoomOut tick already applied this; finish() must not
+  // have moved it (removed redundant applyView).
+  const lastLook = lookAtCalls.at(-1);
+  expect(lastLook).toBeDefined();
+  expect(lastLook!.x).toBeCloseTo(0, 6);
+  expect(lastLook!.y).toBeCloseTo(0, 6);
+  expect(lastLook!.z).toBeCloseTo(0, 6);
+});

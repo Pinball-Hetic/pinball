@@ -15,6 +15,9 @@ export class BumpCollisionHandler implements CollisionHandler {
   constructor(
     private readonly pendingPhysics: Array<() => void>,
     private readonly bumpHitUC: BumpHit,
+    // Injected clock: tests pass a controllable fake — no global
+    // monkey-patch needed.
+    private readonly now: () => number = () => performance.now(),
   ) {}
 
   canHandle(role: string): boolean {
@@ -24,7 +27,7 @@ export class BumpCollisionHandler implements CollisionHandler {
   handle(role: string, gameState: string, started: boolean): void {
     if (!started || gameState !== 'playing') return;
     const side = role === 'bump_right' ? 'right' as const : 'left' as const;
-    const now = performance.now();
+    const now = this.now();
     if (now - this.bumpLastHitMs[side] >= BUMP_HIT_COOLDOWN_MS) {
       this.bumpLastHitMs[side] = now;
       this.pendingPhysics.push(() => this.bumpHitUC.execute(side, BUMP_EJECT_SCALE));

@@ -53,7 +53,7 @@ export class SamplePlayer {
     return this.ctx;
   }
 
-  /** Recalcule les bus depuis AUDIO_VOLUME (appelé à l'init). */
+  /** Recomputes the buses from AUDIO_VOLUME (called at init). */
   syncBusGains(): void {
     if (!this.master || !this.musicBus || !this.cinematicBus || !this.sfxBus) return;
     this.master.gain.value = percentToGain(AUDIO_VOLUME.master);
@@ -77,7 +77,7 @@ export class SamplePlayer {
     return this.cinematicBus;
   }
 
-  /** Baisse musique + sfx pour laisser passer un hit cinématique. */
+  /** Ducks music + sfx to let a cinematic hit through. */
   duckBackground(durationS = 2.5): void {
     const ctx = this.ctx;
     if (!ctx || !this.musicBus || !this.sfxBus) return;
@@ -227,7 +227,7 @@ export class SamplePlayer {
     };
   }
 
-  /** Coupe les pistes cinématiques/boss encore en lecture (ex. spawnDG). */
+  /** Stops cinematic/boss tracks still playing (e.g. spawnDG). */
   stopActiveOneShots(): void {
     for (const { source, gain } of this.activeOneShots) {
       try {

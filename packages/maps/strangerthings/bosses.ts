@@ -7,9 +7,9 @@ import {
 } from './cameraCinematics'
 import { mapAsset } from './manifest'
 
-// Définitions de boss Stranger Things (déplacées de game-engine/BossRegistry).
-// Le moteur ne contient plus de contenu boss : il reçoit ces définitions
-// injectées (layout.bosses) et opère dessus via des helpers génériques.
+// Stranger Things boss definitions. The engine contains no boss content:
+// it receives these definitions injected (layout.bosses) and operates on
+// them via generic helpers.
 export const bossDefinitions: BossDefinition[] = [
   {
     id: 'demogorgon',
@@ -44,7 +44,7 @@ export const bossDefinitions: BossDefinition[] = [
     revealSoundUrl: mapAsset('audio/spawnDG.mp3'),
     revealSoundVolume: 100,
     keepMusicUntilBossReveal: 'vecna',
-    // Eleven aide pendant le fight (cf. DemogorgonReveal émet ASSIST id 'eleven').
+    // Eleven assists during the fight (DemogorgonReveal emits ASSIST id 'eleven').
     assist: { id: 'eleven' },
     targetMeshTheme: {
       ring: {
@@ -112,7 +112,7 @@ export const bossDefinitions: BossDefinition[] = [
     latePhaseSoundUrl: mapAsset('audio/win-music.mp3'),
     latePhaseSoundVolume: 100,
     latePhaseHitThreshold: 7,
-    // win-music continue pendant la cinématique retour portail (photo fin Vecna).
+    // win-music keeps playing during the portal return cinematic (Vecna end photo).
     keepMusicUntilReturnPortal: true,
     targetMeshTheme: {
       ring: {
@@ -144,8 +144,7 @@ export const bossDefinitions: BossDefinition[] = [
   },
 ]
 
-// Registry map-side (mêmes accesseurs que l'ancien BossRegistry game-engine,
-// mais sur les définitions de CETTE map).
+// Map-side registry over THIS map's definitions.
 const byId: Record<string, BossDefinition> = Object.fromEntries(
   bossDefinitions.map((b) => [b.id, b]),
 )

@@ -2,6 +2,7 @@ import {
   DOT,
   FONT_5X7,
   GRID_W,
+  GRID_H,
   drawText,
   drawCentered,
   parseClip,
@@ -11,13 +12,14 @@ import {
   drawClipFrame,
   plot,
   seeded,
+  fmtNum,
   type ClipHandler,
   type ParsedClip,
 } from '@pinball/dmd-core'
 import { DEMOGORGON_HERO } from './demogorgonHero'
 import { RAW_CLIPS } from './rawClips'
 
-// Palettes par clip (résolution char → index palette du DMD).
+// Per-clip palettes (char → DMD palette index resolution).
 const RED = { ':': DOT.heticOff, '#': DOT.lives, '@': DOT.gameOver, '!': DOT.event }
 const VIOLET = { ':': DOT.heticOff, '#': DOT.multi, '@': DOT.rain, '!': DOT.event }
 
@@ -26,7 +28,7 @@ const CLIPS: Record<'portal_swallow' | 'last_chance', ParsedClip> = {
   last_chance: parseClip(RAW_CLIPS.last_chance, RED),
 }
 
-// Frame statique hero demogorgon + palettes procédurales.
+// Static demogorgon hero frame + procedural palettes.
 const HERO_FRAME: string[] = trimFrame(DEMOGORGON_HERO.replace(/\r/g, '').split('\n'))
 const HERO_MAP = { ':': DOT.heticOff, '#': DOT.lives, '@': DOT.gameOver, '!': DOT.event }
 const HERO_MAP_PULSE = { ':': DOT.heticOff, '#': DOT.lives, '@': DOT.event, '!': DOT.gameOver }
@@ -88,8 +90,51 @@ function clipHeticComplete(grid: Uint8Array, ms: number): void {
   }
 }
 
-// Handlers de cinématiques Stranger Things (injectés dans le moteur DMD).
+// Rocket liftoff (DMD) — consistent with the playfield (garlands) and the
+// backglass (cine-rocket). Two phases: ascent (rocket climbing) then spark
+// burst + milestone label. Ascent lasts ~40% of the clip.
+//
+// Pure: rocket y at time ms over an ascent window launchMs, from bottom
+// (GRID_H - 1) to top (topY). Returns topY once the ascent is done
+// (ms >= launchMs). Testable without a grid.
+export function rocketLaunchY(ms: number, launchMs: number, topY = 3): number {
+  const p = Math.max(0, Math.min(1, ms / launchMs))
+  return (GRID_H - 1) + p * (topY - (GRID_H - 1))
+}
+
+function clipMilestoneRocket(grid: Uint8Array, value: number, ms: number): void {
+  const cx = Math.floor(GRID_W / 2)
+  const launchMs = 1600
+  if (ms < launchMs) {
+    // Ascent: rocket body + exhaust flame below.
+    const y = Math.round(rocketLaunchY(ms, launchMs))
+    plot(grid, cx, y, DOT.score)
+    plot(grid, cx, y + 1, DOT.event)
+    plot(grid, cx - 1, y + 2, DOT.event)
+    plot(grid, cx + 1, y + 2, DOT.event)
+    plot(grid, cx, y + 3, DOT.gameOver)
+    return
+  }
+  // Spark burst at apogee + milestone label (deterministic).
+  const et = Math.min(1, (ms - launchMs) / 1400)
+  for (let i = 0; i < 22; i++) {
+    const a = seeded(i) * Math.PI * 2
+    const speed = 6 + seeded(i * 2) * 16
+    const x = cx + Math.cos(a) * speed * et
+    const y = 3 + Math.sin(a) * speed * et * 0.6 + et * et * 10
+    plot(grid, x, y, seeded(i) > 0.5 ? DOT.event : DOT.score)
+  }
+  drawCentered(grid, fmtNum(value), 22, FONT_5X7, DOT.score, 1, 1)
+}
+
+// Stranger Things cinematic handlers (injected into the DMD engine).
 export const cinematicHandlers: Record<string, ClipHandler> = {
+  // Score milestones: all render the same rocket liftoff (cross-screen
+  // rocket consistency). The milestone value comes from ctx.value.
+  milestone_5k: (grid, clockMs, ctx) => clipMilestoneRocket(grid, ctx.value || 5000, clockMs),
+  milestone_15k: (grid, clockMs, ctx) => clipMilestoneRocket(grid, ctx.value || 15000, clockMs),
+  milestone_30k: (grid, clockMs, ctx) => clipMilestoneRocket(grid, ctx.value || 30000, clockMs),
+  milestone_big: (grid, clockMs, ctx) => clipMilestoneRocket(grid, ctx.value || 50000, clockMs),
   demogorgon_rises: (grid, clockMs) => {
     if (clockMs < 2800) {
       revealRadial(grid, HERO_FRAME, HERO_MAP, clockMs / 2800)

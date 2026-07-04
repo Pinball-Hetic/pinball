@@ -1,8 +1,7 @@
 import type { BossDefinition } from './BossRegistry';
 
-// Données de placement/géométrie d'une map. Le moteur reçoit ce bloc par
-// injection (phase 4) au lieu d'importer des constantes ST. Les TYPES vivent
-// dans game-engine ; les VALEURS dans le package de la map (layout.ts).
+// Placement/geometry data for a map, injected into the engine. TYPES live in
+// game-engine; VALUES live in the map package (layout.ts).
 
 export interface MapPoint3 {
   x: number;
@@ -24,18 +23,19 @@ export interface DropTargetDef {
 }
 
 export interface SensorLayout {
-  popZones: MapPoint3[]; // capteurs de zone pop-bumper
-  rocket: MapPoint3; // capteur de rampe
-  bossReveal: MapPoint3; // ancre de flash du reveal boss (monde normal)
-  portal: MapPoint3; // ancre du portail monde alternatif
+  popZones: MapPoint3[]; // pop-bumper zone sensors
+  rocket: MapPoint3; // ramp sensor
+  bossReveal: MapPoint3; // boss-reveal flash anchor (normal world)
+  portal: MapPoint3; // alternate-world portal anchor
+  scoop?: MapPoint3; // saucer hole sensor: capture → rewards → kick. Optional.
 }
 
 export interface SpawnLayout {
-  ball: MapPoint3; // spawn couloir plongeur
-  alternateWorld: MapPoint2; // spawn monde alternatif
-  alternateWorldImpulse: MapPoint3; // impulsion d'entrée monde alternatif
-  normalReturn: MapPoint2; // spawn retour monde normal
-  normalReturnImpulse: MapPoint3; // impulsion de retour
+  ball: MapPoint3; // shooter lane spawn
+  alternateWorld: MapPoint2; // alternate-world spawn
+  alternateWorldImpulse: MapPoint3; // alternate-world entry impulse
+  normalReturn: MapPoint2; // return-to-normal-world spawn
+  normalReturnImpulse: MapPoint3; // return impulse
 }
 
 export interface ShooterLaneLayout {
@@ -92,7 +92,7 @@ export interface GeometryLayout {
   };
 }
 
-// Tous les réglages d'ambiance monde alternatif (ambiance fournie par la map).
+// All alternate-world atmosphere tuning (atmosphere is provided by the map).
 export interface AtmosphereLayout {
   transition: {
     durationS: number;
@@ -132,20 +132,20 @@ export interface AtmosphereLayout {
   blendStrobeHz: number;
   sporeCount: number;
   hintMs: number;
-  /** Libellé de la bannière d'atmosphère active (ex. « monde alternatif »). */
+  /** Active-atmosphere banner label (e.g. « monde alternatif »). */
   bannerLabel: string;
-  /** Libellé du hint d'entrée dans l'atmosphère (ex. « Le monde s'est inversé… »). */
+  /** Atmosphere-entry hint label (e.g. « Le monde s'est inversé… »). */
   hintLabel: string;
 }
 
 export interface MapLayout {
-  bumpers: MapPoint3[]; // BUMPER_POSITIONS
-  dropTargets: DropTargetDef[]; // DROP_TARGETS
+  bumpers: MapPoint3[];
+  dropTargets: DropTargetDef[];
   sensors: SensorLayout;
   spawns: SpawnLayout;
   shooterLane: ShooterLaneLayout;
   flipperPivots: FlipperPivots;
-  bosses: BossDefinition[]; // BOSS_REGISTRY (données ; types restent dans game-engine)
+  bosses: BossDefinition[];
   geometry: GeometryLayout;
   atmosphere: AtmosphereLayout;
 }

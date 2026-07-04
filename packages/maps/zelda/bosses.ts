@@ -7,9 +7,9 @@ import {
   DARK_LINK_VICTORY_CAMERA_CINEMATIC,
 } from './cameraCinematics'
 
-// Définitions de boss Zelda.
-// Ganondorf : monde normal, cible centrale.
-// Dark Link : monde alternatif (Sacred Realm), cible plus haute.
+// Zelda boss definitions.
+// Ganondorf: normal world, central target.
+// Dark Link: alternate world (Sacred Realm), higher target.
 export const bossDefinitions: BossDefinition[] = [
   {
     id: 'ganondorf',
@@ -41,8 +41,8 @@ export const bossDefinitions: BossDefinition[] = [
     unlocksReturnPortal: false,
     cameraCinematic: GANONDORF_CAMERA_CINEMATIC,
     victoryCameraCinematic: GANONDORF_VICTORY_CAMERA_CINEMATIC,
-    // Pas de revealSoundUrl : le son d'intro Ganondorf est joué en one-shot via
-    // manifest.sounds.ganondorf_appear → l'ambient reprend immédiatement après.
+    // No revealSoundUrl: Ganondorf's intro sound plays one-shot via
+    // manifest.sounds.ganondorf_appear → ambient resumes right after.
     targetMeshTheme: {
       ring: {
         color: 0xff6600,
@@ -104,18 +104,18 @@ export const bossDefinitions: BossDefinition[] = [
     unlocksReturnPortal: true,
     cameraCinematic: DARK_LINK_CAMERA_CINEMATIC,
     victoryCameraCinematic: DARK_LINK_VICTORY_CAMERA_CINEMATIC,
-    // ── Audio Dark Link ──────────────────────────────────────────────────────
-    // Musique de combat lancée au reveal.
+    // ── Dark Link audio ──────────────────────────────────────────────────────
+    // Fight music started at reveal.
     revealSoundUrl: mapAsset('audio/second-boss.mp3'),
     revealSoundVolume: 100,
-    // Phase finale (≥7 coups) : musique plus dynamique.
+    // Final phase (≥7 hits): more dynamic music.
     latePhaseSoundUrl: mapAsset('audio/last-pv-second-boss.mp3'),
     latePhaseSoundVolume: 100,
     latePhaseHitThreshold: 7,
-    // Victoire : bascule vers la musique de win dès que Dark Link est vaincu.
+    // Victory: switch to the win music as soon as Dark Link is defeated.
     victoryMusicUrl: mapAsset('audio/win.mp3'),
     victoryMusicVolume: 100,
-    // La musique win continue pendant la cinématique retour Hyrule.
+    // Win music keeps playing during the Hyrule return cinematic.
     keepMusicUntilReturnPortal: true,
     targetMeshTheme: {
       ring: {

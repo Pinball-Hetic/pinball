@@ -24,14 +24,14 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
     })
   }, [reactor])
 
-  // Couleur de glow : émeraude en monde normal, or en Sacred Realm
+  // Glow color: emerald in the normal world, gold in the Sacred Realm
   const glow = sacred ? '#FFD700' : '#22cc44'
   const glowDim = sacred ? '#a87c00' : '#145c20'
   const pulseDur = 3 - agitation * 1.5
   const rayOpacity = 0.04 + agitation * 0.08
 
-  // Coordonnées de la Triforce (3 triangles équilatéraux, côté 80px)
-  // Centrée autour de (160, 280) dans un viewBox 320×660
+  // Triforce coordinates (3 equilateral triangles, 80px side)
+  // Centered around (160, 280) in a 320×660 viewBox
   const S = 80
   const H = S * Math.sqrt(3) / 2  // ≈ 69.3
   const cx0 = 160, cy0 = 235

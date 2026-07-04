@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { GameEvent } from '@pinball/game-engine';
-import { normalizeGltfName } from '@pinball/game-engine';
+import type { GameEvent, BumperMatchRule } from '@pinball/game-engine';
+import { collectBumperParts, tickPunchTimers, applyPunchScale } from '@pinball/game-engine';
 import { layout } from '../layout';
 import { GlowSprite } from '@pinball/game-engine';
 
@@ -26,20 +26,22 @@ const IDLE_PULSE_SPEED = 1.35;
 const IDLE_PULSE_AMP = 0.18;
 const HIT_FLASH_DURATION = 0.2;
 const HIT_FLASH_BOOST = 1.1;
-const PUNCH_DURATION = 0.15; // durée du pop en secondes
-const PUNCH_PEAK = 0.20; // ampleur : 0.20 = grossit à 1.20×
-
-// easeOutBack : léger dépassement puis retour.
-function easeOutBack(t: number): number {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-}
+const PUNCH_DURATION = 0.15; // pop duration in seconds
+const PUNCH_PEAK = 0.20; // amplitude: 0.20 = grows to 1.20×
 
 const _emissiveA = new THREE.Color();
 const _emissiveB = new THREE.Color();
 
 type BumperKind = 'gltf' | 'base' | 'ring';
+
+// Order matters (first matching rule wins): legacy hide, then gltf,
+// then base, then ring.
+const MATCH_RULES: readonly BumperMatchRule<BumperKind>[] = [
+  { pattern: LEGACY_BUMPER, result: { action: 'hide' } },
+  { pattern: GLTF_BUMPER, result: { action: 'part', kind: 'gltf' } },
+  { pattern: LEGACY_BASE, result: { action: 'part', kind: 'base' } },
+  { pattern: LEGACY_RING, result: { action: 'part', kind: 'ring' } },
+];
 
 const GLOW_SIZE = 0.11;
 
@@ -48,7 +50,7 @@ type BumperPart = {
   material: THREE.MeshStandardMaterial;
   bumperIndex: number;
   kind: BumperKind;
-  glow: GlowSprite | null; // remplace l'ancienne PointLight (coût shader nul)
+  glow: GlowSprite | null; // replaces the former PointLight (zero shader cost)
   glowColor: number;
   baseIntensity: number;
   baseScale: THREE.Vector3;
@@ -59,23 +61,6 @@ function cloneStandardMaterial(mesh: THREE.Mesh): THREE.MeshStandardMaterial {
   const mat = (Array.isArray(src) ? src[0] : src) as THREE.Material;
   if (mat instanceof THREE.MeshStandardMaterial) return mat.clone();
   return new THREE.MeshStandardMaterial({ color: 0xffffff });
-}
-
-function nearestBumperIndex(pos: THREE.Vector3): number {
-  let best = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < layout.bumpers.length; i++) {
-    const p = layout.bumpers[i]!;
-    const dx = pos.x - p.x;
-    const dy = pos.y - p.y;
-    const dz = pos.z - p.z;
-    const d = dx * dx + dy * dy + dz * dz;
-    if (d < bestDist) {
-      bestDist = d;
-      best = i;
-    }
-  }
-  return best;
 }
 
 function applyGltfBumperLook(material: THREE.MeshStandardMaterial): void {
@@ -115,29 +100,9 @@ export class BumperVisuals {
     this.dispose();
     this.elapsed = 0;
 
-    const wp = new THREE.Vector3();
-
-    root.traverse((obj) => {
-      const n = normalizeGltfName(obj.name);
-
-      if (LEGACY_BUMPER.test(n)) {
-        obj.visible = false;
-        obj.traverse((child) => {
-          child.visible = false;
-        });
-        return;
-      }
-
-      if (!(obj instanceof THREE.Mesh)) return;
-
-      let kind: BumperKind | null = null;
-      if (GLTF_BUMPER.test(n)) kind = 'gltf';
-      else if (LEGACY_BASE.test(n)) kind = 'base';
-      else if (LEGACY_RING.test(n)) kind = 'ring';
-      else return;
-
-      obj.getWorldPosition(wp);
-      const bumperIndex = nearestBumperIndex(wp);
+    this.parts = collectBumperParts(root, layout.bumpers, MATCH_RULES, (ctx) => {
+      const obj = ctx.mesh;
+      const kind = ctx.kind;
       const material = cloneStandardMaterial(obj);
       let glow: GlowSprite | null = null;
       let glowColor = BUMPER_LIGHT_COLOR;
@@ -171,21 +136,21 @@ export class BumperVisuals {
 
       obj.material = material;
 
-      this.parts.push({
+      return {
         mesh: obj,
         material,
-        bumperIndex,
+        bumperIndex: ctx.bumperIndex,
         kind,
         glow,
         glowColor,
         baseIntensity: material.emissiveIntensity,
-        baseScale: obj.scale.clone(),
-      });
+        baseScale: ctx.baseScale,
+      };
     });
 
-    // Échoue bruyamment : si aucun mesh n'a matché (ex. convention de nommage
-    // GLB changée), tous les effets bumper sont silencieusement morts. On le
-    // signale plutôt que de laisser croire que l'animation est branchée.
+    // Fail loudly: if no mesh matched (e.g. GLB naming convention changed),
+    // all bumper effects are silently dead. Report it rather than pretend
+    // the animation is wired.
     if (this.parts.length === 0) {
       console.warn(
         '[BumperVisuals] aucun mesh bumper reconnu (GLTF_BUMPER/LEGACY_*) — ' +
@@ -203,28 +168,11 @@ export class BumperVisuals {
   update(dt: number): void {
     this.elapsed += dt;
 
-    for (const [idx, t] of this.hitTimers) {
-      const next = t - dt;
-      if (next <= 0) this.hitTimers.delete(idx);
-      else this.hitTimers.set(idx, next);
-    }
+    tickPunchTimers(this.hitTimers, dt);
 
-    // Scale punch (mesh visuel uniquement, colliders inchangés).
-    for (const [idx, t] of this.punchTimers) {
-      const next = t - dt;
-      if (next <= 0) this.punchTimers.delete(idx);
-      else this.punchTimers.set(idx, next);
-    }
-    for (const part of this.parts) {
-      const pt = this.punchTimers.get(part.bumperIndex) ?? 0;
-      let factor = 1;
-      if (pt > 0) {
-        const prog = 1 - pt / PUNCH_DURATION; // 0 → 1
-        const env = prog < 0.5 ? easeOutBack(prog * 2) : 1 - (prog - 0.5) * 2;
-        factor = 1 + PUNCH_PEAK * Math.max(0, env);
-      }
-      part.mesh.scale.copy(part.baseScale).multiplyScalar(factor);
-    }
+    // Scale punch (visual mesh only, colliders unchanged).
+    tickPunchTimers(this.punchTimers, dt);
+    applyPunchScale(this.parts, this.punchTimers, PUNCH_DURATION, PUNCH_PEAK);
 
     if (this.strobeActive) {
       if (!this.strobeOn) {
@@ -262,7 +210,7 @@ export class BumperVisuals {
 
         if (part.glow) {
           part.glow.setColor(upsideDown && strobeFlash > 0.45 ? 0xff2244 : BUMPER_LIGHT_COLOR);
-          // opacité ∝ ancienne intensité lumière (normalisée), pulse en scale.
+          // opacity ∝ former light intensity (normalized), pulse via scale.
           const v = (BUMPER_LIGHT_INTENSITY * slowBreath + hitFactor * 0.35) * moodMul;
           part.glow.set(Math.min(1, v * 0.55), 0.9 + hitFactor * 0.5);
         }
@@ -288,7 +236,10 @@ export class BumperVisuals {
   }
 
   dispose(): void {
+    // Restore scales to their original value before clearing: otherwise a
+    // bumper disposed mid-punch stays enlarged.
     for (const part of this.parts) {
+      part.mesh.scale.copy(part.baseScale);
       part.glow?.dispose();
     }
     this.parts = [];

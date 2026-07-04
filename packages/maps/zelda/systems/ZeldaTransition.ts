@@ -1,58 +1,60 @@
 import * as THREE from 'three';
-import { easeOut, easeIn, strobeOn } from '@pinball/game-engine';
+import { ShakeBasis, TransitionTimeline, tremorOffset } from '@pinball/game-engine';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { layout } from '../layout';
 
 // ── Timings ────────────────────────────────────────────────────────────────
-/** Durée du flash violet montant (entrée Sacred Realm). */
+/** Duration of the rising purple flash (Sacred Realm entry). */
 const BLACKOUT_DURATION = 0.45; // s
-/** Durée du fade-out avant la phase tremor. */
+/** Fade-out duration before the tremor phase. */
 const RESTORE_DURATION  = 0.55; // s
-/** Durée du tremor (secousses caméra + playfield). */
+/** Tremor duration (camera + playfield shakes). */
 const TREMOR_DURATION   = 0.55; // s
-/** Fréquence du strobe pendant le flash. */
+/** Strobe frequency during the flash. */
 const STROBE_HZ = 6;
 
-type Phase = 'idle' | 'blackout' | 'restore' | 'tremor';
-
 type SetupConfig = {
-  /** Racine de la scène (playfield root) — secouée pendant le tremor. */
+  /** Scene root (playfield root) — shaken during the tremor. */
   root: THREE.Object3D;
-  /** Caméra — secouée pendant le tremor. */
+  /** Camera — shaken during the tremor. */
   camera: THREE.Camera;
 };
 
 type StartConfig = {
-  /** Mesh de la bille — masqué pendant la transition. */
+  /** Ball mesh — hidden during the transition. */
   ballMesh: THREE.Object3D;
 };
 
 /**
- * Transition Sacred Realm (Zelda) — aller ET retour.
+ * Sacred Realm transition (Zelda) — both entry AND return.
  *
- * Séquence : flash violet (blackout) → fade (restore) → tremor → callback.
- * Le module appelle `onComplete` pour téléporter la balle et émettre
- * `PORTAL_TRANSITION_END` ou `RETURN_PORTAL_TRANSITION_END`.
+ * Sequence: purple flash (blackout) → fade (restore) → tremor → callback.
+ * The module calls `onComplete` to teleport the ball and emit
+ * `PORTAL_TRANSITION_END` or `RETURN_PORTAL_TRANSITION_END`.
  *
- * Le tremor (secousses de caméra + playfield) suit la restauration de l'écran,
- * avant de rendre la balle visible — même pattern que UpsideDownTransition ST.
+ * The tremor (camera + playfield shakes) follows the screen restore, before
+ * the ball becomes visible — same pattern as ST's UpsideDownTransition.
  */
 export class ZeldaTransition {
   private cinematicStrobe = new PlayfieldCinematicStrobe();
 
-  private phase:    Phase = 'idle';
-  private elapsed   = 0;
-  private strobeT   = 0;
+  private timeline = new TransitionTimeline({
+    blackout: BLACKOUT_DURATION,
+    reveal:   0,
+    hold:     0,
+    restore:  RESTORE_DURATION,
+    tremor:   TREMOR_DURATION,
+    strobeHz: STROBE_HZ,
+    hasReveal: false,
+  });
   private active    = false;
   private ballMesh: THREE.Object3D | null = null;
   private onComplete: (() => void) | null = null;
 
-  // Références pour le tremor.
+  // Tremor references.
   private camera:        THREE.Camera | null       = null;
   private playfieldRoot: THREE.Object3D | null     = null;
-  private baseCamPos     = new THREE.Vector3();
-  private baseRootPos    = new THREE.Vector3();
-  private baseRootRot    = new THREE.Euler();
+  private shakeBasis     = new ShakeBasis();
 
   setup(config: SetupConfig): void {
     this.dispose();
@@ -76,15 +78,14 @@ export class ZeldaTransition {
   }
 
   /**
-   * Démarre la transition.
-   * Appelé depuis `onGameEvent(PORTAL_ENTER | RETURN_PORTAL_ENTER)`.
-   * La balle doit déjà être tenue avant l'appel.
+   * Starts the transition.
+   * Called from `onGameEvent(PORTAL_ENTER | RETURN_PORTAL_ENTER)`.
+   * The ball must already be held before the call.
    */
   start(config: StartConfig, onComplete: () => void): void {
     this.active     = true;
-    this.phase      = 'blackout';
-    this.elapsed    = 0;
-    this.strobeT    = 0;
+    this.timeline.reset();
+    this.timeline.begin();
     this.ballMesh   = config.ballMesh;
     this.onComplete = onComplete;
 
@@ -95,38 +96,27 @@ export class ZeldaTransition {
   }
 
   update(dt: number): void {
-    if (!this.active || this.phase === 'idle') return;
+    if (!this.active || this.timeline.getPhase() === 'idle') return;
 
-    this.elapsed += dt;
-    this.strobeT  += dt;
-    const on = strobeOn(this.strobeT, STROBE_HZ);
+    const d = this.timeline.tick(dt);
 
-    if (this.phase === 'blackout') {
-      const t = Math.min(1, this.elapsed / BLACKOUT_DURATION);
-      this.cinematicStrobe.applyFlashOnly(on, easeOut(t));
-      if (this.elapsed >= BLACKOUT_DURATION) {
-        this.phase   = 'restore';
-        this.elapsed = 0;
-        this.strobeT = 0;
-      }
+    if (d.phase === 'blackout') {
+      this.cinematicStrobe.applyFlashOnly(d.on, d.blackoutMix);
       return;
     }
 
-    if (this.phase === 'restore') {
-      const darkMix = 1 - easeIn(Math.min(1, this.elapsed / RESTORE_DURATION));
-      this.cinematicStrobe.applyFlashOnly(on, darkMix);
-      if (darkMix <= 0) {
+    if (d.phase === 'restore') {
+      this.cinematicStrobe.applyFlashOnly(d.on, d.darkMix);
+      if (d.enteredTremor) {
         this.cinematicStrobe.stop();
-        this.phase   = 'tremor';
-        this.elapsed = 0;
         this.captureShakeBases();
       }
       return;
     }
 
-    if (this.phase === 'tremor') {
+    if (d.phase === 'tremor') {
       this.applyTremor();
-      if (this.elapsed >= TREMOR_DURATION) {
+      if (d.finished) {
         this.restoreShakeBases();
         this.finish();
       }
@@ -134,46 +124,32 @@ export class ZeldaTransition {
   }
 
   private applyTremor(): void {
-    const t   = this.elapsed;
-    const ramp = Math.min(1, t / 0.3);
-    const amp  = 0.003 * ramp;
+    const o = tremorOffset(this.timeline.getElapsed(), 0.3, 0.003);
 
     if (this.camera) {
       this.camera.position.set(
-        this.baseCamPos.x + Math.sin(t * 41) * amp,
-        this.baseCamPos.y + Math.sin(t * 53 + 0.8) * amp,
-        this.baseCamPos.z + Math.sin(t * 37 + 1.6) * amp,
+        this.shakeBasis.camPos.x + o.camX,
+        this.shakeBasis.camPos.y + o.camY,
+        this.shakeBasis.camPos.z + o.camZ,
       );
     }
 
     if (this.playfieldRoot) {
-      this.playfieldRoot.rotation.x =
-        this.baseRootRot.x + Math.sin(t * 44) * amp * 0.4;
-      this.playfieldRoot.rotation.z =
-        this.baseRootRot.z + Math.sin(t * 39 + 1.1) * amp * 0.5;
+      this.playfieldRoot.rotation.x = this.shakeBasis.rootRot.x + o.rootRotX;
+      this.playfieldRoot.rotation.z = this.shakeBasis.rootRot.z + o.rootRotZ;
     }
   }
 
   private captureShakeBases(): void {
-    if (this.camera) this.baseCamPos.copy(this.camera.position);
-    if (this.playfieldRoot) {
-      this.baseRootPos.copy(this.playfieldRoot.position);
-      this.baseRootRot.copy(this.playfieldRoot.rotation);
-    }
+    this.shakeBasis.capture(this.camera, this.playfieldRoot);
   }
 
   private restoreShakeBases(): void {
-    if (this.camera) this.camera.position.copy(this.baseCamPos);
-    if (this.playfieldRoot) {
-      this.playfieldRoot.position.copy(this.baseRootPos);
-      this.playfieldRoot.rotation.copy(this.baseRootRot);
-    }
+    this.shakeBasis.restore(this.camera, this.playfieldRoot);
   }
 
   private finish(): void {
-    this.phase   = 'idle';
-    this.elapsed = 0;
-    this.strobeT = 0;
+    this.timeline.reset();
     this.active  = false;
     this.cinematicStrobe.stop();
 
@@ -188,9 +164,7 @@ export class ZeldaTransition {
     this.cinematicStrobe.dispose();
     this.cinematicStrobe = new PlayfieldCinematicStrobe();
     this.active     = false;
-    this.phase      = 'idle';
-    this.elapsed    = 0;
-    this.strobeT    = 0;
+    this.timeline.reset();
     this.onComplete = null;
     this.ballMesh   = null;
     this.camera     = null;

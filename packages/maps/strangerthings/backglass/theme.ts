@@ -1,10 +1,10 @@
-// Tokens de thème backglass de la map (CSS custom properties). L'app les pose
-// en style inline sur le conteneur racine (cf. apps/backglass pages/index).
-// Le CSS structurel de l'app + les modules ST de la map consomment ces var().
-// Une map sans thème → l'app garde ses défauts neutres (rien de ST en dur).
+// Map backglass theme tokens (CSS custom properties). The app sets them as
+// inline style on the root container (see apps/backglass pages/index).
+// The app's structural CSS + the map's ST modules consume these var().
+// A map without a theme → the app keeps its neutral defaults (no hardcoded ST).
 export type ThemeTokens = Record<`--${string}`, string>
 
-// Palette normale (monde réel).
+// Normal palette (real world).
 export const backglassTheme: ThemeTokens = {
   '--foreground': '#ede4d3',
   '--glow': '#ff2d2d',
@@ -17,8 +17,8 @@ export const backglassTheme: ThemeTokens = {
   '--fever-b': '#00c7ff',
 }
 
-// Surcharges du monde alternatif (Upside Down) — fusionnées par-dessus la base
-// quand alternateWorld est actif.
+// Alternate world (Upside Down) overrides — merged over the base when
+// alternateWorld is active.
 export const backglassThemeAlternate: ThemeTokens = {
   '--glow': '#b14dff',
   '--vignette': '#1a0640',

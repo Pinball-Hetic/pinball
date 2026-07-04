@@ -1,23 +1,15 @@
-// ───────────────────────────────────────────────────────────────────────────
-// Machine à états PURE de la « prise d'écran » (takeover) du backglass.
+// ── Backglass takeover state machine ────────────────────────────────────────
+// Decides which scene to display:
+//   - a STACK of candidate scenes, each with a PRIORITY and an expiration,
+//   - purge of expired scenes + chaining (`followUp`),
+//   - temporary highlight of a leaderboard row (high-score),
+//   - attract mode after an idle period,
+//   - active scene = highest priority.
 //
-// POURQUOI CE FICHIER EXISTE
-// Avant, toute cette logique vivait DANS le hook React `useBackglassTakeover`
-// (~320 lignes), mélangée avec la connexion Socket.io et les `setState`. Le hook
-// avait donc plusieurs responsabilités à la fois → violation du principe SRP
-// (Single Responsibility Principle, le « S » de SOLID).
-//
-// On isole ici la SEULE responsabilité « décider quelle scène afficher » :
-//   - une PILE de scènes candidates, chacune avec une PRIORITÉ et une expiration,
-//   - la purge des scènes expirées + l'enchaînement (`followUp`),
-//   - la surbrillance temporaire d'une ligne de classement (high-score),
-//   - l'« attract mode » après une période d'inactivité,
-//   - le choix de la scène active = la plus haute priorité.
-//
-// Cette classe ne connaît NI React NI Socket.io → elle est testable unitairement
-// (on lui injecte le temps `now` et quelques callbacks). Le hook devient un
-// simple orchestrateur (cf. useBackglassTakeover.ts).
-// ───────────────────────────────────────────────────────────────────────────
+// This class knows NEITHER React NOR Socket.io — `now` and callbacks are
+// injected, so it is unit-testable. The hook (useBackglassTakeover.ts) is a
+// thin orchestrator around it.
+// ────────────────────────────────────────────────────────────────────────────
 
 import type { GameOver } from '@pinball/shared-types';
 
@@ -28,16 +20,16 @@ export type TakeoverScene =
   | 'ATTRACT'
   | 'CINEMATIC';
 
-/** Scène effectivement affichée par l'UI (résultat exposé au composant). */
+/** Scene actually displayed by the UI (result exposed to the component). */
 export interface Takeover {
   scene: TakeoverScene;
   payload?: GameOver & { rank: number };
   clip?: string;
 }
 
-// Chaînage : la scène suivante n'est poussée qu'à l'expiration de la courante
-// (sa durée démarre alors). Le modèle pile-à-priorités préempte mais ne séquence
-// pas — followUp ajoute le séquençage.
+// Chaining: the next scene is only pushed when the current one expires (its
+// duration starts then). The priority-stack model preempts but does not
+// sequence — followUp adds sequencing.
 export interface FollowUp {
   scene: TakeoverScene;
   durationMs: number;
@@ -45,7 +37,7 @@ export interface FollowUp {
   payload?: GameOver & { rank: number };
 }
 
-/** Une scène candidate dans la pile (avec priorité + horodatage d'expiration). */
+/** A candidate scene in the stack (with priority + expiration timestamp). */
 export interface StackEntry {
   scene: TakeoverScene;
   priority: number;
@@ -55,17 +47,17 @@ export interface StackEntry {
   followUp?: FollowUp;
 }
 
-/** Dépendances injectées au `tick` (gardent la classe pure : aucun accès direct). */
+/** Dependencies injected into `tick` (keep the class pure: no direct access). */
 export interface TakeoverTickDeps {
-  /** true si ce clip doit retarder le flip 3D du hall of fame (ex. portal_swallow). */
+  /** true if this clip must delay the hall of fame 3D flip (e.g. portal_swallow). */
   holdsHallFlip: (clip: string) => boolean;
-  /** Pseudo à afficher sur le Joyce wall en attract mode (n°1 du classement), ou null. */
+  /** Name to display on the Joyce wall in attract mode (leaderboard #1), or null. */
   attractJoyceName: () => string | null;
-  /** Émet un signal Joyce (effet de bord délégué au hook). */
+  /** Emits a Joyce signal (side effect delegated to the hook). */
   onJoyce: (text: string) => void;
 }
 
-/** État dérivé renvoyé à chaque tick (consommé par le hook pour son setState). */
+/** Derived state returned on each tick (consumed by the hook for its setState). */
 export interface TakeoverTickResult {
   top: StackEntry | null;
   highlightRank: number | undefined;
@@ -83,37 +75,37 @@ export class TakeoverStack {
   private highlightUntil = 0;
   private highlightRank: number | undefined = undefined;
 
-  /** À appeler une fois au démarrage : initialise les horloges d'inactivité. */
+  /** Call once at startup: initializes the idle clocks. */
   start(now: number): void {
     this.lastActivity = now;
     this.lastJoyceIdle = now;
   }
 
-  /** Signale une activité de jeu → repousse le déclenchement de l'attract mode. */
+  /** Signals game activity → pushes back the attract mode trigger. */
   markActivity(now: number): void {
     this.lastActivity = now;
   }
 
-  /** Empile une scène candidate (la plus haute priorité gagnera au prochain tick). */
+  /** Pushes a candidate scene (the highest priority wins on the next tick). */
   push(entry: StackEntry): void {
     this.stack.push(entry);
   }
 
   /**
-   * Avance la machine à l'instant `now` :
-   *  1. purge les scènes expirées,
-   *  2. enchaîne les `followUp` des scènes qui viennent d'expirer,
-   *  3. gère la surbrillance de la ligne high-score,
-   *  4. (dé)clenche l'attract mode selon l'inactivité,
-   *  5. renvoie la scène active (priorité max) + l'état dérivé.
+   * Advances the machine to time `now`:
+   *  1. purge expired scenes,
+   *  2. chain the `followUp`s of scenes that just expired,
+   *  3. manage the high-score row highlight,
+   *  4. toggle attract mode based on idleness,
+   *  5. return the active scene (max priority) + derived state.
    */
   tick(now: number, deps: TakeoverTickDeps): TakeoverTickResult {
-    // 1. purge des scènes expirées
+    // 1. purge expired scenes
     const expiring = this.stack.filter((e) => e.expiresAt <= now);
     this.stack = this.stack.filter((e) => e.expiresAt > now);
 
-    // 2. chaînage : une scène expirée avec un followUp pousse la suivante
-    //    MAINTENANT (sa durée démarre ici, plus de masquage).
+    // 2. chaining: an expired scene with a followUp pushes the next one NOW
+    //    (its duration starts here, no longer masked).
     for (const e of expiring) {
       if (e.followUp) {
         this.stack.push({
@@ -125,9 +117,9 @@ export class TakeoverStack {
       }
     }
 
-    // 3. un HIGH_SCORE qui vient d'expirer → surbrillance de la ligne. Si un
-    //    followUp (RECAP) suit, on prolonge la surbrillance pour qu'elle survive
-    //    au recap et reste visible sur la scène de base.
+    // 3. a HIGH_SCORE that just expired → highlight the row. If a followUp
+    //    (RECAP) comes next, extend the highlight so it survives the recap
+    //    and stays visible on the base scene.
     const highExpired = expiring.find((e) => e.scene === 'HIGH_SCORE');
     if (highExpired?.payload) {
       this.highlightRank = highExpired.payload.rank;
@@ -139,13 +131,13 @@ export class TakeoverStack {
       this.highlightRank = undefined;
     }
 
-    // 4. ATTRACT : aucune activité depuis ATTRACT_IDLE_MS
+    // 4. ATTRACT: no activity for ATTRACT_IDLE_MS
     const idle = now - this.lastActivity > ATTRACT_IDLE_MS;
     const hasReal = this.stack.some((e) => e.scene !== 'ATTRACT');
     this.stack = this.stack.filter((e) => e.scene !== 'ATTRACT');
     if (idle && !hasReal) {
       this.stack.push({ scene: 'ATTRACT', priority: 10, expiresAt: Infinity });
-      // pseudo du n°1 sur le Joyce wall, périodiquement
+      // leaderboard #1's name on the Joyce wall, periodically
       if (now - this.lastJoyceIdle > JOYCE_IDLE_MS) {
         this.lastJoyceIdle = now;
         const name = deps.attractJoyceName();
@@ -153,13 +145,13 @@ export class TakeoverStack {
       }
     }
 
-    // 5. takeover actif = plus haute priorité
+    // 5. active takeover = highest priority
     const top = this.stack.reduce<StackEntry | null>(
       (best, e) => (!best || e.priority > best.priority ? e : best),
       null,
     );
 
-    // Clip qui retarde le flip 3D du hall of fame (ex. portal_swallow).
+    // Clip delaying the hall of fame 3D flip (e.g. portal_swallow).
     const holdHallFlip = this.stack.some(
       (e) => e.scene === 'CINEMATIC' && e.clip != null && deps.holdsHallFlip(e.clip),
     );

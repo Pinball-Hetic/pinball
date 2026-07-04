@@ -29,7 +29,7 @@ services:
       DATABASE_URL: "postgresql://dev_user:dev_password@db:5432/pinball_dev?schema=public"
       NODE_ENV: development
       GLOBAL_API_URL: "${GLOBAL_API_URL}"
-      BORNE_TOKEN: "${BORNE_TOKEN}" # injecté depuis .env (gitignoré), jamais en dur
+      BORNE_TOKEN: "${BORNE_TOKEN}" # injected from .env (gitignored), never hardcoded
     ports:
       - "3334:3001"
     volumes:
@@ -51,24 +51,27 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_SOCKET_URL: "http://localhost:3334"
-      # dev = next dev lit NEXT_PUBLIC à runtime, build.args inutile ici
-      # (cf. docker-compose.yml prod pour l'inline au build).
+      # dev = next dev reads NEXT_PUBLIC at runtime, build.args useless here
+      # (cf. docker-compose.yml prod for the build-time inline).
       NEXT_PUBLIC_KEYBOARD_MODE: "simulate-esp32"
-      # NEXT_PUBLIC_MAP_ID: "zelda"  # décommenter pour forcer une map (bypass sélecteur)
+      # NEXT_PUBLIC_MAP_ID: "zelda"  # uncomment to force a map (bypass selector)
       NODE_OPTIONS: "--max-old-space-size=2560"
     ports:
       - "3333:3000"
     volumes:
       - ./apps/playfield/src:/app/apps/playfield/src
       - ./apps/playfield/public:/app/apps/playfield/public
+      # next.config mounted → a restart reloads a config edit (otherwise baked
+      # into the image = rebuild required). next dev re-reads it at process start.
+      - ./apps/playfield/next.config.js:/app/apps/playfield/next.config.js
       - ./packages/game-engine/src:/app/packages/game-engine/src
       - ./packages/shared-types/src:/app/packages/shared-types/src
       - ./packages/maps:/app/packages/maps
     depends_on:
       - server
     command: bun run dev
-    # Force la compilation Turbopack de la page lourde pendant le démarrage :
-    # le check ne passe qu'une fois /pinball compilé → débloque dmd ensuite.
+    # Force Turbopack to compile the heavy page during startup: the check only
+    # passes once /pinball is compiled → then unblocks dmd.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/pinball"]
       interval: 10s
@@ -93,6 +96,7 @@ services:
       - "3335:3000"
     volumes:
       - ./apps/dmd/src:/app/apps/dmd/src
+      - ./apps/dmd/next.config.js:/app/apps/dmd/next.config.js
       - ./packages/shared-types/src:/app/packages/shared-types/src
     depends_on:
       server:
@@ -123,6 +127,7 @@ services:
       - "3336:3000"
     volumes:
       - ./apps/backglass/src:/app/apps/backglass/src
+      - ./apps/backglass/next.config.js:/app/apps/backglass/next.config.js
       - ./packages/shared-types/src:/app/packages/shared-types/src
     depends_on:
       server:

@@ -1,18 +1,18 @@
 /**
- * Réglages volume — échelle 0–100 (intuitive).
+ * Volume settings — 0–100 scale (intuitive).
  *
- * Volume final = master × bus × niveau_du_son
+ * Final volume = master × bus × sound_level
  *
- * Boost global ~35 % (test borne flipper — niveaux précédents trop bas).
- * Les ratios music/sfx/cinematic entre eux sont conservés.
+ * ~35% global boost (cabinet test — previous levels too low). The
+ * music/sfx/cinematic ratios relative to each other are preserved.
  *
- * Exemples :
- * - Musique trop forte → baisser `music` (ex. 50)
- * - Son d.ambiance faible → monter `cinematic` (volumes spécifiques fournis par la map)
- * - Tout le jeu plus fort → monter `master` (ex. 90)
+ * Examples:
+ * - Music too loud → lower `music` (e.g. 50)
+ * - Ambient sound too quiet → raise `cinematic` (per-sound volumes supplied by the map)
+ * - Whole game louder → raise `master` (e.g. 90)
  */
 
-/** Volume global + bus par catégorie. */
+/** Global volume + per-category bus. */
 export const AUDIO_VOLUME = {
   master: 100,
   music: 85,
@@ -20,7 +20,7 @@ export const AUDIO_VOLUME = {
   sfx: 68,
 } as const;
 
-/** Niveau fin par fichier (0–100+, relatif à son bus ; >100 = boost). */
+/** Per-file fine level (0–100+, relative to its bus; >100 = boost). */
 export const SOUND_VOLUME = {
   earlySound: 100,
   gameOver: 100,
@@ -32,7 +32,7 @@ export function percentToGain(percent: number): number {
   return Math.max(0, Math.min(100, percent)) / 100;
 }
 
-/** Niveau d'un fichier — à brancher sur le bus déjà réglé (>1.0 autorisé pour boost). */
+/** A file's level — to plug onto the already-set bus (>1.0 allowed for boost). */
 export function soundLevel(sound: SoundVolumeKey): number {
   return Math.max(0, SOUND_VOLUME[sound]) / 100;
 }

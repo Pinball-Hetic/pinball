@@ -86,23 +86,23 @@ export type BossDefinition = {
   targetPulse: BossTargetPulseConfig;
   revealSoundUrl?: string;
   revealSoundVolume?: number;
-  /** Musique de phase tardive (ex. win-music quand hitCount >= seuil). */
+  /** Late-phase music (e.g. win-music when hitCount >= threshold). */
   latePhaseSoundUrl?: string;
   latePhaseSoundVolume?: number;
   latePhaseHitThreshold?: number;
-  /** Après BOSS_FIGHT_END, conserve revealSoundUrl jusqu'au BOSS_REVEAL de ce boss. */
+  /** After BOSS_FIGHT_END, keeps revealSoundUrl until this boss's BOSS_REVEAL. */
   keepMusicUntilBossReveal?: BossId;
   /**
-   * À la victoire (BOSS_FIGHT_END), conserve la musique en cours jusqu'à la fin
-   * de la cinématique retour portail (RETURN_PORTAL_TRANSITION_END) au lieu de
-   * la couper immédiatement. Utile quand une musique de fin doit accompagner la
-   * cinématique de sortie. Data-driven : aucune logique boss en dur côté apps.
+   * On victory (BOSS_FIGHT_END), keeps the current music until the return
+   * portal cinematic ends (RETURN_PORTAL_TRANSITION_END) instead of cutting it
+   * immediately. Useful when an ending track must accompany the exit
+   * cinematic. Data-driven: no hardcoded boss logic on the apps side.
    */
   keepMusicUntilReturnPortal?: boolean;
   /**
-   * Musique jouée dès la victoire sur ce boss (BOSS_FIGHT_END), en remplacement
-   * de la musique de combat en cours. Requiert keepMusicUntilReturnPortal:true pour
-   * que la musique survive jusqu'à RETURN_PORTAL_TRANSITION_END.
+   * Music played on victory over this boss (BOSS_FIGHT_END), replacing the
+   * current fight music. Requires keepMusicUntilReturnPortal:true for the
+   * music to survive until RETURN_PORTAL_TRANSITION_END.
    */
   victoryMusicUrl?: string;
   victoryMusicVolume?: number;

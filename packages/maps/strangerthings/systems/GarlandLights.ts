@@ -9,15 +9,33 @@ const TWINKLE_AMP = 0.28;
 const HIT_SURGE_DURATION = 0.3;
 const HIT_SURGE_BOOST = 0.55;
 
+// Width (in bulb count) of the rocket-liftoff light band.
+const ROCKET_BAND = 3;
+
+// Position of the rocket-liftoff light front, indexed on bulbs.
+// rocketT decays 1 → 0; the front rises from -ROCKET_BAND (before the first
+// bulb) to count (past the last) → full upward sweep. Pure.
+export function rocketFront(rocketT: number, count: number): number {
+  const progress = 1 - Math.max(0, Math.min(1, rocketT));
+  return -ROCKET_BAND + progress * (count + ROCKET_BAND);
+}
+
+// Intensity [0,1] of a given bulb for a rocket front: 1 at the front, falls
+// off linearly over ROCKET_BAND below it, 0 elsewhere. Pure.
+export function rocketGlow(index: number, front: number): number {
+  const d = front - index;
+  if (d < 0 || d > ROCKET_BAND) return 0;
+  return 1 - d / ROCKET_BAND;
+}
+
 /**
- * Chaque guirlande dans le GLB newStrangerthings.glb possède :
- *  - baseColorTexture  : câble sombre + bulbes colorés
- *  - emissiveTexture   : carte de brillance des bulbes
- *  - emissiveFactor    : [1,1,1] (blanc = multiplicateur neutre)
+ * Each garland in newStrangerthings.glb has:
+ *  - baseColorTexture  : dark cable + colored bulbs
+ *  - emissiveTexture   : bulb glow map
+ *  - emissiveFactor    : [1,1,1] (white = neutral multiplier)
  *
- * On ne remplace PLUS le matériau. On conserve le matériau GLB d'origine
- * et on anime uniquement emissiveIntensity pour le scintillement et les
- * réactions aux événements de jeu.
+ * We NO LONGER replace the material. The original GLB material is kept and
+ * only emissiveIntensity is animated for twinkle and game-event reactions.
  */
 type GarlandBulb = {
   mesh: THREE.Mesh;
@@ -39,15 +57,23 @@ export class GarlandLights {
   private strobeNormalWhenOn = false;
   private feverActive = false;
   private celebrateT = 0;
+  private rocketT = 0;
 
-  // Chenillard continu pendant le fever (vague permanente).
+  // Continuous chase during fever (permanent wave).
   setFever(on: boolean): void {
     this.feverActive = on;
   }
 
-  // 1s de chenillard ponctuel (palier franchi).
+  // 1s one-shot chase (milestone crossed).
   celebrate(): void {
     this.celebrateT = 1;
+  }
+
+  // Rocket liftoff (score milestone): rising orange/gold sweep, matching the
+  // backglass/DMD rocket. Replaces the yellow "celebrate" chase on
+  // milestones for cross-screen rocket consistency.
+  rocketBurst(): void {
+    this.rocketT = 1;
   }
 
   setAtmosphere(dim: number, strobe: number, strobeHz = 4): void {
@@ -134,7 +160,7 @@ export class GarlandLights {
       }
     }
 
-    // Vague (chenillard) — fever continu OU célébration ponctuelle.
+    // Wave (chase) — continuous fever OR one-shot celebration.
     if (this.celebrateT > 0) this.celebrateT = Math.max(0, this.celebrateT - dt);
     if (this.feverActive || this.celebrateT > 0) {
       const speed = this.feverActive ? 6 : 9;
@@ -148,6 +174,28 @@ export class GarlandLights {
         if (this.feverActive) {
           bulb.material.emissive.setHex(i % 2 === 0 ? 0xff8800 : 0x00c8ff);
         }
+      }
+    }
+
+    // Rocket liftoff (milestone): orange/gold light band climbs the garlands
+    // once, then fades. Matches the backglass/DMD rocket.
+    if (this.rocketT > 0) {
+      this.rocketT = Math.max(0, this.rocketT - dt);
+      const front = rocketFront(this.rocketT, this.bulbs.length);
+      for (let i = 0; i < this.bulbs.length; i++) {
+        const bulb = this.bulbs[i];
+        const glow = rocketGlow(i, front);
+        if (glow <= 0) continue;
+        bulb.material.emissiveIntensity = Math.max(
+          bulb.material.emissiveIntensity,
+          bulb.origIntensity * (0.6 + glow * 2.4),
+        );
+        // Rocket flame (warm white → bright orange → red), NOT the yellow of
+        // the "celebrate" chase → distinct "liftoff" read, consistent with
+        // the DMD/backglass rocket.
+        bulb.material.emissive.setHex(
+          glow > 0.8 ? 0xffffff : glow > 0.5 ? 0xff7a1a : 0xff2200,
+        );
       }
     }
   }

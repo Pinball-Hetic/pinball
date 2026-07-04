@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPinballSocket } from '@pinball/shared-types/src/socket-client'
-import type { LeaderboardEntry, GameOver } from '@pinball/shared-types'
+import type { PinballSocket } from '@pinball/shared-types/src/socket-client'
+import type { LeaderboardEntry, GameOver, DmdDisplay } from '@pinball/shared-types'
 import { clipShowMs, mapStateFlag } from '@pinball/shared-types'
 import { useMapContent } from '@/map/content'
 import { TakeoverStack } from './takeoverStack'
 import type { Takeover } from './takeoverStack'
 
-// Réexport pour compat des consommateurs existants (les types vivent désormais
-// dans takeoverStack.ts, avec la machine à états).
+// Re-export for existing consumers (the types live in takeoverStack.ts,
+// next to the state machine).
 export type { Takeover, TakeoverScene } from './takeoverStack'
 
 interface JoyceSignal {
@@ -21,11 +21,11 @@ interface TakeoverState {
   highlightRank: number | undefined
   agitation: number
   joyce: JoyceSignal
-  // true tant qu'un portal_swallow joue → on retarde le flip 3D du hall
-  // of fame jusqu'à la fin du clip (synchro avec le bascule playfield).
+  // true while a portal_swallow plays → the hall of fame 3D flip is delayed
+  // until the clip ends (in sync with the playfield switch).
   holdHallFlip: boolean
   fever: boolean
-  goldWaveId: number // incrémenté → rejoue l'onde dorée (milestones 5k/15k)
+  goldWaveId: number // incremented → replays the gold wave (5k/15k milestones)
 }
 
 const TICK_MS = 250
@@ -48,11 +48,11 @@ function agitationAt(elapsed: number): number {
   return elapsed < half ? elapsed / half : (AGITATION_MS - elapsed) / half
 }
 
-export function useBackglassTakeover(entries: LeaderboardEntry[]) {
+export function useBackglassTakeover(entries: LeaderboardEntry[], socket: PinballSocket) {
   const { clipBehavior, eventTakeovers, clips } = useMapContent()
-  // Refs sur les données map : la closure du useEffect([], []) lit toujours les
-  // valeurs courantes sans se recréer. key={mapId} sur le Stage force un
-  // remontage complet quand la map change → refs réinitialisées proprement.
+  // Refs to the map data: the useEffect([], []) closure always reads the
+  // current values without being recreated. key={mapId} on the Stage forces a
+  // full remount when the map changes → refs cleanly reinitialized.
   const clipBehaviorRef = useRef(clipBehavior)
   clipBehaviorRef.current = clipBehavior
   const eventTakeoversRef = useRef(eventTakeovers)
@@ -63,15 +63,15 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
   const entriesRef = useRef(entries)
   entriesRef.current = entries
 
-  // La machine à états (pile de scènes) — toute la logique de décision est là.
+  // The state machine (scene stack) — all decision logic lives there.
   const stackRef = useRef(new TakeoverStack())
-  // Signaux dérivés gérés par le hook (hors responsabilité de la pile) : monde
-  // alternatif, agitation, Joyce wall, fever, onde dorée, dernier game:over.
+  // Derived signals managed by the hook (outside the stack's responsibility):
+  // alternate world, agitation, Joyce wall, fever, gold wave, last game:over.
   const alternateWorldRef = useRef(false)
   const agitationStartRef = useRef(-AGITATION_MS)
   const joyceRef = useRef<JoyceSignal>({ text: null, id: 0 })
-  // Dernier game:over complet (avec stats + rang) — alimente le clip
-  // hall_of_fame (HighScore/Recap), qui n'en reçoit pas via dmd:display.
+  // Last complete game:over (with stats + rank) — feeds the hall_of_fame clip
+  // (HighScore/Recap), which does not receive it via dmd:display.
   const lastGameOverRef = useRef<(GameOver & { rank: number }) | null>(null)
   const feverRef = useRef(false)
   const goldWaveRef = useRef(0)
@@ -95,8 +95,6 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
     const stack = stackRef.current
     stack.start(performance.now())
 
-    const socket = createPinballSocket()
-
     const markActivity = () => {
       stack.markActivity(performance.now())
     }
@@ -104,7 +102,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
     socket.on('game:start', markActivity)
     socket.on('score:update', markActivity)
 
-    socket.on('game:over', (data: GameOver) => {
+    const onGameOver = (data: GameOver) => {
       const now = performance.now()
       markActivity()
       const list = entriesRef.current
@@ -114,9 +112,9 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       lastGameOverRef.current = payload
 
       if (isHigh) {
-        // HIGH_SCORE puis RECAP CHAÎNÉ : le recap ne démarre qu'à
-        // l'expiration du high score (followUp), pas en parallèle masqué.
-        // Le payload (stats) voyage dans l'entry → pas écrasé par un event.
+        // HIGH_SCORE then CHAINED RECAP: the recap only starts when the high
+        // score expires (followUp), not masked in parallel.
+        // The payload (stats) travels in the entry → not clobbered by an event.
         stack.push({
           scene: 'HIGH_SCORE',
           priority: 100,
@@ -134,15 +132,16 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         })
         pushJoyce('GAME OVER')
       }
-    })
+    }
+    socket.on('game:over', onGameOver)
 
-    socket.on('dmd:display', (d) => {
+    const onDmdDisplay = (d: DmdDisplay) => {
       alternateWorldRef.current = d.alternateWorld ?? false
       if ('mapState' in d) feverRef.current = mapStateFlag(d.mapState, 'fever')
       if (d.mode === 'CINEMATIC') {
-        // Garde kiosk : event serveur malformé sans clip. Un clip inconnu
-        // ne crashe plus (clipShowMs garantit un nombre → jamais de NaN sur
-        // expiresAt) : il tombe sur la branche default → scène générique.
+        // Kiosk guard: malformed server event without a clip. An unknown clip
+        // no longer crashes (clipShowMs guarantees a number → never NaN on
+        // expiresAt): it hits the default branch → generic scene.
         if (d.clip == null) return
         markActivity()
         const now = performance.now()
@@ -154,16 +153,16 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
             priority: 110,
             expiresAt: now + durationMs,
             clip,
-            // hall_of_fame n'a pas de stats via dmd:display : on rebranche le
-            // dernier game:over complet (HighScore/Recap).
+            // hall_of_fame has no stats via dmd:display: rewire the last
+            // complete game:over (HighScore/Recap).
             payload: isHall ? lastGameOverRef.current ?? undefined : undefined,
           })
-        // Dispatch data-driven fourni par la map (joyce/onde/fever/takeover).
-        // hall_of_fame + clips inconnus : takeover générique via clipShowMs.
+        // Data-driven dispatch provided by the map (joyce/wave/fever/takeover).
+        // hall_of_fame + unknown clips: generic takeover via clipShowMs.
         const b = clipBehaviorRef.current[clip]
         if (b?.goldWave) goldWaveRef.current += 1
-        // fever démarre dès le clip : pendant le CINEMATIC aucun display SCORE
-        // (porteur de fever) n'arrive, on l'active donc ici sans retard.
+        // fever starts with the clip: during CINEMATIC no SCORE display
+        // (fever carrier) arrives, so activate it here without delay.
         if (b?.fever) feverRef.current = true
         if (b?.joyce) pushJoyce(typeof b.joyce === 'function' ? b.joyce(d.value) : b.joyce)
         if (!b?.noTakeover) pushTk(b?.takeoverMs ?? clipShowMs(clipsRef.current, clip))
@@ -172,7 +171,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
       if (d.mode === 'EVENT') {
         markActivity()
         agitationStartRef.current = performance.now()
-        // Event → takeover de map (label → scène), data-driven.
+        // Event → map takeover (label → scene), data-driven.
         const ev = d.label ? eventTakeoversRef.current[d.label] : undefined
         if (ev) {
           stack.push({
@@ -187,13 +186,14 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
         markActivity()
         agitationStartRef.current = performance.now()
       }
-    })
+    }
+    socket.on('dmd:display', onDmdDisplay)
 
     const interval = window.setInterval(() => {
       const now = performance.now()
-      // Toute la logique de décision (purge / chaînage / attract / priorité) est
-      // déléguée à la machine à états. Le hook ne fait que lui fournir le temps
-      // et quelques accès aux données map, puis projette le résultat en state.
+      // All decision logic (purge / chaining / attract / priority) is delegated
+      // to the state machine. The hook only feeds it the time and some map
+      // data accessors, then projects the result into state.
       const { top, highlightRank, holdHallFlip } = stack.tick(now, {
         holdsHallFlip: (clip) => clipBehaviorRef.current[clip]?.holdsHallFlip ?? false,
         attractJoyceName: () => entriesRef.current.find((e) => e.rank === 1)?.name ?? null,
@@ -216,9 +216,14 @@ export function useBackglassTakeover(entries: LeaderboardEntry[]) {
 
     return () => {
       window.clearInterval(interval)
-      socket.disconnect()
+      // Shared socket (lifted into BackglassStage): remove OUR handlers
+      // without disconnecting it — the caller owns its lifecycle.
+      socket.off('game:start', markActivity)
+      socket.off('score:update', markActivity)
+      socket.off('game:over', onGameOver)
+      socket.off('dmd:display', onDmdDisplay)
     }
-  }, [])
+  }, [socket])
 
   return state
 }

@@ -26,6 +26,14 @@ export const PLAYFIELD_PORTRAIT_HALF_WIDTH =
 export const PLAYFIELD_PORTRAIT_LOOK_Z_BIAS = 0;
 export const PLAYFIELD_PORTRAIT_LOOK_Y_BIAS = 0;
 
+// Module-level shared scratch: avoids allocating in the hot framing loop
+// (bisection ~30 iterations × N corners, per resize/refit).
+// Safe because all usage is SYNCHRONOUS, non-recursive and await-free:
+// single-threaded JS guarantees a scratch is written then fully consumed
+// before the next writer. `_clipMatrix` is returned by withCameraAt then read
+// immediately (only one live matrix at a time); `_ndcPoint`/`_camPosScratch`
+// are distinct objects, no aliasing. Making them locals would reintroduce
+// per-frame allocations — a regression, not a cleanup.
 const _clipMatrix = new THREE.Matrix4();
 const _ndcPoint = new THREE.Vector4();
 const _camPosScratch = new THREE.Vector3();
@@ -66,18 +74,17 @@ export type PlayfieldCameraFitOptions = {
   debugTuning?: PlayfieldCameraDebugTuning | null;
 };
 
-// ── API publique par mode : 100 % délégation à la table de stratégies ─────────
-// Plus aucun switch/if sur le mode ici. Toute la connaissance spécifique à un
-// mode vit dans PLAYFIELD_VIEW_MODE_STRATEGIES (défini plus bas). Conséquence :
-// ajouter un mode de vue = ajouter UNE entrée dans la table, sans modifier ces
-// fonctions ni refit/fit (Open/Closed : ouvert à l'extension, fermé à la modif).
+// ── Per-mode public API: full delegation to the strategy table ────────────────
+// No switch/if on the mode here. All mode-specific knowledge lives in
+// PLAYFIELD_VIEW_MODE_STRATEGIES (defined below). Adding a view mode = adding
+// ONE table entry, without touching these functions or refit/fit.
 
 export function playfieldViewDirForMode(viewMode: PlayfieldViewMode): THREE.Vector3 {
   return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].viewDir();
 }
 
 export function playfieldCameraUpForMode(viewMode: PlayfieldViewMode): THREE.Vector3 {
-  return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].cameraUp();
+  return PLAYFIELD_VIEW_MODE_STRATEGIES[viewMode].cameraUp().clone();
 }
 
 export function playfieldCameraTargetForMode(
@@ -428,34 +435,33 @@ export function boundingBoxPortraitFrame(playfieldRoot: THREE.Object3D): THREE.B
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STRATÉGIES PAR MODE DE VUE — cœur du respect d'Open/Closed.
+// VIEW-MODE STRATEGIES
 //
-// Chaque mode de caméra (`legacy`, `portrait-fill`, …) est décrit par UN objet
-// qui implémente la même interface. Tout le code générique ci-dessous (fit /
-// refit) ne fait que LIRE cette table : il ne connaît aucun nom de mode.
+// Each camera mode (`legacy`, `portrait-fill`, …) is described by ONE object
+// implementing the same interface. The generic code below (fit / refit) only
+// READS this table: it knows no mode names.
 //
-// AJOUTER UN MODE = ajouter une entrée dans PLAYFIELD_VIEW_MODE_STRATEGIES.
-// Aucune fonction existante n'est modifiée (« fermé à la modification »), et le
-// `Record<PlayfieldViewMode, …>` force même TypeScript à exiger l'entrée à la
-// compilation. Avant, il fallait éditer 5 endroits (2 switch + 3 if).
+// ADDING A MODE = adding an entry to PLAYFIELD_VIEW_MODE_STRATEGIES. The
+// `Record<PlayfieldViewMode, …>` makes TypeScript require the entry at
+// compile time.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface PlayfieldViewModeStrategy {
-  /** Direction œil→cible (vecteur frais, normalisé). */
+  /** Eye→target direction (fresh, normalized vector). */
   viewDir(debugTuning?: PlayfieldCameraDebugTuning | null): THREE.Vector3;
-  /** Vecteur « up » de la caméra (constante partagée — l'appelant clone si besoin). */
+  /** Camera "up" vector (shared constant — caller clones if needed). */
   cameraUp(): THREE.Vector3;
-  /** Boîte englobante de cadrage propre au mode. */
+  /** Mode-specific framing bounding box. */
   frameBox(playfieldRoot: THREE.Object3D): THREE.Box3;
-  /** Calcule le point visé, l'écrit dans `out` et le renvoie. */
+  /** Computes the look-at point, writes it into `out` and returns it. */
   computeTarget(
     frameBox: THREE.Box3,
     out: THREE.Vector3,
     debugTuning?: PlayfieldCameraDebugTuning | null,
   ): THREE.Vector3;
-  /** Remplit les coins servant au calcul de distance. */
+  /** Fills the corners used for the distance computation. */
   fillCorners(frameBox: THREE.Box3, corners: THREE.Vector3[]): void;
-  /** Positionne la caméra ; renvoie la distance (perspective) ou half-width (ortho). */
+  /** Positions the camera; returns the distance (perspective) or half-width (ortho). */
   fit(
     camera: PlayfieldCamera,
     fit: PlayfieldCamFit,
@@ -465,13 +471,13 @@ interface PlayfieldViewModeStrategy {
   ): number;
 }
 
-// Cible « centre de la boîte » (mode legacy : caméra inclinée classique).
+// Box-center target (legacy mode: classic tilted camera).
 function legacyCameraTarget(frameBox: THREE.Box3, out: THREE.Vector3): THREE.Vector3 {
   return frameBox.getCenter(out);
 }
 
-// Cible spécifique au portrait : centre XZ posé sur la surface, avec biais
-// optionnels de debug (rapproche le regard de la surface / du bas du cadre).
+// Portrait-specific target: XZ center laid on the surface, with optional
+// debug biases (pulls the look-at toward the surface / bottom of the frame).
 function portraitCameraTarget(
   frameBox: THREE.Box3,
   out: THREE.Vector3,

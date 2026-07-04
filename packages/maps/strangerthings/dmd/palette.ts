@@ -1,6 +1,6 @@
 import type { DotColor } from '@pinball/dmd-core'
 
-// Palette du monde alternatif (violet/magenta) — appliquée quand display.alternateWorld.
+// Alternate world palette (violet/magenta) — applied when display.alternateWorld.
 export const PALETTE_UPSIDE_DOWN: Record<DotColor, string> = {
   score: '#C26BF0',
   lives: '#FF2255',

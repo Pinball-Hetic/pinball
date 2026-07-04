@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""Dump la bounding box monde (taille/centre) de chaque mesh d'un GLB et
-suggère un rôle selon les seuils de PlayfieldTrimeshBuilder.
+"""Dump the world bounding box (size/center) of each mesh in a GLB and
+suggest a role from PlayfieldTrimeshBuilder thresholds.
 
-Usage: python3 scripts/dump-glb-meshes.py [chemin.glb]
-Défaut: apps/playfield/public/playfield/Strangerthings.glb
+Usage: python3 scripts/dump-glb-meshes.py [path.glb]
+Default: apps/playfield/public/playfield/Strangerthings.glb
 
-Outil de dev pour préparer un ré-export GLB conventionné (cf.
-docs/MAP_AUTHORING.md). N'utilise que les min/max des accessors POSITION
-(pas de décodage du buffer) transformés par la matrice monde du nœud.
-Python pur, aucune dépendance.
+Dev tool to prepare a conventioned GLB re-export (cf. docs/MAP_AUTHORING.md).
+Uses only the min/max of POSITION accessors (no buffer decode) transformed by
+the node's world matrix. Pure Python, no dependency.
 """
 import json
 import struct
 import sys
 
-RAIL_MIN_PHYS_DIM = 0.025  # 25 mm — seuil rail vs décor (PlayfieldTrimeshBuilder)
+RAIL_MIN_PHYS_DIM = 0.025  # 25 mm — rail vs decor threshold (PlayfieldTrimeshBuilder)
 
 path = sys.argv[1] if len(sys.argv) > 1 else "apps/playfield/public/playfield/Strangerthings.glb"
 
@@ -87,7 +86,7 @@ def node_name(i):
     return nodes[i].get("name", f"node_{i}")
 
 
-# Conventions de préfixe — miroir de MeshRoleResolver (TS).
+# Prefix conventions — mirror of MeshRoleResolver (TS).
 PREFIXES = ["vis_", "floor_", "wall_", "flipper_", "bumper_",
             "slingshot_", "target_", "sensor_", "lane_"]
 
@@ -100,7 +99,7 @@ def normalize(name):
 
 
 def resolve_ancestry(i):
-    """Remonte la hiérarchie (mesh → racine), 1er préfixe gagne. Comme
+    """Walk up the hierarchy (mesh → root), first prefix wins. Like
     MeshRoleResolver.resolveFromAncestry."""
     cur = i
     while cur is not None:

@@ -9,9 +9,9 @@ import {
 import { FLIPPER_Z_MAX } from './FlipperConstants';
 import type { SurfaceCoefficients } from './MapLayout';
 
-// Courbe de surface du tapis incliné, paramétrée par la map (cf.
-// layout.geometry.coefficients). Défaut = valeurs Stranger Things → comportement
-// identique tant qu'aucune map n'appelle configureSurfaceCoefficients().
+// Tilted-surface curve, parameterized per map (layout.geometry.coefficients).
+// Default = Stranger Things values → identical behavior as long as no map
+// calls configureSurfaceCoefficients().
 const DEFAULT_SURFACE_COEFFICIENTS: SurfaceCoefficients = {
   base: 1.068,
   zOffset: 0.552,
@@ -22,15 +22,15 @@ const DEFAULT_SURFACE_COEFFICIENTS: SurfaceCoefficients = {
 let surfaceCoefficients: SurfaceCoefficients = DEFAULT_SURFACE_COEFFICIENTS;
 
 /**
- * Configure la courbe de surface depuis le layout de la map. À appeler une fois
- * au chargement, AVANT tout setup physique/caméra (les spawns, colliders et le
- * cadrage caméra dérivent tous de surfaceYAtZ).
+ * Configures the surface curve from the map layout. Call once at load time,
+ * BEFORE any physics/camera setup (spawns, colliders and camera framing all
+ * derive from surfaceYAtZ).
  */
 export function configureSurfaceCoefficients(coefficients: SurfaceCoefficients): void {
   surfaceCoefficients = coefficients;
 }
 
-/** Réinitialise la courbe au défaut (Stranger Things). Surtout pour les tests. */
+/** Restores the default curve (Stranger Things). Mainly for tests. */
 export function resetSurfaceCoefficients(): void {
   surfaceCoefficients = DEFAULT_SURFACE_COEFFICIENTS;
 }
@@ -40,7 +40,7 @@ export function surfaceYAtZ(z: number): number {
   return base - ((z + zOffset) / zSpan) * yDrop;
 }
 
-/** Centre de la sphère posé sur le tapis incliné à l'abscisse Z donnée. */
+/** Sphere center resting on the tilted surface at the given Z. */
 export function ballCenterOnSurface(z: number, margin = 0.002): number {
   return surfaceYAtZ(z) + getBallRadius() + margin;
 }
@@ -49,8 +49,8 @@ export const DRAIN_Z_THRESHOLD = WALL_BOTTOM_Z + DEFAULT_BALL_RADIUS * 2;
 
 export const BOTTOM_OUT_Z = FLIPPER_Z_MAX + 0.025;
 
-// Séparateur X de la zone bottom-out : dérivé du spawn (paramétré, plus de
-// constante map dans le domain). laneSepX = spawnX - 2·rayon balle.
+// Bottom-out zone X separator, derived from the spawn:
+// laneSepX = spawnX - 2 × ball radius.
 export function bottomOutLaneSepX(spawnX: number): number {
   return spawnX - getBallRadius() * 2;
 }
@@ -59,10 +59,10 @@ export function isInBottomOutZone(x: number, z: number, laneSepX: number = WALL_
   return z >= BOTTOM_OUT_Z && x <= laneSepX;
 }
 
-// ── Diagnostic : détection d'une balle perdue (hors monde) ───────────────────
-// Surface du tapis ∈ [0.958, 1.068] ; sous 0.90 la balle est tombée dans le vide.
+// ── Diagnostics: lost-ball detection (out of world) ──────────────────────────
+// Playfield surface ∈ [0.958, 1.068]; below 0.90 the ball fell into the void.
 export const BALL_LOST_Y_THRESHOLD = 0.90;
-// Marge au-delà des murs avant de considérer la balle hors-terrain.
+// Margin beyond the walls before the ball counts as out of bounds.
 export const BALL_OOB_MARGIN = 0.08;
 
 export function isBallOutOfBounds(x: number, z: number): boolean {

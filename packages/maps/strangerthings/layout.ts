@@ -48,21 +48,21 @@ import {
   UPSIDE_DOWN_HINT_MS,
 } from './systems/UpsideDownConstants'
 
-// Layout ST. Étape transitoire : on assemble le MapLayout à partir des
-// constantes game-engine existantes (référence, pas de copie → pas de drift).
-// La bascule de propriété (literaux ici, suppression des constantes côté
-// game-engine) se fera consommateur par consommateur en phase 4.
+// ST layout. Transitional step: MapLayout is assembled from existing
+// game-engine constants (referenced, not copied → no drift). Ownership flip
+// (literals here, constants removed from game-engine) happens consumer by
+// consumer.
 export const layout: MapLayout = {
-  // Bumpers : littéraux (collider tuné). Le centre Box3 des meshes bumper_*
-  // dévie de 11-15 mm (cap mushroom) → non dérivable. TODO(blender): ajouter
-  // bumper_anchor_1/2/3 (empty au point collider) pour dériver à terme.
+  // Bumpers: literals (tuned collider). The Box3 center of bumper_* meshes
+  // deviates 11-15 mm (mushroom cap) → not derivable. TODO(blender): add
+  // bumper_anchor_1/2/3 (empty at the collider point) to derive eventually.
   bumpers: [
     { x: -0.020586, y: 1.0482, z: -0.1967 },
     { x: -0.097406, y: 1.0621, z: -0.30509 },
     { x: 0.059483, y: 1.0621, z: -0.30509 },
   ],
-  // Drop targets : positions dérivées du GLB au runtime (LayoutResolver, meshes
-  // target_*). Les littéraux ci-dessous = fallback (≤ 0.7 mm du dérivé).
+  // Drop targets: positions derived from the GLB at runtime (LayoutResolver,
+  // target_* meshes). Literals below = fallback (≤ 0.7 mm off the derived).
   dropTargets: [
     { id: 'drop_left_1', x: -0.209, y: 1.022, z: -0.019, side: 'left' },
     { id: 'drop_left_2', x: -0.205, y: 1.026, z: -0.049, side: 'left' },
@@ -70,9 +70,9 @@ export const layout: MapLayout = {
     { id: 'drop_right_2', x: 0.148, y: 1.028, z: -0.077, side: 'right' },
     { id: 'drop_right_3', x: 0.137, y: 1.032, z: -0.114, side: 'right' },
   ],
-  // TODO(blender): dériver du GLB quand les meshes sensor_* existeront
-  // (sensor_pop_1/2/3, sensor_rocket, sensor_demogorgon). Littéraux explicites
-  // en attendant — pas de mesh dans le GLB actuel.
+  // TODO(blender): derive from the GLB once sensor_* meshes exist
+  // (sensor_pop_1/2/3, sensor_rocket, sensor_demogorgon). Explicit literals
+  // until then — no mesh in the current GLB.
   sensors: {
     popZones: [
       { x: -0.0225, y: 1.057, z: -0.448 },
@@ -80,19 +80,27 @@ export const layout: MapLayout = {
       { x: 0.042, y: 1.056, z: -0.438 },
     ],
     rocket: { x: 0.193, y: 1.021, z: -0.13 },
+    // Scoop hole (saucer): capture → +life/+points/×2(5s) → kick. Position to
+    // refine at smoke test (H key = collider wireframes).
+    scoop: { x: 0.192, y: 1.028, z: -0.061 },
     bossReveal: { x: -0.0195, y: 1.0575, z: -0.269 },
-    // sensor_portal (Ø sensor 1.7 cm) — littéral en attendant le mesh.
+    // sensor_portal (sensor Ø 1.7 cm) — literal until the mesh exists.
     portal: { x: -0.000751, y: 1.015191, z: -0.064818 },
   },
-  // Spawns : analytiques (pas de mesh attendu — hors couloir/hinge).
+  // Spawns: analytic (no mesh expected — outside lane/hinge).
   spawns: {
     ball: { x: 0.2355, y: 1.01, z: 0.161 },
     alternateWorld: { x: -0.0225, z: -0.48 },
     alternateWorldImpulse: { x: 0, y: 0, z: 0.055 },
-    normalReturn: { x: -0.0225, z: -0.12 },
-    normalReturnImpulse: { x: 0, y: 0, z: 0.05 },
+    // Normal-world return → the ball EXITS THE PORTAL (= sensors.portal) with
+    // a push toward the flippers. Not the shooter lane: while `playing` the
+    // plunger does not charge (idle only) and the lane gate is closed
+    // → ball trapped. No re-trigger: the portal is closed after the cycle
+    // (portalOpen=false until a boss reopens it).
+    normalReturn: { x: -0.000751, z: -0.064818 },
+    normalReturnImpulse: { x: 0, y: 0, z: 0.055 },
   },
-  // Couloir plongeur : géométrie analytique (pas de mesh). Littéraux map.
+  // Shooter lane: analytic geometry (no mesh). Map literals.
   shooterLane: {
     xMin: 0.206,
     xMax: 0.265,
@@ -112,7 +120,7 @@ export const layout: MapLayout = {
     guideAngleStart: Math.PI * 1.5,
     guideAngleEnd: Math.PI * 2,
   },
-  // Réglage fin du pivot des flippers (offset depuis le bord de la bbox).
+  // Fine flipper pivot tuning (offset from the bbox edge).
   flipperPivots: {
     leftX: 0.02,
     rightX: -0.02,

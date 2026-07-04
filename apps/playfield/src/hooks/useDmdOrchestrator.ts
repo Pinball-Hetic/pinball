@@ -16,7 +16,7 @@ interface DisplayPushOpts {
   priority: number;
 }
 
-// Priorités (plus haut = plus prioritaire) :
+// Priorities (higher wins):
 const PRIO = {
   CINEMATIC: 110,
   GAME_OVER: 100,
@@ -35,8 +35,8 @@ const DURATIONS = {
 } as const;
 
 
-// alternateWorld est injecté au moment de l'emit (atmosphereRef) — la stack
-// stocke les displays sans ce champ. Omit distributif sur l'union.
+// alternateWorld is injected at emit time (atmosphereRef) — the stack stores
+// displays without that field. Distributive Omit over the union.
 type DisplayBase = DmdDisplay extends infer T
   ? T extends DmdDisplay
     ? Omit<T, 'alternateWorld'>
@@ -46,17 +46,17 @@ type DisplayBase = DmdDisplay extends infer T
 interface PendingDisplay {
   display: DisplayBase;
   priority: number;
-  expiresAt: number; // performance.now() + duration, Infinity si sticky
+  expiresAt: number; // performance.now() + duration, Infinity when sticky
 }
 
 export interface DmdOrchestrator {
-  // Score broadcast bas niveau (DMD data sync, indépendant du mode display)
+  // Low-level score broadcast (DMD data sync, independent of the display mode)
   emitScoreSnapshot: (s: ScoreUpdate) => void;
   emitGameStart: (player: string) => void;
   emitGameOver: (player: string, finalScore: number, mapId: string, stats: GameStats) => void;
-  // Clip cinématique plein écran (prio max) — synchro avec playfield/backglass.
+  // Fullscreen cinematic clip (max priority) — synced with playfield/backglass.
   pushCinematic: (clip: CinematicClip, value?: number) => void;
-  // DMD high-level : push une display, l'orchestrator décide quoi montrer
+  // High-level DMD: push a display, the orchestrator decides what to show
   pushIntro: (player: string) => void;
   pushScore: (s: ScoreUpdate) => void;
   pushEvent: (label: string, points: number, snap: ScoreUpdate) => void;
@@ -67,7 +67,7 @@ export interface DmdOrchestrator {
   setAtmosphere: (alternateWorldActive: boolean) => void;
 }
 
-// Labels lisibles pour les events highlight (boss defs injectées par la map) :
+// Readable labels for highlight events (boss defs injected by the map):
 function eventLabel(event: GameEvent, bosses: BossDefinition[]): string | null {
   switch (event.type) {
     case 'BOSS_REVEAL':
@@ -89,39 +89,39 @@ function eventLabel(event: GameEvent, bosses: BossDefinition[]): string | null {
       const label = bosses.find((b) => b.hud.assistLabel)?.hud.assistLabel ?? 'ASSIST';
       return label.toUpperCase();
     }
-    default: return null; // bumpers/slingshots/zones → pas de highlight, juste score
+    default: return null; // bumpers/slingshots/zones → no highlight, score only
   }
 }
 
-export { eventLabel }; // exporté pour tests
+export { eventLabel }; // exported for tests
 
 export function useDmdOrchestrator(
   clips?: Record<string, ClipTimings>,
   onGameRegistered?: (data: GameRegistered) => void,
 ): DmdOrchestrator {
-  // Table de clips de la map (manifest.clips), lue via ref pour rester à jour
-  // sans recréer l'orchestrateur.
+  // Map clip table (manifest.clips), read through a ref so it stays fresh
+  // without recreating the orchestrator.
   const clipsRef = useRef(clips);
   clipsRef.current = clips;
-  // Callback game:registered tenu à jour par ref (pas de re-render réseau).
+  // game:registered callback kept fresh via ref (no network-driven re-render).
   const onRegisteredRef = useRef(onGameRegistered);
   onRegisteredRef.current = onGameRegistered;
   const socketRef = useRef<PinballSocket | null>(null);
   const stackRef = useRef<PendingDisplay[]>([]);
-  const lastSentRef = useRef<string>(''); // JSON.stringify de la dernière display envoyée
+  const lastSentRef = useRef<string>(''); // JSON.stringify of the last display sent
   const atmosphereRef = useRef<boolean>(false);
-  // Dernier snapshot joueur/score (pour alimenter pushCinematic).
+  // Last player/score snapshot (feeds pushCinematic).
   const lastSnapRef = useRef<{ player: string; score: number }>({ player: '', score: 0 });
 
   useEffect(() => {
     socketRef.current = createPinballSocket();
 
-    // game:registered → routé au callback (QR de fin de partie). Nettoyé au
-    // disconnect du cleanup ci-dessous.
+    // game:registered → routed to the callback (end-of-game QR). Cleared by
+    // the disconnect in the cleanup below.
     socketRef.current.on('game:registered', (d) => onRegisteredRef.current?.(d));
 
-    // Tick d'expiration : retire les displays expirés et émet la plus
-    // prioritaire restante (ou SCORE par défaut).
+    // Expiration tick: drop expired displays and emit the highest-priority
+    // one left (or SCORE by default).
     const tick = window.setInterval(() => {
       const now = performance.now();
       stackRef.current = stackRef.current.filter((p) => p.expiresAt > now);
@@ -142,7 +142,7 @@ export function useDmdOrchestrator(
     const top = stackRef.current
       .slice()
       .sort((a, b) => b.priority - a.priority)[0]!;
-    // alternateWorld injecté ici → l'atmosphere voyage dans chaque display.
+    // alternateWorld injected here → the atmosphere travels with every display.
     const payload = { ...top.display, alternateWorld: atmosphereRef.current } as DmdDisplay;
     const serialized = JSON.stringify(payload);
     if (serialized === lastSentRef.current) return;
@@ -153,7 +153,7 @@ export function useDmdOrchestrator(
   const push = (display: DisplayBase, opts: DisplayPushOpts) => {
     const now = performance.now();
     const expiresAt = opts.duration ? now + opts.duration : Infinity;
-    // Si même mode déjà présent, on remplace (refresh des données)
+    // If the same mode is already present, replace it (data refresh)
     stackRef.current = stackRef.current.filter((p) => p.display.mode !== display.mode);
     stackRef.current.push({ display, priority: opts.priority, expiresAt });
     sendCurrent();
@@ -169,15 +169,15 @@ export function useDmdOrchestrator(
       socketRef.current?.emit('game:over', { player, finalScore, mapId, stats }),
 
     pushIntro: (player) => {
-      // Reset complet : l'INTRO ne s'affiche qu'au repos (ball non lancée),
-      // donc on vide la stack (retire un GAME_OVER sticky / SCORE résiduel).
+      // Full reset: INTRO only shows at rest (ball not launched), so clear
+      // the stack (removes a sticky GAME_OVER / leftover SCORE).
       stackRef.current = [];
       push({ mode: 'INTRO', player }, { priority: PRIO.INTRO });
     },
 
     pushScore: (s) => {
-      // Dès qu'un score arrive (ball lancée), l'INTRO et un éventuel
-      // LIFE_LOST sticky disparaissent ; le SCORE devient l'affichage défaut.
+      // As soon as a score arrives (ball launched), INTRO and any sticky
+      // LIFE_LOST disappear; SCORE becomes the default display.
       stackRef.current = stackRef.current.filter(
         (p) => p.display.mode !== 'INTRO' && p.display.mode !== 'LIFE_LOST',
       );
@@ -219,16 +219,16 @@ export function useDmdOrchestrator(
       ),
 
     pushLifeLost: (livesRemaining, score, player) =>
-      // Sticky : persiste jusqu'au prochain SCORE (relance de bille), qui le
-      // retire via pushScore. Pas de duration.
+      // Sticky: persists until the next SCORE (ball relaunch), which removes
+      // it via pushScore. No duration.
       push(
         { mode: 'LIFE_LOST', livesRemaining, score, player },
         { priority: PRIO.LIFE_LOST },
       ),
 
     pushGameOver: (player, finalScore) => {
-      // GAME_OVER est sticky : pas de duration. Pour le retirer, appeler
-      // pushIntro() au reset.
+      // GAME_OVER is sticky: no duration. To remove it, call pushIntro() on
+      // reset.
       stackRef.current = stackRef.current.filter(
         (p) => p.display.mode === 'INTRO' || p.display.mode === 'SCORE',
       );
@@ -242,7 +242,7 @@ export function useDmdOrchestrator(
       const { player, score } = lastSnapRef.current;
       push(
         { mode: 'CINEMATIC', clip, player, score, value },
-        // Segment plein écran : le mode SCORE reprend après (fever en SCORE).
+        // Fullscreen segment: SCORE mode resumes afterwards (fever shows in SCORE).
         {
           priority: PRIO.CINEMATIC,
           duration: clipTakeoverMs(clipsRef.current, clip) ?? clipShowMs(clipsRef.current, clip),
@@ -253,7 +253,7 @@ export function useDmdOrchestrator(
     setAtmosphere: (alternateWorldActive) => {
       if (atmosphereRef.current === alternateWorldActive) return;
       atmosphereRef.current = alternateWorldActive;
-      // Re-pousse le display courant avec la nouvelle atmosphere.
+      // Re-push the current display with the new atmosphere.
       lastSentRef.current = '';
       sendCurrent();
     },

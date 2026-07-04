@@ -220,11 +220,11 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       clearBossHud(def.id);
       bossArmedFiredRef.current.delete(def.id);
     }
-    callbacks?.onAtmosphereChange?.(false);
+    callbacksRef.current?.onAtmosphereChange?.(false);
     setAlternateWorldActive(false);
     alternateWorldActiveRef.current = false;
     alternateWorldBaselineRef.current = 0;
-  }, [clearAlternateWorldHint, clearBossHud, callbacks, bosses]);
+  }, [clearAlternateWorldHint, clearBossHud, bosses]);
 
   const updateGameState = (state: GameState) => {
     gameStateRef.current = state;
@@ -252,7 +252,8 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
     callbacks?.onLifeGained?.(next);
   }, [callbacks]);
 
-  const handleDrain = (hideBall: () => void) => {
+  // Returns true when this drain ended the game (no lives left).
+  const handleDrain = (hideBall: () => void): boolean => {
     const newLives = livesRef.current - 1;
     livesRef.current = newLives;
     setLives(newLives);
@@ -271,11 +272,12 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
           : 0,
       };
       callbacks?.onGameOver?.(scoreRef.current, stats);
-    } else {
-      onMusicDrain({ gameOver: false });
-      updateGameState("idle");
-      callbacks?.onLifeLost?.(newLives);
+      return true;
     }
+    onMusicDrain({ gameOver: false });
+    updateGameState("idle");
+    callbacks?.onLifeLost?.(newLives);
+    return false;
   };
 
   const resetGame = () => {
@@ -455,8 +457,8 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         setCombo(0);
         setMultiplier(1);
         clearScorePops();
-        handleDrain(hideBall);
-        if (livesRef.current <= 0) {
+        const gameOver = handleDrain(hideBall);
+        if (gameOver) {
           clearAllBossHud();
         }
       }
@@ -507,6 +509,11 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       }
       if (event.type === "RETURN_PORTAL_TRANSITION_END") {
         setAlternateWorldActive(false);
+        // The ref (source of truth read by bossThresholdMet) must track the
+        // state — symmetric with PORTAL_TRANSITION_END. Otherwise the
+        // requiresAlternateWorld boss gates stay wrong after returning to the
+        // normal world.
+        alternateWorldActiveRef.current = false;
         setAlternateWorldHint(false);
         if (alternateWorldHintTimerRef.current !== null) {
           window.clearTimeout(alternateWorldHintTimerRef.current);
@@ -520,6 +527,16 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         alternateWorldActiveRef.current = false;
         alternateWorldBaselineRef.current = 0;
         bossArmedFiredRef.current.clear();
+        // Back to the normal world: sync React state + atmosphere (HUD banner,
+        // trail, DMD) — otherwise they stay stuck in the alternate world.
+        // Symmetric with RETURN_PORTAL_TRANSITION_END.
+        setAlternateWorldActive(false);
+        setAlternateWorldHint(false);
+        if (alternateWorldHintTimerRef.current !== null) {
+          window.clearTimeout(alternateWorldHintTimerRef.current);
+          alternateWorldHintTimerRef.current = null;
+        }
+        callbacks?.onAtmosphereChange?.(false);
       }
     };
 

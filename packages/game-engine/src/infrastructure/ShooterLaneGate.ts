@@ -1,11 +1,11 @@
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import type { MapLayout } from '../domain/MapLayout';
 import { surfaceYAtZ } from '../domain/PlayfieldGeometry';
 
 type LaneConfig = MapLayout['shooterLane'];
 
-// Mur de fermeture du couloir : posé un poil à droite du bord gauche du couloir,
-// fin (le but est de boucher l'ouverture, pas de rebondir).
+// Lane-closing wall: placed just right of the lane's left edge, thin (the goal
+// is to plug the opening, not to bounce the ball).
 const GATE_X_INSET = 0.005;
 const GATE_THICKNESS = 0.01;
 

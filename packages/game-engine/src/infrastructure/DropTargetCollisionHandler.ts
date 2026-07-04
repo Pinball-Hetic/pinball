@@ -56,7 +56,7 @@ export class DropTargetCollisionHandler implements CollisionHandler {
 
   /** Resets all drop targets to the up state (called on drain / bottom_out). */
   resetDropTargets(): void {
-    for (const dt of this.layout.dropTargets) this.dropTargetDown[dt.id] = false;
+    for (const k of Object.keys(this.dropTargetDown)) this.dropTargetDown[k] = false;
     this.emit({ type: 'DROP_TARGET_RESET' });
   }
 }

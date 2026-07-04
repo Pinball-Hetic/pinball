@@ -8,7 +8,7 @@ interface JoyceWallProps {
   reactor?: Reactor
 }
 
-// Triforce SVG minimaliste centré dans le header.
+// Minimal Triforce SVG centered in the header.
 function TriforceIcon() {
   return (
     <svg viewBox="0 0 60 52" className={cx('logo-triforce')} aria-hidden>
@@ -29,7 +29,7 @@ export default function JoyceWall({ message, messageId }: JoyceWallProps) {
     if (timerRef.current) window.clearTimeout(timerRef.current)
     setVisibleMsg(message.toUpperCase())
     setGlow(true)
-    // Efface le message après 4 s
+    // Clears the message after 4s
     timerRef.current = window.setTimeout(() => {
       setGlow(false)
       timerRef.current = window.setTimeout(() => setVisibleMsg(null), 600)

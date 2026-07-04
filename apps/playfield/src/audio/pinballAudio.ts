@@ -32,11 +32,11 @@ function warmAssets(): void {
   assetsWarmed = true;
   void samples.prepareGaplessLoop(getEarlySoundUrl());
   void samples.preloadBuffer(getGameOverUrl());
-  // Sons spécifiques à la map (reveal boss, ambiance) : préchargés via
-  // warmMapSounds(urls) depuis le playfield (URLs fournies par la map).
+  // Map-specific sounds (boss reveal, ambience) are warmed via
+  // warmMapSounds(urls) from the playfield (URLs provided by the map).
 }
 
-// Préchargement des sons de la map (musique boss en boucle gapless).
+// Preloads the map's sounds (boss music as a gapless loop).
 export function warmMapSounds(urls: string[]): void {
   for (const url of urls) {
     void samples.prepareGaplessLoop(url);
@@ -44,8 +44,8 @@ export function warmMapSounds(urls: string[]): void {
   }
 }
 
-// Son cinématique d'event de la map (ducking + impact). URL+volume fournis
-// par le contenu de la map (manifest.sounds).
+// Map event cinematic sound (ducking + impact). URL+volume come from the
+// map content (manifest.sounds).
 export function playMapCinematicSound(url: string, volumePercent = 100): void {
   const gain = percentToGain(volumePercent);
   void samples.resumeContext();
@@ -94,7 +94,7 @@ export function notifyBootPhase(phase: PinballBootPhase): void {
   if (phase === "attract" && earlySound.getPhase() !== "playing") {
     requestEarlySoundStart();
   }
-  // in_game : early-sound continue jusqu'au BOSS_REVEAL (director gère le handoff).
+  // in_game: early-sound keeps playing until BOSS_REVEAL (the director handles the handoff).
 }
 
 /** Called as soon as Rapier/GLB init completes — primary start trigger. */
@@ -131,7 +131,7 @@ export function onMusicGameOver(): void {
   void samples.playOneShotBuffer(getGameOverUrl(), soundLevel("gameOver"));
 }
 
-/** @deprecated Utiliser onMusicGameOver — conservé pour compatibilité interne. */
+/** @deprecated Use onMusicGameOver — kept for internal compatibility. */
 export function playGameOverSound(): void {
   onMusicGameOver();
 }

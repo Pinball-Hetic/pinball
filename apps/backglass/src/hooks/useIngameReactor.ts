@@ -1,5 +1,7 @@
 import { RefObject, useEffect, useRef } from 'react'
-import { createPinballSocket } from '@pinball/shared-types/src/socket-client'
+import type { PinballSocket } from '@pinball/shared-types/src/socket-client'
+import type { DmdDisplay, GameStart } from '@pinball/shared-types'
+import { hitIntensity, heatAfterHit, nextHeat, roundedHeat } from './heatModel'
 
 export type Reaction =
   | { kind: 'gameStart'; player: string }
@@ -12,18 +14,16 @@ export type Reaction =
 export interface Reactor {
   on: (cb: (r: Reaction) => void) => () => void
   getHeat: () => number
-  // Suspend les réactions/heat (pendant un clip cinématique plein écran).
+  // Suspends reactions/heat (during a full-screen cinematic clip).
   setSuspended: (suspended: boolean) => void
-  // Verrouille le heat à 1 (état FEVER : embrasement permanent).
+  // Locks heat at 1 (FEVER state: permanent blaze).
   setHeatLock: (locked: boolean) => void
 }
 
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
-
-const HEAT_DECAY = 0.5 // par seconde
-const HIT_GAIN = 0.3
-
-export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reactor {
+export function useIngameReactor(
+  targetRef: RefObject<HTMLElement | null>,
+  socket: PinballSocket,
+): Reactor {
   const listenersRef = useRef<Set<(r: Reaction) => void>>(new Set())
   const heatRef = useRef(0)
   const lastScoreRef = useRef<number | null>(null)
@@ -52,21 +52,20 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
       listenersRef.current.forEach((cb) => cb(r))
     }
 
-    const socket = createPinballSocket()
-
-    socket.on('game:start', (d) => {
+    const onGameStart = (d: GameStart) => {
       lastScoreRef.current = null
       emit({ kind: 'gameStart', player: d.player })
-    })
+    }
+    socket.on('game:start', onGameStart)
 
-    socket.on('dmd:display', (d) => {
+    const onDmdDisplay = (d: DmdDisplay) => {
       switch (d.mode) {
         case 'SCORE': {
           const prev = lastScoreRef.current
           lastScoreRef.current = d.score
           if (prev !== null && d.score > prev && !suspendedRef.current) {
-            const intensity = clamp((d.score - prev) / 500, 0.1, 1)
-            heatRef.current = Math.min(1, heatRef.current + intensity * HIT_GAIN)
+            const intensity = hitIntensity(d.score - prev)
+            heatRef.current = heatAfterHit(heatRef.current, intensity)
             emit({ kind: 'hit', intensity })
           }
           break
@@ -89,22 +88,19 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
         default:
           break
       }
-    })
+    }
+    socket.on('dmd:display', onDmdDisplay)
 
-    // Boucle heat : decay continu, écriture directe de --heat (pas de re-render).
-    // On n'écrit que si la valeur arrondie change → 0 invalidation style au repos.
+    // Heat loop: continuous decay, direct --heat write (no re-render).
+    // Only write when the rounded value changes → 0 style invalidations at rest.
     let raf = 0
     let last: number | null = null
     let written = -1
     const loop = (t: number) => {
-      if (heatLockRef.current) {
-        heatRef.current = 1 // FEVER : embrasement verrouillé
-      } else if (last !== null) {
-        const dt = (t - last) / 1000
-        heatRef.current = Math.max(0, heatRef.current - HEAT_DECAY * dt)
-      }
+      const dt = last !== null ? (t - last) / 1000 : null
+      heatRef.current = nextHeat(heatRef.current, dt, heatLockRef.current)
       last = t
-      const rounded = Math.round(heatRef.current * 100) / 100
+      const rounded = roundedHeat(heatRef.current)
       if (rounded !== written) {
         written = rounded
         targetRef.current?.style.setProperty('--heat', String(rounded))
@@ -115,9 +111,12 @@ export function useIngameReactor(targetRef: RefObject<HTMLElement | null>): Reac
 
     return () => {
       cancelAnimationFrame(raf)
-      socket.disconnect()
+      // Shared socket (lifted into BackglassStage): remove OUR handlers
+      // without disconnecting it — the caller owns its lifecycle.
+      socket.off('game:start', onGameStart)
+      socket.off('dmd:display', onDmdDisplay)
     }
-  }, [targetRef])
+  }, [targetRef, socket])
 
   return reactorRef.current
 }

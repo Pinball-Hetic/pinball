@@ -17,6 +17,11 @@ export type BossCameraCinematicConfig = {
   distanceScale: number;
 };
 
+/**
+ * Default camera→boss facing direction, shared by ST + Zelda boss cinematics.
+ */
+export const DEFAULT_BOSS_FACE_DIR: BossCameraFocus = { x: -0.52, y: 0.2, z: 0.83 };
+
 export const CAMERA_CINEMATIC_DISTANCE_MIN = 0.05;
 export const CAMERA_CINEMATIC_FOV_MIN = 35;
 export const CAMERA_CINEMATIC_FOV_MAX = 55;

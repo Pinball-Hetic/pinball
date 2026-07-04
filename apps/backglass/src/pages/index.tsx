@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NoSignal } from '@pinball/ui'
+import { createPinballSocket, type PinballSocket } from '@pinball/shared-types/src/socket-client'
 import { useBackglassData } from '@/hooks/useBackglassData'
 import { useBackglassTakeover } from '@/hooks/useBackglassTakeover'
 import { useIngameReactor } from '@/hooks/useIngameReactor'
@@ -13,9 +14,9 @@ import RecapTakeover from '@/components/takeovers/RecapTakeover'
 import AttractScene from '@/components/takeovers/AttractScene'
 import CinematicTakeover from '@/components/takeovers/CinematicTakeover'
 
-// BackglassPage : appelé à la racine, gère le cycle de vie du mapId.
-// La sélection de map arrive via le socket (useBackglassData) et provoque un
-// remontage propre du Stage (key={mapId}) avec le bon contenu de map.
+// BackglassPage: called at the root, owns the mapId lifecycle.
+// The map selection arrives via the socket (useBackglassData) and triggers a
+// clean Stage remount (key={mapId}) with the right map content.
 export default function BackglassPage() {
   const { entries, stats, connected, mapId } = useBackglassData()
   const content = getBackglassContent(mapId) ?? null
@@ -30,8 +31,8 @@ export default function BackglassPage() {
 
   return (
     <MapContentProvider value={content}>
-      {/* key={mapId} : remonte le Stage complet (hooks, socket takeover, art)
-          à chaque changement de map → pas d'état résiduel de la map précédente. */}
+      {/* key={mapId}: remounts the whole Stage (hooks, takeover socket, art)
+          on every map change → no residual state from the previous map. */}
       <BackglassStage key={mapId} entries={entries} stats={stats} connected={connected} />
     </MapContentProvider>
   )
@@ -45,24 +46,35 @@ interface StageProps {
 
 function BackglassStage({ entries, stats, connected }: StageProps) {
   const { JoyceWall, SideArt, backglassTheme, backglassThemeAlternate } = useMapContent()
+  // ONE Socket.io connection for the whole Stage, shared between the takeover
+  // and reactor hooks. Created once (useState initializer), disconnected on
+  // unmount. key={mapId} on the Stage guarantees a fresh socket on every map
+  // change.
+  const [socket] = useState<PinballSocket>(() => createPinballSocket())
+  useEffect(() => {
+    return () => {
+      socket.disconnect()
+    }
+  }, [socket])
+
   const { takeover, alternateWorld, highlightRank, agitation, joyce, holdHallFlip, fever, goldWaveId } =
-    useBackglassTakeover(entries)
+    useBackglassTakeover(entries, socket)
   const stageRef = useRef<HTMLDivElement>(null)
   const goldWaveRef = useRef<HTMLDivElement>(null)
-  const reactor = useIngameReactor(stageRef)
+  const reactor = useIngameReactor(stageRef, socket)
 
-  // Réacteur in-game suspendu pendant un clip cinématique (il ne doit pas
-  // poser de heat/hits par-dessus la scène).
+  // In-game reactor suspended during a cinematic clip (it must not paint
+  // heat/hits over the scene).
   useEffect(() => {
     reactor.setSuspended(takeover?.scene === 'CINEMATIC')
   }, [reactor, takeover?.scene])
 
-  // FEVER : heat verrouillé à 1 (embrasement permanent) pendant l'état.
+  // FEVER: heat locked at 1 (permanent blaze) while the state lasts.
   useEffect(() => {
     reactor.setHeatLock(fever)
   }, [reactor, fever])
 
-  // Onde dorée (milestones 5k/15k) — rejoue l'animation à chaque incrément.
+  // Gold wave (5k/15k milestones) — replays the animation on each increment.
   useEffect(() => {
     if (goldWaveId === 0) return
     const el = goldWaveRef.current
@@ -72,8 +84,8 @@ function BackglassStage({ entries, stats, connected }: StageProps) {
     el.classList.add('gold-wave-on')
   }, [goldWaveId])
 
-  // Scale-to-fit : la borne est en 1920×1080 exact (scale 1), mais on
-  // s'adapte aux fenêtres dev plus petites sans casser le layout fixe.
+  // Scale-to-fit: the cabinet is exactly 1920×1080 (scale 1), but adapt to
+  // smaller dev windows without breaking the fixed layout.
   useEffect(() => {
     const fit = () => {
       const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080)
@@ -86,8 +98,8 @@ function BackglassStage({ entries, stats, connected }: StageProps) {
 
   const sideAgitation = alternateWorld ? 1 : Math.max(0.15, agitation)
 
-  // Tokens de thème de la map posés en custom properties (base + surcharges
-  // monde alternatif). Le backglass se re-render librement (pas de scène 3D).
+  // Map theme tokens set as custom properties (base + alternate world
+  // overrides). The backglass re-renders freely (no 3D scene).
   const themeStyle = {
     ...backglassTheme,
     ...(alternateWorld ? backglassThemeAlternate : {}),

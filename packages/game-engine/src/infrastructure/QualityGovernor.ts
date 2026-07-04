@@ -1,6 +1,6 @@
-// Gouverneur de qualité adaptatif : surveille le frame time et descend/
-// remonte les crans (pixelRatio + flags trail/spores) avec hystérésis.
-// Diagnostic borne : log console à chaque changement de cran.
+// Adaptive quality governor: monitors frame time and steps tiers down/up
+// (pixelRatio + trail/spores flags) with hysteresis.
+// Cabinet diagnostics: console log on every tier change.
 
 export interface QualityTier {
   dpr: number;
@@ -13,21 +13,25 @@ const TIERS: QualityTier[] = [
   { dpr: 1.25, trailMax: 24, sporesOn: true },
   { dpr: 1.0, trailMax: 24, sporesOn: true },
   { dpr: 1.0, trailMax: 12, sporesOn: false },
+  // Low-resolution tiers: under heavy load the governor drops down to
+  // dpr 0.7 — nearly indistinguishable on the cabinet screen, big fill-rate win.
+  { dpr: 0.85, trailMax: 12, sporesOn: false },
+  { dpr: 0.7, trailMax: 8, sporesOn: false },
 ];
 
 const WINDOW = 60; // frames
-const DOWN_MS = 19; // moyenne au-dessus → descendre
-const UP_MS = 12; // sous ce seuil pendant UP_HOLD_MS → remonter
+const DOWN_MS = 19; // average above → step down
+const UP_MS = 12; // below this for UP_HOLD_MS → step up
 const UP_HOLD_MS = 5000;
-const COOLDOWN_MS = 3000; // max 1 changement / 3s
+const COOLDOWN_MS = 3000; // max 1 change / 3s
 
 export class QualityGovernor {
   private index = 0;
   private samples: number[] = [];
   private cursor = 0;
-  private clock = 0; // ms cumulés
+  private clock = 0; // cumulative ms
   private lastChange = 0;
-  private goodSince = 0; // ms où la moyenne est repassée sous UP_MS
+  private goodSince = 0; // ms when the average fell back under UP_MS
 
   constructor(private onChange: (tier: QualityTier) => void) {}
 
@@ -35,7 +39,7 @@ export class QualityGovernor {
     return TIERS[this.index];
   }
 
-  /** À appeler chaque frame avec le frame time en ms. */
+  /** Call every frame with the frame time in ms. */
   frame(ms: number): void {
     this.clock += ms;
     if (this.samples.length < WINDOW) this.samples.push(ms);
@@ -46,9 +50,9 @@ export class QualityGovernor {
     const avg = this.samples.reduce((s, v) => s + v, 0) / this.samples.length;
 
     if (this.clock - this.lastChange < COOLDOWN_MS) {
-      // Pendant le cooldown, le minuteur de remontée ne court PAS (sinon il
-      // serait déjà écoulé à la sortie du cooldown → remontée immédiate puis
-      // re-dégradation = oscillation).
+      // During cooldown the step-up timer does NOT run (otherwise it would
+      // already be elapsed when cooldown ends → immediate step-up then
+      // re-degradation = oscillation).
       this.goodSince = this.clock;
       return;
     }

@@ -7,8 +7,26 @@ import { NoSignal } from '@pinball/ui'
 import type { DmdDisplay } from '@pinball/shared-types'
 import { getDmdContent } from '@pinball/maps/dmd'
 import { AVAILABLE_MAPS } from '@pinball/maps'
+import { livesDisplay } from '@pinball/dmd-core'
 
-const TOTAL_LIVES = 3
+function renderLives(livesRemaining: number): ReactElement {
+  const view = livesDisplay(livesRemaining)
+  if (view.kind === 'count') {
+    return (
+      <div className="flex items-center gap-2 text-4xl font-mono tabular-nums">
+        <span>×{view.value}</span>
+        <span>●</span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex gap-3 text-3xl">
+      {Array.from({ length: view.total }).map((_, i) => (
+        <span key={i} style={{ opacity: i < view.filled ? 1 : 0.2 }}>●</span>
+      ))}
+    </div>
+  )
+}
 
 function renderDisplay(d: DmdDisplay): ReactElement {
   switch (d.mode) {
@@ -72,11 +90,7 @@ function renderDisplay(d: DmdDisplay): ReactElement {
           <div className="text-7xl font-mono font-bold uppercase tracking-widest text-red-400 drop-shadow-[0_0_20px_rgba(239,68,68,0.7)]">
             Ball Lost
           </div>
-          <div className="flex gap-3 text-3xl">
-            {Array.from({ length: TOTAL_LIVES }).map((_, i) => (
-              <span key={i} style={{ opacity: i < d.livesRemaining ? 1 : 0.2 }}>●</span>
-            ))}
-          </div>
+          {renderLives(d.livesRemaining)}
         </div>
       )
 
@@ -93,7 +107,7 @@ function renderDisplay(d: DmdDisplay): ReactElement {
       )
 
     case 'CINEMATIC':
-      // Placeholder no-op : rendu réel des clips en P15 (AsciiClipPlayer).
+      // No-op placeholder: real clip rendering is done by AsciiClipPlayer.
       return (
         <div className="flex flex-col items-center gap-4">
           <div className="text-6xl font-mono font-bold tabular-nums">
@@ -114,17 +128,17 @@ export default function ScoreboardPage() {
   const router = useRouter()
   const { display, alternateWorld, connected, mapId } = useDmdState()
 
-  // Nom affiché de la map active (bandeau supérieur). Fallback sur l'id en
-  // majuscules si la map n'est pas dans AVAILABLE_MAPS (map inconnue en dev).
+  // Display name of the active map (top band). Falls back to the uppercased
+  // id if the map is not in AVAILABLE_MAPS (unknown map in dev).
   const mapName =
     AVAILABLE_MAPS.find((m) => m.id === mapId)?.name ?? mapId.toUpperCase()
 
-  // Contenu DMD de la map active. key={mapId} sur DmdCanvas force un remontage
-  // propre (ferme la boucle rAF précédente, recrée LAYOUTS/PALETTE/BURST).
+  // DMD content of the active map. key={mapId} on DmdCanvas forces a clean
+  // remount (closes the previous rAF loop, recreates LAYOUTS/PALETTE/BURST).
   const mapDmdContent = getDmdContent(mapId) ?? {}
 
-  // ?flat : ancien rendu JSX plat (debug). Attendre router.isReady pour
-  // éviter de monter le canvas puis de basculer en flat.
+  // ?flat: legacy flat JSX rendering (debug). Wait for router.isReady to
+  // avoid mounting the canvas then switching to flat.
   if (!router.isReady) {
     return <main style={{ minHeight: '100vh', background: '#000' }} />
   }

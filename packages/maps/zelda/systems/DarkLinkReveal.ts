@@ -3,16 +3,15 @@ import type { GameEvent } from '@pinball/game-engine';
 import { getBossDefinition, DARK_LINK_TARGET } from '../bosses';
 import { PLAYFIELD_TILT } from '@pinball/game-engine';
 import { createBossTargetMesh, BossTargetPulse } from '@pinball/game-engine';
+import { WalkFightPhaseMachine } from '@pinball/game-engine';
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { DarkLinkTargetVisual } from './DarkLinkTargetVisual';
 import type { BossRevealController } from './BossRevealController';
 
 const VICTORY_DURATION = 0.65;
-// Flash rouge Dark Link
+// Dark Link red flash
 const FLASH_COLOR = 0xff2200;
 const FLASH_INTENSITY = 1.6;
-
-type Phase = 'idle' | 'walk' | 'settle' | 'fight' | 'victory';
 
 export type DarkLinkSetup = {
   root: THREE.Object3D;
@@ -23,12 +22,12 @@ export type DarkLinkSetup = {
 };
 
 /**
- * Contrôleur de révélation Dark Link (Sacred Realm).
- * Pattern identique à VecnaReveal :
- *  - phase walk  : Dark Link marche vers sa position (gameplay gelé)
- *  - phase settle: rotation face caméra (gameplay gelé)
- *  - phase fight : combat, animation idle + hit à chaque coup
- *  - phase victory: animation dead + portail retour ouvert
+ * Dark Link reveal controller (Sacred Realm).
+ * Same pattern as VecnaReveal:
+ *  - walk phase   : Dark Link walks to his position (gameplay frozen)
+ *  - settle phase : rotation to face the camera (gameplay frozen)
+ *  - fight phase  : combat, idle animation + hit on each blow
+ *  - victory phase: dead animation + return portal opened
  */
 export class DarkLinkReveal implements BossRevealController {
   readonly bossId = 'darklink' as const;
@@ -45,8 +44,12 @@ export class DarkLinkReveal implements BossRevealController {
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
 
-  private phase: Phase = 'idle';
-  private elapsed = 0;
+  private machine = new WalkFightPhaseMachine({
+    victoryDuration: VICTORY_DURATION,
+    fightFlickerShade: 0.22,
+    fightFlickerFlashMix: 0.10,
+    targetHits: getBossDefinition('darklink').targetHits,
+  });
 
   // ── BossRevealController ─────────────────────────────────────────────────
 
@@ -57,6 +60,13 @@ export class DarkLinkReveal implements BossRevealController {
   ): Promise<void> {
     await this.darkLinkVisual.ensureReady();
     await this.darkLinkVisual.warmup(renderer, scene, camera);
+  }
+
+  // PointLights added dynamically during the fight: strobe flash +
+  // Dark Link glow + target light. Used to prewarm shader variants at
+  // preload (see BossRevealOrchestrator.preloadAll).
+  dynamicPointLightCount(): number {
+    return 3;
   }
 
   setup(config: DarkLinkSetup): void {
@@ -90,14 +100,15 @@ export class DarkLinkReveal implements BossRevealController {
 
   onGameEvent(event: GameEvent): void {
     if (event.type === 'BOSS_REVEAL' && event.bossId === 'darklink') {
-      this.startWalkPhase();
+      if (this.machine.onReveal()) this.startWalkPhase();
       return;
     }
     if (event.type === 'BOSS_TARGET_HIT' && event.bossId === 'darklink') {
-      if (this.phase !== 'fight') return;
+      const res = this.machine.onHit(event.hitCount);
+      if (!res.accepted) return;
       this.targetPulse?.flashHit();
       this.darkLinkVisual.playHit();
-      if (event.hitCount >= getBossDefinition('darklink').targetHits) {
+      if (res.victory) {
         this.beginVictory();
       }
     }
@@ -108,7 +119,7 @@ export class DarkLinkReveal implements BossRevealController {
   }
 
   isGameplayFrozen(): boolean {
-    return this.phase === 'walk' || this.phase === 'settle';
+    return this.machine.isGameplayFrozen();
   }
 
   update(dt: number): void {
@@ -116,41 +127,36 @@ export class DarkLinkReveal implements BossRevealController {
     this.targetPulse?.update(
       dt,
       this.targetGroup?.visible ?? false,
-      this.phase === 'victory',
+      this.machine.getPhase() === 'victory',
     );
 
-    if (this.phase === 'idle') return;
+    // walk/settle exit timing is Three-side; sample it for the pure machine.
+    const walkPathComplete =
+      this.machine.getPhase() === 'walk' && this.darkLinkVisual.isWalkPathComplete();
+    const settleComplete =
+      this.machine.getPhase() === 'settle' && this.darkLinkVisual.updateSettle(dt);
 
-    this.elapsed += dt;
+    const d = this.machine.tick(dt, { walkPathComplete, settleComplete });
 
-    if (this.phase === 'walk') {
-      this.cinematicStrobe.stop();
-      if (this.darkLinkVisual.isWalkPathComplete()) {
-        this.darkLinkVisual.setPathProgress(1);
-        this.beginSettlePhase();
-      }
-      return;
+    if (d.phase === 'idle') return;
+
+    switch (d.strobe.kind) {
+      case 'stop':
+        this.cinematicStrobe.stop();
+        break;
+      case 'fightFlicker':
+        this.cinematicStrobe.applyFightFlicker(d.strobe.shade, d.strobe.flashMix);
+        break;
+      case 'apply':
+        this.cinematicStrobe.apply(d.strobe.on, d.strobe.fullMap, d.strobe.mix);
+        break;
     }
 
-    if (this.phase === 'settle') {
-      this.cinematicStrobe.stop();
-      if (this.darkLinkVisual.updateSettle(dt)) {
-        this.beginFightPhase();
-      }
-      return;
-    }
+    if (walkPathComplete) this.darkLinkVisual.setPathProgress(1);
+    if (d.enteredSettle) this.beginSettlePhase();
+    if (d.enteredFight) this.beginFightPhase();
 
-    if (this.phase === 'fight') {
-      this.cinematicStrobe.applyFightFlicker(0.22, 0.10);
-      return;
-    }
-
-    if (this.phase === 'victory') {
-      this.cinematicStrobe.apply(false, false, Math.max(0, 1 - this.elapsed / VICTORY_DURATION));
-      if (this.elapsed >= VICTORY_DURATION) {
-        this.hideBoss();
-      }
-    }
+    if (d.finishedVictory) this.hideBoss();
   }
 
   dispose(): void {
@@ -171,16 +177,11 @@ export class DarkLinkReveal implements BossRevealController {
     this.targetCoreMat = null;
     this.targetLight  = null;
     this.targetPulse  = null;
-    this.phase   = 'idle';
-    this.elapsed = 0;
   }
 
-  // ── Privé ────────────────────────────────────────────────────────────────
+  // ── Private ──────────────────────────────────────────────────────────────
 
   private startWalkPhase(): void {
-    if (this.phase !== 'idle') return;
-    this.phase = 'walk';
-    this.elapsed = 0;
     this.targetPulse?.reset();
     this.darkLinkVisual.beginReveal();
     this.darkLinkVisual.show();
@@ -189,22 +190,16 @@ export class DarkLinkReveal implements BossRevealController {
   }
 
   private beginSettlePhase(): void {
-    this.phase = 'settle';
-    this.elapsed = 0;
     this.darkLinkVisual.startSettle();
   }
 
   private beginFightPhase(): void {
-    this.phase = 'fight';
-    this.elapsed = 0;
     this.darkLinkVisual.setPathProgress(1);
     if (this.targetGroup) this.targetGroup.visible = true;
     this.onTargetReady?.();
   }
 
   private beginVictory(): void {
-    this.phase = 'victory';
-    this.elapsed = 0;
     this.darkLinkVisual.playDead();
     this.onFightEnd?.();
     if (this.targetGroup) this.targetGroup.visible = false;
@@ -217,8 +212,7 @@ export class DarkLinkReveal implements BossRevealController {
   }
 
   private resetState(): void {
-    this.phase = 'idle';
-    this.elapsed = 0;
+    this.machine.reset();
     this.darkLinkVisual.hide();
     if (this.targetGroup) {
       this.targetGroup.visible = false;

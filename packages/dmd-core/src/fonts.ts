@@ -1,7 +1,7 @@
-// Fonts bitmap pour le renderer dot-matrix.
-// Chaque glyphe = un tableau de `height` rows ; chaque row est un bitmask
-// de `width` bits (bit de poids fort = colonne la plus à gauche).
-// Le buffer cible stocke un INDEX de palette par dot (0 = éteint).
+// Bitmap fonts for the dot-matrix renderer.
+// Each glyph = an array of `height` rows; each row is a bitmask of `width`
+// bits (most significant bit = leftmost column).
+// The target buffer stores a palette INDEX per dot (0 = off).
 
 export interface BitmapFont {
   width: number
@@ -9,8 +9,8 @@ export interface BitmapFont {
   glyphs: Record<string, number[]>
 }
 
-// 5×7 — charset arcade. A-Z, 0-9, espace, ponctuation, 'x', '+', '-', ':',
-// '●' (disque plein pour les vies).
+// 5×7 — arcade charset. A-Z, 0-9, space, punctuation, 'x', '+', '-', ':',
+// '●' (filled disc for lives).
 const GLYPHS_5X7: Record<string, number[]> = {
   ' ': [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
   '.': [0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x04],
@@ -61,7 +61,7 @@ const GLYPHS_5X7: Record<string, number[]> = {
 
 export const FONT_5X7: BitmapFont = { width: 5, height: 7, glyphs: GLYPHS_5X7 }
 
-// 12×22 — gros chiffres plein cadre (style DMD Williams), traits 3 dots.
+// 12×22 — large full-frame digits (Williams DMD style), 3-dot strokes.
 const GLYPHS_12X22: Record<string, number[]> = {
   '0': [0x3fc, 0x7fe, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0xe07, 0x7fe, 0x3fc],
   '1': [0x070, 0x1f0, 0x7f0, 0x7f0, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x070, 0x1fc, 0x3fc, 0x3fc, 0x3fc],
@@ -82,8 +82,8 @@ export function measureText(text: string, font: BitmapFont, spacing = 1, scale =
   return (text.length * font.width + (text.length - 1) * spacing) * scale
 }
 
-// `scale` : chaque dot du glyphe est dessiné en bloc scale×scale ; l'advance
-// par caractère = (width + spacing) × scale.
+// `scale`: each glyph dot is drawn as a scale×scale block; per-character
+// advance = (width + spacing) × scale.
 export function drawText(
   grid: Uint8Array,
   gridW: number,

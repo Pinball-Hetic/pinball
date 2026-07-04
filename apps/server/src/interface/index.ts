@@ -1,134 +1,46 @@
-import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@pinball/shared-types';
-import { DEFAULT_MAP_ID } from '@pinball/shared-types';
-import { worldTopTen, globalStats } from '../use-cases/Leaderboard';
-import { registerScore } from '../use-cases/RegisterScore';
+import { createGlobalApiClient, type LeaderboardCache } from '../infrastructure/GlobalApiClient';
+import { prismaGameRepository } from '../infrastructure/PrismaGameRepository';
+import { GameStateManager } from '../infrastructure/GameStateManager';
+import { createRegisterScore } from '../use-cases/RegisterScore';
+import { createLeaderboard } from '../use-cases/Leaderboard';
+import { createApp } from './createApp';
+import { createSocketGateway } from './socketGateway';
 
-const app = express();
-const httpServer = createServer(app);
-const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer);
-
+// Composition root: wire the real adapters into the use-case factories. All
+// testable logic lives in createApp / createSocketGateway / the use-cases
+// (side-effect-free, port-injected). This module is the only place that knows
+// about prisma + the global API.
 const PORT = process.env.PORT || 3001;
 
-const INPUT_BRIDGE_ROOM = 'input-bridge';
-
-// Active map on the server side: updated via 'map:select' (playfield → selector).
-// Sent to every newly connected client and broadcast to all when it changes.
-let currentMapId: string = DEFAULT_MAP_ID;
-
-app.get('/', (req, res) => {
-  res.send('Pinball Server is running');
+const games = prismaGameRepository;
+const lbCache: LeaderboardCache = new Map();
+const globalApi = createGlobalApiClient({
+  fetch,
+  config: { baseUrl: process.env.GLOBAL_API_URL, token: process.env.BORNE_TOKEN },
+  cache: lbCache,
+});
+const registerScore = createRegisterScore({ games, scores: globalApi });
+const { worldTopTen, globalStats } = createLeaderboard({
+  games,
+  world: globalApi,
 });
 
-app.get('/api/leaderboard', async (req, res) => {
-  try {
-    const mapId = typeof req.query.mapId === 'string' ? req.query.mapId : undefined;
-    res.json(await worldTopTen(mapId));
-  } catch (err) {
-    console.error('[server] /api/leaderboard failed:', err);
-    res.status(500).json({ error: 'leaderboard unavailable' });
-  }
-});
+export const app = createApp({ worldTopTen, globalStats });
+export const httpServer = createServer(app);
+export const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer);
 
-app.get('/api/stats', async (req, res) => {
-  try {
-    const mapId = typeof req.query.mapId === 'string' ? req.query.mapId : undefined;
-    res.json(await globalStats(mapId));
-  } catch (err) {
-    console.error('[server] /api/stats failed:', err);
-    res.status(500).json({ error: 'stats unavailable' });
-  }
-});
+const gameState = new GameStateManager();
+const handleConnection = createSocketGateway({ registerScore, worldTopTen, gameState });
+io.on('connection', (socket) => handleConnection(io, socket));
 
-io.on('connection', (socket) => {
-  const role = (socket.handshake.auth as { role?: string } | undefined)?.role;
-  console.log('[server] client connected:', socket.id, 'role=', role ?? 'frontend');
-
-  if (role === 'input-bridge') {
-    socket.join(INPUT_BRIDGE_ROOM);
-    console.log('[server] input-bridge joined room');
-  }
-
-  // Sync the newly connected client with the current map so DMD/backglass
-  // are up to date even if no `map:select` has been emitted yet.
-  socket.emit('map:selected', { mapId: currentMapId });
-
-  socket.on('map:select', ({ mapId }) => {
-    if (typeof mapId !== 'string' || mapId === currentMapId) return;
-    console.log('[server] map:select', mapId, '→ broadcast map:selected');
-    currentMapId = mapId;
-    io.emit('map:selected', { mapId });
+if (import.meta.main) {
+  httpServer.listen(PORT, () => {
+    console.log(`[server] listening on port ${PORT}`);
   });
-
-  socket.on('input:button', (data) => {
-    console.log('[server] input:button', data.id, data.action, '→ broadcast');
-    io.emit('input:button', data);
-  });
-
-  socket.on('input:tilt', (data) => {
-    console.log('[server] input:tilt', data.state, '→ broadcast');
-    io.emit('input:tilt', data);
-  });
-
-  socket.on('input:sensor', (data) => {
-    console.log('[server] input:sensor', data.id, data.value, '→ broadcast');
-    io.emit('input:sensor', data);
-  });
-
-  // Dev `simulate-esp32` mode: route the event to the input-bridge room only.
-  // The input-bridge injects the raw protocol line into its mock port, its parser
-  // re-reads it and emits `input:button` back to the server, which broadcasts to all.
-  socket.on('dev:simulate-button', (data) => {
-    console.log('[server] dev:simulate-button', data.id, data.action, '→ input-bridge');
-    io.to(INPUT_BRIDGE_ROOM).emit('dev:simulate-button', data);
-  });
-
-  socket.on('score:update', (data) => {
-    console.log('[server] score:update', data.player, data.score, 'combo=', data.combo, 'x', data.multiplier);
-    io.emit('score:update', data);
-  });
-
-  socket.on('game:start', (data) => {
-    console.log('[server] game:start', data.player);
-    io.emit('game:start', data);
-  });
-
-  socket.on('game:over', async (data) => {
-    console.log('[server] game:over', data.player, 'final=', data.finalScore);
-    io.emit('game:over', data);
-    if (data.debug === true) {
-      console.log('[server] game:over [debug skip]');
-      return;
-    }
-    try {
-      const registered = await registerScore(data);
-      socket.emit('game:registered', registered);
-      io.emit('leaderboard:refresh', await worldTopTen(data.mapId));
-    } catch (err) {
-      console.error('[server] game:over persist failed:', err);
-    }
-  });
-
-  socket.on('dmd:display', (data) => {
-    console.log('[server] dmd:display', data.mode);
-    io.emit('dmd:display', data);
-  });
-
-  socket.on('dev:trigger-game-event', (data) => {
-    console.log('[server] dev:trigger-game-event', data.type);
-    io.emit('dev:trigger-game-event', data);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('[server] client disconnected:', socket.id);
-  });
-});
-
-httpServer.listen(PORT, () => {
-  console.log(`[server] listening on port ${PORT}`);
-});
+}

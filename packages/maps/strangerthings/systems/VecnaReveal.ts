@@ -8,13 +8,12 @@ import type { BumperVisuals } from './BumperVisuals';
 import type { UpsideDownAtmosphere } from './UpsideDownAtmosphere';
 import { createBossTargetMesh } from '@pinball/game-engine';
 import { BossTargetPulse } from '@pinball/game-engine';
-import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
+import { WalkFightPhaseMachine } from '@pinball/game-engine';
+import { PlayfieldCinematicStrobe, strangerthingsDecor } from './PlayfieldCinematicStrobe';
 import { VecnaTargetVisual } from './VecnaTargetVisual';
 import type { BossRevealController } from './BossRevealController';
 
 const VICTORY = 0.65;
-
-type Phase = 'idle' | 'walk' | 'settle' | 'fight' | 'victory';
 
 export type VecnaSetup = {
   root: THREE.Object3D;
@@ -43,8 +42,12 @@ export class VecnaReveal implements BossRevealController {
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
 
-  private phase: Phase = 'idle';
-  private elapsed = 0;
+  private machine = new WalkFightPhaseMachine({
+    victoryDuration: VICTORY,
+    fightFlickerShade: 0.26,
+    fightFlickerFlashMix: 0.12,
+    targetHits: getBossDefinition('vecna').targetHits,
+  });
 
   bindUpsideDownAtmosphere(atmosphere: UpsideDownAtmosphere | null): void {
     this.upsideDownAtmosphere = atmosphere;
@@ -59,6 +62,13 @@ export class VecnaReveal implements BossRevealController {
     await this.vecnaVisual.warmup(renderer, scene, camera);
   }
 
+  // PointLights added dynamically during the fight: strobe flash + Vecna
+  // glow + target light. Used to prewarm shader variants at preload
+  // (see BossRevealOrchestrator.preloadAll).
+  dynamicPointLightCount(): number {
+    return 3;
+  }
+
   setup(config: VecnaSetup): void {
     this.dispose();
     this.garlandLights = config.garlandLights;
@@ -66,15 +76,19 @@ export class VecnaReveal implements BossRevealController {
     this.onFightEnd = config.onFightEnd ?? null;
     this.onTargetReady = config.onTargetReady ?? null;
 
-    this.cinematicStrobe.mount(config.root, config.garlandLights, config.bumperVisuals, {
-      flashColor: 0x6622aa,
-      flashIntensity: 1.6,
-      flashPosition: new THREE.Vector3(
-        VECNA_TARGET.x,
-        VECNA_TARGET.y + 0.14,
-        VECNA_TARGET.z,
-      ),
-    });
+    this.cinematicStrobe.mount(
+      config.root,
+      {
+        flashColor: 0x6622aa,
+        flashIntensity: 1.6,
+        flashPosition: new THREE.Vector3(
+          VECNA_TARGET.x,
+          VECNA_TARGET.y + 0.14,
+          VECNA_TARGET.z,
+        ),
+      },
+      strangerthingsDecor(config.garlandLights, config.bumperVisuals),
+    );
 
     this.vecnaVisual.mount(config.root, config.camera);
 
@@ -92,14 +106,15 @@ export class VecnaReveal implements BossRevealController {
 
   onGameEvent(event: GameEvent): void {
     if (event.type === 'BOSS_REVEAL' && event.bossId === 'vecna') {
-      this.startWalkPhase();
+      if (this.machine.onReveal()) this.startWalkPhase();
       return;
     }
     if (event.type === 'BOSS_TARGET_HIT' && event.bossId === 'vecna') {
-      if (this.phase !== 'fight') return;
+      const res = this.machine.onHit(event.hitCount);
+      if (!res.accepted) return;
       this.targetPulse?.flashHit();
       this.vecnaVisual.playHit();
-      if (event.hitCount >= getBossDefinition('vecna').targetHits) {
+      if (res.victory) {
         this.beginVictory();
       }
     }
@@ -110,7 +125,7 @@ export class VecnaReveal implements BossRevealController {
   }
 
   isGameplayFrozen(): boolean {
-    return this.phase === 'walk' || this.phase === 'settle';
+    return this.machine.isGameplayFrozen();
   }
 
   update(dt: number): void {
@@ -118,45 +133,42 @@ export class VecnaReveal implements BossRevealController {
     this.targetPulse?.update(
       dt,
       this.targetGroup?.visible ?? false,
-      this.phase === 'victory',
+      this.machine.getPhase() === 'victory',
     );
 
-    if (this.phase === 'idle') {
+    // The walk/settle exit timing lives in the visual (Three-side animation);
+    // sample it for the pure machine. updateSettle(dt) advances the settle anim
+    // and reports completion, so it must run every frame while settling.
+    const walkPathComplete =
+      this.machine.getPhase() === 'walk' && this.vecnaVisual.isWalkPathComplete();
+    const settleComplete =
+      this.machine.getPhase() === 'settle' && this.vecnaVisual.updateSettle(dt);
+
+    const d = this.machine.tick(dt, { walkPathComplete, settleComplete });
+
+    if (d.phase === 'idle') {
       this.garlandLights?.setStrobe(false, false);
       this.bumperVisuals?.setStrobe(false, false);
       return;
     }
 
-    this.elapsed += dt;
-
-    if (this.phase === 'walk') {
-      this.cinematicStrobe.stop();
-      if (this.vecnaVisual.isWalkPathComplete()) {
-        this.vecnaVisual.setPathProgress(1);
-        this.beginSettlePhase();
-      }
-      return;
+    switch (d.strobe.kind) {
+      case 'stop':
+        this.cinematicStrobe.stop();
+        break;
+      case 'fightFlicker':
+        this.cinematicStrobe.applyFightFlicker(d.strobe.shade, d.strobe.flashMix);
+        break;
+      case 'apply':
+        this.cinematicStrobe.apply(d.strobe.on, d.strobe.fullMap, d.strobe.mix);
+        break;
     }
 
-    if (this.phase === 'settle') {
-      this.cinematicStrobe.stop();
-      if (this.vecnaVisual.updateSettle(dt)) {
-        this.beginFightPhase();
-      }
-      return;
-    }
+    if (walkPathComplete) this.vecnaVisual.setPathProgress(1);
+    if (d.enteredSettle) this.beginSettlePhase();
+    if (d.enteredFight) this.beginFightPhase();
 
-    if (this.phase === 'fight') {
-      this.cinematicStrobe.applyFightFlicker(0.26, 0.12);
-      return;
-    }
-
-    if (this.phase === 'victory') {
-      this.cinematicStrobe.apply(false, false, Math.max(0, 1 - this.elapsed / VICTORY));
-      if (this.elapsed >= VICTORY) {
-        this.hideBoss();
-      }
-    }
+    if (d.finishedVictory) this.hideBoss();
   }
 
   dispose(): void {
@@ -179,14 +191,9 @@ export class VecnaReveal implements BossRevealController {
     this.targetCoreMat = null;
     this.targetLight = null;
     this.targetPulse = null;
-    this.phase = 'idle';
-    this.elapsed = 0;
   }
 
   private startWalkPhase(): void {
-    if (this.phase !== 'idle') return;
-    this.phase = 'walk';
-    this.elapsed = 0;
     this.targetPulse?.reset();
     this.vecnaVisual.beginReveal();
     this.vecnaVisual.show();
@@ -196,14 +203,10 @@ export class VecnaReveal implements BossRevealController {
   }
 
   private beginSettlePhase(): void {
-    this.phase = 'settle';
-    this.elapsed = 0;
     this.vecnaVisual.startSettle();
   }
 
   private beginFightPhase(): void {
-    this.phase = 'fight';
-    this.elapsed = 0;
     this.upsideDownAtmosphere?.setRevealLift(0);
     this.vecnaVisual.setPathProgress(1);
     if (this.targetGroup) this.targetGroup.visible = true;
@@ -233,22 +236,19 @@ export class VecnaReveal implements BossRevealController {
   }
 
   private beginVictory(): void {
-    this.phase = 'victory';
-    this.elapsed = 0;
     this.vecnaVisual.playVictory();
-    this.onFightEnd?.();
     if (this.targetGroup) this.targetGroup.visible = false;
   }
 
   private hideBoss(): void {
     this.vecnaVisual.hide();
     if (this.targetGroup) this.targetGroup.visible = false;
+    this.onFightEnd?.();
     this.resetAtmosphere();
   }
 
   private resetAtmosphere(): void {
-    this.phase = 'idle';
-    this.elapsed = 0;
+    this.machine.reset();
     this.upsideDownAtmosphere?.setRevealLift(0);
     this.vecnaVisual.hide();
     if (this.targetGroup) {

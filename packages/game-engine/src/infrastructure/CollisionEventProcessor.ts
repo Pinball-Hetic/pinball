@@ -1,59 +1,48 @@
-import RAPIER from '@dimforge/rapier3d-compat';
-import type { BossId, BossDefinition } from '../domain/BossRegistry';
-import {
-  bossPointsRemaining,
-  bossThresholdMet,
-} from '../domain/BossRegistry';
+import * as RAPIER from '@dimforge/rapier3d-compat';
+import type { BossId } from '../domain/BossRegistry';
 import type { GameEventListener } from '../domain/GameEvents';
 import type { MapLayout } from '../domain/MapLayout';
 import type { BumperHit } from '../use-cases/BumperHit';
 import type { BumpHit } from '../use-cases/BumpHit';
 import type { DrainBall } from '../use-cases/DrainBall';
 import type { BottomOutBall } from '../use-cases/BottomOutBall';
+import { AlternateWorldState } from './AlternateWorldState';
 import { BossFightManager } from './BossFightManager';
 import type { CollisionHandler } from './CollisionHandler';
 import { BumperCollisionHandler } from './BumperCollisionHandler';
 import { BumpCollisionHandler } from './BumpCollisionHandler';
-import { DrainCollisionHandler } from './DrainCollisionHandler';
 import { BottomOutCollisionHandler } from './BottomOutCollisionHandler';
 import { SlingshotCollisionHandler } from './SlingshotCollisionHandler';
 import { PopZoneCollisionHandler } from './PopZoneCollisionHandler';
+import { ScoopCollisionHandler } from './ScoopCollisionHandler';
 import { RocketRampCollisionHandler } from './RocketRampCollisionHandler';
 import { DropTargetCollisionHandler } from './DropTargetCollisionHandler';
 import { PortalCollisionHandler } from './PortalCollisionHandler';
+import { BossCollisionHandler } from './BossCollisionHandler';
 
 export class CollisionEventProcessor {
   private readonly bossFights: BossFightManager;
-  private readonly bossByRole = new Map<string, BossDefinition>();
-  private alternateWorldActive = false;
-  private normalWorldScoreBaseline = 0;
-  private alternateWorldScoreBaseline = 0;
-  private lastTotalScore = 0;
-  private lockedHitLastMs: Partial<Record<BossId, number>> = {};
+  private readonly worldState = new AlternateWorldState();
   private pendingPhysics: Array<() => void> = [];
   private readonly handlers: CollisionHandler[] = [];
   private readonly portalHandler: PortalCollisionHandler;
   private readonly dropTargetHandler: DropTargetCollisionHandler;
+  private readonly bossHandler: BossCollisionHandler;
 
   private gateContext() {
-    return {
-      totalScore: this.lastTotalScore,
-      alternateWorldActive: this.alternateWorldActive,
-      normalWorldScoreBaseline: this.normalWorldScoreBaseline,
-      alternateWorldScoreBaseline: this.alternateWorldScoreBaseline,
-    };
+    return this.worldState.gateContext();
   }
 
   getNormalWorldScoreBaseline(): number {
-    return this.normalWorldScoreBaseline;
+    return this.worldState.getNormalWorldScoreBaseline();
   }
 
   getAlternateWorldScoreBaseline(): number {
-    return this.alternateWorldScoreBaseline;
+    return this.worldState.getAlternateWorldScoreBaseline();
   }
 
   isAlternateWorldActive(): boolean {
-    return this.alternateWorldActive;
+    return this.worldState.isActive();
   }
 
   isBossTriggered(id: BossId): boolean {
@@ -86,43 +75,48 @@ export class CollisionEventProcessor {
 
   resetAllBossFights(): void {
     this.bossFights.resetAll();
+    this.resetLockedHitThrottle();
+  }
+
+  resetLockedHitThrottle(id?: BossId): void {
+    this.bossHandler.resetThrottle(id);
   }
 
   onAlternateWorldEntered(score: number): void {
-    this.alternateWorldActive = true;
-    this.alternateWorldScoreBaseline = score;
+    this.worldState.enter(score);
   }
 
   resetAlternateWorldSession(): void {
-    this.alternateWorldActive = false;
-    this.alternateWorldScoreBaseline = 0;
-    for (const b of this.layout.bosses) {
-      if (b.reveal.requiresAlternateWorld) this.resetBossFight(b.id);
-    }
+    this.worldState.resetSession();
+    this.bossFights.resetAlternateWorldBosses();
   }
 
   resetScoreBaselines(): void {
-    this.normalWorldScoreBaseline = 0;
-    this.alternateWorldScoreBaseline = 0;
+    this.worldState.resetScoreBaselines();
   }
 
   completeWorldCycle(score: number): void {
-    this.alternateWorldActive = false;
-    this.alternateWorldScoreBaseline = 0;
-    this.normalWorldScoreBaseline = score;
+    this.worldState.completeCycle(score);
     this.portalHandler.resetPortalTrigger();
     this.resetAllBossFights();
   }
 
   tryAllBossReveals(totalScore: number, gameState: string): void {
-    this.lastTotalScore = totalScore;
+    this.worldState.setLastTotalScore(totalScore);
     this.bossFights.tryAllReveals({
-      totalScore,
+      ...this.worldState.gateContext(),
       gameState,
-      alternateWorldActive: this.alternateWorldActive,
-      normalWorldScoreBaseline: this.normalWorldScoreBaseline,
-      alternateWorldScoreBaseline: this.alternateWorldScoreBaseline,
     });
+  }
+
+  /** DEBUG (/debug): reveal via the real state path (boss armed, not a ghost). */
+  debugRevealBoss(id: BossId, gameState: string): void {
+    this.bossFights.forceReveal(id, gameState);
+  }
+
+  /** DEBUG (/debug): credits a hit via the real sensor (real counter/defeat). */
+  debugBossTargetHit(id: BossId, gameState: string): void {
+    this.bossFights.forceTargetHit(id, gameState);
   }
 
   constructor(
@@ -130,29 +124,52 @@ export class CollisionEventProcessor {
     private readonly colliderMap: Map<number, string>,
     bumperHitUC: BumperHit,
     bumpHitUC: BumpHit,
-    drainBallUC: DrainBall,
+    // Positional slot preserved for call-site compatibility. The real drain is
+    // handled by BottomOutCollisionHandler (role 'bottom_out'); no collider is
+    // ever created with role 'drain', so this use-case is no longer dispatched here.
+    _drainBallUC: DrainBall,
     bottomOutBallUC: BottomOutBall,
+    // Single event sink for every collision this processor dispatches. Its
+    // fan-out ordering is a CONTRACT the processor relies on but does not
+    // itself enforce (the injected listener owns sequencing — in the playfield
+    // that is `createEmitRouter`):
+    //
+    //   1. onPreDrain(livesPreDecrement)  — DRAIN/BOTTOM_OUT only; map may
+    //                                        grant a rescue life BEFORE step 2
+    //                                        reads/decrements lives.
+    //   2. baseEmit (useGameState)        — scoring, lives decrement, reset.
+    //   3. mapModule.onGameEvent          — visuals, world switch, boss reveals;
+    //                                        observes the post-scoring state.
+    //
+    // The DRAIN-vs-rescue split (1 before 2) is the load-bearing invariant:
+    // a map that rescues on the last ball must see the pre-decrement count.
     private readonly emit: GameEventListener,
+    // Injected clock: tests pass a controllable fake to make the anti-spam
+    // throttles deterministic.
+    private readonly now: () => number = () => performance.now(),
   ) {
-    this.bossFights = new BossFightManager(emit, layout.bosses);
-
-    // Index bosses by collider role for O(1) lookup in process().
-    for (const b of layout.bosses) this.bossByRole.set(b.colliderRole, b);
+    this.bossFights = new BossFightManager(emit, layout.bosses, this.now);
 
     // Kept as properties because they are exposed publicly (reset, state).
     this.dropTargetHandler = new DropTargetCollisionHandler(emit, layout);
-    this.portalHandler = new PortalCollisionHandler(emit, () => this.alternateWorldActive);
+    this.portalHandler = new PortalCollisionHandler(emit, () => this.worldState.isActive());
+    this.bossHandler = new BossCollisionHandler(
+      layout.bosses,
+      this.bossFights,
+      emit,
+      () => this.worldState.isActive(),
+      () => this.gateContext(),
+      this.now,
+    );
 
     // Handler registry — declaration order = dispatch priority.
     // The first handler whose canHandle() returns true owns the collision.
+    // BossCollisionHandler is first: a boss collider role is always consumed
+    // here and never falls through to the generic handlers.
     this.handlers = [
+      this.bossHandler,
       new BumperCollisionHandler(this.pendingPhysics, bumperHitUC, layout),
-      new BumpCollisionHandler(this.pendingPhysics, bumpHitUC),
-      new DrainCollisionHandler(
-        this.pendingPhysics,
-        () => this.dropTargetHandler.resetDropTargets(),
-        drainBallUC,
-      ),
+      new BumpCollisionHandler(this.pendingPhysics, bumpHitUC, this.now),
       new BottomOutCollisionHandler(
         this.pendingPhysics,
         () => this.dropTargetHandler.resetDropTargets(),
@@ -160,6 +177,7 @@ export class CollisionEventProcessor {
       ),
       new SlingshotCollisionHandler(emit),
       new PopZoneCollisionHandler(emit),
+      new ScoopCollisionHandler(emit),
       new RocketRampCollisionHandler(emit),
       this.dropTargetHandler,
       this.portalHandler,
@@ -172,36 +190,8 @@ export class CollisionEventProcessor {
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
 
-      // --- Boss handling (takes priority over generic handlers) ---
-      const boss = this.bossByRole.get(role);
-      if (
-        boss
-        && boss.reveal.requiresAlternateWorld === this.alternateWorldActive
-        && started
-        && gameState === 'playing'
-        && !this.bossFights.isTriggered(boss.id)
-      ) {
-        const ctx = this.gateContext();
-        if (!bossThresholdMet(boss, ctx)) {
-          // Anti-spam: do not re-emit BOSS_LOCKED_HIT more than once every 2s.
-          const now = performance.now();
-          if (now - (this.lockedHitLastMs[boss.id] ?? 0) >= 2000) {
-            this.lockedHitLastMs[boss.id] = now;
-            this.emit({
-              type: 'BOSS_LOCKED_HIT',
-              bossId: boss.id,
-              remaining: bossPointsRemaining(boss, ctx),
-            });
-          }
-        }
-      }
-
-      // If the boss fight consumes the event, skip the generic handlers.
-      if (this.bossFights.handleTargetCollision(role, started, gameState)) {
-        return;
-      }
-
       // Dispatch to the registered handler for this role.
+      // BossCollisionHandler is first and consumes every boss collider role.
       const handler = this.handlers.find(h => h.canHandle(role));
       handler?.handle(role, gameState, started);
     });
@@ -209,8 +199,12 @@ export class CollisionEventProcessor {
 
   flushPendingPhysics(): void {
     if (this.pendingPhysics.length === 0) return;
-    const pending = this.pendingPhysics;
-    this.pendingPhysics = [];
+    // Drain IN PLACE (splice) — do NOT reassign: the collision handlers
+    // capture this same array reference at construction. A
+    // `this.pendingPhysics = []` would detach it → after the 1st flush the
+    // handlers would push into the old array and nothing would run anymore
+    // (silent bumpers, drain/game-over never fired).
+    const pending = this.pendingPhysics.splice(0);
     for (const run of pending) run();
   }
 }

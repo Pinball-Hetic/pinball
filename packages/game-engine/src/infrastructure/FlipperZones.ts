@@ -1,15 +1,33 @@
 import * as THREE from 'three';
 
-export type FlipperZone = { xMin: number; xMax: number; zMin: number; zMax: number };
+export type FlipperZone = {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+  zMin: number;
+  zMax: number;
+};
 export type FlipperZones = { left: FlipperZone; right: FlipperZone };
 
 /**
- * Dérive les zones de garantie de lancement depuis la bbox réelle des meshes
- * flippers (pose de repos, AVANT le démarrage de la simulation). Évite les
- * coordonnées X figées mesurées sur un ancien GLB.
+ * Toggle for the zone-derivation log. On by default (a single `console.info`
+ * at load). The cabinet can turn it off in prod via
+ * `setFlipperZonesLogging(false)` to avoid console noise.
+ */
+let flipperZonesLogging = true;
+
+export function setFlipperZonesLogging(enabled: boolean): void {
+  flipperZonesLogging = enabled;
+}
+
+/**
+ * Derives the flip-guarantee zones from the real bbox of the flipper meshes
+ * (rest pose, BEFORE the simulation starts). Avoids frozen X coordinates
+ * measured on an old GLB.
  *
- * `margin` étend la bbox sur X/Z : la balle touche dès que son centre est à un
- * rayon du bord (margin = BALL_RADIUS).
+ * `margin` expands the bbox on X/Z: the ball counts as touching as soon as
+ * its center is within one radius of the edge (margin = BALL_RADIUS).
  */
 export function computeFlipperZones(
   left: THREE.Object3D,
@@ -22,12 +40,14 @@ export function computeFlipperZones(
     return {
       xMin: min.x - margin,
       xMax: max.x + margin,
+      yMin: min.y - margin,
+      yMax: max.y + margin,
       zMin: min.z - margin,
       zMax: max.z + margin,
     };
   };
 
   const zones = { left: zoneOf(left), right: zoneOf(right) };
-  console.info('[FlipperZones]', zones);
+  if (flipperZonesLogging) console.info('[FlipperZones]', zones);
   return zones;
 }

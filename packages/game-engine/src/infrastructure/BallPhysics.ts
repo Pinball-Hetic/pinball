@@ -1,4 +1,4 @@
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import type { IMapBallPhysics } from '../domain/IBallPhysics';
 import {
   getBallRadius,
@@ -12,6 +12,8 @@ import {
 } from '../domain/Ball';
 import type { MapLayout } from '../domain/MapLayout';
 import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
+import { lerpVec3, BALL_INTERPOLATION_TELEPORT_DIST } from '../domain/RenderInterpolation';
+import { radialEjectionImpulse, sidedEjectionImpulse } from '../domain/BumperEjection';
 import type { IBallPhysics } from '../use-cases/LaunchBall';
 import type { IBumperEject } from '../use-cases/BumperHit';
 
@@ -23,6 +25,12 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
   private spawnX: number;
   private spawnY: number;
   private spawnZ: number;
+
+  // Render-lerp bounds: positions at the last two physics steps.
+  // Reused objects (mutated in place) — zero allocation in the hot loop.
+  private readonly prevPos = { x: 0, y: 0, z: 0 };
+  private readonly currPos = { x: 0, y: 0, z: 0 };
+  private readonly lerpOut = { x: 0, y: 0, z: 0 };
 
   constructor(world: RAPIER.World, layout: MapLayout) {
     this.spawns = layout.spawns;
@@ -46,6 +54,36 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
       .setDensity(density)
       .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     this.collider = world.createCollider(colliderDesc, this.body);
+    this.resetInterpolation();
+  }
+
+  /**
+   * Resets prev = curr = the body's real position. Call after EVERY teleport
+   * (setTranslation): otherwise the next frame would lerp between the old
+   * and new positions → ball rendered as a "streak" across the playfield.
+   */
+  private resetInterpolation(): void {
+    const p = this.body.translation();
+    this.prevPos.x = p.x;
+    this.prevPos.y = p.y;
+    this.prevPos.z = p.z;
+    this.currPos.x = p.x;
+    this.currPos.y = p.y;
+    this.currPos.z = p.z;
+  }
+
+  /**
+   * Call after EACH world.step(): shifts the current state into prev and
+   * captures the new position — provides both bounds of the render lerp.
+   */
+  noteStepped(): void {
+    this.prevPos.x = this.currPos.x;
+    this.prevPos.y = this.currPos.y;
+    this.prevPos.z = this.currPos.z;
+    const p = this.body.translation();
+    this.currPos.x = p.x;
+    this.currPos.y = p.y;
+    this.currPos.z = p.z;
   }
 
   setSpawnPosition(x: number, y: number, z: number): void {
@@ -56,6 +94,7 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.wakeUp();
+    this.resetInterpolation();
   }
 
   applyPlungerImpulse(factor = 1): void {
@@ -63,6 +102,7 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     const z = this.spawnZ;
     const y = ballCenterOnSurface(z);
     this.body.setTranslation({ x: this.spawnX, y, z }, true);
+    this.resetInterpolation();
     this.body.applyImpulse(
       { x: 0, y: -0.02 * factor, z: PLUNGER_IMPULSE_Z * factor },
       true,
@@ -74,6 +114,7 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.wakeUp();
+    this.resetInterpolation();
   }
 
   holdAtAlternateWorldSpawn(): void {
@@ -83,6 +124,7 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.wakeUp();
+    this.resetInterpolation();
   }
 
   spawnFromAlternateWorld(): void {
@@ -98,6 +140,7 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.body.wakeUp();
+    this.resetInterpolation();
   }
 
   spawnFromNormalReturn(): void {
@@ -108,25 +151,14 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
 
   applyEjectionForce(bumperPos: { x: number; z: number }): void {
     const t = this.body.translation();
-    const px = t.x;
-    const pz = t.z;
-    const dx = px - bumperPos.x;
-    const dz = pz - bumperPos.z;
-    const len = Math.sqrt(dx * dx + dz * dz) || 1;
     this.body.applyImpulse(
-      { x: (dx / len) * BUMPER_EJECT_IMPULSE, y: 0, z: (dz / len) * BUMPER_EJECT_IMPULSE },
+      radialEjectionImpulse({ x: t.x, z: t.z }, bumperPos, BUMPER_EJECT_IMPULSE),
       true,
     );
   }
 
   applyScaledEjectionForce(scale: number, side: 'left' | 'right'): void {
-    // Direction X fixe : bump_left pousse toujours à droite (+X),
-    //                     bump_right pousse toujours à gauche (-X).
-    // Peu importe où la balle touche le mèche, la direction horizontale est
-    // déterministe → effet ping-pong entre les deux bumps.
-    const xDir = side === 'left' ? 1 : -1;
-    const impulse = BUMPER_EJECT_IMPULSE * scale;
-    this.body.applyImpulse({ x: xDir * impulse, y: 0, z: 0 }, true);
+    this.body.applyImpulse(sidedEjectionImpulse(side, BUMPER_EJECT_IMPULSE * scale), true);
   }
 
   syncToMesh(mesh: {
@@ -134,6 +166,35 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     quaternion: { set(x: number, y: number, z: number, w: number): void };
   }): void {
     const p = this.body.translation();
+    const q = this.body.rotation();
+    mesh.position.set(p.x, p.y, p.z);
+    mesh.quaternion.set(q.x, q.y, q.z, q.w);
+  }
+
+  /**
+   * Interpolated visual sync: position = lerp(prev, curr, alpha) to smooth
+   * 120 Hz rendering over 60 steps/s physics. Quaternion taken as-is — ball
+   * rotation is barely perceptible, no need to slerp.
+   */
+  syncToMeshInterpolated(
+    mesh: {
+      position: { set(x: number, y: number, z: number): void };
+      quaternion: { set(x: number, y: number, z: number, w: number): void };
+    },
+    alpha: number,
+  ): void {
+    // Guard against EXTERNAL teleports (direct ball.body.setTranslation: map
+    // scoop, boss intro hold, debug drag, stepBallSync locks) that cannot all
+    // be intercepted: a prev↔curr distance impossible within one physics step
+    // (clamped speed) betrays a teleport → snap without lerp + resync buffers.
+    const dx = this.currPos.x - this.prevPos.x;
+    const dy = this.currPos.y - this.prevPos.y;
+    const dz = this.currPos.z - this.prevPos.z;
+    const teleportDistSq = BALL_INTERPOLATION_TELEPORT_DIST * BALL_INTERPOLATION_TELEPORT_DIST;
+    if (dx * dx + dy * dy + dz * dz > teleportDistSq) {
+      this.resetInterpolation();
+    }
+    const p = lerpVec3(this.prevPos, this.currPos, alpha, this.lerpOut);
     const q = this.body.rotation();
     mesh.position.set(p.x, p.y, p.z);
     mesh.quaternion.set(q.x, q.y, q.z, q.w);

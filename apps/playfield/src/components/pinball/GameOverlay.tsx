@@ -7,8 +7,13 @@ import PlungerPowerBar from "./PlungerPowerBar";
 import BossHealthBar from "./BossHealthBar";
 import { bossHealthBarTheme } from "./bossHealthHud";
 import StyledQrCode from "./StyledQrCode";
+import type { PlayfieldBootPhase } from "./bootPhase";
 
-export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
+// Ball reset = DEV helper only (button + hint + R key). Must not exist in
+// prod (cabinet). NODE_ENV is inlined at Next build time.
+const IS_DEV = process.env.NODE_ENV !== "production";
+
+export type { PlayfieldBootPhase };
 
 interface GameOverlayProps {
   lives: number;
@@ -149,8 +154,8 @@ export default function GameOverlay({
     bootPhase === "in_game" && gameState === "idle" && plungerCharge !== null;
   const showGameOver = bootPhase === "in_game" && gameState === "game_over";
 
-  // Couleur d'accent de l'outro : glow normal vs monde inversé. Fallbacks
-  // neutres → une map sans theme reste propre (pas de ST en dur).
+  // Outro accent color: normal glow vs inverted world. Neutral fallbacks →
+  // a map without a theme stays clean (no hardcoded ST).
   const glow = alternateWorldActive ? "var(--glow-alt, #b14dff)" : "var(--glow, #ff2d2d)";
   const dot = "var(--vignette, #2a0606)";
   const title = outro?.title ?? "FIN DE PARTIE";
@@ -158,7 +163,7 @@ export default function GameOverlay({
   const replayLabel = outro?.replayLabel ?? "START — Rejouer";
 
   const showResetBall =
-    bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
+    IS_DEV && bootPhase === "in_game" && gameState !== "game_over" && plungerCharge === null;
 
   const showAlternateWorldBanner =
     bootPhase === "in_game" && gameState === "playing" && alternateWorldActive;
@@ -199,7 +204,7 @@ export default function GameOverlay({
               <div>Q / ← — Flipper gauche</div>
               <div>D / → — Flipper droit</div>
               <div>ESPACE — Charger / lancer</div>
-              <div>R — Reset balle (−1 vie)</div>
+              {IS_DEV && <div>R — Reset balle (−1 vie)</div>}
               <div>H — Debug colliders</div>
             </div>
           )}
@@ -291,7 +296,7 @@ export default function GameOverlay({
       })}
 
       {bootPhase === "loading" && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-[#0a0e18]/92 backdrop-blur-sm">
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-black">
           <div
             className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-amber-400/90"
             aria-hidden
@@ -314,28 +319,7 @@ export default function GameOverlay({
               {attractTagline}
             </p>
             <h1 className={layout.attractTitle}>Pinball</h1>
-            <p className={layout.attractSubtitle}>
-              Le plateau est prêt. Entrez dans la partie pour lancer la balle.
-            </p>
           </div>
-
-          <div className="flex flex-col items-center gap-3">
-            <div className={layout.attractPrompt}>
-              <p className="animate-pulse text-sm uppercase tracking-[0.28em] text-amber-200/90">
-                ESPACE ou START pour jouer
-              </p>
-            </div>
-            {layout.attractTapHint && (
-              <p className={layout.attractTapHint}>ou cliquez sur le plateau</p>
-            )}
-          </div>
-
-          {layout.attractControls && (
-            <div className={layout.attractControls}>
-              <p>Q / D — Flippers</p>
-              <p>ESPACE (en jeu) — Charger puis relâcher pour lancer</p>
-            </div>
-          )}
         </div>
       )}
 
@@ -377,7 +361,7 @@ export default function GameOverlay({
             >
               Transmission entrante
             </p>
-            {/* 4 coins crochets */}
+            {/* 4 bracket corners */}
             <span className="absolute left-0 top-3 h-5 w-5 border-l-2 border-t-2" style={{ borderColor: glow }} />
             <span className="absolute right-0 top-3 h-5 w-5 border-r-2 border-t-2" style={{ borderColor: glow }} />
             <span className="absolute bottom-0 left-0 h-5 w-5 border-b-2 border-l-2" style={{ borderColor: glow }} />

@@ -10,23 +10,22 @@ import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
 type Vec3 = { x: number; y: number; z: number };
 
 export interface SurfaceSnapResult {
-  /** Position où reposer la balle (toujours présente quand le snap déclenche). */
+  /** Position to rest the ball at (always present when the snap triggers). */
   translation: Vec3;
-  /** Vélocité corrigée — présente uniquement si on a annulé un Y montant. */
+  /** Corrected velocity — present only when an upward Y was cancelled. */
   linvel?: Vec3;
 }
 
 /**
- * Décide si la balle doit être recollée à la surface inclinée du tapis.
- * Pure : aucune dépendance Rapier — l'appelant lit pos/vel du corps et applique
- * le résultat. Renvoie null quand aucun snap n'est nécessaire.
+ * Decides whether the ball must be snapped back onto the tilted surface.
+ * Pure: no Rapier dependency — the caller reads pos/vel from the body and
+ * applies the result. Returns null when no snap is needed.
  *
- * Règles :
- * - actif uniquement dans le plateau, hors couloir de lancement droit ;
- * - déclenche si la balle décolle de plus de SURFACE_SNAP_THRESHOLD ;
- * - n'annule que la vélocité Y POSITIVE (décollage) — un Y négatif est la
- *   gravité qui ramène la balle, on ne l'empêche pas. XZ jamais touché →
- *   vitesse de jeu conservée.
+ * Rules:
+ * - active only inside the playfield, outside the straight shooter lane;
+ * - triggers when the ball lifts more than SURFACE_SNAP_THRESHOLD;
+ * - cancels only POSITIVE Y velocity (lift-off) — negative Y is gravity
+ *   bringing the ball back, never blocked. XZ untouched → game speed kept.
  */
 export function computeSurfaceSnap(
   pos: Vec3,

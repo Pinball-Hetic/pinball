@@ -1,9 +1,8 @@
 /**
  * gameStateUtils.ts — Pure functions and constants for game state logic.
  *
- * Extracted from useGameState.ts (SRP): these utilities depend on no React
- * state, refs, or hooks. They can be tested independently without mounting
- * any component.
+ * These utilities depend on no React state, refs, or hooks, so they can be
+ * tested independently without mounting any component.
  */
 
 export const COMBO_DECAY_MS = 2000;

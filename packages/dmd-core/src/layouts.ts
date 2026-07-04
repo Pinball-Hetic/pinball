@@ -3,6 +3,7 @@ import { mapStateFlag } from '@pinball/shared-types';
 import { FONT_5X7, FONT_12X22, drawText } from './fonts';
 import { GRID_W, GRID_H } from './DmdRenderer';
 import { DOT } from './palette';
+import { livesDisplay } from './livesDisplay';
 import {
   drawCentered,
   drawFlash,
@@ -18,25 +19,31 @@ import type { ClipContext, ClipHandler, DmdMapContent, ScoreDisplay } from './co
 type Variant<M extends DmdDisplay['mode']> = Extract<DmdDisplay, { mode: M }>;
 export type LayoutFn = (grid: Uint8Array, display: DmdDisplay, clockMs: number) => void;
 
-const TOTAL_LIVES = 3;
-
-// Rangée de vies (générique). La rangée HETIC (ST) est dessinée par
-// content.scoreOverlay.
+// Lives row (generic). The HETIC row (ST) is drawn by content.scoreOverlay.
+// Above 3 lives (bonus/rescue) we switch to a compact "N ●" counter — driven
+// by the real number, never capped.
 function drawLivesRow(grid: Uint8Array, lives: number, y: number): void {
-  for (let i = 0; i < TOTAL_LIVES; i++) {
-    const color = i < lives ? DOT.lives : DOT.heticOff;
+  const view = livesDisplay(lives);
+  if (view.kind === 'count') {
+    drawText(grid, GRID_W, 2, y, String(view.value), FONT_5X7, DOT.lives);
+    const dotX = 2 + (String(view.value).length * 6);
+    drawText(grid, GRID_W, dotX, y, '●', FONT_5X7, DOT.lives);
+    return;
+  }
+  for (let i = 0; i < view.total; i++) {
+    const color = i < view.filled ? DOT.lives : DOT.heticOff;
     drawText(grid, GRID_W, 2 + i * 7, y, '●', FONT_5X7, color);
   }
 }
 
-// Bandeau fever par défaut (chenillard + gros score). La map peut surcharger.
+// Default fever banner (chaser lights + big score). Maps can override it.
 function defaultFeverBanner(grid: Uint8Array, score: number, clockMs: number): void {
   drawChenillard(grid, clockMs, 0);
   drawChenillard(grid, -clockMs, GRID_H - 1);
   drawCentered(grid, String(score), 2, FONT_12X22, DOT.event);
 }
 
-// ── Clips paliers (procéduraux, génériques) ───────────────────────────────
+// ── Milestone clips (procedural, generic) ─────────────────────────────────
 function clipMilestone5k(grid: Uint8Array, value: number, ms: number): void {
   const t = Math.min(1, ms / 4000);
   const cx = GRID_W / 2;
@@ -129,8 +136,8 @@ function clipHallOfFame(grid: Uint8Array, score: number, clockMs: number): void 
   }
 }
 
-// Handlers de cinématiques par défaut du moteur (génériques). Une map peut
-// les surcharger via content.cinematicHandlers.
+// Engine default cinematic handlers (generic). A map can override them via
+// content.cinematicHandlers.
 const CORE_CINEMATICS: Record<string, ClipHandler> = {
   milestone_5k: (g, ms, c) => clipMilestone5k(g, c.value || 5000, ms),
   milestone_15k: (g, ms, c) => clipMilestone15k(g, c.value || 15000, ms),
@@ -158,7 +165,7 @@ function defaultAttract(grid: Uint8Array, display: { player: string }, clockMs: 
   }
 }
 
-// Construit la table de layouts pour un contenu de map donné.
+// Builds the layout table for a given map content.
 export function makeLayouts(content: DmdMapContent = {}): Record<DmdDisplay['mode'], LayoutFn> {
   const attract = content.attract ?? defaultAttract;
   const feverBanner = content.feverBanner ?? defaultFeverBanner;

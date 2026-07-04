@@ -4,7 +4,7 @@ import { scoreOverlay, feverBanner } from './overlays'
 import { attractFrame } from './attract'
 import { PALETTE_UPSIDE_DOWN } from './palette'
 
-// Contenu DMD Stranger Things injecté dans le moteur @pinball/dmd-core.
+// Stranger Things DMD content injected into the @pinball/dmd-core engine.
 export const dmdContent: DmdMapContent = {
   paletteAlternateWorld: PALETTE_UPSIDE_DOWN,
   cinematicHandlers,

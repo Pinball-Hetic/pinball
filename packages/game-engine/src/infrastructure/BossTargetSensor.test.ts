@@ -62,6 +62,25 @@ test('auto-disables the fight once maxHits reached', () => {
   expect(s.targetArmed).toBe(false);
 });
 
+test('injected clock: two hits across the cooldown boundary (régression)', () => {
+  // Regression: BossTargetSensor called performance.now() directly while the
+  // rest of the subsystem injects a clock. With the injected clock, two hits
+  // separated by the cooldown both count — deterministic.
+  const clock = { t: 1000 };
+  const s = new BossTargetSensor(() => clock.t);
+  const { hits, opts } = collector();
+  s.beginFight(true);
+  s.handleCollision(true, 'playing', opts({ hitCooldownMs: 450 })); // t=1000 → hit 1
+  s.handleCollision(false, 'playing', opts({ hitCooldownMs: 450 })); // ball leaves
+  clock.t = 1449; // < cooldown depuis t=1000
+  s.handleCollision(true, 'playing', opts({ hitCooldownMs: 450 })); // ignoré
+  expect(hits).toEqual([1]);
+  clock.t = 1450; // frontière exacte du cooldown
+  s.handleCollision(false, 'playing', opts({ hitCooldownMs: 450 }));
+  s.handleCollision(true, 'playing', opts({ hitCooldownMs: 450 })); // hit 2
+  expect(hits).toEqual([1, 2]);
+});
+
 test('no hit outside the playing state', () => {
   const s = new BossTargetSensor();
   const { hits, opts } = collector();
