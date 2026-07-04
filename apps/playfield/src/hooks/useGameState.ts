@@ -509,9 +509,10 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
       }
       if (event.type === "RETURN_PORTAL_TRANSITION_END") {
         setAlternateWorldActive(false);
-        // Ref (source de vérité lue par bossThresholdMet) doit suivre l'état :
-        // symétrique de PORTAL_TRANSITION_END. Sans ça, les gates de boss
-        // requiresAlternateWorld restent faussés après retour au monde normal.
+        // The ref (source of truth read by bossThresholdMet) must track the
+        // state — symmetric with PORTAL_TRANSITION_END. Otherwise the
+        // requiresAlternateWorld boss gates stay wrong after returning to the
+        // normal world.
         alternateWorldActiveRef.current = false;
         setAlternateWorldHint(false);
         if (alternateWorldHintTimerRef.current !== null) {
@@ -526,9 +527,9 @@ export function useGameState(callbacks?: ScoringCallbacks, opts?: GameStateOptio
         alternateWorldActiveRef.current = false;
         alternateWorldBaselineRef.current = 0;
         bossArmedFiredRef.current.clear();
-        // Retour au monde normal : synchroniser state React + atmosphère (HUD
-        // banner, trail, DMD) — sinon ils restent bloqués en monde alternatif.
-        // Symétrique de RETURN_PORTAL_TRANSITION_END.
+        // Back to the normal world: sync React state + atmosphere (HUD banner,
+        // trail, DMD) — otherwise they stay stuck in the alternate world.
+        // Symmetric with RETURN_PORTAL_TRANSITION_END.
         setAlternateWorldActive(false);
         setAlternateWorldHint(false);
         if (alternateWorldHintTimerRef.current !== null) {

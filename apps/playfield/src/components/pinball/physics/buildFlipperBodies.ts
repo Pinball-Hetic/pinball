@@ -8,7 +8,7 @@ import {
   type FlipperPivot,
 } from "@pinball/game-engine";
 
-// Couleurs de debug (wireframe hull + sphère pivot) par flipper.
+// Debug colors (wireframe hull + pivot sphere) per flipper.
 const LEFT_DEBUG_COLOR = 0x00ffff;
 const RIGHT_DEBUG_COLOR = 0xff00ff;
 
@@ -32,16 +32,16 @@ export interface BuildFlipperBodiesDeps {
   rightFlipper: THREE.Mesh | null;
   leftPivot: FlipperPivot | null;
   rightPivot: FlipperPivot | null;
-  // Registres de dispose du composant — on y pousse les geo/mat créés ici.
+  // Component dispose registries — the geos/mats created here are pushed in.
   disposableGeos: THREE.BufferGeometry[];
   disposableMats: THREE.Material[];
 }
 
-// Construction PURE (setup, pas de frame) : corps cinématiques + convex hulls de
-// debug des flippers, plus les sphères marquant les pivots (visibles quand H est
-// actif). Les meshes sont ajoutés à la scène et enregistrés pour dispose. Aucune
-// lecture par la boucle animate pendant la construction — les refs retournées
-// sont assignées ensuite dans la closure d'init. Behavior-preserving 1:1.
+// Setup-only construction (no frame work): flipper kinematic bodies + debug
+// convex hulls, plus the pivot marker spheres (visible when H is active).
+// Meshes are added to the scene and registered for dispose. Nothing reads
+// them from the animate loop during construction — the returned refs are
+// assigned in the init closure afterwards.
 export function buildFlipperBodies(
   deps: BuildFlipperBodiesDeps,
 ): FlipperBodiesResult {
@@ -90,7 +90,7 @@ export function buildFlipperBodies(
   const left = makeBody(leftFlipper, LEFT_DEBUG_COLOR);
   const right = makeBody(rightFlipper, RIGHT_DEBUG_COLOR);
 
-  // Pivot debug markers — sphères visibles quand H est actif.
+  // Pivot debug markers — spheres visible when H is active.
   const pivotGeo = new THREE.SphereGeometry(0.008, 12, 12);
   const pivotMatL = new THREE.MeshBasicMaterial({ color: LEFT_DEBUG_COLOR, depthTest: false });
   const pivotMatR = new THREE.MeshBasicMaterial({ color: RIGHT_DEBUG_COLOR, depthTest: false });

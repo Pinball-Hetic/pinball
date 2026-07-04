@@ -1,12 +1,12 @@
 import type { DmdDisplay } from '@pinball/shared-types';
 import type { DotColor } from './palette';
 
-// Contrat de contenu DMD fourni par une map. Le moteur (makeLayouts) reste
-// générique ; la map injecte ses cinématiques, palettes et overlays.
+// DMD content contract provided by a map. The engine (makeLayouts) stays
+// generic; the map injects its cinematics, palettes and overlays.
 
 export type ScoreDisplay = Extract<DmdDisplay, { mode: 'SCORE' }>;
 
-// Contexte minimal passé à un handler de clip (découplé du shape DmdDisplay).
+// Minimal context passed to a clip handler (decoupled from the DmdDisplay shape).
 export interface ClipContext {
   clip: string;
   value: number;
@@ -23,21 +23,21 @@ export type AttractRenderer = (
 ) => void;
 
 export interface DmdMapContent {
-  /** Palette normale de la map (remplace PALETTE_NORMAL du moteur si fournie).
-   *  Permet à chaque map d'avoir ses propres couleurs de dots par défaut. */
+  /** Map's normal palette (replaces the engine's PALETTE_NORMAL if provided).
+   *  Lets each map have its own default dot colors. */
   paletteNormal?: Record<DotColor, string>;
-  /** Palette alternative appliquée quand display.alternateWorld. */
+  /** Alternate palette applied when display.alternateWorld. */
   paletteAlternateWorld?: Record<DotColor, string>;
-  /** Couleur du bandeau NeonBand (haut/bas de l'écran DMD). Défaut : rouge ST. */
+  /** NeonBand color (top/bottom of the DMD screen). Default: ST red. */
   neonColor?: string;
-  /** Handlers de cinématiques par clipId (priment sur les défauts du moteur). */
+  /** Cinematic handlers by clipId (take precedence over engine defaults). */
   cinematicHandlers?: Record<string, ClipHandler>;
-  /** Overlay dessiné par-dessus le mode SCORE (ex. rangée HETIC). */
+  /** Overlay drawn on top of SCORE mode (e.g. HETIC row). */
   scoreOverlay?: ScoreOverlay;
-  /** Bandeau plein écran quand mapState.fever est actif. */
+  /** Full-screen banner when mapState.fever is active. */
   feverBanner?: FeverBanner;
-  /** Rendu complet de l'attract mode (sinon défaut minimal du moteur). */
+  /** Full attract-mode rendering (otherwise minimal engine default). */
   attract?: AttractRenderer;
-  /** Durée du burst Game Over (effet de sortie, ms). */
+  /** Game Over burst duration (exit effect, ms). */
   alternateWorldBurstMs?: number;
 }

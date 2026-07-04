@@ -63,9 +63,9 @@ test('auto-disables the fight once maxHits reached', () => {
 });
 
 test('injected clock: two hits across the cooldown boundary (régression)', () => {
-  // Régression : BossTargetSensor appelait performance.now() en dur alors que le
-  // reste du sous-système injecte une horloge. Avec l'horloge injectée, deux
-  // hits séparés par le cooldown comptent bien tous les deux — déterministe.
+  // Regression: BossTargetSensor called performance.now() directly while the
+  // rest of the subsystem injects a clock. With the injected clock, two hits
+  // separated by the cooldown both count — deterministic.
   const clock = { t: 1000 };
   const s = new BossTargetSensor(() => clock.t);
   const { hits, opts } = collector();

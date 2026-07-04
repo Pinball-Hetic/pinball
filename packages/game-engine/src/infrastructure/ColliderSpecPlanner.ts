@@ -6,12 +6,12 @@ import {
 import type { MapLayout } from '../domain/MapLayout';
 import { surfaceYAtZ, BOTTOM_OUT_Z } from '../domain/PlayfieldGeometry';
 
-// ── ColliderSpec : description PURE d'un collider physique ───────────────────
-// Capture exactement ce que le code passe à Rapier (forme, position, rotation,
-// matière, sensor, role pour le colliderMap) SANS dépendre de RAPIER. Le module
-// applier (PlayfieldColliderFactory) traduit un ColliderSpec en
-// createRigidBody/createCollider. Les planners ci-dessous sont la partie math
-// (bug-prone) testée à l'unité.
+// ── ColliderSpec: plain description of a physics collider ────────────────────
+// Captures exactly what the code passes to Rapier (shape, position, rotation,
+// material, sensor, role for the colliderMap) WITHOUT depending on RAPIER.
+// The applier module (PlayfieldColliderFactory) translates a ColliderSpec into
+// createRigidBody/createCollider. The planners below are the bug-prone math
+// part.
 
 export type SpecQuat = { x: number; y: number; z: number; w: number };
 export type SpecVec3 = { x: number; y: number; z: number };
@@ -37,41 +37,40 @@ export type ColliderShape = CuboidShape | CylinderShape | BallShape;
 export interface ColliderSpec {
   shape: ColliderShape;
   translation: SpecVec3;
-  /** Rotation du rigid body. Absente → pas de setRotation (identité). */
+  /** Rigid body rotation. Absent → no setRotation (identity). */
   rotation?: SpecQuat;
   restitution?: number;
   friction?: number;
   sensor?: boolean;
-  /** Émet des COLLISION_EVENTS Rapier. */
+  /** Enables Rapier COLLISION_EVENTS. */
   collisionEvents?: boolean;
-  /** Étiquette enregistrée dans colliderMap (handle → role). */
+  /** Tag registered in colliderMap (handle → role). */
   role?: string;
 }
 
-// ── Géométrie analytique du plateau (valeurs ST, verbatim) ───────────────────
-// PLAYFIELD_*_Z = bornes Z du sol analytique. Numériquement égales à
-// layout.geometry.bounds.topZ / bottomZ, mais planPlayfieldFloor() ne reçoit
-// pas de layout → constantes nommées (cf. backlog : injecter layout pour
-// dériver et rendre générique).
+// ── Analytic playfield geometry (ST values) ──────────────────────────────────
+// PLAYFIELD_*_Z = Z bounds of the analytic floor. Numerically equal to
+// layout.geometry.bounds.topZ / bottomZ, but planPlayfieldFloor() receives no
+// layout → named constants.
 const PLAYFIELD_MIN_Z = -0.552;
 const PLAYFIELD_MAX_Z = 0.418;
-const PLAYFIELD_HALF_X = 0.27; // pas une borne (bounds = ±0.265) : marge collider
+const PLAYFIELD_HALF_X = 0.27; // not a bound (bounds = ±0.265): collider margin
 const PLAYFIELD_FLOOR_HALF_Y = 0.003;
 const PLAYFIELD_FLOOR_RESTITUTION = 0.35;
 const PLAYFIELD_FLOOR_FRICTION = 0.12;
 
-// Couloir plongeur "legacy" (planLaneFloor) — bornes X verbatim. 0.265 = rightX,
-// 0.206 n'est pas une borne layout → conservées en l'état.
+// "Legacy" shooter lane (planLaneFloor) — X bounds. 0.265 = rightX,
+// 0.206 is not a layout bound → kept as-is.
 const LANE_FLOOR_X_MIN = 0.206;
 const LANE_FLOOR_X_MAX = 0.265;
 const LANE_FLOOR_HALF_Y = 0.003;
 const LANE_FLOOR_RESTITUTION = 0.35;
 const LANE_FLOOR_FRICTION = 0.15;
 
-// Murs analytiques (planWalls) — positions/épaisseurs verbatim ST.
+// Analytic walls (planWalls) — ST positions/thicknesses.
 const WALL_HEIGHT = 0.06;
 const WALL_THICKNESS = 0.015;
-const WALL_SIDE_LEFT_X = -0.265; // = bounds.leftX (gardé littéral : valeurs ST hardcodées)
+const WALL_SIDE_LEFT_X = -0.265; // = bounds.leftX (kept literal: hardcoded ST values)
 const WALL_SIDE_RIGHT_X = 0.265; // = bounds.rightX
 const WALL_SIDE_HALF_Z = 0.485;
 const WALL_SIDE_Z = -0.067;
@@ -82,19 +81,19 @@ const WALL_LANE_SEP_Z = -0.05;
 const WALL_RESTITUTION = 0.4;
 const WALL_FRICTION = 0.1;
 
-/** Quaternion d'une rotation autour de l'axe X (tilt du tapis). */
+/** Quaternion of a rotation around the X axis (playfield tilt). */
 function quatAroundX(angle: number): SpecQuat {
   return { x: Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) };
 }
 
-/** Quaternion d'une rotation autour de l'axe Y (orientation guide). */
+/** Quaternion of a rotation around the Y axis (guide orientation). */
 function quatAroundY(angle: number): SpecQuat {
   return { x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) };
 }
 
 /**
- * Sol analytique principal (cuboïde incliné lisse) — remplace le trimesh
- * bosselé du GLB. Z ∈ [-0.552, 0.418], inclinaison dérivée de surfaceYAtZ.
+ * Main analytic floor (smooth tilted cuboid) — replaces the bumpy GLB
+ * trimesh. Z ∈ [-0.552, 0.418], tilt derived from surfaceYAtZ.
  */
 export function planPlayfieldFloor(): ColliderSpec {
   const zMin = PLAYFIELD_MIN_Z;
@@ -113,7 +112,7 @@ export function planPlayfieldFloor(): ColliderSpec {
   };
 }
 
-/** Sol du couloir plongeur (strip lisse qui shadow la couture GLB). */
+/** Shooter lane floor (smooth strip that shadows the GLB seam). */
 export function planLaneFloor(laneTopZ = 0.03, laneBotZ = 0.42): ColliderSpec {
   const laneMidZ = (laneTopZ + laneBotZ) / 2;
   const laneHalfZ = (laneBotZ - laneTopZ) / 2;
@@ -132,7 +131,7 @@ export function planLaneFloor(laneTopZ = 0.03, laneBotZ = 0.42): ColliderSpec {
   };
 }
 
-/** Murs analytiques du terrain (côtés + fond + séparateur couloir). */
+/** Analytic playfield walls (sides + back + lane separator). */
 export function planWalls(layout: MapLayout): ColliderSpec[] {
   const HH = WALL_HEIGHT / 2;
   const HT = WALL_THICKNESS / 2;
@@ -153,7 +152,7 @@ export function planWalls(layout: MapLayout): ColliderSpec[] {
   }));
 }
 
-/** Bumpers (cylindres) — role `bumper_${i}`. */
+/** Bumpers (cylinders) — role `bumper_${i}`. */
 export function planBumpers(layout: MapLayout): ColliderSpec[] {
   return layout.bumpers.map((pos, i) => ({
     shape: { kind: 'cylinder', halfHeight: 0.02, radius: 0.025 },
@@ -165,7 +164,7 @@ export function planBumpers(layout: MapLayout): ColliderSpec[] {
   }));
 }
 
-/** Sensors slingshot gauche/droite (cuboïdes sensor). */
+/** Left/right slingshot sensors (sensor cuboids). */
 export function planSlingshotSensors(): ColliderSpec[] {
   const slings = [
     { pos: SLINGSHOT_LEFT_CENTER, role: 'slingshot_left' },
@@ -180,7 +179,7 @@ export function planSlingshotSensors(): ColliderSpec[] {
   }));
 }
 
-/** Sensors pop-zone (cuboïdes sensor) — role `pop_zone_${i}`. */
+/** Pop-zone sensors (sensor cuboids) — role `pop_zone_${i}`. */
 export function planPopZoneSensors(layout: MapLayout): ColliderSpec[] {
   return layout.sensors.popZones.map((p, i) => ({
     shape: { kind: 'cuboid', halfExtents: { x: 0.015, y: 0.01, z: 0.015 } },
@@ -191,7 +190,7 @@ export function planPopZoneSensors(layout: MapLayout): ColliderSpec[] {
   }));
 }
 
-/** Cibles boss (sphères sensor) — role = boss.colliderRole. */
+/** Boss targets (sensor spheres) — role = boss.colliderRole. */
 export function planBossTargets(layout: MapLayout): ColliderSpec[] {
   return layout.bosses.map((boss) => ({
     shape: { kind: 'ball', radius: 0.034 },
@@ -202,7 +201,7 @@ export function planBossTargets(layout: MapLayout): ColliderSpec[] {
   }));
 }
 
-/** Sensor rampe rocket (cuboïde sensor) — role `rocket_ramp`. */
+/** Rocket ramp sensor (sensor cuboid) — role `rocket_ramp`. */
 export function planRocketSensor(layout: MapLayout): ColliderSpec {
   const rocket = layout.sensors.rocket;
   return {
@@ -214,7 +213,7 @@ export function planRocketSensor(layout: MapLayout): ColliderSpec {
   };
 }
 
-/** Drop targets (cuboïdes) — role = dropTarget.id. */
+/** Drop targets (cuboids) — role = dropTarget.id. */
 export function planDropTargets(layout: MapLayout): ColliderSpec[] {
   return layout.dropTargets.map((dt) => ({
     shape: { kind: 'cuboid', halfExtents: { x: 0.006, y: 0.02, z: 0.015 } },
@@ -226,17 +225,17 @@ export function planDropTargets(layout: MapLayout): ColliderSpec[] {
   }));
 }
 
-/** Sensor bottom-out (cuboïde sensor pleine largeur) — role `bottom_out`. */
+/** Bottom-out sensor (full-width sensor cuboid) — role `bottom_out`. */
 export function planBottomOutSensor(layout: MapLayout): ColliderSpec {
   const leftX = layout.geometry.bounds.leftX;
   const rightX = layout.geometry.bounds.rightX;
   const centerX = (leftX + rightX) / 2;
   const halfX = (rightX - leftX) / 2;
-  // Offset +0.03 : centre le sensor JUSTE au-delà de la ligne de drain
-  // (BOTTOM_OUT_Z) plutôt que dessus, pour ne déclencher qu'une fois la balle
-  // franchie. halfZ 0.06 (bande de 0.12 de profond) : sensor épais volontaire —
-  // une balle qui draine vite pourrait tunneler à travers une bande mince entre
-  // deux pas de physique. Ce ne sont donc PAS des valeurs à "corriger".
+  // +0.03 offset: centers the sensor JUST past the drain line (BOTTOM_OUT_Z)
+  // rather than on it, so it only fires once the ball has crossed.
+  // halfZ 0.06 (0.12-deep band): deliberately thick sensor — a fast-draining
+  // ball could tunnel through a thin band between two physics steps.
+  // These are NOT values to "fix".
   const sensorZ = BOTTOM_OUT_Z + 0.03;
   return {
     shape: { kind: 'cuboid', halfExtents: { x: halfX, y: 0.03, z: 0.06 } },
@@ -247,7 +246,7 @@ export function planBottomOutSensor(layout: MapLayout): ColliderSpec {
   };
 }
 
-// Capteur du trou scoop (saucer). Optionnel : uniquement si la map le déclare.
+// Scoop hole (saucer) sensor. Optional: only if the map declares it.
 export function planScoopSensor(layout: MapLayout): ColliderSpec[] {
   const scoop = layout.sensors.scoop;
   if (!scoop) return [];
@@ -260,7 +259,7 @@ export function planScoopSensor(layout: MapLayout): ColliderSpec[] {
   }];
 }
 
-/** Tous les sensors (slingshots + pop-zones + rocket + scoop + boss + drop + bottom-out). */
+/** All sensors (slingshots + pop-zones + rocket + scoop + boss + drop + bottom-out). */
 export function planSensors(layout: MapLayout): ColliderSpec[] {
   return [
     ...planSlingshotSensors(),
@@ -273,9 +272,9 @@ export function planSensors(layout: MapLayout): ColliderSpec[] {
   ];
 }
 
-// ── Couloir plongeur (shooter lane) ──────────────────────────────────────────
+// ── Shooter lane ─────────────────────────────────────────────────────────────
 
-/** Sol incliné du couloir plongeur. */
+/** Tilted shooter lane floor. */
 export function planShooterLaneFloor(layout: MapLayout): ColliderSpec {
   const lane = layout.shooterLane;
   const zTop = lane.topZ;
@@ -297,7 +296,7 @@ export function planShooterLaneFloor(layout: MapLayout): ColliderSpec {
   };
 }
 
-/** Mur latéral incliné du couloir (suit l'inclinaison du tapis, épaisseur sur X). */
+/** Tilted lane side wall (follows the playfield tilt, thickness along X). */
 export function planTiltedLaneWall(
   layout: MapLayout,
   x: number,
@@ -322,7 +321,7 @@ export function planTiltedLaneWall(
   };
 }
 
-/** Mur de fond (filet de sécurité en haut du couloir). */
+/** Back wall (safety net at the top of the lane). */
 export function planShooterBackWall(layout: MapLayout): ColliderSpec {
   const lane = layout.shooterLane;
   const z = lane.topZ;
@@ -341,8 +340,8 @@ export function planShooterBackWall(layout: MapLayout): ColliderSpec {
 }
 
 /**
- * Guide courbe : quart de cercle approximé par N cuboïdes tangents. La normale
- * concave pousse la balle montante (-Z) vers le terrain (-X).
+ * Curved guide: quarter circle approximated by N tangent cuboids. The concave
+ * normal pushes the climbing ball (-Z) toward the playfield (-X).
  */
 export function planShooterGuide(layout: MapLayout): ColliderSpec[] {
   const lane = layout.shooterLane;
@@ -359,7 +358,7 @@ export function planShooterGuide(layout: MapLayout): ColliderSpec[] {
     const z = C.z + R * Math.sin(aMid);
     const y = surfaceYAtZ(z) + lane.wallHeight / 2;
 
-    // Tangente à l'arc dans le plan XZ → axe local +X du cuboïde.
+    // Tangent to the arc in the XZ plane → cuboid local +X axis.
     const tx = -Math.sin(aMid);
     const tz = Math.cos(aMid);
     const alpha = Math.atan2(-tz, tx);
@@ -378,7 +377,7 @@ export function planShooterGuide(layout: MapLayout): ColliderSpec[] {
   return specs;
 }
 
-/** Tout le couloir plongeur : sol (optionnel) + murs + guide + mur de fond. */
+/** Whole shooter lane: floor (optional) + walls + guide + back wall. */
 export function planShooterLane(
   layout: MapLayout,
   options: { includeFloor?: boolean } = {},
@@ -388,9 +387,9 @@ export function planShooterLane(
   if (options.includeFloor !== false) {
     specs.push(planShooterLaneFloor(layout));
   }
-  // Mur droit : pleine hauteur, contient la balle côté +X jusqu'au sommet.
+  // Right wall: full height, contains the ball on the +X side up to the top.
   specs.push(planTiltedLaneWall(layout, lane.xMax, lane.topZ, lane.bottomZ));
-  // Mur gauche : s'arrête avant le sommet → ouverture de sortie en haut-gauche.
+  // Left wall: stops before the top → exit opening at the top-left.
   specs.push(planTiltedLaneWall(layout, lane.xMin + 0.005, lane.leftWallTopZ, lane.bottomZ, 0.01));
   specs.push(...planShooterGuide(layout));
   specs.push(planShooterBackWall(layout));

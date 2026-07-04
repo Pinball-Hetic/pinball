@@ -1,9 +1,9 @@
 import type { ButtonId, ButtonAction } from '@pinball/shared-types';
 import { CABINET_BUTTONS } from '@pinball/shared-types';
 
-// Parsing PUR du protocole série ESP32 ↔ input-bridge (texte ligne par ligne).
-// Aucun effet de bord : pas de socket, pas de console. `index.ts` consomme le
-// résultat typé et émet. Tester ICI le décodage exhaustif des lignes.
+// Pure parsing of the ESP32 ↔ input-bridge serial protocol (line-by-line text).
+// No side effects: no socket, no console. `index.ts` consumes the typed result
+// and emits. Exhaustive line decoding is tested HERE.
 
 export type ParsedLine =
   | { kind: 'button'; id: ButtonId; action: ButtonAction }

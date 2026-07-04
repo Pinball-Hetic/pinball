@@ -6,13 +6,13 @@ export interface ResizeHandlerDeps {
   camera: THREE.Camera;
   renderer: THREE.WebGLRenderer;
   cameraRig: PlayfieldCameraRig;
-  /** racine GLB live (null tant que le GLB n'est pas chargé) */
+  /** live GLB root (null until the GLB is loaded) */
   getPlayfieldRoot: () => THREE.Object3D | null;
 }
 
-// Redimensionnement du canvas : aspect caméra + recadrage rig + taille renderer.
-// Observe le mount (ResizeObserver) + resize/orientationchange fenêtre, et joue
-// une passe initiale au prochain frame. Retourne le detach (cleanup).
+// Canvas resize: camera aspect + rig reframing + renderer size. Observes the
+// mount (ResizeObserver) + window resize/orientationchange, and runs an initial
+// pass on the next frame. Returns the detach (cleanup).
 export function attachResizeHandler(d: ResizeHandlerDeps): () => void {
   const handleResize = () => {
     const { clientWidth: w, clientHeight: h } = d.mountEl;

@@ -3,19 +3,19 @@ import { GRID_W, GRID_H, DOT } from '@pinball/dmd-core'
 import { cinematicHandlers } from './handlers'
 import type { ClipContext } from '@pinball/dmd-core'
 
-// Grille DMD 96×32, index palette par dot (0 = éteint).
+// 96×32 DMD grid, palette index per dot (0 = off).
 function newGrid(): Uint8Array {
   return new Uint8Array(GRID_W * GRID_H)
 }
 
-// Nombre de dots allumés (index != 0).
+// Number of lit dots (index != 0).
 function litCount(grid: Uint8Array): number {
   let n = 0
   for (const v of grid) if (v !== 0) n++
   return n
 }
 
-// Ensemble des index palette présents.
+// Set of palette indices present.
 function colorsUsed(grid: Uint8Array): Set<number> {
   const s = new Set<number>()
   for (const v of grid) if (v !== 0) s.add(v)
@@ -39,7 +39,7 @@ describe('cinematicHandlers registry', () => {
   test('chaque handler dessine sans déborder de la grille', () => {
     for (const handler of Object.values(cinematicHandlers)) {
       const grid = newGrid()
-      // plusieurs instants pour couvrir les branches temporelles
+      // several timestamps to cover the temporal branches
       for (const ms of [0, 500, 1500, 3500, 5500, 8000]) {
         handler(grid, ms, ctx({ value: 3 }))
       }
@@ -55,8 +55,8 @@ describe('hetic_letter', () => {
     const grid = newGrid()
     handler(grid, 0, ctx({ value: 1 }))
     expect(litCount(grid)).toBeGreaterThan(0)
-    // au début (ms=0) la lettre est hors champ haut (y=-21) → seule la rangée
-    // du bas (y=25) doit s'allumer. heticOn pour la 1ère lettre, heticOff sinon.
+    // at start (ms=0) the letter is off-screen top (y=-21) → only the
+    // bottom row (y=25) may light up. heticOn for the 1st letter, else heticOff.
     expect(colorsUsed(grid).has(DOT.heticOn)).toBe(true)
   })
 
@@ -65,7 +65,7 @@ describe('hetic_letter', () => {
     handler(early, 0, ctx({ value: 1 }))
     const late = newGrid()
     handler(late, 2000, ctx({ value: 1 }))
-    // à ms=2000 la lettre tombée (y=2) ajoute des dots en haut de grille.
+    // at ms=2000 the landed letter (y=2) adds dots at the top of the grid.
     expect(litCount(late)).toBeGreaterThan(litCount(early))
   })
 
@@ -96,8 +96,8 @@ describe('hetic_complete', () => {
   const handler = cinematicHandlers.hetic_complete
 
   test('phase pulse (3000<ms<5000) affiche HETIC en heticOn', () => {
-    // Les lettres orbitent hors champ avant 3000ms ; le texte HETIC centré
-    // (heticOn) n'apparaît qu'en phase pulse.
+    // Letters orbit off-screen before 3000ms; the centered HETIC text
+    // (heticOn) only appears in the pulse phase.
     const grid = newGrid()
     handler(grid, 4000, ctx())
     expect(colorsUsed(grid).has(DOT.heticOn)).toBe(true)
@@ -111,7 +111,7 @@ describe('hetic_complete', () => {
   })
 
   test('phase finale (ms>7000) affiche HETIC FEVER en event/combo', () => {
-    // ms choisi pour tomber sur la frame "on" du clignotement.
+    // ms chosen to land on the "on" frame of the blink.
     const grid = newGrid()
     handler(grid, 7000, ctx())
     const used = colorsUsed(grid)
@@ -120,7 +120,7 @@ describe('hetic_complete', () => {
   })
 
   test('clignotement: frame off de la phase finale peut être vide', () => {
-    // Math.floor(ms/250)%2 === 1 → rien dessiné.
+    // Math.floor(ms/250)%2 === 1 → nothing drawn.
     const grid = newGrid()
     handler(grid, 7250, ctx())
     expect(litCount(grid)).toBe(0)
@@ -137,7 +137,7 @@ describe('ganondorf_rises', () => {
   })
 
   test('après 2000ms ajoute "S EVEILLE" en lives sur frame on', () => {
-    // frame on = floor(ms/400)%2===0 → ms=2400.
+    // on frame = floor(ms/400)%2===0 → ms=2400.
     const grid = newGrid()
     handler(grid, 2400, ctx())
     expect(colorsUsed(grid).has(DOT.lives)).toBe(true)
@@ -145,7 +145,7 @@ describe('ganondorf_rises', () => {
 
   test('le sous-titre clignote (frame off n affiche que GANONDORF)', () => {
     const grid = newGrid()
-    // ms=2400 → floor(2400/400)=6, %2===0 → on ; ms=2800 → 7 → off
+    // ms=2400 → floor(2400/400)=6, %2===0 → on; ms=2800 → 7 → off
     handler(grid, 2800, ctx())
     expect(colorsUsed(grid).has(DOT.gameOver)).toBe(true)
     expect(colorsUsed(grid).has(DOT.lives)).toBe(false)

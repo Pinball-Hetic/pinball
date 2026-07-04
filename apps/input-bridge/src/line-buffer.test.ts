@@ -58,7 +58,7 @@ describe('createLineBuffer — découpage pur en lignes', () => {
     const { buffer, lines } = collector();
     buffer.push('x'.repeat(9000));
     expect(lines).toEqual([]);
-    // après reset, une ligne complète repart proprement
+    // after the reset, a complete line goes through cleanly
     buffer.push('BTN:PLUNGER:UP\n');
     expect(lines).toEqual(['BTN:PLUNGER:UP']);
   });

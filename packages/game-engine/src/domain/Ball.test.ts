@@ -32,7 +32,7 @@ import {
   SLINGSHOT_RESTITUTION,
 } from './Ball';
 
-// Toujours repartir du rayon par defaut pour ne pas polluer les autres tests.
+// Always restore the default radius so other tests are not polluted.
 afterEach(() => resetBallRadius());
 
 describe('ball radius state (getter/setter/reset)', () => {
@@ -111,7 +111,7 @@ describe('ball physics constants — invariants', () => {
   });
 
   test('full-charge plunge stays under the speed ceiling', () => {
-    // Δv = |impulse| / masse, doit rester sous le clamp BALL_MAX_SPEED.
+    // Δv = |impulse| / mass, must stay under the BALL_MAX_SPEED clamp.
     const dv = Math.abs(PLUNGER_IMPULSE_Z) / BALL_MASS;
     expect(dv).toBeLessThanOrEqual(BALL_MAX_SPEED);
   });

@@ -9,7 +9,7 @@ import {
 import { renderHook, act, cleanup, waitFor } from '@testing-library/react';
 import type { GlobalStats, LeaderboardEntry } from '@pinball/shared-types';
 
-// ── Faux socket : capture les handlers .on() pour les déclencher à la main. ──
+// ── Fake socket: captures .on() handlers to fire them manually. ─────────────
 type Handler = (...args: unknown[]) => void;
 
 let handlers: Record<string, Handler>;
@@ -32,7 +32,7 @@ mock.module('@pinball/shared-types/src/socket-client', () => ({
   createPinballSocket,
 }));
 
-// ── Stub fetch : file de réponses programmables par URL prefix. ──────────────
+// ── Stub fetch: queue of responses programmable by URL prefix. ──────────────
 type FetchResult = { ok: boolean; status: number; body: unknown };
 
 let leaderboardResult: FetchResult;
@@ -54,9 +54,9 @@ const fetchMock = mock((url: string) => {
   throw new Error(`unexpected fetch ${url}`);
 });
 
-// ── Capture du poll : on n'intercepte QUE l'interval de 30 s du hook, en
-// laissant passer tous les autres setInterval (waitFor de testing-library en
-// dépend pour son propre polling). ──────────────────────────────────────────
+// ── Poll capture: intercept ONLY the hook's 30 s interval, letting all other
+// setInterval through (testing-library's waitFor relies on it for its own
+// polling). ─────────────────────────────────────────────────────────────────
 let pollCallback: (() => void) | null;
 let pollHandle: ReturnType<typeof setInterval> | null;
 let clearIntervalCalls: number;
@@ -87,8 +87,8 @@ beforeEach(() => {
   fetchMock.mockClear();
 
   globalThis.fetch = fetchMock as unknown as typeof fetch;
-  // On ne capture QUE le poll du hook (delay 30000). Tout le reste (waitFor)
-  // passe par les vrais timers.
+  // Capture ONLY the hook's poll (delay 30000). Everything else (waitFor) goes
+  // through the real timers.
   window.setInterval = ((cb: () => void, delay?: number, ...rest: unknown[]) => {
     if (delay === 30_000) {
       pollCallback = cb;
@@ -209,7 +209,7 @@ describe('useBackglassData — events socket', () => {
     await waitFor(() =>
       expect(fetchedUrls).toContain('/api/leaderboard?mapId=strangerthings'),
     );
-    // game:over n'a pas été émis → pas de re-fetch stats.
+    // game:over was not emitted → no stats re-fetch.
     expect(fetchedUrls.some((u) => u.startsWith('/api/stats'))).toBe(false);
   });
 

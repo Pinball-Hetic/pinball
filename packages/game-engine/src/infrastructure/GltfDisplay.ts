@@ -46,14 +46,13 @@ function shouldDarkenMapMaterial(mesh: THREE.Mesh): boolean {
 }
 
 /**
- * Prépare les matériaux GLB pour le rendu Three.js PBR.
- * - Corrige les espaces couleur des textures (SRGBColorSpace).
- * - Assombrit les surfaces de table selon `rendering.colorDarken`.
- * - Booste l'`envMapIntensity` selon le niveau de metalness et la config map.
+ * Prepares GLB materials for Three.js PBR rendering.
+ * - Fixes texture color spaces (SRGBColorSpace).
+ * - Darkens table surfaces per `rendering.colorDarken`.
+ * - Boosts `envMapIntensity` based on metalness level and the map config.
  *
- * @param root     Racine de la scène GLB.
- * @param rendering Config de rendu de la map (depuis manifest.rendering).
- *                  Si absent → valeurs par défaut neutres.
+ * @param rendering Map rendering config (from manifest.rendering).
+ *                  Absent → neutral defaults.
  */
 export function prepareGltfMaterialsForDisplay(
   root: THREE.Object3D,
@@ -64,9 +63,9 @@ export function prepareGltfMaterialsForDisplay(
   const envSemi            = rendering?.envIntensitySemi    ?? DEFAULT_ENV_SEMI;
   const envBase            = rendering?.envIntensityBase    ?? DEFAULT_ENV_BASE;
 
-  // Un même matériau (et son `.color`) peut être partagé par plusieurs meshes.
-  // Sans ce garde, `color.multiplyScalar` s'appliquerait une fois par mesh et
-  // assombrirait la couleur en double. On ne traite chaque matériau qu'une fois.
+  // The same material (and its `.color`) can be shared by several meshes.
+  // Without this guard, `color.multiplyScalar` would run once per mesh and
+  // darken the color multiple times. Process each material only once.
   const processed = new Set<THREE.MeshStandardMaterial>();
 
   root.traverse((obj) => {
@@ -77,29 +76,29 @@ export function prepareGltfMaterialsForDisplay(
       if (processed.has(material)) continue;
       processed.add(material);
 
-      // Espaces couleur textures.
+      // Texture color spaces.
       for (const key of TEXTURE_KEYS) {
         const tex = material[key];
         if (tex) tex.colorSpace = THREE.SRGBColorSpace;
       }
 
-      // Assombrissement sélectif des surfaces de plateau.
+      // Selective darkening of playfield surfaces.
       if (shouldDarkenMapMaterial(obj)) {
         material.color.multiplyScalar(colorDarken);
-        // Surfaces imprimées (sol/plastique/stickers) = diffuses, pas miroir.
-        // roughness haut + metalness 0 + envMapIntensity quasi nul : même au
-        // ras (fresnel rasant), le sol ne renvoie plus les panneaux de
-        // RoomEnvironment. NE PAS retomber dans le boost ci-dessous.
+        // Printed surfaces (floor/plastic/stickers) = diffuse, not mirrors.
+        // High roughness + metalness 0 + near-zero envMapIntensity: even at
+        // grazing angles (fresnel), the floor no longer reflects the
+        // RoomEnvironment panels. Do NOT fall through to the boost below.
         material.roughness = Math.max(material.roughness, 0.85);
         material.metalness = 0;
         material.envMapIntensity = 0.05;
         continue;
       }
 
-      // envMapIntensity selon metalness — clé du rendu PBR vivid.
-      // metalness = 0 → matériau diffus (plastique, bois) : envBase.
-      // metalness 0.2–0.5 → semi-métal : envSemi.
-      // metalness ≥ 0.5 → métal pur (or, chrome, gemmes) : envMetallic.
+      // envMapIntensity by metalness — key to the vivid PBR look.
+      // metalness = 0 → diffuse material (plastic, wood): envBase.
+      // metalness 0.2–0.5 → semi-metal: envSemi.
+      // metalness ≥ 0.5 → pure metal (gold, chrome, gems): envMetallic.
       if (material.metalness >= 0.5) {
         material.envMapIntensity = envMetallic;
       } else if (material.metalness >= 0.2) {
@@ -112,9 +111,9 @@ export function prepareGltfMaterialsForDisplay(
 }
 
 /**
- * Configure le renderer WebGL pour le rendu PBR correct.
- * @param rendering Config de la map — toneMappingExposure lu depuis rendering,
- *                  ou DEFAULT si absent.
+ * Configures the WebGL renderer for correct PBR rendering.
+ * @param rendering Map config — toneMappingExposure read from rendering,
+ *                  or DEFAULT when absent.
  */
 export function configureGltfRenderer(
   renderer: THREE.WebGLRenderer,
@@ -126,8 +125,8 @@ export function configureGltfRenderer(
 }
 
 /**
- * Retourne le facteur de flou à passer à `pmrem.fromScene(env, blur)`.
- * 0 = reflets nets, 0.04 = doux (défaut Three.js).
+ * Blur factor to pass to `pmrem.fromScene(env, blur)`.
+ * 0 = sharp reflections, 0.04 = soft (Three.js default).
  */
 export function getEnvironmentBlur(rendering?: MapRenderingConfig): number {
   return rendering?.environmentBlur ?? DEFAULT_ENVIRONMENT_BLUR;

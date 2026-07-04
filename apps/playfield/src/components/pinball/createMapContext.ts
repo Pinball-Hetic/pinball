@@ -13,11 +13,11 @@ import type { useDmdOrchestrator } from "@/hooks/useDmdOrchestrator";
 
 type Dmd = ReturnType<typeof useDmdOrchestrator>;
 
-// Dépendances du MapContext. Les collaborateurs assignés APRÈS ce build
-// (ball / ballMesh / collisionProcessor / emit) sont passés en getters/closures
-// live-bound — JAMAIS en snapshots, sinon le contexte se fige.
+// MapContext dependencies. Collaborators assigned AFTER this build
+// (ball / ballMesh / collisionProcessor / emit) are passed as live-bound
+// getters/closures — NEVER as snapshots, or the context freezes.
 export interface MapContextDeps {
-  // Passthrough (typés via MapContext → match garanti).
+  // Passthrough (typed via MapContext → guaranteed match).
   scene: MapContext["scene"];
   root: MapContext["root"];
   camera: MapContext["camera"];
@@ -27,13 +27,13 @@ export interface MapContextDeps {
   colliderMap: MapContext["colliderMap"];
   lighting: MapContext["lighting"];
 
-  // Forward-refs live.
+  // Live forward refs.
   getBall: () => BallPhysics | null;
   getBallMesh: () => MapContext["ballMesh"];
   getCollisionProcessor: () => CollisionEventProcessor | null;
   emit: (e: GameEvent) => void;
 
-  // Refs d'état.
+  // State refs.
   scoreRef: MutableRefObject<number>;
   comboRef: MutableRefObject<number>;
   multiplierRef: MutableRefObject<number>;
@@ -43,7 +43,7 @@ export interface MapContextDeps {
   mapStateExtraRef: MutableRefObject<Record<string, unknown>>;
   atmosphereAlternateRef: MutableRefObject<boolean>;
 
-  // Collaborateurs.
+  // Collaborators.
   dmd: Dmd;
   screenShakeAdd: (amount: number) => void;
   resetStuck: () => void;
@@ -55,10 +55,9 @@ export interface MapContextDeps {
   buildMapState: () => MapState;
 }
 
-// Construit le MapContext passé à mapModule.setup() : le sac de closures par
-// lequel un module de map pilote scène / physique / score / DMD / cinématiques.
-// C'est la plus grande surface de couplage de l'init — l'isoler ici documente le
-// contrat et allège la closure d'init. Behavior-preserving 1:1.
+// Builds the MapContext passed to mapModule.setup(): the bag of closures a
+// map module uses to drive scene / physics / score / DMD / cinematics. This
+// is the largest coupling surface of the init.
 export function createMapContext(deps: MapContextDeps): MapContext {
   const {
     scene, root, camera, physics, layout, manifest, colliderMap, lighting,

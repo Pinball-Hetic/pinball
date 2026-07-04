@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 
-// Glow additif léger (THREE.Sprite → billboard auto, pas de caméra à
-// threader, 1 draw call, AUCUNE lumière). Remplace les PointLights
-// décoratives : coût shader nul. Texture radiale partagée (générée une fois).
+// Lightweight additive glow (THREE.Sprite → auto billboard, no camera to
+// thread through, 1 draw call, NO light). Replaces decorative PointLights:
+// zero shader cost. Shared radial texture (generated once).
 
 let sharedTexture: THREE.Texture | null = null;
 
@@ -47,7 +47,7 @@ export class GlowSprite {
     this.mat.color.setHex(hex);
   }
 
-  // intensity → opacité ; scaleMul module la taille (pulse).
+  // intensity → opacity; scaleMul modulates size (pulse).
   set(intensity: number, scaleMul = 1): void {
     this.mat.opacity = Math.max(0, Math.min(1, intensity));
     this.sprite.scale.setScalar(this.baseSize * scaleMul);

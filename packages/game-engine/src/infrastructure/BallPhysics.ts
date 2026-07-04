@@ -26,8 +26,8 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
   private spawnY: number;
   private spawnZ: number;
 
-  // Bornes du lerp de rendu : positions aux deux derniers steps physiques.
-  // Objets réutilisés (mutation en place) — zéro allocation dans le hot loop.
+  // Render-lerp bounds: positions at the last two physics steps.
+  // Reused objects (mutated in place) — zero allocation in the hot loop.
   private readonly prevPos = { x: 0, y: 0, z: 0 };
   private readonly currPos = { x: 0, y: 0, z: 0 };
   private readonly lerpOut = { x: 0, y: 0, z: 0 };
@@ -58,10 +58,9 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
   }
 
   /**
-   * Recale prev = curr = position réelle du body. À appeler après TOUT
-   * téléport (setTranslation) : sans ça, la frame suivante lerperait entre
-   * l'ancienne et la nouvelle position → bille rendue en "streak" à travers
-   * tout le terrain.
+   * Resets prev = curr = the body's real position. Call after EVERY teleport
+   * (setTranslation): otherwise the next frame would lerp between the old
+   * and new positions → ball rendered as a "streak" across the playfield.
    */
   private resetInterpolation(): void {
     const p = this.body.translation();
@@ -74,8 +73,8 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
   }
 
   /**
-   * À appeler après CHAQUE world.step() : décale l'état courant vers prev et
-   * capture la nouvelle position — fournit les deux bornes du lerp de rendu.
+   * Call after EACH world.step(): shifts the current state into prev and
+   * captures the new position — provides both bounds of the render lerp.
    */
   noteStepped(): void {
     this.prevPos.x = this.currPos.x;
@@ -173,9 +172,9 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
   }
 
   /**
-   * Sync visuel interpolé : position = lerp(prev, curr, alpha) pour lisser le
-   * rendu 120 Hz sur une physique à 60 steps/s. Quaternion pris tel quel — la
-   * rotation de la bille est peu perceptible, pas la peine de slerp.
+   * Interpolated visual sync: position = lerp(prev, curr, alpha) to smooth
+   * 120 Hz rendering over 60 steps/s physics. Quaternion taken as-is — ball
+   * rotation is barely perceptible, no need to slerp.
    */
   syncToMeshInterpolated(
     mesh: {
@@ -184,10 +183,10 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     },
     alpha: number,
   ): void {
-    // Garde-fou téléports EXTERNES (ball.body.setTranslation direct : scoop de
-    // map, hold d'intro boss, drag debug, locks stepBallSync) qu'on ne peut pas
-    // tous intercepter : une distance prev↔curr impossible en un step physique
-    // (vitesse clampée) trahit un téléport → snap sans lerp + resync des buffers.
+    // Guard against EXTERNAL teleports (direct ball.body.setTranslation: map
+    // scoop, boss intro hold, debug drag, stepBallSync locks) that cannot all
+    // be intercepted: a prev↔curr distance impossible within one physics step
+    // (clamped speed) betrays a teleport → snap without lerp + resync buffers.
     const dx = this.currPos.x - this.prevPos.x;
     const dy = this.currPos.y - this.prevPos.y;
     const dz = this.currPos.z - this.prevPos.z;

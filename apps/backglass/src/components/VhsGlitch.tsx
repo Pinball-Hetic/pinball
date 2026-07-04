@@ -5,8 +5,8 @@ interface VhsGlitchProps {
   className?: string
 }
 
-// Wrapper de transition réutilisable : scanlines + tracking band + RGB
-// split bref à l'entrée. Utilisé par chaque takeover.
+// Reusable transition wrapper: scanlines + tracking band + brief RGB split
+// on entry. Used by every takeover.
 export default function VhsGlitch({ children, className }: VhsGlitchProps) {
   return (
     <div className={`vhs ${className ?? ''}`}>

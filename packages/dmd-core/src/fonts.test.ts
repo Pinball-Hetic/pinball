@@ -7,7 +7,7 @@ import {
   type BitmapFont,
 } from './fonts'
 
-// Helper : récupère les coords (x,y) allumées (index != 0) d'une grille.
+// Helper: collects the lit (x,y) coords (index != 0) of a grid.
 function litPixels(grid: Uint8Array, gridW: number): Array<[number, number]> {
   const out: Array<[number, number]> = []
   const gridH = grid.length / gridW
@@ -75,7 +75,7 @@ describe('measureText', () => {
 
 describe('drawText — écriture des pixels', () => {
   test('dessine le glyphe avec MSB = colonne la plus à gauche', () => {
-    // Fonte 1 row, 3 bits : bit set = colonne 0 uniquement (0b100).
+    // 1-row, 3-bit font: set bit = column 0 only (0b100).
     const font: BitmapFont = {
       width: 3,
       height: 1,
@@ -84,11 +84,11 @@ describe('drawText — écriture des pixels', () => {
     const grid = new Uint8Array(3 * 1)
     drawText(grid, 3, 0, 0, 'A', font, 5)
     expect(litPixels(grid, 3)).toEqual([[0, 0]])
-    expect(grid[0]).toBe(5) // colorIndex écrit
+    expect(grid[0]).toBe(5) // written colorIndex
   })
 
   test('mappe correctement plusieurs bits dans une row', () => {
-    // 0b101 → colonnes 0 et 2 allumées.
+    // 0b101 → columns 0 and 2 lit.
     const font: BitmapFont = { width: 3, height: 1, glyphs: { A: [0b101] } }
     const grid = new Uint8Array(3)
     drawText(grid, 3, 0, 0, 'A', font, 1)
@@ -112,7 +112,7 @@ describe('drawText — écriture des pixels', () => {
     const font: BitmapFont = { width: 3, height: 1, glyphs: { A: [0b100] } }
     const grid = new Uint8Array(10)
     drawText(grid, 10, 0, 0, 'AA', font, 1, 1) // spacing=1
-    // 1er A → col 0 ; 2e A avance de (3+1) = 4 → col 4
+    // 1st A → col 0; 2nd A advances by (3+1) = 4 → col 4
     expect(litPixels(grid, 10)).toEqual([
       [0, 0],
       [4, 0],
@@ -141,31 +141,31 @@ describe('drawText — écriture des pixels', () => {
   test('ignore un glyphe inconnu (rien dessiné) mais avance le curseur', () => {
     const font: BitmapFont = { width: 1, height: 1, glyphs: { A: [0b1] } }
     const grid = new Uint8Array(5)
-    drawText(grid, 5, 0, 0, '?A', font, 9, 0) // '?' absent
-    // '?' inconnu → curseur avance de (1+0)=1 → A en col 1
+    drawText(grid, 5, 0, 0, '?A', font, 9, 0) // '?' missing
+    // unknown '?' → cursor advances by (1+0)=1 → A at col 1
     expect(litPixels(grid, 5)).toEqual([[1, 0]])
   })
 
   test('clippe les pixels hors de la grille en X', () => {
     const font: BitmapFont = { width: 2, height: 1, glyphs: { A: [0b11] } }
     const grid = new Uint8Array(2)
-    // x=1 → col0 dans la grille (x=1), col1 hors (x=2) → ignoré, pas de crash
+    // x=1 → col0 inside the grid (x=1), col1 outside (x=2) → ignored, no crash
     drawText(grid, 2, 1, 0, 'A', font, 3)
     expect(litPixels(grid, 2)).toEqual([[1, 0]])
   })
 
   test('clippe les pixels hors de la grille en Y', () => {
     const font: BitmapFont = { width: 1, height: 2, glyphs: { A: [0b1, 0b1] } }
-    const grid = new Uint8Array(1) // 1 row seulement
+    const grid = new Uint8Array(1) // only 1 row
     drawText(grid, 1, 0, 0, 'A', font, 3)
-    // 2e row hors grille → ignorée, seul (0,0)
+    // 2nd row outside the grid → ignored, only (0,0)
     expect(litPixels(grid, 1)).toEqual([[0, 0]])
   })
 
   test('clippe les coordonnées négatives', () => {
     const font: BitmapFont = { width: 1, height: 1, glyphs: { A: [0b1] } }
     const grid = new Uint8Array(4)
-    drawText(grid, 4, -1, 0, 'A', font, 3) // x négatif
+    drawText(grid, 4, -1, 0, 'A', font, 3) // negative x
     expect(litPixels(grid, 4)).toEqual([])
   })
 
@@ -176,7 +176,7 @@ describe('drawText — écriture des pixels', () => {
   })
 
   test('rend un vrai glyphe FONT_5X7 (le point « . »)', () => {
-    // '.' = [0,0,0,0,0,0x04,0x04] → bit col 2 (0b00100) aux rows 5 et 6.
+    // '.' = [0,0,0,0,0,0x04,0x04] → col-2 bit (0b00100) at rows 5 and 6.
     const grid = new Uint8Array(5 * 7)
     drawText(grid, 5, 0, 0, '.', FONT_5X7, 2)
     expect(litPixels(grid, 5)).toEqual([

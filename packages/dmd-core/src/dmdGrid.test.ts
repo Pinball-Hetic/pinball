@@ -87,8 +87,8 @@ describe('gridDrawPlan', () => {
 
   test('ordre de parcours y puis x (row-major)', () => {
     const grid = new Uint8Array(GRID_W * GRID_H)
-    // un dot sur la ligne 1 (col 0) et un sur la ligne 0 (col 1) :
-    // le row-major doit visiter (y=0,x=1) avant (y=1,x=0).
+    // one dot on row 1 (col 0) and one on row 0 (col 1):
+    // row-major order must visit (y=0,x=1) before (y=1,x=0).
     grid[1 * GRID_W + 0] = 9 // y=1, x=0
     grid[0 * GRID_W + 1] = 7 // y=0, x=1
     const plan = gridDrawPlan(grid)

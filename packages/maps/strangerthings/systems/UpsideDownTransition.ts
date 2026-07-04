@@ -40,7 +40,7 @@ type SetupConfig = {
 type StartConfig = {
   ballMesh: THREE.Object3D;
   ballBody: RAPIER.RigidBody;
-  /** Texture plein écran (défaut : upsidedown.jpg). */
+  /** Fullscreen texture (default: upsidedown.jpg). */
   textureUrl?: string;
   onRevealStart?: () => void;
   onTremorStart?: () => void;

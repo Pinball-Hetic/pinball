@@ -2,7 +2,7 @@ import { test, expect, describe } from 'bun:test';
 import { TakeoverStack } from './takeoverStack';
 import type { StackEntry, TakeoverTickDeps } from './takeoverStack';
 
-// Deps neutres par défaut : aucun effet de bord, aucun hold.
+// Neutral default deps: no side effects, no hold.
 function makeDeps(over: Partial<TakeoverTickDeps> = {}): TakeoverTickDeps {
   return {
     holdsHallFlip: () => false,
@@ -52,7 +52,7 @@ describe('TakeoverStack — priorité (top)', () => {
     s.push(entry({ scene: 'RECAP', priority: 80 }));
     s.push(entry({ scene: 'MAP_EVENT', priority: 80 }));
     const r = s.tick(0, makeDeps());
-    // strict `>` → le premier reste best.
+    // strict `>` → the first one stays best.
     expect(r.top?.scene).toBe('RECAP');
   });
 });
@@ -63,7 +63,7 @@ describe('TakeoverStack — purge / expiration', () => {
     s.start(0);
     s.push(entry({ scene: 'RECAP', priority: 50, expiresAt: 100 }));
     expect(s.tick(99, makeDeps()).top?.scene).toBe('RECAP');
-    // À l’instant exact d’expiration, la scène disparaît.
+    // At the exact expiration instant, the scene disappears.
     expect(s.tick(100, makeDeps()).top).toBeNull();
   });
 
@@ -87,14 +87,14 @@ describe('TakeoverStack — followUp (chaînage)', () => {
         followUp: { scene: 'RECAP', durationMs: 500, priority: 60 },
       }),
     );
-    // Avant expiration : HIGH_SCORE actif.
+    // Before expiration: HIGH_SCORE active.
     expect(s.tick(50, makeDeps()).top?.scene).toBe('HIGH_SCORE');
-    // À l’expiration : RECAP poussé, priorité 60, expire à now+500.
+    // On expiration: RECAP pushed, priority 60, expires at now+500.
     const r = s.tick(100, makeDeps());
     expect(r.top?.scene).toBe('RECAP');
     expect(r.top?.priority).toBe(60);
     expect(r.top?.expiresAt).toBe(600);
-    // RECAP survit jusqu’à 600.
+    // RECAP survives until 600.
     expect(s.tick(599, makeDeps()).top?.scene).toBe('RECAP');
     expect(s.tick(600, makeDeps()).top).toBeNull();
   });
@@ -152,9 +152,9 @@ describe('TakeoverStack — surbrillance high-score', () => {
     );
     const r = s.tick(100, makeDeps());
     expect(r.highlightRank).toBe(2);
-    // Survit jusqu’à now + HIGHLIGHT_MS.
+    // Survives until now + HIGHLIGHT_MS.
     expect(s.tick(100 + HIGHLIGHT_MS, makeDeps()).highlightRank).toBe(2);
-    // Au-delà, la surbrillance s’éteint (now > highlightUntil).
+    // Beyond that, the highlight turns off (now > highlightUntil).
     expect(s.tick(100 + HIGHLIGHT_MS + 1, makeDeps()).highlightRank).toBeUndefined();
   });
 
@@ -188,9 +188,9 @@ describe('TakeoverStack — attract mode', () => {
   test('déclenche ATTRACT après ATTRACT_IDLE_MS d’inactivité, pile vide', () => {
     const s = new TakeoverStack();
     s.start(0);
-    // Juste avant le seuil : pas d’attract.
+    // Just before the threshold: no attract.
     expect(s.tick(ATTRACT_IDLE_MS, makeDeps()).top).toBeNull();
-    // Strictement au-dessus du seuil : attract poussé.
+    // Strictly above the threshold: attract pushed.
     const r = s.tick(ATTRACT_IDLE_MS + 1, makeDeps());
     expect(r.top?.scene).toBe('ATTRACT');
     expect(r.top?.priority).toBe(10);
@@ -200,7 +200,7 @@ describe('TakeoverStack — attract mode', () => {
     const s = new TakeoverStack();
     s.start(0);
     s.markActivity(ATTRACT_IDLE_MS);
-    // L’inactivité est mesurée depuis markActivity.
+    // Idleness is measured since markActivity.
     expect(s.tick(ATTRACT_IDLE_MS + ATTRACT_IDLE_MS, makeDeps()).top).toBeNull();
     expect(
       s.tick(ATTRACT_IDLE_MS + ATTRACT_IDLE_MS + 1, makeDeps()).top?.scene,
@@ -210,9 +210,9 @@ describe('TakeoverStack — attract mode', () => {
   test('une vraie scène empêche l’attract et l’attract ancien est purgé', () => {
     const s = new TakeoverStack();
     s.start(0);
-    // Premier tick idle → attract.
+    // First idle tick → attract.
     expect(s.tick(ATTRACT_IDLE_MS + 1, makeDeps()).top?.scene).toBe('ATTRACT');
-    // Une vraie scène arrive : l’attract est retiré, la vraie scène gagne.
+    // A real scene arrives: the attract is removed, the real scene wins.
     s.push(entry({ scene: 'RECAP', priority: 50 }));
     const r = s.tick(ATTRACT_IDLE_MS + 2, makeDeps());
     expect(r.top?.scene).toBe('RECAP');
@@ -226,10 +226,10 @@ describe('TakeoverStack — attract mode', () => {
       attractJoyceName: () => 'NEO',
       onJoyce: (t) => calls.push(t),
     });
-    // Avant JOYCE_IDLE_MS : attract mais pas de Joyce.
+    // Before JOYCE_IDLE_MS: attract but no Joyce.
     s.tick(ATTRACT_IDLE_MS + 1, deps);
     expect(calls).toEqual([]);
-    // Au-delà de JOYCE_IDLE_MS : Joyce émis une fois.
+    // Beyond JOYCE_IDLE_MS: Joyce emitted once.
     s.tick(JOYCE_IDLE_MS + 1, deps);
     expect(calls).toEqual(['NEO']);
   });
@@ -254,10 +254,10 @@ describe('TakeoverStack — attract mode', () => {
       attractJoyceName: () => 'NEO',
       onJoyce: (t) => calls.push(t),
     });
-    s.tick(JOYCE_IDLE_MS + 1, deps); // émet
-    s.tick(JOYCE_IDLE_MS + 100, deps); // trop tôt depuis lastJoyceIdle
+    s.tick(JOYCE_IDLE_MS + 1, deps); // emits
+    s.tick(JOYCE_IDLE_MS + 100, deps); // too soon since lastJoyceIdle
     expect(calls).toEqual(['NEO']);
-    // Un nouvel intervalle plus tard → ré-émet.
+    // Another full interval later → re-emits.
     s.tick(JOYCE_IDLE_MS + 1 + JOYCE_IDLE_MS + 1, deps);
     expect(calls).toEqual(['NEO', 'NEO']);
   });

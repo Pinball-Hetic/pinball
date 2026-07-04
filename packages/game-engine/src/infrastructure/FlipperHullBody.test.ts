@@ -8,7 +8,7 @@ import {
 } from './FlipperHullBody';
 
 beforeAll(async () => {
-  // convexHull s'exécute côté WASM → init une fois pour tout le fichier.
+  // convexHull runs in WASM → init once for the whole file.
   await RAPIER.init();
 });
 
@@ -35,8 +35,8 @@ function makeWorldStub() {
   return { world, captured, bodyHandle };
 }
 
-// Un tétraèdre unité comme géométrie de flipper minimale (4 sommets non
-// coplanaires → convex hull valide).
+// A unit tetrahedron as a minimal flipper geometry (4 non-coplanar vertices
+// → valid convex hull).
 function tetraMesh(): THREE.Mesh {
   const geo = new THREE.BufferGeometry();
   const positions = new Float32Array([
@@ -60,7 +60,7 @@ test('geoCenter = moyenne des sommets monde ; localOffset centré à origine ide
     restitution: 0.3,
     friction: 0.2,
   });
-  // geoCenter = (0.25, 0.25, 0.25) ; meshOrigin = (0,0,0) ; quat identité
+  // geoCenter = (0.25, 0.25, 0.25); meshOrigin = (0,0,0); identity quat
   expect(localOffset.x).toBeCloseTo(0.25, 6);
   expect(localOffset.y).toBeCloseTo(0.25, 6);
   expect(localOffset.z).toBeCloseTo(0.25, 6);
@@ -146,8 +146,8 @@ test('la transform monde du mesh est prise en compte (mesh translaté)', () => {
     restitution: 0.3,
     friction: 0.2,
   });
-  // geoCenter monde = (10.25, 0.25, 0.25) ; meshOrigin = (10,0,0)
-  // localOffset = geoCenter - meshOrigin (quat identité) = (0.25,0.25,0.25)
+  // world geoCenter = (10.25, 0.25, 0.25); meshOrigin = (10,0,0)
+  // localOffset = geoCenter - meshOrigin (identity quat) = (0.25,0.25,0.25)
   expect(localOffset.x).toBeCloseTo(0.25, 6);
   expect(localOffset.y).toBeCloseTo(0.25, 6);
   expect(localOffset.z).toBeCloseTo(0.25, 6);
@@ -164,7 +164,7 @@ test('flipperWorldTransform : offset nul → position = position monde du flippe
   expect(position.x).toBeCloseTo(3, 6);
   expect(position.y).toBeCloseTo(4, 6);
   expect(position.z).toBeCloseTo(5, 6);
-  // rotation identité
+  // identity rotation
   expect(quaternion.x).toBeCloseTo(0, 6);
   expect(quaternion.w).toBeCloseTo(1, 6);
 });
@@ -180,7 +180,7 @@ test('flipperWorldTransform : offset additionné à la position (quat identité)
 
 test('flipperWorldTransform : offset local pivoté dans le monde (rot 90° autour Y)', () => {
   const obj = new THREE.Object3D();
-  // rotation +90° autour de Y : un offset local +X pointe vers -Z en monde
+  // +90° rotation about Y: a local +X offset points to -Z in world space
   obj.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
   const { position } = flipperWorldTransform(obj, new THREE.Vector3(1, 0, 0));
   expect(position.x).toBeCloseTo(0, 6);

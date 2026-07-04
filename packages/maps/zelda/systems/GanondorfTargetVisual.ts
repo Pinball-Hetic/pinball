@@ -22,9 +22,9 @@ export function resolveGanondorfClips(
   mixer: THREE.AnimationMixer,
   clips: THREE.AnimationClip[],
 ) {
-  // Recadrage des clips sur leur plage Blender (Manual Frame Range).
-  // Sans subclip, le GLB exporte les keyframes en temps absolu et Three.js
-  // joue depuis t=0, ce qui fait jouer la mauvaise partie de l'animation.
+  // Re-crop clips to their Blender range (Manual Frame Range).
+  // Without a subclip, the GLB exports keyframes in absolute time and
+  // Three.js plays from t=0, playing the wrong part of the animation.
   const rawIdleClip = findGltfAnimationClip(clips, GANONDORF_ANIM_IDLE);
   const rawHitClip = findGltfAnimationClip(clips, GANONDORF_ANIM_HIT);
   const rawVictoryClip =

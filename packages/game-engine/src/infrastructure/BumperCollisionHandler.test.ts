@@ -11,7 +11,7 @@ function makeBumperHitUC() {
   };
 }
 
-// Layout minimal : seules les positions de bumpers sont lues.
+// Minimal layout: only the bumper positions are read.
 function makeLayout(bumpers: Array<{ x: number; z: number }>): MapLayout {
   return { bumpers } as unknown as MapLayout;
 }
@@ -57,14 +57,14 @@ test('no-op si aucune position de bumper pour cet index', () => {
   const pending: Array<() => void> = [];
   const h = new BumperCollisionHandler(pending, uc as never, makeLayout([{ x: 0, z: 0 }]));
 
-  h.handle('bumper_5', 'playing', true); // idx 5 absent du layout
+  h.handle('bumper_5', 'playing', true); // idx 5 missing from layout
   expect(pending.length).toBe(0);
 });
 
 test('no-op si gameState != playing (régression : garde game_over/idle)', () => {
-  // Régression : sans la garde gameState === 'playing', les bumpers éjectaient
-  // et émettaient encore pendant game_over/idle. Le use-case ne doit PAS être
-  // planifié hors playing.
+  // Regression: without the gameState === 'playing' guard, bumpers still
+  // ejected and emitted during game_over/idle. The use-case must NOT be
+  // scheduled outside playing.
   const { uc, calls } = makeBumperHitUC();
   const pending: Array<() => void> = [];
   const h = new BumperCollisionHandler(pending, uc as never, makeLayout([{ x: 0, z: 0 }]));
@@ -73,7 +73,7 @@ test('no-op si gameState != playing (régression : garde game_over/idle)', () =>
   h.handle('bumper_0', 'idle', true);
   expect(pending.length).toBe(0);
 
-  // Sanity : en 'playing' le use-case est bien planifié.
+  // Sanity: in 'playing' the use-case is scheduled.
   h.handle('bumper_0', 'playing', true);
   drain(pending);
   expect(calls).toEqual([{ idx: 0, pos: { x: 0, z: 0 } }]);

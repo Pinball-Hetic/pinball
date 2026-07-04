@@ -4,8 +4,8 @@ import { BossFightManager } from './BossFightManager';
 import type { BossDefinition, BossGateContext } from '../domain/BossRegistry';
 import type { GameEvent } from '../domain/GameEvents';
 
-// Définitions de boss FIXTURES génériques (pas de contenu ST) : la mécanique
-// du moteur doit marcher sur n'importe quelles définitions injectées.
+// Generic FIXTURE boss definitions (no ST content): the engine mechanics must
+// work on any injected definitions.
 function boss(
   over: Partial<BossDefinition> & Pick<BossDefinition, 'id' | 'colliderRole'>,
 ): BossDefinition {
@@ -49,7 +49,7 @@ function boss(
   };
 }
 
-// boss_a : monde normal, palier 3000. boss_b : monde alternatif, palier 3000.
+// boss_a: normal world, threshold 3000. boss_b: alternate world, threshold 3000.
 const BOSS_A = boss({ id: 'boss_a', colliderRole: 'a_target' });
 const BOSS_B = boss({
   id: 'boss_b',
@@ -57,9 +57,9 @@ const BOSS_B = boss({
   reveal: { scoreThreshold: 3000, scoreIncrement: 200, requiresAlternateWorld: true },
 });
 
-// Horloge injectée (DIP) : pilotée par le test, déterministe, sans stub global.
-// Départ >= 2000 pour que le 1er hit verrouillé passe le throttle (le code
-// compare now - (lastMs ?? 0) >= 2000, lastMs initial = 0).
+// Injected clock: driven by the test, deterministic, no global stub. Start
+// >= 2000 so the 1st locked hit passes the throttle (the code compares
+// now - (lastMs ?? 0) >= 2000, initial lastMs = 0).
 function makeClock(start = 5000) {
   const clock = { t: start };
   return { now: () => clock.t, set: (ms: number) => { clock.t = ms; } };
@@ -138,11 +138,11 @@ test('throttle 2s : un hit verrouillé après expiration ré-émet', () => {
 
 test('throttle indépendant par boss', () => {
   const clock = makeClock(5000);
-  // boss_b verrouillé requiert le monde alternatif actif.
+  // locked boss_b requires the alternate world active.
   const { handler, events } = make(true, ctx({ totalScore: 1000, alternateWorldActive: true }), clock.now);
   handler.handle('a_target', 'playing', true);
   handler.handle('b_target', 'playing', true);
-  // a_target requiert monde normal → pas d'émission ; b_target requiert alternatif → émet.
+  // a_target requires normal world → no emit; b_target requires alternate → emits.
   expect(events).toEqual([
     { type: 'BOSS_LOCKED_HIT', bossId: 'boss_b', remaining: 2000 },
   ]);
@@ -156,7 +156,7 @@ test('pas de BOSS_LOCKED_HIT hors started/playing', () => {
 });
 
 test('locked-hit dépend du monde requis par le boss', () => {
-  // boss_a requiert le monde normal ; en monde alternatif il ne fait rien.
+  // boss_a requires the normal world; in the alternate world it does nothing.
   const { handler, events } = make(true, ctx({ totalScore: 1000, alternateWorldActive: true }));
   handler.handle('a_target', 'playing', true);
   expect(events).toHaveLength(0);
@@ -166,13 +166,13 @@ test('pas de locked-hit une fois le boss déclenché (fight en cours)', () => {
   const { handler, mgr, events } = make(false, ctx({ totalScore: 1000 }));
   mgr.beginFight('boss_a', false); // triggered
   handler.handle('a_target', 'playing', true);
-  // isTriggered → branche locked-hit ignorée ; fight non armé → pas de hit non plus.
+  // isTriggered → locked-hit branch skipped; fight not armed → no hit either.
   expect(events).toHaveLength(0);
 });
 
 test('délègue la collision de combat : émet BOSS_TARGET_HIT quand armé', () => {
-  // Horloge injectée (départ 5000) partagée handler + sensor : le 1er hit passe
-  // toujours le cooldown (lastHitMs initial = 0), déterministe sans setTimeout.
+  // Injected clock (start 5000) shared handler + sensor: the 1st hit always
+  // passes the cooldown (initial lastHitMs = 0), deterministic without setTimeout.
   const { handler, mgr, events } = make(false, ctx({ totalScore: 3000 }));
   mgr.beginFight('boss_a', true); // fightActive + targetArmed
   handler.handle('a_target', 'playing', true);
@@ -182,15 +182,15 @@ test('délègue la collision de combat : émet BOSS_TARGET_HIT quand armé', () 
 });
 
 test('resetThrottle ré-arme le locked-hit après un reset (régression)', () => {
-  // Régression : sans resetThrottle, un boss ré-armé après reset resterait
-  // muet jusqu'à 2s. Hit à t=5000, reset, hit à t=5001 → doit ré-émettre.
+  // Regression: without resetThrottle, a boss re-armed after reset would stay
+  // silent until 2s. Hit at t=5000, reset, hit at t=5001 → must re-emit.
   const clock = makeClock(5000);
   const { handler, events } = make(false, ctx({ totalScore: 1000 }), clock.now);
   handler.handle('a_target', 'playing', true);
   expect(events).toHaveLength(1);
 
   handler.resetThrottle(); // clear all
-  clock.set(5001); // 1ms plus tard, bien dans la fenêtre de 2s
+  clock.set(5001); // 1ms later, well within the 2s window
 
   handler.handle('a_target', 'playing', true);
   expect(events).toHaveLength(2);
@@ -208,9 +208,9 @@ test('resetThrottle(id) ne ré-arme que le boss ciblé', () => {
 });
 
 test('horloge par défaut = performance.now quand non injectée (prod)', () => {
-  // performance.now() au démarrage process peut être < 2000ms → on ne peut pas
-  // garantir l'émission verrouillée. On vérifie juste que le constructeur sans
-  // clock fonctionne et que le seuil atteint coupe bien la branche locked-hit.
+  // performance.now() at process start may be < 2000ms → we can't guarantee the
+  // locked emit. We only check that the constructor without a clock works and
+  // that reaching the threshold does cut off the locked-hit branch.
   const events: GameEvent[] = [];
   const mgr = new BossFightManager((e) => events.push(e), [BOSS_A]);
   const handler = new BossCollisionHandler(

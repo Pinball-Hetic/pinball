@@ -78,10 +78,10 @@ describe('plungerChargeProgress', () => {
   });
 
   test('applies the 1.15 easing exponent mid-charge', () => {
-    // moitié du temps → (0.5)^1.15
+    // half the charge time → (0.5)^1.15
     const half = plungerChargeProgress(PLUNGER_CHARGE_MS / 2, 0);
     expect(half).toBeCloseTo(0.5 ** 1.15, 10);
-    // easing > 1 rend la courbe sous la diagonale linéaire
+    // exponent > 1 puts the curve below the linear diagonal
     expect(half).toBeLessThan(0.5);
   });
 
@@ -94,8 +94,8 @@ describe('plungerChargeProgress', () => {
   });
 
   test('negative elapsed (clock skew) yields NaN — base négative ** exposant fractionnaire', () => {
-    // now < start → ratio négatif ; (neg) ** 1.15 = NaN en JS.
-    // Edge case documenté : les appelants doivent garantir now >= chargeStart.
+    // now < start → negative ratio; (neg) ** 1.15 = NaN in JS.
+    // Documented edge case: callers must guarantee now >= chargeStart.
     expect(Number.isNaN(plungerChargeProgress(500, 1000))).toBe(true);
   });
 });

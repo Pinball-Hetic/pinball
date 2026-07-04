@@ -3,7 +3,7 @@ import type { GameOver } from '@pinball/shared-types';
 import { createRegisterScore } from './RegisterScore';
 import type { GameRepository, ScoreGateway } from './ports';
 
-// Fakes des ports (DIP) — aucun prisma, aucun fetch, aucun mock.module.
+// Fake ports — no prisma, no fetch, no mock.module.
 const create = mock(async (..._a: unknown[]) => ({ id: 'local-id-1' }));
 const setCode = mock(async (..._a: unknown[]) => undefined);
 const postScore = mock(async (..._a: unknown[]) => ({
@@ -116,7 +116,7 @@ describe('registerScore', () => {
     postScore.mockRejectedValueOnce(new Error('global KO'));
     await expect(makeRegisterScore()(makeGameOver())).rejects.toThrow('global KO');
     expect(create).toHaveBeenCalledTimes(1);
-    expect(setCode).not.toHaveBeenCalled(); // pas de code à lier
+    expect(setCode).not.toHaveBeenCalled(); // no code to link
   });
 
   test('utilise le même score borné pour le local ET le global', async () => {

@@ -17,11 +17,11 @@ export interface DmdScoreCallbackDeps {
   playerRef: MutableRefObject<string>;
   scoreRef: MutableRefObject<number>;
   atmosphereAlternateRef: MutableRefObject<boolean>;
-  /** compteurs map (mapStateExtraRef.current) — seuls les numbers partent au leaderboard */
+  /** map counters (mapStateExtraRef.current) — only numbers go to the leaderboard */
   getMapCounters: () => Record<string, number | boolean>;
   setFinalScore: (score: number) => void;
   clearClaimQr: () => void;
-  /** hooks de remise à zéro jouées au retour idle (replay) */
+  /** reset hooks run on the return to idle (replay) */
   resetCinematics: () => void;
   resetAudio: () => void;
   resetMapModule: () => void;
@@ -29,12 +29,12 @@ export interface DmdScoreCallbackDeps {
 }
 
 /**
- * Callbacks useGameState → DMD/backglass : snapshots de score, priorité
- * d'affichage (EVENT > MULTI > COMBO), vies, game over (stats + counters map),
- * intro/reset. Déps résolues PARESSEUSEMENT via `getDeps()` à l'invocation
- * (post-render) — indispensable : plusieurs collaborateurs (snapshot,
- * mapStateExtraRef…) sont déclarés APRÈS l'appel useGameState dans le
- * composant (TDZ au render sinon). Extrait + testé (spies).
+ * useGameState → DMD/backglass callbacks: score snapshots, display priority
+ * (EVENT > MULTI > COMBO), lives, game over (stats + map counters),
+ * intro/reset. Deps are resolved LAZILY via `getDeps()` at call time
+ * (post-render) — required: several collaborators (snapshot,
+ * mapStateExtraRef…) are declared AFTER the useGameState call in the
+ * component (TDZ at render otherwise).
  */
 export function createDmdScoreCallbacks(
   getDeps: () => DmdScoreCallbackDeps,
@@ -56,9 +56,9 @@ export function createDmdScoreCallbacks(
       d.dmd.emitScoreSnapshot(snap);
       d.dmd.pushScore(snap);
 
-      // Chaque event fait switcher l'affichage. Exclusif, par priorité
-      // décroissante : event labellisé → EVENT ; nouveau multiplier →
-      // MULTI ; sinon combo en cours → COMBO.
+      // Every event switches the display. Exclusive, by decreasing
+      // priority: labeled event → EVENT; new multiplier → MULTI; otherwise
+      // ongoing combo → COMBO.
       const label = eventLabel(event, d.mapBosses);
       if (label) {
         d.dmd.pushEvent(label, finalPoints, snap);
@@ -73,13 +73,13 @@ export function createDmdScoreCallbacks(
       const d = getDeps();
       d.dmd.emitScoreSnapshot(d.snapshot({ combo: 0, multiplier: 1, lives: livesRemaining }));
       d.dmd.pushLifeLost(livesRemaining, d.scoreRef.current, d.playerRef.current);
-      // Dernière vie engagée → respiration 1.2s (pas de gel : bille déjà drainée).
+      // Last life in play → 1.2s breather (no freeze: ball already drained).
       if (livesRemaining === 1) d.playCinematic("last_chance");
     },
 
     onLifeGained: (lives) => {
-      // Rafraîchir immédiatement le DMD avec le vrai compteur — sinon désync
-      // jusqu'au prochain event de score (surtout au-delà de 3 vies).
+      // Refresh the DMD immediately with the real counter — otherwise it
+      // desyncs until the next score event (especially past 3 lives).
       const d = getDeps();
       const snap = d.snapshot({ lives });
       d.dmd.emitScoreSnapshot(snap);
@@ -88,22 +88,22 @@ export function createDmdScoreCallbacks(
 
     onGameOver: (finalScore, stats) => {
       const d = getDeps();
-      d.setFinalScore(finalScore); // le QR arrive ensuite via game:registered (async)
-      // Counters map : seuls les numbers partent au leaderboard.
+      d.setFinalScore(finalScore); // the QR arrives later via game:registered (async)
+      // Map counters: only numbers go to the leaderboard.
       const counters: Record<string, number> = {};
       for (const [k, v] of Object.entries(d.getMapCounters())) {
         if (typeof v === "number") counters[k] = v;
       }
-      // Pas d'affichage GAME_OVER sur le DMD : on garde le dernier SCORE
-      // jusqu'au reset (INTRO). emitGameOver sert au backglass/leaderboard.
+      // No GAME_OVER display on the DMD: keep the last SCORE until the
+      // reset (INTRO). emitGameOver feeds the backglass/leaderboard.
       d.dmd.emitGameOver(d.playerRef.current, finalScore, d.mapId, { ...stats, counters });
-      // Poussé à CHAQUE game over ; le backglass connaît le rang → fanfare ou recap.
+      // Pushed on EVERY game over; the backglass knows the rank → fanfare or recap.
       d.dmd.pushCinematic("hall_of_fame");
     },
 
     onGameStart: () => {
       const d = getDeps();
-      d.clearClaimQr(); // évite un QR périmé qui flashe sur la partie suivante
+      d.clearClaimQr(); // avoids a stale QR flashing on the next game
       d.dmd.emitGameStart(d.playerRef.current);
       const snap = d.snapshot({ combo: 0, multiplier: 1 });
       d.dmd.emitScoreSnapshot(snap);
@@ -129,7 +129,7 @@ export function createDmdScoreCallbacks(
     },
 
     onFeverEnd: () => {
-      // Re-émet un snapshot fever:false pour que DMD/backglass retombent.
+      // Re-emit a fever:false snapshot so DMD/backglass settle back.
       const d = getDeps();
       const snap = d.snapshot({ mapState: d.buildMapState(false) });
       d.dmd.emitScoreSnapshot(snap);

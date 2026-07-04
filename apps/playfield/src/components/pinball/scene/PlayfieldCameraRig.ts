@@ -26,13 +26,9 @@ type CamFitSnapshot = {
 };
 
 /**
- * Cadrage / recadrage caméra + capture de la base du directeur cinématique.
- *
- * Glue Three.js + directeurs game-engine (aucun import de map). Extrait
- * verbatim de PinballPlayfield : `syncToRoot` reproduit exactement l'ancien
- * `syncPlayfieldCamera` (refit + captureBase), `updateFrame` l'update per-frame
- * orbit/director, `restoreBoss` le `restoreBossCamera`. Le directeur reste
- * exposé via `.director` pour le routeur d'events (play/playVictory/setBosses).
+ * Camera framing/reframing + capture of the cinematic director base.
+ * The director stays exposed via `.director` for the event router
+ * (play/playVictory/setBosses).
  */
 export class PlayfieldCameraRig {
   readonly director = new PlayfieldCameraDirector();
@@ -116,9 +112,8 @@ export class PlayfieldCameraRig {
   }
 
   /**
-   * Fallback de recadrage au resize quand la racine playfield n'est pas encore
-   * chargée : réoriente la caméra vers la cible via l'up du mode courant.
-   * Verbatim de la branche `else if (playfieldCamFit)` du handleResize.
+   * Resize reframing fallback when the playfield root isn't loaded yet:
+   * re-orients the camera toward the target using the current mode's up vector.
    */
   applyViewUpFallback(): boolean {
     if (!this.camFit) return false;

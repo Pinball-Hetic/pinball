@@ -1,7 +1,7 @@
-// Découpage PUR d'un flux d'octets/strings en lignes (séparateur `\n`). Aucune
-// dépendance IO : `push(chunk)` accumule, émet chaque ligne complète via le
-// callback injecté, et garde un garde-fou contre une ligne sans newline qui
-// gonflerait le buffer (>8192 → reset). Testable sans device série.
+// Splits a byte/string stream into lines (`\n` separator). No IO dependency:
+// `push(chunk)` accumulates, emits each complete line via the injected
+// callback, and guards against a newline-less line inflating the buffer
+// (>8192 → reset). Testable without a serial device.
 
 const OVERFLOW_LIMIT = 8192;
 
@@ -20,7 +20,7 @@ export function createLineBuffer(onLine: (line: string) => void): LineBuffer {
         buf = buf.slice(nl + 1);
         onLine(line);
       }
-      if (buf.length > OVERFLOW_LIMIT) buf = ''; // garde-fou contre une ligne sans newline
+      if (buf.length > OVERFLOW_LIMIT) buf = ''; // guard against a line without newline
     },
   };
 }

@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'bun:test'
 import { backglassTheme, backglassThemeAlternate } from './theme'
 
-// Toutes les clés de tokens sont des CSS custom properties (--xxx).
+// All token keys are CSS custom properties (--xxx).
 const isCssVar = (k: string) => /^--[a-z-]+$/.test(k)
 
 describe('backglassTheme (palette monde réel)', () => {
@@ -39,8 +39,8 @@ describe('backglassThemeAlternate (surcharges Upside Down)', () => {
   })
 
   test('ne contient que des surcharges existant déjà dans la base', () => {
-    // Une surcharge doit cibler un token de la palette de base, sinon elle
-    // n introduit qu un token orphelin jamais réinitialisé au retour au réel.
+    // An override must target a base-palette token, otherwise it only
+    // introduces an orphan token never reset on return to the real world.
     for (const k of Object.keys(backglassThemeAlternate)) {
       expect(backglassTheme).toHaveProperty(k)
     }
@@ -65,10 +65,10 @@ describe('fusion app : base puis surcharge alternate (cf. pages/index.tsx)', () 
 
   test('Upside Down = base écrasée par les surcharges alternate', () => {
     const merged = { ...backglassTheme, ...backglassThemeAlternate }
-    // Les tokens surchargés prennent la valeur alternate.
+    // Overridden tokens take the alternate value.
     expect(merged['--glow']).toBe('#b14dff')
     expect(merged['--stage-filter']).toBe('hue-rotate(8deg) saturate(1.1)')
-    // Les tokens non surchargés gardent la valeur de base.
+    // Non-overridden tokens keep the base value.
     expect(merged['--foreground']).toBe(backglassTheme['--foreground'])
     expect(merged['--fever-a']).toBe(backglassTheme['--fever-a'])
   })

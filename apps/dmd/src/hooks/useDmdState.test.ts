@@ -9,8 +9,8 @@ import {
 import { renderHook, act, cleanup } from '@testing-library/react';
 import type { DmdDisplay } from '@pinball/shared-types';
 
-// ── Faux socket : capture les handlers enregistrés via .on() pour pouvoir les
-// déclencher manuellement et observer l'effet sur l'état du hook. ──────────────
+// ── Fake socket: captures handlers registered via .on() so they can be
+// triggered manually to observe the effect on the hook's state. ────────────────
 type Handler = (...args: unknown[]) => void;
 
 let handlers: Record<string, Handler>;

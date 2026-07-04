@@ -9,10 +9,10 @@ import { createSocketEmitter, handleLine, type BridgeEmitter } from './dispatch'
 import { createLineBuffer } from './line-buffer';
 import { runWithRetry, type OpenOutcome } from './serial-retry';
 
-// Lecture série en fs brut + stty (pas de @serialport) : le binding natif
-// serialport appelle uv_default_loop, non supporté par Bun (SIGILL au runtime).
-// On lit donc le device comme un fichier après l'avoir mis en mode raw, exactement
-// comme le bridge de référence Fliphetic. Bun supporte node:fs/child_process.
+// Serial reading via raw fs + stty (no @serialport): the serialport native
+// binding calls uv_default_loop, unsupported by Bun (SIGILL at runtime).
+// So we read the device as a file after putting it in raw mode, exactly like
+// the Fliphetic reference bridge. Bun supports node:fs/child_process.
 
 function readConfig() {
   return {
@@ -37,9 +37,9 @@ socket.on('connect', () => console.log('[bridge] socket connected to', SERVER_UR
 socket.on('disconnect', (reason) => console.log('[bridge] socket disconnected:', reason));
 socket.on('connect_error', (err) => console.log('[bridge] connect_error:', err.message));
 
-// Mode dev `simulate-esp32` côté playfield : le server route l'event ciblé vers
-// nous (room `input-bridge`). On rejoue la ligne protocolaire directement dans
-// le parser — chemin identique à une ligne reçue d'un vrai ESP32.
+// Playfield dev mode `simulate-esp32`: the server routes the event to us
+// (room `input-bridge`). Replay the protocol line straight through the
+// parser — identical path to a line received from a real ESP32.
 socket.on('dev:simulate-button', (data) => {
   if (MODE !== 'mock') {
     console.warn('[bridge] dev:simulate-button ignored (serial mode, use real ESP32):', data);
@@ -49,10 +49,10 @@ socket.on('dev:simulate-button', (data) => {
   console.log('[bridge] dev:simulate-button replayed as', `BTN:${data.id}:${data.action}`);
 });
 
-// Adaptateur IO PUR du device série (pas de politique de retry ici — elle vit
-// dans serial-retry.ts). Passe la tty en mode raw au bon baud (busybox stty),
-// puis lit le flux ligne par ligne. Échec d'ouverture → 'failed' ; sinon câble
-// error/close du stream sur `reopen` (fourni par la politique) et → 'opened'.
+// Serial device IO adapter (no retry policy here — it lives in
+// serial-retry.ts). Puts the tty in raw mode at the right baud (busybox stty),
+// then reads the stream line by line. Open failure → 'failed'; otherwise wires
+// the stream's error/close to `reopen` (provided by the policy) and → 'opened'.
 function openSerialDevice(reopen: () => void): OpenOutcome {
   try {
     execFileSync('stty', [
@@ -80,8 +80,8 @@ function openSerialDevice(reopen: () => void): OpenOutcome {
   return 'opened';
 }
 
-// Si le device est absent (ESP non branché / pas encore énuméré), retente toutes
-// les 3 s — tolère le reboot USB après flash. Politique pure injectée.
+// If the device is absent (ESP unplugged / not yet enumerated), retry every
+// 3 s — tolerates the USB reboot after flashing.
 function openSerial() {
   runWithRetry({
     openDevice: openSerialDevice,

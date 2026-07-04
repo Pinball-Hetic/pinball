@@ -63,10 +63,10 @@ export interface MapModule {
   setup(ctx: MapContext): void;
   preload?(): Promise<void>;
   /**
-   * Appelé AVANT que le décrément de vie (handleDrain) ne s'applique, sur un
-   * DRAIN/BOTTOM_OUT, avec le nombre de vies PRÉ-décrément. Permet à une map
-   * d'accorder une vie avant le décrément (ex. sauvetage dernière vie) afin
-   * d'éviter le game over. Ne doit RIEN faire d'autre que ce sauvetage.
+   * Called BEFORE the life decrement (handleDrain) applies, on a
+   * DRAIN/BOTTOM_OUT, with the PRE-decrement life count. Lets a map grant a
+   * life before the decrement (e.g. last-life save) to avoid the game over.
+   * Must do NOTHING besides that save.
    */
   onPreDrain?(livesBeforeDrain: number): void;
   onGameEvent(e: GameEvent): void;

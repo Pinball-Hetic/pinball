@@ -12,7 +12,7 @@ let consoleSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
   sessionStorage.clear()
-  // Silence le console.error attendu (crash + warning React boundary).
+  // Silence the expected console.error (crash + React boundary warning).
   consoleSpy = spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -57,7 +57,7 @@ describe('ErrorBoundary', () => {
         <Boom />
       </ErrorBoundary>,
     )
-    // Un setTimeout avec le délai de reload (15s) doit avoir été programmé.
+    // A setTimeout with the reload delay (15s) must have been scheduled.
     const scheduledReload = setTimeoutSpy.mock.calls.some(
       (c) => c[1] === RELOAD_MS,
     )
@@ -66,7 +66,7 @@ describe('ErrorBoundary', () => {
   })
 
   test('cesse de programmer un reload au-delà du max de crashs', () => {
-    // Le 4e crash (count -> 4 > MAX_RELOADS=3) ne doit plus recharger.
+    // The 4th crash (count -> 4 > MAX_RELOADS=3) must no longer reload.
     sessionStorage.setItem('eb_crash_count', '3')
     const setTimeoutSpy = spyOn(window, 'setTimeout')
     render(

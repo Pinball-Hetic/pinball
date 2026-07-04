@@ -1,12 +1,12 @@
-// Registre de timers de "défaite de boss" partagé entre les modules de map
-// (ST, Zelda). À la défaite, le module ralentit le temps (setTimeScale) puis
-// programme un setTimeout pour le restaurer + jouer la cinématique. Sans suivi,
-// ces timers fuient : ils se déclenchent après un reset/dispose (restaurant le
-// timescale d'une partie terminée) et s'empilent si le même boss re-déclenche.
+// Registry of boss-defeat timers shared by map modules (ST, Zelda). On defeat,
+// the module slows time (setTimeScale) then schedules a setTimeout to restore
+// it + play the cinematic. Untracked, these timers leak: they fire after a
+// reset/dispose (restoring the timescale of a finished game) and stack when
+// the same boss re-triggers.
 //
-// Ce registre : un seul timer par bossId (le nouveau annule le précédent) et
-// annulation groupée au reset/dispose. Le planificateur est injectable pour
-// rester testable sans DOM ; il défaut sur `window`.
+// This registry keeps one timer per bossId (a new one cancels the previous)
+// and cancels everything on reset/dispose. The scheduler is injectable so
+// tests run without a DOM; defaults to `window`.
 
 export interface TimerScheduler {
   setTimeout(handler: () => void, timeout: number): number;
@@ -14,12 +14,12 @@ export interface TimerScheduler {
 }
 
 export interface BossDefeatTimers {
-  // Programme (ou remplace) le timer de défaite d'un boss. `delayMs` conserve
-  // le délai historique par map (200 ms ST, 400 ms Zelda).
+  // Schedules (or replaces) a boss defeat timer. `delayMs` preserves the
+  // per-map historical delay (200 ms ST, 400 ms Zelda).
   schedule(bossId: string, delayMs: number, run: () => void): void;
-  // Annule le timer d'un boss précis (no-op si aucun).
+  // Cancels one boss timer (no-op if none).
   clear(bossId: string): void;
-  // Annule tous les timers en attente (reset/dispose).
+  // Cancels all pending timers (reset/dispose).
   clearAll(): void;
 }
 
@@ -46,8 +46,8 @@ export function createBossDefeatTimers(
   }
 
   function schedule(bossId: string, delayMs: number, run: () => void): void {
-    // Un seul timer par boss : annule l'éventuel précédent avant d'en armer un
-    // nouveau (pas d'empilement si BOSS_TARGET_HIT re-déclenche au seuil).
+    // One timer per boss: cancel any previous one before arming a new one
+    // (no stacking when BOSS_TARGET_HIT re-triggers at the threshold).
     clear(bossId);
     handles[bossId] = scheduler.setTimeout(() => {
       delete handles[bossId];

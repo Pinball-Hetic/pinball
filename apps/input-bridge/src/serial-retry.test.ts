@@ -6,9 +6,9 @@ interface Scheduled {
   delayMs: number;
 }
 
-// Faux ordonnanceur déterministe : capture les setTimeout au lieu de les exécuter.
-// `drain()` rejoue la file en l'ordre FIFO une fois (les nouvelles entrées
-// programmées pendant le drain seront rejouées au drain suivant).
+// Deterministic fake scheduler: captures setTimeouts instead of running them.
+// `drain()` replays the queue in FIFO order once (entries scheduled during the
+// drain are replayed on the next drain).
 function fakeScheduler() {
   const queue: Scheduled[] = [];
   return {
@@ -57,7 +57,7 @@ describe('runWithRetry — politique pure de retry/reopen', () => {
       schedule: sched.schedule,
     });
     expect(opens).toBe(1);
-    // chaque drain rejoue exactement une tentative qui reprogramme la suivante
+    // each drain replays exactly one attempt, which schedules the next one
     for (let i = 2; i <= 5; i++) {
       expect(sched.queue.length).toBe(1);
       sched.drain();
@@ -73,11 +73,11 @@ describe('runWithRetry — politique pure de retry/reopen', () => {
       openDevice: () => outcomes[i++]!,
       schedule: sched.schedule,
     });
-    // 1er échec programmé
+    // 1st failure scheduled
     expect(sched.queue.length).toBe(1);
-    sched.drain(); // 2e échec
+    sched.drain(); // 2nd failure
     expect(sched.queue.length).toBe(1);
-    sched.drain(); // succès
+    sched.drain(); // success
     expect(sched.queue).toEqual([]);
     expect(i).toBe(3);
   });
@@ -95,12 +95,12 @@ describe('runWithRetry — politique pure de retry/reopen', () => {
       schedule: sched.schedule,
     });
     expect(opens).toBe(1);
-    expect(sched.queue).toEqual([]); // rien tant que le stream tient
+    expect(sched.queue).toEqual([]); // nothing while the stream holds
     // simulate stream error/close
     reopenCb!();
     expect(sched.queue.length).toBe(1);
     expect(sched.queue[0]!.delayMs).toBe(RETRY_DELAY_MS);
-    sched.drain(); // ré-ouverture
+    sched.drain(); // reopen
     expect(opens).toBe(2);
   });
 

@@ -5,7 +5,7 @@ import * as THREE from 'three';
  * Upside Down, Zelda Sacred Realm). The blend integrator lives in
  * `AtmosphereBlend` (domain); these mutate the actual Three materials/lights.
  *
- * VERBATIM math from the original `applyMix()` loops:
+ * Per-element math:
  *  - color  : copy(orig) -> set(tint) -> lerp(ease*tintK) -> multiplyScalar(1 - ease*darken)
  *  - emissive: copy(orig) -> set(emissive) -> lerp(ease*emissiveK)
  *  - emissiveIntensity: lerp(orig, orig*emissiveMul + emissiveAdd, ease)
@@ -49,7 +49,7 @@ export type LightTintDescriptor = {
 
 const _scratch = new THREE.Color();
 
-/** Tint one material toward its descriptor by `ease`. VERBATIM lerp. */
+/** Tint one material toward its descriptor by `ease`. */
 export function applyMaterialTint(
   snapshot: MaterialTintSnapshot,
   ease: number,

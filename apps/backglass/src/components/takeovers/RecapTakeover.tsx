@@ -11,8 +11,8 @@ export default function RecapTakeover({ payload }: Props) {
   const s = payload.stats
   const qualifying = payload.rank <= 10
 
-  // Compteurs génériques : libellés fournis par la map (counterLabels), valeurs
-  // depuis GameStats.counters. Le core n'a aucune clé ST en dur.
+  // Generic counters: labels come from the map (counterLabels), values from
+  // GameStats.counters. The core has no hardcoded ST keys.
   const counterCells = Object.entries(s.counters).map(([id, value]) => ({
     label: counterLabels[id] ?? id.toUpperCase(),
     value,

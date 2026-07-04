@@ -65,7 +65,7 @@ describe('easeOutBack', () => {
   });
 
   test('depasse 1 avant de revenir (overshoot)', () => {
-    // le back ease dépasse 1 sur la fin de course
+    // the back ease overshoots 1 near the end of travel
     expect(easeOutBack(0.8)).toBeGreaterThan(1);
   });
 
@@ -79,7 +79,7 @@ describe('easeOutBack', () => {
 
 describe('strobeOn', () => {
   test('true sur la première moitié de la période, false sur la seconde', () => {
-    // hz = 1 -> période 1s. sin > 0 pour t dans (0, 0.5).
+    // hz = 1 -> period 1s. sin > 0 for t in (0, 0.5).
     expect(strobeOn(0.25, 1)).toBe(true);
     expect(strobeOn(0.75, 1)).toBe(false);
   });
@@ -89,12 +89,12 @@ describe('strobeOn', () => {
   });
 
   test('repasse à false sur la seconde moitié de période', () => {
-    // hz=1 : sin négatif sur (0.5, 1) -> off.
+    // hz=1: sin negative on (0.5, 1) -> off.
     expect(strobeOn(0.6, 1)).toBe(false);
   });
 
   test('fréquence plus élevée commute plus vite', () => {
-    // hz = 2 -> période 0.5s. t=0.125 est dans la 1re moitié.
+    // hz = 2 -> period 0.5s. t=0.125 is in the first half.
     expect(strobeOn(0.125, 2)).toBe(true);
     expect(strobeOn(0.375, 2)).toBe(false);
   });

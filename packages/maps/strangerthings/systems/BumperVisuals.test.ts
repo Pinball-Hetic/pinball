@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import type { GameEvent } from '@pinball/game-engine';
 import { layout } from '../layout';
 
-// GlowSprite (gltf/base) cree un canvas radial. Pas de happy-dom dans ce
-// package : on stub le minimum de document.createElement('canvas') pour que
-// le constructeur de texture passe, de facon deterministe.
+// GlowSprite (gltf/base) creates a radial canvas. No happy-dom in this
+// package: stub the minimum of document.createElement('canvas') so the
+// texture constructor passes, deterministically.
 type StubCanvas = {
   width: number;
   height: number;
@@ -32,7 +32,7 @@ if (typeof g.document === 'undefined') {
   };
 }
 
-// Importe APRES le stub (GlowSprite genere sa texture partagee a la 1re ctor).
+// Import AFTER the stub (GlowSprite builds its shared texture on first ctor).
 const { BumperVisuals } = await import('./BumperVisuals');
 
 const PUNCH_DURATION = 0.15;
@@ -66,17 +66,17 @@ describe('strangerthings BumperVisuals wiring', () => {
     const v = new BumperVisuals();
     v.setup(root);
 
-    // legacy masque, decor intact
+    // legacy hidden, decor untouched
     expect(legacy.visible).toBe(false);
     expect(decor.scale.toArray()).toEqual([3, 3, 3]);
 
-    // punch applique aux 3 kinds matchant le bumper 0
+    // punch applied to the 3 kinds matching bumper 0
     v.onGameEvent(bumperHit(0));
     v.update(PUNCH_DURATION / 2);
     expect(gltf.scale.x).toBeCloseTo(1 + PUNCH_PEAK, 5);
     expect(base.scale.x).toBeCloseTo(1 + PUNCH_PEAK, 5);
     expect(ring.scale.x).toBeCloseTo(1 + PUNCH_PEAK, 5);
-    // decor jamais touche
+    // decor never touched
     expect(decor.scale.toArray()).toEqual([3, 3, 3]);
   });
 
@@ -89,12 +89,12 @@ describe('strangerthings BumperVisuals wiring', () => {
     v.setup(root);
     const mat = ring.material as THREE.MeshStandardMaterial;
 
-    // idle (sans hit) : scale revient a base, emissiveIntensity de repos
+    // idle (no hit): scale returns to base, resting emissiveIntensity
     v.update(0.016);
     expect(ring.scale.x).toBeCloseTo(1, 5);
     const idleIntensity = mat.emissiveIntensity;
 
-    // hit : punch scale au pic + flash augmente l intensite
+    // hit: punch scale at peak + flash raises the intensity
     v.onGameEvent(bumperHit(0));
     v.update(PUNCH_DURATION / 2);
     expect(ring.scale.x).toBeCloseTo(1 + PUNCH_PEAK, 5);
@@ -127,7 +127,7 @@ describe('strangerthings BumperVisuals wiring', () => {
     expect(ring.scale.x).toBeGreaterThan(1.5);
 
     v.dispose();
-    // B2 : dispose remet la scale a baseScale (avant, ST la laissait gonflee)
+    // dispose restores scale to baseScale (previously ST left it inflated)
     expect(ring.scale.toArray()).toEqual([1.5, 1.5, 1.5]);
   });
 
@@ -140,14 +140,14 @@ describe('strangerthings BumperVisuals wiring', () => {
     v.setup(root);
     v.dispose();
     const afterDispose = ring.scale.clone();
-    // plus aucun part suivi -> update ne reapplique aucune transformation
+    // no part tracked anymore -> update reapplies no transform
     v.update(1);
     expect(ring.scale.toArray()).toEqual(afterDispose.toArray());
   });
 
   test('hit flash decay: a elapsed egal, avec flash > sans flash', () => {
-    // Compare deux instances au MEME elapsed (meme phase de respiration) :
-    // seule differe la presence du hit flash -> isole hitFactor.
+    // Compare two instances at the SAME elapsed (same breathing phase):
+    // only the hit flash presence differs -> isolates hitFactor.
     const makeRing = () => {
       const root = new THREE.Group();
       const ring = meshNamed('bumper_ring.001', layout.bumpers[0]!);

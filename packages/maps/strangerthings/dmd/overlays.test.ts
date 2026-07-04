@@ -57,7 +57,7 @@ describe('scoreOverlay (rangée HETIC)', () => {
         if (grid[y * GRID_W + x]) minX = Math.min(minX, x)
       }
     }
-    // startX = GRID_W - 2 - largeur → bien dans la moitié droite.
+    // startX = GRID_W - 2 - width → well inside the right half.
     expect(minX).toBeGreaterThan(GRID_W / 2)
   })
 })
@@ -68,18 +68,18 @@ describe('feverBanner', () => {
     feverBanner(grid, 99999, 0)
     const colors = usedColors(grid)
     expect(colors.has(DOT.event)).toBe(true)
-    // chenillard utilise combo/multi
+    // chase uses combo/multi
     expect(colors.has(DOT.combo) || colors.has(DOT.multi)).toBe(true)
   })
 
   test('le libellé FEVER X5 clignote selon clockMs', () => {
-    // floor(ms/350)%2===0 → libellé visible ; sinon caché.
+    // floor(ms/350)%2===0 → label visible; otherwise hidden.
     const on = newGrid()
     const off = newGrid()
     feverBanner(on, 1000, 0) // floor(0/350)=0 → visible
-    feverBanner(off, 1000, 350) // floor(350/350)=1 → caché
-    // La frame "on" doit avoir au moins autant de dots que la frame "off"
-    // (le libellé ajoute des dots event en bas de l'écran).
+    feverBanner(off, 1000, 350) // floor(350/350)=1 → hidden
+    // The "on" frame must have at least as many dots as the "off" frame
+    // (the label adds event dots at the bottom of the screen).
     const litOn = [...on].filter(Boolean).length
     const litOff = [...off].filter(Boolean).length
     expect(litOn).toBeGreaterThanOrEqual(litOff)
@@ -89,7 +89,7 @@ describe('feverBanner', () => {
     const a = newGrid()
     const b = newGrid()
     feverBanner(a, 12345, 0)
-    feverBanner(b, 12345, 120) // décale les chenillards (off = floor(ms/60))
+    feverBanner(b, 12345, 120) // shifts the chases (off = floor(ms/60))
     expect([...a].join(',')).not.toBe([...b].join(','))
   })
 

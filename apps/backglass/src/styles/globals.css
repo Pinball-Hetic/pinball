@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
-/* Défauts NEUTRES (aucune identité de map). La map active surcharge ces tokens
-   en custom properties via le style inline du conteneur racine (cf. pages/index
-   + map.backglassTheme). Une map sans thème reste générique. */
+/* NEUTRAL defaults (no map identity). The active map overrides these tokens as
+   custom properties via the root container's inline style (cf. pages/index +
+   map.backglassTheme). A map without a theme stays generic. */
 :root {
   --background: #060406;
   --foreground: #e6e6e6;
@@ -80,7 +80,7 @@ body {
   letter-spacing: 0.1em;
 }
 
-/* Joyce wall + Side art (demogorgon/vines) : styles ST déplacés dans
+/* Joyce wall + Side art (demogorgon/vines): ST styles moved to
    packages/maps/strangerthings/backglass/art.module.css. */
 
 /* ---------- Hall of Fame ---------- */
@@ -104,7 +104,7 @@ body {
 .hof-inverted .hof-title {
   transform-origin: center;
 }
-/* contre-flip du texte + léger miroir partiel : lisible mais "à l'envers" */
+/* counter-flip the text + slight partial mirror: readable but "upside down" */
 .hof-inverted .hof-row {
   transform: scaleY(-1) skewX(-4deg);
 }
@@ -177,7 +177,7 @@ body {
   50% { background: rgba(255, 45, 45, 0.28); box-shadow: inset 0 0 50px rgba(255, 45, 45, 0.55); }
 }
 
-/* shimmer permanent qui balaye la table */
+/* permanent shimmer sweeping the table */
 .hof-shimmer {
   position: absolute;
   inset: 0;
@@ -341,8 +341,8 @@ body {
 }
 .recap-value { font-size: 56px; font-weight: 800; color: #fff; }
 .recap-label { margin-top: 8px; font-size: 22px; letter-spacing: 0.12em; opacity: 0.6; }
-/* (hetic-slots : mortes, supprimées. DEMOGORGON takeover : déplacé dans
-   art.module.css de la map.) */
+/* (hetic-slots: dead, removed. DEMOGORGON takeover: moved to the map's
+   art.module.css.) */
 
 /* ATTRACT */
 .tk-attract { background: radial-gradient(ellipse at 50% 45%, #120810 0%, #050308 70%, #000 100%); }
@@ -389,9 +389,9 @@ body {
 }
 
 /* ===================== In-game reactor ===================== */
-/* heat (0..1) écrit en continu sur .stage par useIngameReactor */
+/* heat (0..1) continuously written on .stage by useIngameReactor */
 
-/* vignettage rouge proportionnel au heat (couche dédiée, DOM-only) */
+/* red vignette proportional to heat (dedicated layer, DOM-only) */
 .vignette-heat {
   position: absolute;
   inset: 0;
@@ -402,15 +402,15 @@ body {
   transition: opacity 0.12s linear;
 }
 
-/* (.vine + heat : déplacé dans art.module.css de la map — lit var(--heat).) */
-/* heat accélère le shimmer du tableau */
+/* (.vine + heat: moved to the map's art.module.css — reads var(--heat).) */
+/* heat speeds up the table shimmer */
 .hof-shimmer {
   animation-duration: calc(6s * (1 - var(--heat, 0) * 0.55));
 }
 
-/* (RAMP ramp-beam : déplacé dans art.module.css de la map — SideArt.) */
+/* (RAMP ramp-beam: moved to the map's art.module.css — SideArt.) */
 
-/* DROP : secousse du tableau */
+/* DROP: table shake */
 .hof-shake {
   animation: hof-shake 0.2s ease-in-out;
 }
@@ -421,7 +421,7 @@ body {
   75% { transform: translate(-2px, 2px); }
 }
 
-/* MULTI : flash doré du bandeau */
+/* MULTI: gold flash of the banner */
 .banner-gold {
   animation: banner-gold 0.7s ease-out;
 }
@@ -430,7 +430,7 @@ body {
   100% { background: linear-gradient(180deg, #0c0608, #060406); box-shadow: none; }
 }
 
-/* PORTAL : onde violette traversant l'écran */
+/* PORTAL: purple wave crossing the screen */
 .portal-wave {
   position: absolute;
   inset: 0;
@@ -457,7 +457,7 @@ body {
   100% { opacity: 0; background-position: -150% 0; }
 }
 
-/* gameStart : réveil — illumination en séquence des zones */
+/* gameStart: wake-up — sequential illumination of the zones */
 .stage-waking .zone-header { animation: wake 0.5s ease-out 0s both; }
 .stage-waking .zone-side { animation: wake 0.5s ease-out 0.3s both; }
 .stage-waking .zone-hof { animation: wake 0.5s ease-out 0.6s both; }
@@ -468,7 +468,7 @@ body {
   100% { filter: brightness(1); }
 }
 
-/* lifeLost : tout le backglass s'assombrit 1.5s */
+/* lifeLost: the whole backglass darkens for 1.5s */
 .stage-dimmed { animation: stage-dim 1.5s ease-in-out; }
 @keyframes stage-dim {
   0% { filter: brightness(1); }
@@ -477,11 +477,11 @@ body {
   100% { filter: brightness(1); }
 }
 
-/* Cinématiques de takeover propres à la map : styles déplacés dans son
-   art.module.css (co-localisé avec les composants). */
+/* Map-specific takeover cinematics: styles moved to its art.module.css
+   (co-located with the components). */
 
-/* ===================== Paliers / FEVER (structurel app) ===================== */
-/* Onde dorée (milestones 5k/15k) — même mécanique que portal-wave. */
+/* ===================== Milestones / FEVER (app structural) ===================== */
+/* Gold wave (milestones 5k/15k) — same mechanic as portal-wave. */
 .gold-wave {
   position: absolute;
   inset: 0;
@@ -506,11 +506,11 @@ body {
   100% { opacity: 0; background-position: -150% 0; }
 }
 
-/* Takeovers de palier propres à la map : styles déplacés dans son
-   art.module.css. gold-wave (onde milestone) + l'état FEVER ci-dessous
-   restent app (structurels). */
+/* Map-specific milestone takeovers: styles moved to its art.module.css.
+   gold-wave (milestone wave) + the FEVER state below stay app-side
+   (structural). */
 
-/* ── État FEVER continu (display.fever) : bordure chenillard + vignettage chaud. */
+/* ── Continuous FEVER state (display.fever): chase-light border + warm vignette. */
 .fever .stage::before {
   content: '';
   position: absolute;

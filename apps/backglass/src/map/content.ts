@@ -3,9 +3,9 @@ import { getBackglassContent } from '@pinball/maps/backglass'
 
 export type BackglassContent = NonNullable<ReturnType<typeof getBackglassContent>>
 
-// Valeur de fallback : no-op pour chaque champ (la page gate sur la présence du
-// contenu avant de rendre le Stage, donc ce fallback n'est jamais rendu en
-// pratique — il évite les crashes si un consommateur lit le contexte hors Provider).
+// Fallback value: no-op for every field (the page gates on content presence
+// before rendering the Stage, so this fallback is never rendered in practice —
+// it avoids crashes if a consumer reads the context outside a Provider).
 export const EMPTY_CONTENT: BackglassContent = {
   JoyceWall: () => null,
   SideArt: () => null,
@@ -18,11 +18,11 @@ export const EMPTY_CONTENT: BackglassContent = {
   backglassThemeAlternate: {},
 } as unknown as BackglassContent
 
-// Context React pour le contenu backglass de la map active.
-// Fourni par BackglassPage (via MapContentProvider) et consommé par les hooks
-// et composants enfants via useMapContent(). Permet le changement dynamique de
-// map sans rechargement de page (key={mapId} sur le Stage force un remontage
-// propre quand la map change).
+// React context for the active map's backglass content.
+// Provided by BackglassPage (via MapContentProvider) and consumed by hooks and
+// child components via useMapContent(). Enables dynamic map switching without
+// a page reload (key={mapId} on the Stage forces a clean remount when the map
+// changes).
 const MapContentCtx = createContext<BackglassContent>(EMPTY_CONTENT)
 
 export const MapContentProvider = MapContentCtx.Provider

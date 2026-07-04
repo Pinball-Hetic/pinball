@@ -3,12 +3,12 @@ import * as THREE from 'three';
 import { UpsideDownPortal } from './UpsideDownPortal';
 import { RETURN_PORTAL_REVEAL_DELAY_S } from './UpsideDownConstants';
 
-// Le state machine d'ouverture (`opening` / `revealing`) partage `revealT`.
-// On vérifie ici que `update(dt)` n'avance `revealT` qu'UNE fois par frame,
-// dans la bonne phase — sans passer par `setup()` (qui exige un canvas WebGL
-// via GlowSprite, indisponible sous bun:test). On câble donc directement les
-// champs privés pilotés par le state machine ; `update()` est null-safe sur
-// `world` (pas de sensor), les matériaux et les particules.
+// The opening state machine (`opening` / `revealing`) shares `revealT`.
+// We verify that `update(dt)` advances `revealT` only ONCE per frame, in the
+// right phase — without going through `setup()` (which requires a WebGL
+// canvas via GlowSprite, unavailable under bun:test). So we wire the private
+// state-machine fields directly; `update()` is null-safe on `world`
+// (no sensor), materials and particles.
 type PortalInternals = {
   revealT: number;
   opening: boolean;
@@ -54,9 +54,9 @@ describe('UpsideDownPortal.update revealT advance', () => {
   });
 
   test('does not double-advance revealT when opening and revealing coincide', () => {
-    // Garde de régression : avant le fix, les deux branches `if` avançaient
-    // `revealT` du même frame (2·dt). Le `else if` les rend mutuellement
-    // exclusives → un seul avancement.
+    // Regression guard: before the fix, both `if` branches advanced
+    // `revealT` in the same frame (2·dt). The `else if` makes them mutually
+    // exclusive → a single advance.
     const { portal, internals } = primePortal({
       opening: true,
       revealing: true,
@@ -71,9 +71,9 @@ describe('UpsideDownPortal.update revealT advance', () => {
 });
 
 describe('UpsideDownPortal open idempotency', () => {
-  // Défense en profondeur du fix module : un boss vaincu route à la fois par
-  // `notifyBossDefeated` PUIS `onGameEvent` (avant fix). `tryOpenForBoss` doit
-  // rester idempotent — une seule ouverture, jamais deux.
+  // Defense in depth for the module fix: a defeated boss routes through
+  // both `notifyBossDefeated` THEN `onGameEvent` (pre-fix). `tryOpenForBoss`
+  // must stay idempotent — one opening, never two.
   type OpeningState = { opening: boolean; revealing: boolean; revealed: boolean };
 
   function opening(portal: UpsideDownPortal): OpeningState {
@@ -85,17 +85,17 @@ describe('UpsideDownPortal open idempotency', () => {
     (portal as unknown as { portalGroup: THREE.Group }).portalGroup =
       new THREE.Group();
 
-    // vecna : unlocksReturnPortal, requiert alternateWorldActive.
-    // Reveal différé : rien ne s'ouvre au coup fatal (bille collée au boss).
+    // vecna: unlocksReturnPortal, requires alternateWorldActive.
+    // Deferred reveal: nothing opens on the fatal hit (ball stuck to the boss).
     portal.notifyBossDefeated('vecna', true);
     expect(opening(portal).revealing).toBe(false);
     expect(opening(portal).revealed).toBe(false);
 
-    // Second chemin d'ouverture (le bug) : ne doit ni ouvrir ni relancer le délai.
+    // Second opening path (the bug): must neither open nor restart the delay.
     portal.onGameEvent({ type: 'BOSS_TARGET_HIT', bossId: 'vecna', hitCount: 10 });
     expect(opening(portal).revealed).toBe(false);
 
-    // Écoule le délai frame par frame → une seule ouverture.
+    // Run down the delay frame by frame → a single opening.
     for (let t = 0; t <= RETURN_PORTAL_REVEAL_DELAY_S; t += 0.1) portal.update(0.1);
     const afterDelay = { ...opening(portal) };
     expect(afterDelay.revealed).toBe(true);

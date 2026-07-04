@@ -1,17 +1,17 @@
 import { strobeOn } from './CinematicEasing';
 
 export interface CinematicFreezeFeedbackConfig {
-  /** fréquence du strobe pendant le gel (Hz) */
+  /** strobe frequency during the freeze (Hz) */
   hz: number;
-  /** intensité max du flash (mix passé au strobe) */
+  /** max flash intensity (mix passed to the strobe) */
   maxMix: number;
   /**
-   * part [0..1] de la durée du gel pendant laquelle le feedback est actif.
-   * < 1 → le strobe s'arrête avant la fin du clip (repos avant reprise jeu),
-   * évitant un flash brutal au moment où la physique redémarre.
+   * fraction [0..1] of the freeze duration during which the feedback is
+   * active. < 1 → the strobe stops before the clip ends (rest before play
+   * resumes), avoiding a harsh flash right when physics restarts.
    */
   activeFraction: number;
-  /** part [0..1] de la fenêtre active consacrée au fondu de sortie */
+  /** fraction [0..1] of the active window spent fading out */
   fadeOutFraction: number;
 }
 
@@ -23,13 +23,12 @@ export interface CinematicFreezeFeedback {
 const OFF: CinematicFreezeFeedback = { on: false, mix: 0 };
 
 /**
- * Décision pure : état du feedback playfield (flash strobé) pendant un gel de
- * cinématique. Rend le gel « lisible » comme intentionnel plutôt qu'un freeze
- * mort. Aucune dépendance Three.js — testable à la milliseconde.
+ * Playfield feedback state (strobed flash) during a cinematic freeze. Makes
+ * the freeze read as intentional rather than a dead hang.
  *
- * - hors gel (elapsed < 0 ou duration <= 0) → OFF
- * - dans la fenêtre active → strobe on/off à `hz`, mix fondu en sortie
- * - après la fenêtre active → OFF (repos avant reprise physique)
+ * - outside the freeze (elapsed < 0 or duration <= 0) → OFF
+ * - inside the active window → strobe on/off at `hz`, mix fades out
+ * - past the active window → OFF (rest before physics resumes)
  */
 export function cinematicFreezeFeedback(
   elapsedMs: number,

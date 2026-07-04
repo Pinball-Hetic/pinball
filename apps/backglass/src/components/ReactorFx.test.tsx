@@ -81,7 +81,7 @@ describe('ReactorFx', () => {
     const stageRef = { current: stage }
     const { unmount } = render(<ReactorFx reactor={reactor} stageRef={stageRef} />)
     unmount()
-    // après démontage, plus aucun listener actif → aucun effet sur le stage.
+    // after unmount, no listener remains active → no effect on the stage.
     act(() => emit({ kind: 'gameStart', player: 'X' }))
     expect(stage.className).not.toContain('stage-waking')
   })

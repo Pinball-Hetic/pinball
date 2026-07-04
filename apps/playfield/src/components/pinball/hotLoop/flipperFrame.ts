@@ -16,23 +16,23 @@ import {
 } from "@pinball/game-engine";
 import type { InputState } from "../createApplyAction";
 
-// Accumulateurs des flippers, partagés entre le pas physique (par step Rapier),
-// le pas visuel (par frame de rendu) et l'assistance de lancement.
+// Flipper accumulators, shared between the physics step (per Rapier step),
+// the visual step (per render frame) and the launch assist.
 //
-// Deux intégrateurs distincts sur le MÊME modèle (computeSwingStep, même cible) :
-// - phys* avance à STEP_INTERVAL dans onBeforeStep → les corps kinématiques
-//   balayent un arc constant par step (anti-tunneling, cf. PhysicsUpdateHooks) ;
-// - leftSwing/rightSwing avance au dt de rendu → pose Three affichée fluide au
-//   refresh rate. Divergence bornée (convergence exponentielle vers la même
-//   cible) : l'écart visuel/physique reste imperceptible.
+// Two distinct integrators over the SAME model (computeSwingStep, same target):
+// - phys* advances at STEP_INTERVAL in onBeforeStep → kinematic bodies sweep a
+//   constant arc per step (anti-tunneling, cf. PhysicsUpdateHooks);
+// - leftSwing/rightSwing advances at render dt → smooth displayed Three pose
+//   at refresh rate. Divergence is bounded (exponential convergence toward the
+//   same target): the visual/physics gap stays imperceptible.
 export interface FlipperFrameState {
-  /** Swing VISUEL (rendu), radians. */
+  /** VISUAL swing (render), radians. */
   leftSwing: number;
   rightSwing: number;
-  /** Swing PHYSIQUE (par step), radians — source des cibles kinématiques. */
+  /** PHYSICS swing (per step), radians — source of the kinematic targets. */
   physLeftSwing: number;
   physRightSwing: number;
-  /** Swing physique du step précédent — sert à l'angVel vue par la physique. */
+  /** Physics swing from the previous step — yields the angVel physics sees. */
   physPrevLeft: number;
   physPrevRight: number;
   leftFlash: number;
@@ -52,15 +52,15 @@ export function createFlipperFrameState(): FlipperFrameState {
   };
 }
 
-// Lissage normalisé à 60 FPS : Math.pow(1 - SWING_SMOOTH, dt * 60) reproduit
-// exactement le comportement 60 Hz sur tous les écrans (120 Hz → decay plus
-// petit par frame, même vitesse angulaire réelle). Pur.
+// Smoothing normalized to 60 FPS: Math.pow(1 - SWING_SMOOTH, dt * 60)
+// reproduces the 60 Hz behavior exactly on every display (120 Hz → smaller
+// decay per frame, same real angular speed).
 export function computeSwingStep(current: number, target01: number, dt: number): number {
   const decay = 1 - Math.pow(1 - SWING_SMOOTH, dt * 60);
   return current + (target01 * SWING_RAD - current) * decay;
 }
 
-// Décroissance linéaire du hit-flash, plancher 0. Pur.
+// Linear hit-flash decay, floored at 0.
 export function decayFlash(flash: number, dt: number): number {
   return flash > 0 ? Math.max(0, flash - dt) : flash;
 }
@@ -77,13 +77,14 @@ export interface FlipperPhysicsDeps {
   rightOffset: THREE.Vector3;
 }
 
-// Pas PHYSIQUE flippers, appelé dans onBeforeStep AVANT chaque world.step()
-// avec stepDt = PhysicsWorld.STEP_INTERVAL : avance le phys-swing, pose le
-// pivot Three (transform monde = source de la cible kinématique) puis pousse
-// la cible au corps Rapier. Une cible par step → arc balayé constant, quel que
-// soit le refresh rate (anti-tunneling, cf. PhysicsUpdateHooks).
-// applyFlipperSwing fait un rotation.set absolu (pas d'accumulation) : le rendu
-// peut réappliquer le swing visuel après les steps sans corrompre la physique.
+// Flipper PHYSICS step, called in onBeforeStep BEFORE each world.step() with
+// stepDt = PhysicsWorld.STEP_INTERVAL: advances the phys-swing, poses the
+// Three pivot (world transform = source of the kinematic target) then pushes
+// the target to the Rapier body. One target per step → constant swept arc
+// regardless of refresh rate (anti-tunneling, cf. PhysicsUpdateHooks).
+// applyFlipperSwing does an absolute rotation.set (no accumulation): the
+// render can re-apply the visual swing after the steps without corrupting
+// physics.
 export function stepFlipperPhysics(
   s: FlipperFrameState,
   d: FlipperPhysicsDeps,
@@ -114,9 +115,9 @@ export interface FlipperKinematicsDeps {
   rightDebug: THREE.Mesh | null;
 }
 
-// Pas VISUEL flippers (rendu, après les steps physiques) : swing lissé Three.js,
-// décroissance + application du hit-flash, alignement des wireframes debug.
-// Ne touche PLUS aux corps Rapier — pilotés par stepFlipperPhysics (par step).
+// Flipper VISUAL step (render, after the physics steps): smoothed Three.js
+// swing, hit-flash decay + apply, debug wireframe alignment. Does NOT touch
+// the Rapier bodies — those are driven by stepFlipperPhysics (per step).
 export function stepFlipperKinematics(
   s: FlipperFrameState,
   d: FlipperKinematicsDeps,
@@ -144,11 +145,11 @@ export function stepFlipperKinematics(
   }
 }
 
-// Assistance de lancement : si la balle est dans la zone d'un flipper qui monte,
-// garantit une vitesse de sortie (helper pur game-engine) + déclenche le
-// hit-flash. Appelé seulement en jeu, hors gel. L'angVel vient des deltas
-// PHYSIQUES par step (stepDt = STEP_INTERVAL) — c'est la vitesse de flipper que
-// Rapier voit réellement, pas celle du swing visuel au refresh rate.
+// Launch assist: if the ball sits in the zone of a rising flipper, guarantee
+// an exit velocity (pure game-engine helper) + trigger the hit-flash. Only
+// called while playing, outside freezes. The angVel comes from the per-step
+// PHYSICS deltas (stepDt = STEP_INTERVAL) — the flipper speed Rapier actually
+// sees, not the visual swing speed at refresh rate.
 export function stepFlipperAssist(
   s: FlipperFrameState,
   ball: BallPhysics,

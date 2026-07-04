@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
 
-// Smoke DMD : la page monte un <main> plein écran. Sans signal serveur, le
-// fallback NO SIGNAL s'affiche (aria-label="no signal"). On accepte les deux
-// états : l'objectif est juste de prouver que l'écran charge.
-// Cibler avec PLAYWRIGHT_BASE_URL=<host:port_dmd>.
+// DMD smoke: the page mounts a full-screen <main>. Without a server signal the
+// NO SIGNAL fallback shows (aria-label="no signal"). Both states are accepted:
+// the goal is only to prove the screen loads.
+// Target with PLAYWRIGHT_BASE_URL=<host:port_dmd>.
 test.describe('dmd kiosk', () => {
   test('scoreboard page mounts', async ({ page }) => {
     await page.goto('/')
@@ -14,7 +14,7 @@ test.describe('dmd kiosk', () => {
   test('shows NO SIGNAL fallback when server is absent', async ({ page }) => {
     await page.goto('/')
 
-    // Soit le DMD est connecté (contenu de map), soit il affiche NO SIGNAL.
+    // Either the DMD is connected (map content), or it shows NO SIGNAL.
     const noSignal = page.locator('[aria-label="no signal"]')
     const main = page.locator('main')
     await expect(noSignal.or(main).first()).toBeVisible()

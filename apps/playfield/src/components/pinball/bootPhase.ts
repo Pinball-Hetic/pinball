@@ -1,9 +1,9 @@
-// Phase d'amorçage de l'écran playfield : dérivation PURE (testable) depuis
-// deux booléens de progression. La map étant déjà sélectionnée en amont, il
-// n'y a plus d'écran "attract" bloquant : dès que la physique est prête la
-// session démarre automatiquement (auto-spawn de la balle dans le couloir
-// plongeur, prête à lancer). La phase "attract" ne subsiste que comme état
-// transitoire entre `physicsReady` et le tick d'auto-start.
+// Playfield boot phase: pure derivation from two progress booleans. The map
+// is already selected upstream, so there is no blocking "attract" screen:
+// as soon as physics is ready the session starts automatically (ball
+// auto-spawns in the shooter lane, ready to launch). The "attract" phase only
+// remains as a transient state between `physicsReady` and the auto-start
+// tick.
 
 export type PlayfieldBootPhase = "loading" | "attract" | "in_game";
 
@@ -21,8 +21,8 @@ export function computeBootPhase({
   return "in_game";
 }
 
-// Auto-spawn : la session doit démarrer d'elle-même dès que la physique est
-// prête et qu'aucune session n'est encore active. Pas de START/ESPACE requis.
+// Auto-spawn: the session must start on its own once physics is ready and no
+// session is active yet. No START/SPACE required.
 export function shouldAutoBeginSession({
   physicsReady,
   sessionStarted,

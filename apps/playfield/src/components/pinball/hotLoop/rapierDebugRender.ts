@@ -1,9 +1,9 @@
 import * as THREE from "three";
 
-// Prépare le buffer debugRender de Rapier pour Three : couleurs RGBA→RGB, et
-// sommets non finis (NaN/Infinity renvoyés par certains colliders) écrasés à 0
-// pour éviter les pics parasites + l'erreur computeBoundingSphere (radius NaN).
-// Pur (mute `vertices` in place, comme l'original) — testable.
+// Prepares Rapier's debugRender buffer for Three: RGBA→RGB colors, and
+// non-finite vertices (NaN/Infinity returned by some colliders) squashed to 0
+// to avoid stray spikes + the computeBoundingSphere error (NaN radius).
+// Mutates `vertices` in place.
 export function sanitizeRapierDebugBuffers(
   vertices: Float32Array,
   colors: Float32Array,
@@ -20,7 +20,7 @@ export function sanitizeRapierDebugBuffers(
   return { vertices, rgb };
 }
 
-// Pousse le rendu debug Rapier dans la géométrie des LineSegments (toggle H).
+// Pushes the Rapier debug render into the LineSegments geometry (H toggle).
 export function updateRapierDebugGeometry(
   geo: THREE.BufferGeometry,
   raw: { vertices: Float32Array; colors: Float32Array },

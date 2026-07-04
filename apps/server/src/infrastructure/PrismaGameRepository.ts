@@ -11,7 +11,7 @@ import type {
 
 /**
  * Prisma-backed adapter for GameRepository. The composition root wires this in;
- * use-cases never import prisma directly (DIP).
+ * use-cases never import prisma directly.
  */
 export const prismaGameRepository: GameRepository = {
   async create(input: NewGame): Promise<{ id: string }> {

@@ -12,7 +12,7 @@ import {
 } from '@pinball/dmd-core'
 import { mapStateNumber } from '@pinball/shared-types'
 
-// Overlay HETIC (rangée droite) — identique à ST, indépendant du thème.
+// HETIC overlay (right row) — identical to ST, theme-independent.
 export const scoreOverlay: ScoreOverlay = (grid, display) => {
   const hetic = mapStateNumber(display.mapState, 'hetic')
   const letters = 'HETIC'
@@ -24,7 +24,7 @@ export const scoreOverlay: ScoreOverlay = (grid, display) => {
   }
 }
 
-// Bandeau FEVER Zelda : chenillard doré + gros score + "FEVER X5".
+// Zelda FEVER banner: golden chase + big score + "FEVER X5".
 export const feverBanner: FeverBanner = (grid, score, clockMs) => {
   drawChenillard(grid, clockMs, 0)
   drawChenillard(grid, -clockMs, GRID_H - 1)

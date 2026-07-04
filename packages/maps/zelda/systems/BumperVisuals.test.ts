@@ -41,7 +41,7 @@ describe('zelda BumperVisuals wiring', () => {
     v.onGameEvent(bumperHit(0));
     v.update(PUNCH_DURATION / 2);
 
-    // le mesh vis_bumper a recu le punch (pic), le decor reste intact
+    // the vis_bumper mesh got the punch (peak), decor untouched
     expect(hit.scale.x).toBeCloseTo(1 + PUNCH_PEAK, 5);
     expect(skip.scale.toArray()).toEqual([2, 2, 2]);
   });
@@ -55,7 +55,7 @@ describe('zelda BumperVisuals wiring', () => {
     expect(mesh.scale.x).toBeCloseTo(1, 5); // idle = baseScale
 
     v.onGameEvent(bumperHit(0));
-    v.update(PUNCH_DURATION / 2); // milieu -> pic
+    v.update(PUNCH_DURATION / 2); // midway -> peak
     expect(mesh.scale.x).toBeCloseTo(1 + PUNCH_PEAK, 5);
   });
 
@@ -79,7 +79,7 @@ describe('zelda BumperVisuals wiring', () => {
     const v = new BumperVisuals();
     v.setup(root);
     v.onGameEvent(bumperHit(0));
-    v.update(PUNCH_DURATION / 2); // gonfle au-dela de baseScale
+    v.update(PUNCH_DURATION / 2); // inflates beyond baseScale
     expect(mesh.scale.x).toBeGreaterThan(1.5);
 
     v.dispose();

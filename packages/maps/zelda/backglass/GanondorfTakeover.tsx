@@ -1,8 +1,8 @@
 import { cx } from './artStyles'
 
-// Takeover boss Ganondorf vaincu — analogie du DemogorgonTakeover ST.
+// Ganondorf-defeated boss takeover.
 export default function GanondorfTakeover() {
-  // Coordonnées Triforce (même logique que SideArt, scale ×1.6 sur viewBox 400×600)
+  // Triforce coordinates (same as SideArt, scaled ×1.6 in a 400×600 viewBox)
   const S = 128
   const H = S * Math.sqrt(3) / 2  // ≈ 110.9
   const cx0 = 200, cy0 = 130

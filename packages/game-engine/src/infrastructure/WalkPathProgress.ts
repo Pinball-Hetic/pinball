@@ -22,11 +22,10 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /**
- * Progression de marche pure d'un boss : spawn → target le long du tapis
- * incliné. Comportement extrait verbatim des *TargetVisual (ST + Zelda) :
+ * Boss walk progression: spawn → target along the tilted playfield.
  *  - progressAt(elapsed) = min(1, elapsed / duration)
- *  - positionAt(t) lerp x/z spawn→target, y = surfaceYAtZ(z) + footLift,
- *    t clampé sur [0, 1].
+ *  - positionAt(t) lerps x/z spawn→target, y = surfaceYAtZ(z) + footLift,
+ *    t clamped to [0, 1].
  */
 export class WalkPathProgress {
   constructor(
@@ -49,9 +48,8 @@ export class WalkPathProgress {
 }
 
 /**
- * Placement statique d'un boss sur le tapis incliné : même formule que
- * WalkPathProgress.positionAt(1). Verbatim des *TargetVisual (ST + Zelda) :
- * { x, y: surfaceYAtZ(z) + footLift, z }. surfaceYAtZ injecté (DIP).
+ * Static boss placement on the tilted playfield: same formula as
+ * WalkPathProgress.positionAt(1) — { x, y: surfaceYAtZ(z) + footLift, z }.
  */
 export function surfacePoint(
   target: WalkPathPoint,
@@ -62,8 +60,8 @@ export function surfacePoint(
 }
 
 /**
- * Yaw du modèle pour faire face à la caméra (billboard sur l'axe Y).
- * Verbatim des *TargetVisual : atan2(camX - anchorX, camZ - anchorZ) + yaw.
+ * Model yaw to face the camera (Y-axis billboard):
+ * atan2(camX - anchorX, camZ - anchorZ) + yaw.
  */
 export function cameraFacingYaw(
   anchorPos: WalkPathPoint,
@@ -76,8 +74,8 @@ export function cameraFacingYaw(
 }
 
 /**
- * Yaw du modèle pour faire face à la direction de marche (spawn → target).
- * Verbatim des *TargetVisual : atan2(targetX - spawnX, targetZ - spawnZ) + yaw.
+ * Model yaw to face the walk direction (spawn → target):
+ * atan2(targetX - spawnX, targetZ - spawnZ) + yaw.
  */
 export function pathFacingYaw(
   spawn: WalkPathPoint,

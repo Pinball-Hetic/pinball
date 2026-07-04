@@ -25,7 +25,7 @@ describe('getMapPackage', () => {
 
   test('enrichit le MapPackage avec layout + module (ResolvedMap)', () => {
     const pkg = getMapPackage('zelda')!
-    // layout et module sont ajoutés par le registry, pas par le MapPackage brut.
+    // layout and module are added by the registry, not by the raw MapPackage.
     expect(pkg).toHaveProperty('layout')
     expect(pkg).toHaveProperty('module')
     expect(pkg).toHaveProperty('manifest')

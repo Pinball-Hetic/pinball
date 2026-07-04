@@ -40,13 +40,13 @@ describe('centerX', () => {
 
 describe('flickerSkip', () => {
   test('vrai quand la sinusoïde plonge sous le floor', () => {
-    // sin(clock/period) au creux. clock=period*(3π/2) → sin ≈ -1 < 0
+    // sin(clock/period) at its trough. clock=period*(3π/2) → sin ≈ -1 < 0
     const clock = (3 * Math.PI) / 2 * 100;
     expect(flickerSkip(clock, 100, 0)).toBe(true);
   });
 
   test('faux quand la sinusoïde est au-dessus du floor', () => {
-    // sin(period*(π/2)/period) = sin(π/2) = 1, pas < 0
+    // sin(period*(π/2)/period) = sin(π/2) = 1, not < 0
     const clock = (Math.PI / 2) * 100;
     expect(flickerSkip(clock, 100, 0)).toBe(false);
   });
@@ -147,9 +147,9 @@ describe('drawCentered', () => {
   test('dessine le texte centré horizontalement', () => {
     const g = newGrid();
     drawCentered(g, 'A', 0, FONT_5X7, DOT.score);
-    // 'A' largeur 5 → centerX(5) = 46. Le glyphe occupe les colonnes 46..50.
+    // 'A' width 5 → centerX(5) = 46. The glyph occupies columns 46..50.
     expect(litCount(g)).toBeGreaterThan(0);
-    // Aucune colonne avant le x de départ ne doit être allumée.
+    // No column before the starting x may be lit.
     const startX = centerX(measureText('A', FONT_5X7, 1, 1));
     for (let y = 0; y < GRID_H; y++) {
       for (let x = 0; x < startX; x++) {
@@ -170,18 +170,18 @@ describe('drawFlash', () => {
     const g = newGrid();
     drawFlash(g, 'GO', '', DOT.event);
     expect(litCount(g)).toBeGreaterThan(0);
-    // toutes les cellules allumées portent la couleur passée
+    // all lit cells carry the given color
     for (const v of g) if (v) expect(v).toBe(DOT.event);
   });
 
   test('label seul trop large retombe en scale 1', () => {
     const g1 = newGrid();
     const g2 = newGrid();
-    // label dont la largeur scale 2 dépasse GRID_W → scale 1
+    // label whose scale-2 width exceeds GRID_W → scale 1
     const longLabel = 'GAMEOVERXX';
     expect(measureText(longLabel, FONT_5X7, 1, 2)).toBeGreaterThan(GRID_W);
     drawFlash(g1, longLabel, '', DOT.gameOver);
-    // une version qui tient en scale 2
+    // a version that fits at scale 2
     drawFlash(g2, 'OK', '', DOT.gameOver);
     expect(litCount(g1)).toBeGreaterThan(0);
     expect(litCount(g2)).toBeGreaterThan(0);
@@ -199,10 +199,10 @@ describe('drawFlash', () => {
     const g = newGrid();
     const label = 'COMBO';
     const value = 'XXXX';
-    // une ligne en scale 2 dépasse → deux lignes y=2 et y=17
+    // one line at scale 2 overflows → two lines y=2 and y=17
     expect(measureText(`${label} ${value}`, FONT_5X7, 1, 2)).toBeGreaterThan(GRID_W);
     drawFlash(g, label, value, DOT.combo);
-    // dots présents à la fois dans la zone haute (y<10) et la zone basse (y>=17)
+    // dots present in both the top zone (y<10) and the bottom zone (y>=17)
     let topLit = false;
     let bottomLit = false;
     for (let y = 0; y < GRID_H; y++) {
@@ -254,7 +254,7 @@ describe('drawChenillard', () => {
     const g = newGrid();
     const row = 10;
     drawChenillard(g, 0, row);
-    // tout dot allumé est sur la rangée demandée
+    // every lit dot is on the requested row
     for (let y = 0; y < GRID_H; y++) {
       for (let x = 0; x < GRID_W; x++) {
         if (at(g, x, y)) expect(y).toBe(row);
@@ -284,7 +284,7 @@ describe('drawChenillard', () => {
     const a = newGrid();
     const b = newGrid();
     drawChenillard(a, 0, 0);
-    // clock=180 → off = floor(180/60) = 3 → décalage du motif
+    // clock=180 → off = floor(180/60) = 3 → pattern shift
     drawChenillard(b, 180, 0);
     expect(a).not.toEqual(b);
   });

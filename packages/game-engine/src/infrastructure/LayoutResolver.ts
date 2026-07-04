@@ -2,22 +2,18 @@ import * as THREE from 'three';
 import { MeshRoleResolver } from './MeshRoleResolver';
 import type { MapLayout, MapPoint3 } from '../domain/MapLayout';
 
-// Dérive les positions d'éléments de jeu depuis les meshes conventionnés du
-// GLB (centre de la Box3 monde), au lieu de constantes en dur. But : une seule
-// source de vérité (le GLB), pas de drift au ré-export Blender.
+// Derives gameplay element positions from the conventioned GLB meshes
+// (world Box3 center) instead of hardcoded constants. Goal: a single source
+// of truth (the GLB), no drift on Blender re-export.
 //
-// Phase 3.4 — étape COMPARAISON : on dérive ET on logge l'écart avec le layout
-// constant, SANS encore brancher les consommateurs. Validation en jeu (deltas
-// < tolérance) avant de supprimer les constantes (commit séparé).
-//
-// Couverture GLB actuelle : bumpers (bumper_<n>) + drop targets (target_<id>).
-// Les sensors / portail / drain / cibles boss n'ont PAS de mesh → restent des
-// littéraux explicites dans le layout de la map (hybride décidé avec l'équipe).
+// Current GLB coverage: bumpers (bumper_<n>) + drop targets (target_<id>).
+// Sensors / portal / drain / boss targets have NO mesh → they stay explicit
+// literals in the map layout (deliberate hybrid).
 
 export interface DerivedLayout {
-  /** Centre Box3 monde du mesh bumper_<n>, indexé par (n-1). */
+  /** World Box3 center of the bumper_<n> mesh, indexed by (n-1). */
   bumpers: (MapPoint3 | null)[];
-  /** Centre Box3 monde du mesh target_<id>, clé = `drop_<id>`. */
+  /** World Box3 center of the target_<id> mesh, key = `drop_<id>`. */
   dropTargets: Record<string, MapPoint3>;
 }
 
@@ -42,7 +38,7 @@ function distMm(a: MapPoint3, b: MapPoint3): number {
 }
 
 export class LayoutResolver {
-  /** Parcourt le GLB et dérive les positions des rôles supportés. */
+  /** Traverses the GLB and derives the positions of the supported roles. */
   static derive(playfieldRoot: THREE.Object3D, resolver: MeshRoleResolver): DerivedLayout {
     playfieldRoot.updateMatrixWorld(true);
     const bumpers: (MapPoint3 | null)[] = [];
@@ -63,9 +59,9 @@ export class LayoutResolver {
   }
 
   /**
-   * Dérive et logge l'écart (mm) avec le layout constant. Ne modifie rien.
-   * `[LayoutResolver] <id> derived={…} constant={…} delta=<mm>` ; marque OK/⚠
-   * selon la tolérance. Source de vérité de validation pour la suppression.
+   * Derives and logs the delta (mm) against the constant layout. Mutates
+   * nothing. `[LayoutResolver] <id> derived={…} constant={…} delta=<mm>`;
+   * marks OK/⚠ against the tolerance.
    */
   static deriveAndCompare(
     playfieldRoot: THREE.Object3D,
@@ -97,10 +93,10 @@ export class LayoutResolver {
   }
 
   /**
-   * Renvoie une copie du layout avec les positions des drop targets remplacées
-   * par celles dérivées du GLB (source de vérité). Les bumpers ne sont PAS
-   * dérivés (centre Box3 ≠ point collider tuné, deltas hors tolérance) → ils
-   * restent au littéral. Un drop target sans mesh garde son littéral (fallback).
+   * Returns a copy of the layout with drop target positions replaced by the
+   * GLB-derived ones (source of truth). Bumpers are NOT derived (Box3 center
+   * ≠ tuned collider point, deltas out of tolerance) → they keep their
+   * literals. A drop target without a mesh keeps its literal (fallback).
    */
   static withDerivedDropTargets(layout: MapLayout, derived: DerivedLayout): MapLayout {
     return {

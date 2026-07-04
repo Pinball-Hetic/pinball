@@ -3,7 +3,7 @@ import { GRID_W, GRID_H, DOT } from '@pinball/dmd-core'
 import type { ClipContext } from '@pinball/dmd-core'
 import { cinematicHandlers, rocketLaunchY } from './handlers'
 
-// Crée un buffer grid vierge (index palette par dot, 0 = éteint).
+// Creates a blank grid buffer (palette index per dot, 0 = off).
 const newGrid = () => new Uint8Array(GRID_W * GRID_H)
 const litCount = (g: Uint8Array) => g.reduce((acc, v) => acc + (v ? 1 : 0), 0)
 const usedColors = (g: Uint8Array) => new Set([...g].filter((v) => v !== 0))
@@ -37,7 +37,7 @@ describe('cinematicHandlers registry', () => {
       const grid = newGrid()
       handler(grid, 500, ctx({ value: 3, score: 1000 }))
       expect(grid.length).toBe(GRID_W * GRID_H)
-      // aucun handler ne doit allumer un index hors palette (1..11)
+      // no handler may light an index outside the palette (1..11)
       for (const v of grid) {
         expect(v).toBeLessThanOrEqual(11)
         expect(v).toBeGreaterThanOrEqual(0)
@@ -92,13 +92,13 @@ describe('demogorgon_rises', () => {
   })
 
   test('alterne entre deux palettes en phase pulse (>=2800ms)', () => {
-    // pulse=true à (clockMs-2800) dans [0,300[, pulse=false dans [300,600[
+    // pulse=true at (clockMs-2800) in [0,300[, pulse=false in [300,600[
     const a = newGrid()
     const b = newGrid()
     cinematicHandlers.demogorgon_rises(a, 2900, ctx()) // pulse true
     cinematicHandlers.demogorgon_rises(b, 3200, ctx()) // pulse false
-    // Les deux frames sont pleines (reveal complet à p=1) mais diffèrent par
-    // la palette d'accent (gameOver vs event).
+    // Both frames are full (complete reveal at p=1) but differ by the
+    // accent palette (gameOver vs event).
     expect(litCount(a)).toBeGreaterThan(0)
     expect(litCount(b)).toBeGreaterThan(0)
     expect([...a].join(',')).not.toBe([...b].join(','))
@@ -124,7 +124,7 @@ describe('demogorgon_slain', () => {
     const grid = newGrid()
     cinematicHandlers.demogorgon_slain(grid, 3000, ctx())
     const colors = usedColors(grid)
-    // VAINCU en event, +500 en gameOver
+    // VAINCU in event, +500 in gameOver
     expect(colors.has(DOT.event)).toBe(true)
     expect(colors.has(DOT.gameOver)).toBe(true)
   })
@@ -158,7 +158,7 @@ describe('hetic_letter', () => {
   })
 
   test('la rangée HETIC allume plus de lettres quand value augmente', () => {
-    // i <= idx → heticOn (DOT.heticOn=3), sinon heticOff (DOT.heticOff=4).
+    // i <= idx → heticOn (DOT.heticOn=3), else heticOff (DOT.heticOff=4).
     const countOn = (value: number) => {
       const g = newGrid()
       cinematicHandlers.hetic_letter(g, 950, ctx({ value }))
@@ -170,8 +170,8 @@ describe('hetic_letter', () => {
 
 describe('hetic_complete', () => {
   test('phase converge (<3000ms) finit par allumer des lettres', () => {
-    // Les lettres convergent depuis l'extérieur de l'écran ; on échantillonne
-    // la fenêtre pour trouver une frame où elles sont visibles.
+    // Letters converge from off-screen; sample the window to find a frame
+    // where they are visible.
     let anyLit = false
     for (let ms = 1000; ms < 3000; ms += 100) {
       const g = newGrid()
@@ -185,8 +185,8 @@ describe('hetic_complete', () => {
   })
 
   test('phase blink (3000-5000ms) clignote selon le temps', () => {
-    // Le draw est conditionné par Math.floor(ms/speed)%2 ; on cherche au
-    // moins une frame allumée dans la fenêtre.
+    // Drawing is gated by Math.floor(ms/speed)%2; look for at least one
+    // lit frame in the window.
     let anyLit = false
     for (let ms = 3000; ms < 5000; ms += 50) {
       const g = newGrid()
@@ -207,7 +207,7 @@ describe('hetic_complete', () => {
   })
 
   test('phase finale (>=7000ms) affiche HETIC FEVER / X5', () => {
-    // Cherche une frame "on" du clignotement final.
+    // Find an "on" frame of the final blink.
     let colors = new Set<number>()
     for (let ms = 7000; ms < 7600; ms += 50) {
       const g = newGrid()
@@ -241,7 +241,7 @@ describe('portal_swallow & last_chance (clip frames)', () => {
     const grid = newGrid()
     cinematicHandlers.last_chance(grid, 200, ctx())
     const colors = usedColors(grid)
-    // Le label "DERNIERE VIE" est dessiné en DOT.lives.
+    // The "DERNIERE VIE" label is drawn in DOT.lives.
     expect(colors.has(DOT.lives)).toBe(true)
     expect(litCount(grid)).toBeGreaterThan(0)
   })

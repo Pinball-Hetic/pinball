@@ -4,8 +4,8 @@ import {
   UPSIDE_DOWN_PORTAL_REVEAL_DELAY,
 } from './UpsideDownConstants';
 
-// Part de la progression d'ouverture atteinte pendant la phase de délai
-// (le reste de [DELAY_PROGRESS_FRACTION, 1] est couvert par la phase d'ouverture).
+// Share of the opening progress reached during the delay phase
+// (the remaining [DELAY_PROGRESS_FRACTION, 1] is covered by the opening phase).
 const DELAY_PROGRESS_FRACTION = 0.28;
 
 export function portalRevealTotalDuration(): number {
@@ -13,10 +13,10 @@ export function portalRevealTotalDuration(): number {
 }
 
 /**
- * Mappe le temps de reveal normalisé `u` ∈ [0,1] (sur délai + ouverture) vers la
- * progression d'ouverture du portail `p` ∈ [0,1] : la phase de délai amène la
- * couverture jusqu'à DELAY_PROGRESS_FRACTION (linéaire), la phase d'ouverture
- * easeInOut le reste jusqu'à 1.
+ * Maps normalized reveal time `u` ∈ [0,1] (over delay + opening) to the
+ * portal opening progress `p` ∈ [0,1]: the delay phase brings coverage up to
+ * DELAY_PROGRESS_FRACTION (linear), the opening phase eases in-out the rest
+ * up to 1.
  */
 export function mapPortalRevealProgress(u: number): number {
   const total = portalRevealTotalDuration();

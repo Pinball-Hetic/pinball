@@ -1,6 +1,4 @@
 /**
- * Strategy pattern contract for collision handling (OCP).
- *
  * Each collider role has its own dedicated handler.
  * Adding a new role means creating a class that implements this interface
  * and registering it in CollisionEventProcessor — without touching the processor.

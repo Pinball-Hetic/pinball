@@ -1,8 +1,8 @@
 import { test, expect, describe } from 'bun:test'
 import * as dmdCore from './index'
 
-// Le barrel ne contient que des ré-exports : on vérifie que l'API publique
-// est exposée et que les helpers purs restent appelables via le barrel.
+// The barrel only contains re-exports: verify the public API is exposed and
+// pure helpers remain callable through the barrel.
 
 describe('@pinball/dmd-core barrel', () => {
   test('ré-exporte les constantes/classe du renderer', () => {
@@ -47,13 +47,13 @@ describe('@pinball/dmd-core barrel', () => {
   })
 
   test('un helper pur ré-exporté reste fonctionnel (centerX)', () => {
-    // centerX(width) = position de départ pour centrer sur GRID_W (96).
+    // centerX(width) = starting position to center on GRID_W (96).
     expect(dmdCore.centerX(10)).toBe(Math.round((96 - 10) / 2))
-    expect(dmdCore.centerX(11)).toBe(Math.round((96 - 11) / 2)) // arrondi impair
+    expect(dmdCore.centerX(11)).toBe(Math.round((96 - 11) / 2)) // odd rounding
   })
 
   test('fmtNum ré-exporté formate un nombre', () => {
-    // sanity : retourne une chaîne pour une entrée numérique.
+    // sanity: returns a string for a numeric input.
     expect(typeof dmdCore.fmtNum(1234)).toBe('string')
   })
 })

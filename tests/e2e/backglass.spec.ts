@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
 
-// Smoke backglass : la page monte le Stage (classement) quand le contenu de map
-// est résolu, sinon NoSignal (aria-label="no signal"). Sans stack live, on
-// tombe sur NO SIGNAL — c'est attendu.
-// Cibler avec PLAYWRIGHT_BASE_URL=<host:port_backglass>.
+// Backglass smoke: the page mounts the Stage (leaderboard) when map content is
+// resolved, otherwise NoSignal (aria-label="no signal"). Without a live stack we
+// land on NO SIGNAL — that is expected.
+// Target with PLAYWRIGHT_BASE_URL=<host:port_backglass>.
 test.describe('backglass kiosk', () => {
   test('page renders stage or NO SIGNAL fallback', async ({ page }) => {
     await page.goto('/')

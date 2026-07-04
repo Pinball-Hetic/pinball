@@ -1,5 +1,5 @@
-// Systèmes visuels/comportementaux Stranger Things (relocalisés depuis
-// game-engine : le moteur reste générique, ces classes vivent dans la map).
+// Stranger Things visual/behavioral systems (the engine stays generic,
+// these classes live in the map).
 export * from './GarlandLights';
 export * from './BumperVisuals';
 export * from './UpsideDownAtmosphere';

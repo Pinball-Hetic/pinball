@@ -16,7 +16,7 @@ const PORTRAIT_FILL =
   parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE) === 'portrait-fill';
 const PORTRAIT_VIEWPORT =
   'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover';
-// Type de ressource <link rel=preload> inféré depuis l'extension.
+// <link rel=preload> resource type inferred from the extension.
 function preloadAs(path: string): string {
   if (/\.(glb|gltf|bin)$/i.test(path)) return 'fetch';
   if (/\.(png|jpe?g|webp|gif|svg)$/i.test(path)) return 'image';
@@ -24,8 +24,8 @@ function preloadAs(path: string): string {
   return 'fetch';
 }
 
-// Si NEXT_PUBLIC_MAP_ID est défini (ex: prod Fliphetic mono-map), on bypasse
-// le sélecteur et on charge directement cette map.
+// When NEXT_PUBLIC_MAP_ID is set (e.g. Fliphetic mono-map prod), bypass the
+// selector and load that map directly.
 const FORCED_MAP_ID = process.env.NEXT_PUBLIC_MAP_ID;
 
 export default function PinballPage() {
@@ -33,8 +33,8 @@ export default function PinballPage() {
     FORCED_MAP_ID ?? null,
   );
 
-  // Émet map:select au server (→ broadcast aux DMD/backglass) puis met à jour
-  // l'état local. Connexion socket éphémère : crée, émet, déconnecte.
+  // Emits map:select to the server (→ broadcast to DMD/backglass) then
+  // updates local state. Ephemeral socket connection: create, emit, disconnect.
   const handleSelect = useCallback((mapId: string) => {
     const socket = createPinballSocket();
     socket.once('connect', () => {
@@ -48,7 +48,7 @@ export default function PinballPage() {
     ? (getMapPackage(selectedMapId)?.manifest.preload ?? [])
     : [];
 
-  // Sélecteur de map — affiché si aucune map forcée et aucune map choisie.
+  // Map selector — shown when no map is forced and none is chosen yet.
   if (!selectedMapId) {
     return <MapSelectorScreen maps={AVAILABLE_MAPS} onSelect={handleSelect} />;
   }
@@ -66,9 +66,9 @@ export default function PinballPage() {
         ))}
       </Head>
       {/*
-        key={selectedMapId} → remonte complètement le composant si on change
-        de map (ex: retour menu + nouvelle sélection). Garantit que le moteur
-        physique, les loaders Three.js et les refs internes repartent à zéro.
+        key={selectedMapId} → fully remounts the component when the map changes
+        (e.g. back to menu + new selection). Ensures the physics engine, Three.js
+        loaders and internal refs start from scratch.
       */}
       <PinballPlayfield key={selectedMapId} mapId={selectedMapId} />
     </>

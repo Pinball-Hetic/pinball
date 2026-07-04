@@ -19,7 +19,6 @@ export type BossCameraCinematicConfig = {
 
 /**
  * Default camera→boss facing direction, shared by ST + Zelda boss cinematics.
- * Was duplicated verbatim in each map's cameraCinematics.ts.
  */
 export const DEFAULT_BOSS_FACE_DIR: BossCameraFocus = { x: -0.52, y: 0.2, z: 0.83 };
 

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
-// Upload GPU immédiat de toutes les textures d'un sous-arbre.
-// compileAsync ne compile QUE les shaders : l'upload texture (texImage2D,
-// plusieurs Mo pour un GLB de boss) resterait sinon différé à la première
-// frame visible — pile l'instant du spawn du boss.
+// Immediate GPU upload of every texture in a subtree.
+// compileAsync only compiles shaders: the texture upload (texImage2D, several
+// MB for a boss GLB) would otherwise stay deferred until the first visible
+// frame — exactly the moment the boss spawns.
 function initMaterialTextures(renderer: THREE.WebGLRenderer, root: THREE.Object3D): void {
   const seen = new Set<THREE.Texture>();
   root.traverse((obj) => {
@@ -22,9 +22,9 @@ function initMaterialTextures(renderer: THREE.WebGLRenderer, root: THREE.Object3
   });
 }
 
-// La bone texture (DataTexture des matrices d'os) est créée paresseusement
-// par le renderer à la PREMIÈRE frame où le SkinnedMesh est rendu :
-// allocation + upload retomberaient sur la frame du reveal. On force ici.
+// The bone texture (DataTexture of bone matrices) is created lazily by the
+// renderer on the FIRST frame the SkinnedMesh is rendered: allocation +
+// upload would land on the reveal frame. Force it here.
 function initBoneTextures(renderer: THREE.WebGLRenderer, root: THREE.Object3D): void {
   root.traverse((obj) => {
     if (!(obj instanceof THREE.SkinnedMesh)) return;
@@ -65,9 +65,9 @@ export async function warmupObject3D(
     if (obj instanceof THREE.SkinnedMesh) obj.skeleton.update();
   });
 
-  // compileAsync ne couvre ni l'upload des textures matériaux ni la création
-  // de la bone texture des SkinnedMesh — les deux doivent être poussés au GPU
-  // ici, hors frame critique.
+  // compileAsync covers neither the material texture upload nor the creation
+  // of the SkinnedMesh bone texture — both must be pushed to the GPU here,
+  // outside the critical frame.
   initMaterialTextures(renderer, root);
   initBoneTextures(renderer, root);
 
@@ -78,22 +78,21 @@ export async function warmupObject3D(
 }
 
 /**
- * Pré-compile les variantes de shaders « nombre de point lights » de la scène.
+ * Pre-compiles the scene's "point-light count" shader variants.
  *
- * POURQUOI : la clé de cache des programmes Three inclut le NOMBRE de
- * lumières visibles. Les reveals boss ajoutent/retirent des PointLights à la
- * volée (flash strobe, glow du boss, lumière de cible, assist) : au premier
- * changement de compte, TOUS les matériaux éclairés de la scène doivent
- * recompiler leur programme GLSL → freeze de plusieurs frames pile au moment
- * du spawn. Chaque matériau garde ensuite ses variantes en cache
- * (materialProperties.programs, clé = cacheKey) : compiler ici, au preload,
- * avec 0..max lumières supplémentaires rend le basculement au reveal quasi
- * gratuit. Seul le COMPTE importe (pas l'identité des lumières) : des
- * PointLights factices d'intensité 0 suffisent.
+ * WHY: the Three program cache key includes the NUMBER of visible lights.
+ * Boss reveals add/remove PointLights on the fly (strobe flash, boss glow,
+ * target light, assist): on the first count change, ALL lit materials in the
+ * scene must recompile their GLSL program → multi-frame freeze exactly at
+ * spawn time. Each material then keeps its variants cached
+ * (materialProperties.programs, key = cacheKey): compiling here, at preload,
+ * with 0..max extra lights makes the switch at reveal nearly free. Only the
+ * COUNT matters (not the lights' identity): dummy PointLights of intensity 0
+ * are enough.
  *
- * Le passage k=0 compile aussi tous les matériaux encore invisibles (boss,
- * cibles, portail…) au compte de base — le premier rendu réel ne compile que
- * le visible.
+ * The k=0 pass also compiles all still-invisible materials (boss, targets,
+ * portal…) at the base count — the first real render only compiles what is
+ * visible.
  */
 export async function prewarmPointLightProgramVariants(
   renderer: THREE.WebGLRenderer,

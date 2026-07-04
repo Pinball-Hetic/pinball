@@ -4,9 +4,6 @@
  * index) and per-frame position math (angle/radius/lift/wander -> x,y,z). NO
  * Three/BufferGeometry dependency — the map class builds the THREE.Points geometry
  * by reading positions written here.
- *
- * Math is VERBATIM from the original buildSpores()/updateSpores() (THREE.MathUtils.lerp
- * inlined as a + (b - a) * t).
  */
 
 export type SporeParticle = {
@@ -23,7 +20,7 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-/** Seed a single particle from its index and the total count (verbatim). */
+/** Seed a single particle from its index and the total count. */
 export function seedSpore(i: number, count: number): SporeParticle {
   return {
     anchorX: lerp(-0.22, 0.22, (i * 0.37) % 1),
@@ -45,7 +42,7 @@ export function seedSpores(count: number): SporeParticle[] {
 
 /**
  * Advance one particle's angle by `speed * dt` (mutates `spore.angle`) and return
- * its world position for the given `pulseT`. Verbatim from updateSpores().
+ * its world position for the given `pulseT`.
  */
 export function stepSpore(
   spore: SporeParticle,

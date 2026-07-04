@@ -20,27 +20,27 @@ import type { DmdOrchestrator } from "@/hooks/useDmdOrchestrator";
 type AlternateWorldPersistence = "until_game_over" | "until_drain";
 
 export interface EmitRouterDeps {
-  /** Emit de base (buildEmit) — scoring/vies/reset react-scope. */
+  /** Base emit (buildEmit) — react-scope scoring/lives/reset. */
   baseEmit: GameEventListener;
-  /** Module de la map (optionnel selon la map). */
+  /** Map module (optional depending on the map). */
   mapModule: MapModule | null;
-  /** Accès paresseux au processor (assigné après le factory). */
+  /** Lazy access to the processor (assigned after the factory). */
   getCollisionProcessor: () => CollisionEventProcessor | null;
   cameraRig: PlayfieldCameraRig;
   dmd: DmdOrchestrator;
   screenShake: ScreenShake;
   diag: BallDiagnostics;
-  /** Accès paresseux au verrou couloir (assigné après le factory). */
+  /** Lazy access to the shooter-lane gate (assigned after the factory). */
   getShooterLaneGate: () => ShooterLaneGate | null;
-  /** Accès paresseux à la racine playfield (assignée au chargement GLB). */
+  /** Lazy access to the playfield root (assigned at GLB load). */
   getPlayfieldRoot: () => THREE.Object3D | null;
   mapLayout: MapLayout;
   mapBosses: BossDefinition[];
-  /** Accès paresseux au use-case bottom-out (assigné après le factory). */
+  /** Lazy access to the bottom-out use-case (assigned after the factory). */
   getBottomOutBallUC: () => BottomOutBall | null;
-  /** Accès paresseux au use-case drain (assigné après le factory). */
+  /** Lazy access to the drain use-case (assigned after the factory). */
   getDrainBallUC: () => DrainBall | null;
-  /** Libère le monde alternatif (react-scope : restoreBossCamera + clear session). */
+  /** Releases the alternate world (react-scope: restoreBossCamera + clear session). */
   releaseAlternateWorld: () => void;
   livesRef: { current: number };
   gameStateRef: { current: GameState };
@@ -49,13 +49,13 @@ export interface EmitRouterDeps {
 }
 
 /**
- * Routeur d'events du game loop (le « god-router »). Extrait verbatim du
- * `useEffect` de PinballPlayfield : ferme sur ses collaborateurs via l'objet
- * `deps` (getters paresseux pour les `let` assignés plus tard dans l'effet).
+ * Game-loop event router (the "god-router"). Closes over its collaborators
+ * through the `deps` object (lazy getters for the `let`s assigned later in
+ * PinballPlayfield's effect).
  *
- * Non pure : mute des meshes THREE (drop targets), pilote Rapier via le
- * processor, la caméra cinématique et le DMD. Vit dans la glue apps/playfield,
- * pas dans game-engine.
+ * Not pure: mutates THREE meshes (drop targets), drives Rapier via the
+ * processor, the cinematic camera and the DMD. Lives in the apps/playfield
+ * glue, not in game-engine.
  */
 export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
   const {
@@ -84,34 +84,34 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
   };
 
   /**
-   * Sink d'events injecté dans le CollisionEventProcessor et le game loop.
+   * Event sink injected into the CollisionEventProcessor and the game loop.
    *
-   * Ordre GARANTI de fan-out par event (contrat — voir aussi le JSDoc du
-   * paramètre `emit` de CollisionEventProcessor) :
+   * GUARANTEED fan-out order per event (contract — see also the JSDoc of
+   * CollisionEventProcessor's `emit` parameter):
    *
-   *   1. mapModule.onPreDrain(livesPré-décrément) — DRAIN/BOTTOM_OUT uniquement.
-   *   2. baseEmit (useGameState) — scoring, décrément de vie, reset.
-   *   3. mapModule.onGameEvent — visuels, bascule de monde, reveals de boss.
+   *   1. mapModule.onPreDrain(pre-decrement lives) — DRAIN/BOTTOM_OUT only.
+   *   2. baseEmit (useGameState) — scoring, life decrement, reset.
+   *   3. mapModule.onGameEvent — visuals, world switch, boss reveals.
    *
-   * L'invariant porteur est le split 1 avant 2 : `onPreDrain` s'exécute AVANT
-   * que `baseEmit` ne lise/décrémente les vies, afin qu'une map puisse
-   * accorder une vie de sauvetage sur la dernière bille (elle voit le compte
-   * pré-décrément). Ne pas déplacer ces trois appels les uns par rapport aux
-   * autres. Les effets react-scope suivants (screen shake, caméra, DMD,
-   * cleanup) observent l'état post-scoring et sont hors-contrat entre eux.
+   * The load-bearing invariant is 1 before 2: `onPreDrain` runs BEFORE
+   * `baseEmit` reads/decrements lives, so a map can grant a save life on the
+   * last ball (it sees the pre-decrement count). Do not reorder these three
+   * calls. The react-scope effects that follow (screen shake, camera, DMD,
+   * cleanup) observe post-scoring state and carry no ordering contract among
+   * themselves.
    */
   const emit: GameEventListener = (event: GameEvent) => {
     const collisionProcessor = getCollisionProcessor();
 
-    // ── Phase 1 : pré-drain (sauvetage dernière vie) ─────────────────────
-    // La map peut accorder une vie AVANT le décrément (handleDrain) pour
-    // éviter le game over. On lui passe le compte de vies pré-décrément
-    // (livesRef n'est pas encore modifié par baseEmit).
+    // ── Phase 1: pre-drain (last-life save) ──────────────────────────────
+    // The map can grant a life BEFORE the decrement (handleDrain) to avoid
+    // the game over. It receives the pre-decrement life count (livesRef not
+    // yet modified by baseEmit).
     if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
       mapModule?.onPreDrain?.(livesRef.current);
     }
 
-    // ── Phase 2 : baseEmit (scoring / vies / reset, react-scope) ─────────
+    // ── Phase 2: baseEmit (scoring / lives / reset, react-scope) ─────────
     baseEmit(event);
     if (
       "scoreIncrement" in event
@@ -128,23 +128,18 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
     }
     if (event.type === "BALL_LAUNCHED") diag.noteReset("launch");
 
-    // ── Phase 3 : mapModule.onGameEvent (observe l'état post-scoring) ────
-    // bumperVisuals + garlands : onGameEvent géré par le module de map.
-    // bossReveals + upsideDownPortal + upsideDownAtmosphere : onGameEvent
-    // géré par le module de map.
+    // ── Phase 3: mapModule.onGameEvent (observes post-scoring state) ─────
     mapModule?.onGameEvent(event);
 
-    // ── Screen shake par event (juice) ───────────────────────────────────
+    // ── Per-event screen shake (juice) ───────────────────────────────────
     if (event.type === "BUMPER_HIT") screenShake.add(0.25);
     else if (event.type === "SLINGSHOT_HIT") screenShake.add(0.2);
     else if (event.type === "DROP_TARGET_HIT") screenShake.add(0.35);
     else if (event.type === "DROP_TARGET_COMPLETE") screenShake.add(0.6);
     else if (event.type === "BOSS_TARGET_HIT") {
-      // Juice générique : tout hit de cible boss secoue l'écran.
+      // Generic juice: any boss-target hit shakes the screen.
       screenShake.add(0.5);
     }
-
-    // BOSS_LOCKED_HIT (flash nid + « ENCORE X PTS ») : géré par le module.
 
     if (event.type === "BOSS_REVEAL") {
       cameraRig.director.play(event.bossId);
@@ -165,7 +160,6 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
     ) {
       collisionProcessor?.resetAllBossFights();
       collisionProcessor?.resetScoreBaselines();
-      // bossReveals.endAllFights géré par le module (DRAIN/BOTTOM_OUT game-over).
     }
     if (event.type === "DRAIN" || event.type === "BOTTOM_OUT") {
       if (
@@ -176,14 +170,12 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
       }
     }
     if (event.type === "PORTAL_ENTER") {
-      // Bascule de monde gérée par le module (mapModule.onGameEvent).
+      // The world switch itself is handled by the map module (onGameEvent).
       dmd.pushCinematic("portal_swallow");
     }
     if (event.type === "RETURN_PORTAL_ENTER") {
       dmd.pushCinematic("portal_swallow");
     }
-    // PORTAL_TRANSITION_END (portail actif + baseline + nid) géré par le
-    // module de map.
     if (event.type === "BALL_LAUNCHED") {
       collisionProcessor?.resetPortalTrigger();
       getBottomOutBallUC()?.resetLatch();
@@ -193,8 +185,8 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
       getShooterLaneGate()?.open();
     }
     if (event.type === 'DROP_TARGET_HIT') {
-      // Meshes GLB conventionnés en target_<id> (ex. target_left_1) ;
-      // l'id de drop est drop_<id> → on retrouve le mesh visuel.
+      // GLB meshes follow the target_<id> convention (e.g. target_left_1);
+      // the drop id is drop_<id> → recover the visual mesh from it.
       const meshName = event.targetId.replace('drop_', 'target_');
       const mesh = getPlayfieldRoot()?.getObjectByName(meshName);
       if (mesh) mesh.visible = false;
@@ -205,8 +197,6 @@ export function createEmitRouter(deps: EmitRouterDeps): GameEventListener {
         if (mesh) mesh.visible = true;
       }
     }
-
-    // État des marqueurs de nid : recalculé par le module de map.
   };
 
   return emit;

@@ -31,9 +31,9 @@ function resolveDarkLinkClips(
   mixer: THREE.AnimationMixer,
   clips: THREE.AnimationClip[],
 ): Omit<WalkBossActions, 'mixer'> {
-  // Recadrage des clips sur leur plage Blender (Manual Frame Range).
-  // Sans subclip, le GLB exporte les keyframes en temps absolu et Three.js
-  // joue depuis t=0, ce qui fait jouer la mauvaise partie de l'animation.
+  // Re-crop clips to their Blender range (Manual Frame Range).
+  // Without a subclip, the GLB exports keyframes in absolute time and
+  // Three.js plays from t=0, playing the wrong part of the animation.
   const rawWalkClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_WALK);
   const rawIdleClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_IDLE);
   const rawHitClip = findGltfAnimationClip(clips, DARK_LINK_ANIM_HIT);
@@ -91,13 +91,13 @@ function resolveDarkLinkClips(
 }
 
 /**
- * Visuel 3D de Dark Link (GLB + animations). Délègue tout le cycle de vie au
- * WalkBossTargetActor générique (game-engine) :
- *  - marche depuis DARK_LINK_SPAWN vers DARK_LINK_TARGET
- *  - idle bouclé en combat
- *  - animation hit à chaque coup
- *  - animation dead à la victoire
- * Seuls la résolution des clips (subclippés) et les constantes sont spécifiques.
+ * Dark Link 3D visual (GLB + animations). Delegates the whole lifecycle to
+ * the generic WalkBossTargetActor (game-engine):
+ *  - walks from DARK_LINK_SPAWN to DARK_LINK_TARGET
+ *  - looped idle in combat
+ *  - hit animation on each blow
+ *  - dead animation at victory
+ * Only clip resolution (subclipped) and the constants are specific.
  */
 export class DarkLinkTargetVisual {
   private readonly actor = new WalkBossTargetActor({

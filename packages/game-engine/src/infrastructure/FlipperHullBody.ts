@@ -10,10 +10,10 @@ export type FlipperHullBodyResult = {
 };
 
 /**
- * Corps cinématique + collider convex hull d'un flipper, dérivé de la
- * géométrie monde d'une THREE.Mesh. Pure factory : aucune mutation de scène,
- * aucun mesh de debug créé ici — retourne `localPts`/`hullVertices` pour que
- * l'appelant construise sa ConvexGeometry de debug.
+ * Kinematic body + convex hull collider for a flipper, derived from a
+ * THREE.Mesh's world geometry. No scene mutation, no debug mesh created
+ * here — returns `localPts`/`hullVertices` so the caller can build its own
+ * debug ConvexGeometry.
  */
 export function buildFlipperHullBody(
   world: RAPIER.World,
@@ -30,7 +30,7 @@ export function buildFlipperHullBody(
   const n = posAttr.count;
   const v = new THREE.Vector3();
 
-  // Centre géométrique réel (pas l'origine du groupe parent)
+  // Real geometric center (not the parent group's origin)
   let wSumX = 0,
     wSumY = 0,
     wSumZ = 0;
@@ -43,7 +43,7 @@ export function buildFlipperHullBody(
   const geoCenter = new THREE.Vector3(wSumX / n, wSumY / n, wSumZ / n);
   const localOffset = geoCenter.clone().sub(meshOrigin).applyQuaternion(invWorldQuat);
 
-  // Vertices en espace body-local (centré sur geoCenter)
+  // Vertices in body-local space (centered on geoCenter)
   const localPts: THREE.Vector3[] = [];
   const raw: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -76,10 +76,10 @@ export function buildFlipperHullBody(
 }
 
 /**
- * Transforme monde d'un flipper décalé de son `localOffset` (exprimé en espace
- * local du flipper). Offset math partagé entre le sync du corps cinématique et
- * les wireframes de debug — vit ici une seule fois. Appelle
- * `updateMatrixWorld(true)` (comportement verbatim de l'ancien inline).
+ * World transform of a flipper offset by its `localOffset` (expressed in the
+ * flipper's local space). Offset math shared between the kinematic body sync
+ * and the debug wireframes — lives here once. Calls
+ * `updateMatrixWorld(true)`.
  */
 export function flipperWorldTransform(
   flipper: THREE.Object3D,
@@ -96,8 +96,8 @@ export function flipperWorldTransform(
 }
 
 /**
- * Pousse la transforme monde d'un flipper (via `flipperWorldTransform`) dans son
- * corps Rapier cinématique. No-op si `body` ou `flipper` est nul.
+ * Pushes a flipper's world transform (via `flipperWorldTransform`) into its
+ * kinematic Rapier body. No-op if `body` or `flipper` is null.
  */
 export function syncFlipperBody(
   body: RAPIER.RigidBody | null,

@@ -1,5 +1,5 @@
-// @pinball/dmd-core — moteur de rendu DMD générique (dot-matrix, palettes,
-// fonts bitmap, effets). Aucun contenu spécifique à une map.
+// @pinball/dmd-core — generic DMD rendering engine (dot-matrix, palettes,
+// bitmap fonts, effects). No map-specific content.
 export * from './palette';
 export * from './fonts';
 export * from './dmdGrid';

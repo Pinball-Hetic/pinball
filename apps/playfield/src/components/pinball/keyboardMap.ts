@@ -1,10 +1,10 @@
 import type { GameAction, ButtonId } from "@pinball/shared-types";
 import { CABINET_BUTTONS } from "@pinball/shared-types";
 
-// Résout l'id physique du bouton mappé à une action de jeu (DRY — survit à un
-// remap GPIO, pas de littéral 'WHITE_LEFT' codé en dur). Fail-fast : si l'action
-// n'est plus câblée dans CABINET_BUTTONS, throw explicite au lieu du `!` qui
-// crashait silencieusement plus loin.
+// Resolves the physical id of the button mapped to a game action (survives a
+// GPIO remap, no hardcoded 'WHITE_LEFT' literal). Fail-fast: if the action is
+// no longer wired in CABINET_BUTTONS, throw explicitly instead of a `!` that
+// crashed silently later.
 export function idForAction(action: GameAction): ButtonId {
   const btn = CABINET_BUTTONS.find((b) => b.action === action);
   if (!btn) {
@@ -15,10 +15,10 @@ export function idForAction(action: GameAction): ButtonId {
   return btn.id;
 }
 
-// Touches clavier dev → action de jeu. null = touche non-jeu (ignorée par le
-// routeur ; les toggles debug H/J/M/R sont gérés séparément). Le sens DOWN/UP
-// est fourni par l'appelant (keydown vs keyup) — cette table ne mappe que la
-// touche vers l'action.
+// Dev keyboard keys → game action. null = non-game key (ignored by the
+// router; the H/J/M/R debug toggles are handled separately). The DOWN/UP
+// direction comes from the caller (keydown vs keyup) — this table only maps
+// key to action.
 const KEY_TO_ACTION: Readonly<Record<string, GameAction>> = {
   ArrowLeft: "FLIP_LEFT",
   q: "FLIP_LEFT",
@@ -33,8 +33,8 @@ export function gameKeyToAction(key: string): GameAction | null {
   return KEY_TO_ACTION[key] ?? null;
 }
 
-// Touches dont le routeur doit annuler le comportement navigateur par défaut
-// (scroll flèches / espace).
+// Keys whose default browser behavior the router must cancel (arrow/space
+// scrolling).
 export function isPreventDefaultKey(key: string): boolean {
   return key === "ArrowLeft" || key === "ArrowRight" || key === " ";
 }

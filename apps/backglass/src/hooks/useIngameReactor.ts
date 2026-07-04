@@ -14,9 +14,9 @@ export type Reaction =
 export interface Reactor {
   on: (cb: (r: Reaction) => void) => () => void
   getHeat: () => number
-  // Suspend les réactions/heat (pendant un clip cinématique plein écran).
+  // Suspends reactions/heat (during a full-screen cinematic clip).
   setSuspended: (suspended: boolean) => void
-  // Verrouille le heat à 1 (état FEVER : embrasement permanent).
+  // Locks heat at 1 (FEVER state: permanent blaze).
   setHeatLock: (locked: boolean) => void
 }
 
@@ -91,8 +91,8 @@ export function useIngameReactor(
     }
     socket.on('dmd:display', onDmdDisplay)
 
-    // Boucle heat : decay continu, écriture directe de --heat (pas de re-render).
-    // On n'écrit que si la valeur arrondie change → 0 invalidation style au repos.
+    // Heat loop: continuous decay, direct --heat write (no re-render).
+    // Only write when the rounded value changes → 0 style invalidations at rest.
     let raf = 0
     let last: number | null = null
     let written = -1
@@ -111,8 +111,8 @@ export function useIngameReactor(
 
     return () => {
       cancelAnimationFrame(raf)
-      // Socket partagé (lifté dans BackglassStage) : on retire NOS handlers,
-      // sans le déconnecter — l'appelant gère son cycle de vie.
+      // Shared socket (lifted into BackglassStage): remove OUR handlers
+      // without disconnecting it — the caller owns its lifecycle.
       socket.off('game:start', onGameStart)
       socket.off('dmd:display', onDmdDisplay)
     }

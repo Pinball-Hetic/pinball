@@ -14,7 +14,7 @@ export const WALK_BOSS_HIT_FLASH = 0.18;
 export const WALK_BOSS_FINISHER_FLASH = 0.28;
 
 /**
- * Pure glow pulse multiplier shared verbatim by the walk-boss target visuals
+ * Glow pulse multiplier shared by the walk-boss target visuals
  * (Vecna / Dark Link): pulse = (0.82 + sin(t*2.2)*0.14) * (hitFlash>0 ? 1.5 : 1).
  * NB: distinct from BossActorAnimator's static-boss pulse (2.5 / 0.12 / 1.4).
  */
@@ -24,7 +24,7 @@ export function walkBossPulse(pulseT: number, hitFlash: number): number {
 }
 
 /**
- * Pure anchor scale during a hit flash: 1 + (hitFlash/0.18)*scaleBoost.
+ * Anchor scale during a hit flash: 1 + (hitFlash/0.18)*scaleBoost.
  * scaleBoost is per-boss (Vecna 0.12, Dark Link 0.10).
  */
 export function walkBossScale(hitFlash: number, scaleBoost: number): number {

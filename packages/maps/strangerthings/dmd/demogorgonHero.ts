@@ -1,7 +1,7 @@
-// Frame hero du demogorgon, générée depuis l'artwork officiel via
-// tools/ascii-quantize.py (quantification palette 5 niveaux .:#@!, 52×24).
-// Les animations (revealRadial, dissolve) se dérivent procéduralement de
-// cette unique frame — voir AsciiClipPlayer.
+// Demogorgon hero frame, generated from the official artwork via
+// tools/ascii-quantize.py (5-level palette quantization .:#@!, 52×24).
+// Animations (revealRadial, dissolve) derive procedurally from this single
+// frame — see AsciiClipPlayer.
 export const DEMOGORGON_HERO = `
 ........................:...........................
 .......................#@#..........................

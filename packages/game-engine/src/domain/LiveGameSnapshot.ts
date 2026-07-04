@@ -1,7 +1,6 @@
 /**
- * Snapshot d'état lu par les hooks UI qui doivent émettre des events
- * réseau (DMD display, score broadcast) sans accéder aux refs internes
- * de useGameState.
+ * State snapshot read by UI hooks that must emit network events (DMD display,
+ * score broadcast) without touching useGameState's internal refs.
  */
 export interface LiveGameSnapshot {
   score: number;

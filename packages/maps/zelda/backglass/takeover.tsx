@@ -11,8 +11,8 @@ export interface MapTakeoverContext {
   Vhs: VhsComponent
 }
 
-// Visuel de takeover propre à la map Zelda pour un clip (ou une clé d'event).
-// Retourne null → le core gère hall_of_fame + le fallback générique.
+// Zelda-specific takeover visual for a clip (or an event key).
+// Returns null → the core handles hall_of_fame + the generic fallback.
 export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactNode | null {
   const { payload, Vhs } = ctx
   switch (clip) {

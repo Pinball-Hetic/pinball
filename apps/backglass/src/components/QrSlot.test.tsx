@@ -17,8 +17,8 @@ describe('QrSlot', () => {
   })
 
   test('le motif a un état data-on déterministe sur chaque point', () => {
-    // (i*7 + (i%3)*5) % 3 se réduit à (i%3)*3 % 3 === 0 pour tout i :
-    // tous les points sont donc "on". On verrouille ce comportement.
+    // (i*7 + (i%3)*5) % 3 reduces to (i%3)*3 % 3 === 0 for all i:
+    // every dot is therefore "on". This locks in that behavior.
     const { container } = render(<QrSlot />)
     const dots = container.querySelectorAll('.qr-dot')
     expect(dots.length).toBe(25)

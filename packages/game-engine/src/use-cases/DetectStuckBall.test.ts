@@ -1,7 +1,7 @@
 import { test, expect, describe, beforeEach } from 'bun:test';
 import { StuckBallDetector } from './DetectStuckBall';
 
-// Position centrée par défaut (x = 0 → nudge vers +X).
+// Default centered position (x = 0 → nudge toward +X).
 const center = { x: 0 };
 
 describe('StuckBallDetector', () => {
@@ -13,7 +13,7 @@ describe('StuckBallDetector', () => {
 
   test('returns null while the ball is moving (speed >= 0.02)', () => {
     expect(detector.update(0.5, center, 0.5)).toBeNull();
-    // Même après un long dt, une balle rapide ne déclenche rien.
+    // Even after a long dt, a fast ball never triggers.
     expect(detector.update(0.02, center, 10)).toBeNull();
   });
 
@@ -23,7 +23,7 @@ describe('StuckBallDetector', () => {
   });
 
   test('does not trigger exactly at timer === 1.0 (strict >)', () => {
-    expect(detector.update(0.01, center, 1.0)).toBeNull(); // timer = 1.0, pas > 1.0
+    expect(detector.update(0.01, center, 1.0)).toBeNull(); // timer = 1.0, not > 1.0
   });
 
   test('emits a nudge once the slow timer exceeds 1.0s', () => {
@@ -36,10 +36,10 @@ describe('StuckBallDetector', () => {
 
   test('nudge direction depends on ball X sign', () => {
     const right = detector.update(0.01, { x: 0.5 }, 1.01);
-    expect(right!.impulse!.x).toBe(-0.08); // x > 0 → pousse vers -X
+    expect(right!.impulse!.x).toBe(-0.08); // x > 0 → pushes toward -X
 
     const left = new StuckBallDetector().update(0.01, { x: -0.5 }, 1.01);
-    expect(left!.impulse!.x).toBe(0.08); // x <= 0 → pousse vers +X
+    expect(left!.impulse!.x).toBe(0.08); // x <= 0 → pushes toward +X
   });
 
   test('x === 0 nudges toward +X (boundary)', () => {
@@ -48,11 +48,11 @@ describe('StuckBallDetector', () => {
   });
 
   test('resets the timer between nudges (each nudge needs its own >1s)', () => {
-    // 1er nudge
+    // 1st nudge
     expect(detector.update(0.01, center, 1.01)!.type).toBe('nudge');
-    // Timer remis à zéro → un petit dt ne redéclenche pas.
+    // Timer reset to zero → a small dt does not re-trigger.
     expect(detector.update(0.01, center, 0.5)).toBeNull();
-    // 2e nudge après un nouveau dépassement.
+    // 2nd nudge after a fresh overshoot.
     expect(detector.update(0.01, center, 0.6)!.type).toBe('nudge');
   });
 
@@ -68,15 +68,15 @@ describe('StuckBallDetector', () => {
     detector.update(0.01, center, 1.01); // nudge 1
     detector.update(0.01, center, 1.01); // nudge 2
     expect(detector.update(0.01, center, 1.01)!.type).toBe('force_drain'); // 3 → reset count
-    // Compteur remis à zéro : on repart sur un nudge.
+    // Counter back to zero: next trigger is a nudge again.
     expect(detector.update(0.01, center, 1.01)!.type).toBe('nudge');
   });
 
   test('a moving ball resets timer and nudge count', () => {
     detector.update(0.01, center, 1.01); // nudge 1
     detector.update(0.01, center, 1.01); // nudge 2 (count = 2)
-    detector.update(0.5, center, 0.1); // balle bouge → reset
-    // count repart de 0 : il faut 3 nouveaux nudges avant force_drain.
+    detector.update(0.5, center, 0.1); // ball moving → reset
+    // count restarts at 0: 3 fresh nudges needed before force_drain.
     expect(detector.update(0.01, center, 1.01)!.type).toBe('nudge'); // 1
     expect(detector.update(0.01, center, 1.01)!.type).toBe('nudge'); // 2
     expect(detector.update(0.01, center, 1.01)!.type).toBe('force_drain');
@@ -86,9 +86,9 @@ describe('StuckBallDetector', () => {
     detector.update(0.01, center, 1.01); // nudge 1
     detector.update(0.01, center, 0.9); // timer = 0.9
     detector.reset();
-    // Timer effacé : 0.9 + 0.2 = 1.1 n'aurait déclenché qu'avant reset.
+    // Timer cleared: 0.9 + 0.2 = 1.1 would only have triggered before reset.
     expect(detector.update(0.01, center, 0.2)).toBeNull(); // timer = 0.2
-    // Et le compteur de nudge est aussi à zéro → prochain nudge n'est pas le force_drain.
+    // Nudge count is also zero → next trigger is a nudge, not force_drain.
     expect(detector.update(0.01, center, 1.0)!.type).toBe('nudge');
   });
 

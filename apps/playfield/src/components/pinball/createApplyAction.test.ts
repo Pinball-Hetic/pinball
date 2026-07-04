@@ -78,7 +78,7 @@ describe("createApplyAction — flippers", () => {
     expect(h.state.leftTarget).toBe(0);
     h.apply("FLIP_RIGHT", "DOWN");
     expect(h.state.rightTarget).toBe(1);
-    // n'affecte PAS l'autre flipper
+    // does NOT affect the other flipper
     expect(h.state.leftTarget).toBe(0);
   });
 });

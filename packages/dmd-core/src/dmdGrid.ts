@@ -1,5 +1,5 @@
-// Cœur PUR du renderer DMD (aucune dépendance canvas/DOM). Permet de tester
-// la grille, la résolution couleur et le plan de rendu sans contexte 2D.
+// PURE core of the DMD renderer (no canvas/DOM dependency). Lets the grid,
+// color resolution and draw plan be tested without a 2D context.
 
 export const GRID_W = 96
 export const GRID_H = 32
@@ -17,7 +17,7 @@ export function hexToRgb(hex: string): [number, number, number] {
   ]
 }
 
-// Color stops du dot (halo via radial gradient). VERBATIM depuis makeSprite.
+// Dot color stops (halo via radial gradient).
 export type GradientStop = { offset: number; color: string }
 
 export function spriteGradientStops(color: string): GradientStop[] {
@@ -30,11 +30,10 @@ export function spriteGradientStops(color: string): GradientStop[] {
   ]
 }
 
-// Un dot allumé à dessiner : index couleur + position pixel.
+// One lit dot to draw: color index + pixel position.
 export type DotDraw = { colorIndex: number; px: number; py: number }
 
-// Parcours de la grille → liste des dots allumés (index 0 ignoré). Ordre
-// identique au double for d'origine (y puis x).
+// Grid scan → list of lit dots (index 0 skipped). Row-major order (y then x).
 export function gridDrawPlan(grid: Uint8Array): DotDraw[] {
   const plan: DotDraw[] = []
   for (let y = 0; y < GRID_H; y++) {

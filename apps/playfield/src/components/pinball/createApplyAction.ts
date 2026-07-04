@@ -2,15 +2,15 @@ import type { GameAction, ButtonAction } from "@pinball/shared-types";
 import { plungerChargeProgress, plungerLaunchFactor } from "@pinball/game-engine";
 import type { GameState } from "@/hooks/useGameState";
 
-// État d'entrée mutable PARTAGÉ entre le routeur d'actions (createApplyAction)
-// et la boucle animate (swing flippers + physique plunger). Un seul objet
-// possédé par la closure d'init → pas de `let` éparpillés.
+// Mutable input state SHARED between the action router (createApplyAction)
+// and the animate loop (flipper swing + plunger physics). Single object owned
+// by the init closure.
 export type PlungerState = "idle" | "charging" | "releasing" | "returning";
 
 export interface InputState {
-  /** cible de swing flipper gauche : 1 = appuyé, 0 = relâché */
+  /** left flipper swing target: 1 = pressed, 0 = released */
   leftTarget: number;
-  /** cible de swing flipper droit : 1 = appuyé, 0 = relâché */
+  /** right flipper swing target: 1 = pressed, 0 = released */
   rightTarget: number;
   isChargingPlunger: boolean;
   plungerState: PlungerState;
@@ -29,7 +29,7 @@ export function createInputState(): InputState {
 
 export interface ApplyActionDeps {
   state: InputState;
-  /** horloge injectée (performance.now en prod) → testable */
+  /** injected clock (performance.now in prod) — tests pass a fake */
   now: () => number;
   isSessionStarted: () => boolean;
   isPhysicsReady: () => boolean;
@@ -40,19 +40,20 @@ export interface ApplyActionDeps {
   /** launchBallUC?.execute(factor) */
   launchBall: (factor: number) => void;
   setPlungerCharge: (v: number | null) => void;
-  /** sortie outro/game-over → reload → sélecteur de map */
+  /** outro/game-over exit → reload → map selector */
   restartWorkflow: () => void;
   debugLog: (...args: unknown[]) => void;
 }
 
 /**
- * Traduit une action de jeu (FLIP_LEFT/RIGHT, PLUNGE, START) en effets sur le
- * game loop. Source de vérité UNIQUE des effets d'entrée — appelée aussi bien
- * par les events réseau `input:button` que par le clavier dev. Keyé sur
- * l'ACTION (pas l'id physique) ; l'adaptateur ButtonId→GameAction vit en amont.
+ * Translates a game action (FLIP_LEFT/RIGHT, PLUNGE, START) into game-loop
+ * effects. SINGLE source of truth for input effects — called by
+ * `input:button` network events as well as the dev keyboard. Keyed on the
+ * ACTION (not the physical id); the ButtonId→GameAction adapter lives
+ * upstream.
  *
- * Aucune dépendance Three.js / React : toute la collaboration passe par `deps`
- * (getters d'état, callbacks, horloge injectée) → unit-testable.
+ * No Three.js / React dependency: all collaboration goes through `deps`
+ * (state getters, callbacks, injected clock).
  */
 export function createApplyAction(deps: ApplyActionDeps) {
   const {
@@ -70,8 +71,8 @@ export function createApplyAction(deps: ApplyActionDeps) {
   } = deps;
 
   return function applyAction(action: GameAction, btnAction: ButtonAction): void {
-    // Avant le début de session : seuls PLUNGE/START (DOWN, physique prête)
-    // démarrent la partie. PLUNGE en idle amorce aussi la charge du plongeur.
+    // Before the session starts: only PLUNGE/START (DOWN, physics ready)
+    // start the game. PLUNGE while idle also primes the plunger charge.
     if (!isSessionStarted()) {
       if (
         btnAction === "DOWN"

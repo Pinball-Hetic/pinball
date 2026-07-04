@@ -11,9 +11,9 @@ export type FlipperZone = {
 export type FlipperZones = { left: FlipperZone; right: FlipperZone };
 
 /**
- * Interrupteur du log de dérivation des zones. Activé par défaut (comportement
- * historique : un `console.info` unique au chargement). La borne peut le couper
- * en prod via `setFlipperZonesLogging(false)` pour éviter le bruit console.
+ * Toggle for the zone-derivation log. On by default (a single `console.info`
+ * at load). The cabinet can turn it off in prod via
+ * `setFlipperZonesLogging(false)` to avoid console noise.
  */
 let flipperZonesLogging = true;
 
@@ -22,12 +22,12 @@ export function setFlipperZonesLogging(enabled: boolean): void {
 }
 
 /**
- * Dérive les zones de garantie de lancement depuis la bbox réelle des meshes
- * flippers (pose de repos, AVANT le démarrage de la simulation). Évite les
- * coordonnées X figées mesurées sur un ancien GLB.
+ * Derives the flip-guarantee zones from the real bbox of the flipper meshes
+ * (rest pose, BEFORE the simulation starts). Avoids frozen X coordinates
+ * measured on an old GLB.
  *
- * `margin` étend la bbox sur X/Z : la balle touche dès que son centre est à un
- * rayon du bord (margin = BALL_RADIUS).
+ * `margin` expands the bbox on X/Z: the ball counts as touching as soon as
+ * its center is within one radius of the edge (margin = BALL_RADIUS).
  */
 export function computeFlipperZones(
   left: THREE.Object3D,

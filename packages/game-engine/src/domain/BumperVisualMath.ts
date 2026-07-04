@@ -7,8 +7,8 @@ export interface BumperPoint {
 }
 
 /**
- * Index du bumper de layout le plus proche d'une position monde (distance au
- * carré, pas de racine). Retourne 0 si la liste est vide.
+ * Index of the layout bumper closest to a world position (squared distance,
+ * no sqrt). Returns 0 when the list is empty.
  */
 export function nearestBumperIndex(pos: BumperPoint, bumpers: readonly BumperPoint[]): number {
   let best = 0;
@@ -28,9 +28,9 @@ export function nearestBumperIndex(pos: BumperPoint, bumpers: readonly BumperPoi
 }
 
 /**
- * Facteur d'échelle du "punch" bumper : 1 → 1+peak → 1 sur la durée, via
- * easeOutBack sur la montée puis retour linéaire. `remaining` est le temps
- * restant (s), `duration` la durée totale (s). remaining <= 0 → facteur 1.
+ * Bumper "punch" scale factor: 1 → 1+peak → 1 over the duration, easeOutBack
+ * on the way up then linear back down. `remaining` is the time left (s),
+ * `duration` the total duration (s). remaining <= 0 → factor 1.
  */
 export function bumperPunchScale(remaining: number, duration: number, peak: number): number {
   if (remaining <= 0) return 1;
@@ -40,9 +40,8 @@ export function bumperPunchScale(remaining: number, duration: number, peak: numb
 }
 
 /**
- * Décrémente en place tous les timers de `timers` de `dt`, supprimant les
- * entrées qui atteignent 0 ou moins. Pur (mute uniquement la Map injectée),
- * sans THREE. Logique de tick partagée ST/Zelda extraite verbatim.
+ * Decrements every timer in `timers` by `dt` in place, deleting entries that
+ * reach 0 or below. Only mutates the injected Map; no THREE dependency.
  */
 export function tickPunchTimers(timers: Map<number, number>, dt: number): void {
   for (const [idx, t] of timers) {
@@ -52,7 +51,7 @@ export function tickPunchTimers(timers: Map<number, number>, dt: number): void {
   }
 }
 
-/** Cible minimale d'un punch de scale : un mesh avec un index de bumper. */
+/** Minimal scale-punch target: a mesh with a bumper index. */
 export interface BumperScaleTarget {
   bumperIndex: number;
   baseScale: { x: number; y: number; z: number };
@@ -60,9 +59,9 @@ export interface BumperScaleTarget {
 }
 
 /**
- * Applique le scale "punch" à chaque part : `baseScale × bumperPunchScale(...)`
- * en fonction du temps restant lu dans `timers` (0 si absent → facteur 1, soit
- * retour à baseScale). Boucle d'application partagée ST/Zelda extraite verbatim.
+ * Applies the "punch" scale to each part: `baseScale × bumperPunchScale(...)`
+ * from the remaining time in `timers` (missing → 0 → factor 1, i.e. back to
+ * baseScale).
  */
 export function applyPunchScale(
   parts: readonly BumperScaleTarget[],
@@ -78,13 +77,13 @@ export function applyPunchScale(
 }
 
 /**
- * Résultat de classification d'un nœud GLB par le matcher bumper :
- * - `skip` : ce nœud n'est pas un bumper (ignoré).
- * - `hide` : ce nœud doit être masqué (legacy mesh remplacé), pas de part.
- * - `part` : ce nœud est un bumper visuel de catégorie `kind`.
+ * Classification of a GLB node by the bumper matcher:
+ * - `skip`: not a bumper (ignored).
+ * - `hide`: must be hidden (legacy mesh replaced), no part.
+ * - `part`: a visual bumper of category `kind`.
  *
- * `kind` est paramétré par la map (chaîne libre) — le core ne connaît pas
- * les catégories spécifiques (gltf/base/ring côté ST, etc.).
+ * `kind` is map-defined (free string) — the core does not know the specific
+ * categories (gltf/base/ring on the ST side, etc.).
  */
 export type BumperMatch<K extends string> =
   | { action: 'skip' }
@@ -92,8 +91,8 @@ export type BumperMatch<K extends string> =
   | { action: 'part'; kind: K };
 
 /**
- * Règle de matching bumper : si `pattern` matche le nom normalisé, le nœud
- * reçoit `result`. Les règles sont évaluées dans l'ordre, première gagnante.
+ * Bumper matching rule: if `pattern` matches the normalized name, the node
+ * gets `result`. Rules are evaluated in order, first match wins.
  */
 export interface BumperMatchRule<K extends string> {
   pattern: RegExp;
@@ -101,9 +100,8 @@ export interface BumperMatchRule<K extends string> {
 }
 
 /**
- * Classe un nom de mesh normalisé via une liste ordonnée de règles
- * (première règle dont le pattern matche gagne). Aucune règle → `skip`.
- * Pur : ne dépend pas de THREE, paramétrable par map.
+ * Classifies a normalized mesh name through an ordered rule list (first
+ * matching pattern wins). No matching rule → `skip`.
  */
 export function classifyBumperName<K extends string>(
   normalizedName: string,

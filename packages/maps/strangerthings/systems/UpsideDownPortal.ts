@@ -140,7 +140,7 @@ export class UpsideDownPortal {
 
   setUpsideDownActive(active: boolean): void {
     this.alternateWorldActive = active;
-    // Sortie du monde alternatif : un reveal retour en attente n'a plus de sens.
+    // Leaving the alternate world: a pending return reveal no longer makes sense.
     if (!active) this.returnRevealCountdown.cancel();
   }
 
@@ -164,8 +164,8 @@ export class UpsideDownPortal {
       return;
     }
     if (def.unlocksReturnPortal && this.alternateWorldActive) {
-      // Reveal différé : au coup fatal la bille colle au boss (= au portail),
-      // ouvrir immédiatement l'aspirerait sans laisser jouer.
+      // Deferred reveal: on the fatal hit the ball sticks to the boss
+      // (= to the portal); opening immediately would suck it in without play.
       this.returnRevealCountdown.start(RETURN_PORTAL_REVEAL_DELAY_S);
     }
   }
@@ -201,7 +201,7 @@ export class UpsideDownPortal {
 
   update(dt: number): void {
     if (this.returnRevealCountdown.tick(dt)) {
-      // Re-vérifie les gardes : le monde a pu être quitté pendant le délai.
+      // Re-check the guards: the world may have been left during the delay.
       if (!this.revealed && !this.revealing && !this.opening && this.alternateWorldActive) {
         this.beginReveal();
       }

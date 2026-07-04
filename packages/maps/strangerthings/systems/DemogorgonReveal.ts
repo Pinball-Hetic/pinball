@@ -49,10 +49,10 @@ export type DemogorgonSetup = {
   onFightEnd?: () => void;
   onTargetReady?: () => void;
   /**
-   * Jeu en cours ? (gameState === 'playing'). Injecté par le module — sert à
-   * suspendre l'assist Eleven quand la bille est drainée : sans ce gate,
-   * l'assist continue de scorer +100 toutes les ~4 s pendant l'attente au
-   * spawn. Absent (tests, legacy) → considéré toujours en jeu.
+   * Game running? (gameState === 'playing'). Injected by the module — used
+   * to suspend the Eleven assist when the ball drains: without this gate the
+   * assist keeps scoring +100 every ~4 s while waiting at spawn.
+   * Absent (tests, legacy) → treated as always playing.
    */
   isPlaying?: () => boolean;
 };
@@ -126,9 +126,9 @@ export class DemogorgonReveal implements BossRevealController {
       this.billboard.ensureReady(),
       this.demogorgonVisual.ensureReady(),
     ]);
-    // Upload GPU de la texture billboard + compilation des shaders du
-    // demogorgon, du targetGroup (ring/core/burst) et du sprite — hors
-    // frame critique. Sinon tout tombe sur la frame du spawn → freeze.
+    // GPU upload of the billboard texture + shader compilation for the
+    // demogorgon, targetGroup (ring/core/burst) and sprite — off the
+    // critical frame. Otherwise it all lands on the spawn frame → freeze.
     this.billboard.warmup(renderer);
     await this.demogorgonVisual.warmup(renderer, scene, camera);
     if (this.targetGroup) await renderer.compileAsync(this.targetGroup, camera, scene);
@@ -136,10 +136,10 @@ export class DemogorgonReveal implements BossRevealController {
     if (sprite) await renderer.compileAsync(sprite, camera, scene);
   }
 
-  // PointLights ajoutées dynamiquement pendant le combat : flash strobe +
-  // glow du Demogorgon + lumière de la cible + flash assist Eleven. Chaque
-  // compte jamais vu recompilerait tous les shaders éclairés à la frame du
-  // reveal — le preloadAll pré-compile ces variantes (cf. orchestrator).
+  // PointLights added dynamically during the fight: strobe flash +
+  // Demogorgon glow + target light + Eleven assist flash. Any never-seen
+  // light count would recompile every lit shader on the reveal frame —
+  // preloadAll precompiles these variants (see orchestrator).
   dynamicPointLightCount(): number {
     return 4;
   }
@@ -184,7 +184,7 @@ export class DemogorgonReveal implements BossRevealController {
 
     const assistY = DEMOGORGON_TARGET.y + 0.021;
 
-    // Ajoutée à la scène SEULEMENT pendant ses flashs (cf. trigger/hide).
+    // Added to the scene ONLY during its flashes (see trigger/hide).
     this.elevenAssistLight = new THREE.PointLight(0xbb55ff, 0, 0.32, 0.3);
     this.elevenAssistLight.position.set(DEMOGORGON_TARGET.x, DEMOGORGON_TARGET.y + 0.045, DEMOGORGON_TARGET.z);
 
@@ -261,8 +261,8 @@ export class DemogorgonReveal implements BossRevealController {
       this.machine.isVictory(),
     );
 
-    // Assist gelé hors 'playing' (voir DemogorgonSetup.isPlaying) ; les autres
-    // effets du combat (strobe, flicker, phases) continuent comme avant.
+    // Assist frozen outside 'playing' (see DemogorgonSetup.isPlaying); other
+    // fight effects (strobe, flicker, phases) keep running.
     const d = this.machine.tick(dt, {
       suspendAssist: this.isPlaying ? !this.isPlaying() : false,
     });
@@ -413,7 +413,7 @@ export class DemogorgonReveal implements BossRevealController {
     if (this.elevenShockInnerMat) this.elevenShockInnerMat.opacity = 0;
     if (this.elevenAssistLight) {
       this.elevenAssistLight.intensity = 0;
-      this.elevenAssistLight.removeFromParent(); // hors scène entre les flashs
+      this.elevenAssistLight.removeFromParent(); // off-scene between flashes
     }
   }
 

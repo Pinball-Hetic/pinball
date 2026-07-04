@@ -4,7 +4,7 @@ import { BossRevealOrchestrator } from './BossRevealOrchestrator';
 import type { BossRevealController } from './BossRevealController';
 import type { GameEvent } from '../domain/GameEvents';
 
-// Faux reveal minimal : implémente le contrat avec des spies, sans Three réel.
+// Minimal fake reveal: implements the contract with spies, no real Three.
 function makeFake(
   bossId: string,
   opts: { frozen?: boolean; dynamicLights?: number } = {},
@@ -85,9 +85,9 @@ test('preloadAll pré-chauffe les variantes 0..max+1 lumières et nettoie la sc�
 
   await orch.preloadAll(renderer, scene, CAMERA);
 
-  // max(4, 3) + 1 de marge = 5 lumières factices → 6 passes (k = 0..5).
+  // max(4, 3) + 1 margin = 5 fake lights → 6 passes (k = 0..5).
   expect(compileAsync).toHaveBeenCalledTimes(6);
-  // Les lumières factices ne restent pas dans la scène après le preload.
+  // The fake lights don't stay in the scene after the preload.
   expect(scene.children.length).toBe(0);
 });
 

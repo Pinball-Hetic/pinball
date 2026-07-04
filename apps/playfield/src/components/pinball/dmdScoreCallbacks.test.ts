@@ -78,7 +78,7 @@ describe("onScoreEvent — priorité d'affichage", () => {
       scoreEvent({
         event: { type: "RAMP_HIT", scoreIncrement: 100 },
         previousMultiplier: 1,
-        newMultiplier: 2, // même avec multi changé, le label gagne
+        newMultiplier: 2, // even with multiplier changed, the label wins
       }),
     );
     expect(h.dmd.pushEvent).toHaveBeenCalledTimes(1);

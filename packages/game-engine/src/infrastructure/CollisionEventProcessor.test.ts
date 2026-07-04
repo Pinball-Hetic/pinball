@@ -62,8 +62,8 @@ test('deferred physics still runs on the 2nd flush cycle (bumper)', () => {
 });
 
 test('bumper collision during game_over does not run the use-case (régression)', () => {
-  // Régression : le handler bumper manquait la garde gameState === 'playing',
-  // donc les bumpers éjectaient/scoraient pendant game_over/idle.
+  // Regression: the bumper handler was missing the gameState === 'playing'
+  // guard, so bumpers ejected/scored during game_over/idle.
   const { cep, bumperExec } = makeProcessor();
 
   cep.process(queueFor(1), 'game_over');

@@ -24,13 +24,13 @@ export interface PlayfieldScene {
 }
 
 /**
- * Construit toutes les lumières d'une map depuis `rendering.lights`, avec les
- * fallbacks `??` exacts. Fonction PURE (aucun renderer/DOM) : renvoie des vraies
- * lumières THREE, ajoutées à la scène par l'appelant. Testable en unitaire.
+ * Builds all of a map's lights from `rendering.lights`, with exact `??`
+ * fallbacks. No renderer/DOM dependency: returns real THREE lights, added to
+ * the scene by the caller.
  *
- * Les lumières optionnelles (dir2, rim) sont ajoutées directement à la scène ici
- * car elles ne sont pas exposées au MapContext ; ambient/hemi/dir/fill sont
- * renvoyées pour le wiring `MapContext.lighting`.
+ * Optional lights (dir2, rim) are added straight to the scene here because
+ * they are not exposed to the MapContext; ambient/hemi/dir/fill are returned
+ * for the `MapContext.lighting` wiring.
  */
 export function buildManifestLights(
   scene: THREE.Scene,
@@ -59,9 +59,9 @@ export function buildManifestLights(
   dir.castShadow = false;
   scene.add(dir);
 
-  // Second soleil optionnel (rl.dir2), côté opposé → double éclairage qui
-  // débouche l'ombre du principal. Distinct du fill (réservé à
-  // UpsideDownAtmosphere). Absent dans la config → un seul soleil.
+  // Optional second sun (rl.dir2) on the opposite side → dual lighting that
+  // opens up the main light's shadow. Distinct from fill (reserved for
+  // UpsideDownAtmosphere). Absent from the config → single sun.
   if (rl?.dir2) {
     const dir2 = new THREE.DirectionalLight(rl.dir2.color, rl.dir2.intensity);
     dir2.position.set(rl.dir2.x, rl.dir2.y, rl.dir2.z);
@@ -69,8 +69,8 @@ export function buildManifestLights(
     scene.add(dir2);
   }
 
-  // Contre-jour optionnel (rl.rim) fond de table → liseré métal vers la
-  // caméra. Coût quasi nul. Absent dans la config → pas de rim.
+  // Optional backlight (rl.rim) at the back of the table → metal edge
+  // highlight toward the camera. Near-zero cost. Absent from the config → no rim.
   if (rl?.rim) {
     const rim = new THREE.DirectionalLight(rl.rim.color, rl.rim.intensity);
     rim.position.set(rl.rim.x, rl.rim.y, rl.rim.z);
@@ -89,13 +89,12 @@ export function buildManifestLights(
 }
 
 /**
- * Bootstrap de la scène Three.js d'une map : renderer (config PBR + env map
- * PMREM/RoomEnvironment), scène + background, caméra perspective + cible,
- * lumières depuis `manifest.rendering`, et groupe `modelRoot`.
+ * Bootstrap of a map's Three.js scene: renderer (PBR config + PMREM/
+ * RoomEnvironment env map), scene + background, perspective camera + target,
+ * lights from `manifest.rendering`, and the `modelRoot` group.
  *
- * Glue React-adjacent (dépend du DOM `mountEl`) → vit dans apps/playfield.
- * Le `renderer.domElement` est appendé à `mountEl` ici pour respecter l'ordre
- * original. Comportement déplacé VERBATIM depuis PinballPlayfield.tsx.
+ * React-adjacent glue (depends on the `mountEl` DOM) → lives in
+ * apps/playfield. `renderer.domElement` is appended to `mountEl` here.
  */
 export function createPlayfieldScene(
   mountEl: HTMLElement,
@@ -115,12 +114,12 @@ export function createPlayfieldScene(
   const cameraTarget = new THREE.Vector3();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  // Expose + tonemapping depuis la config de la map (pas de valeur globale).
+  // Exposure + tonemapping from the map config (no global value).
   configureGltfRenderer(renderer, rendering);
 
-  // Environment map — par map (rendering.useEnvironment). ST : off → métal
-  // éclairé par les directionnels + rim (pas de reflets ambiants). Zelda :
-  // on → or/gemmes très réfléchissants (effet Vectary).
+  // Environment map — per map (rendering.useEnvironment). ST: off → metal
+  // lit by the directionals + rim (no ambient reflections). Zelda: on →
+  // highly reflective gold/gems (Vectary look).
   if (rendering?.useEnvironment) {
     const pmrem = new THREE.PMREMGenerator(renderer);
     pmrem.compileEquirectangularShader();
@@ -132,9 +131,9 @@ export function createPlayfieldScene(
   renderer.shadowMap.enabled = false;
   mountEl.appendChild(renderer.domElement);
 
-  // ─── Lumières — lues depuis manifest.rendering ─────────────────────────
-  // Chaque map contrôle entièrement son setup d'éclairage. Pas de valeur
-  // partagée ici : ST (froide/cinéma) et Zelda (chaude/overhead) divergent.
+  // ─── Lights — read from manifest.rendering ──────────────────────────────
+  // Each map fully controls its lighting setup. No shared value here: ST
+  // (cold/cinematic) and Zelda (warm/overhead) diverge.
   const lights = buildManifestLights(scene, rendering);
 
   const modelRoot = new THREE.Group();

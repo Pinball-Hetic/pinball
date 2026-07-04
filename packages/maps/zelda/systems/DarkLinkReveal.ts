@@ -9,7 +9,7 @@ import { DarkLinkTargetVisual } from './DarkLinkTargetVisual';
 import type { BossRevealController } from './BossRevealController';
 
 const VICTORY_DURATION = 0.65;
-// Flash rouge Dark Link
+// Dark Link red flash
 const FLASH_COLOR = 0xff2200;
 const FLASH_INTENSITY = 1.6;
 
@@ -22,12 +22,12 @@ export type DarkLinkSetup = {
 };
 
 /**
- * Contrôleur de révélation Dark Link (Sacred Realm).
- * Pattern identique à VecnaReveal :
- *  - phase walk  : Dark Link marche vers sa position (gameplay gelé)
- *  - phase settle: rotation face caméra (gameplay gelé)
- *  - phase fight : combat, animation idle + hit à chaque coup
- *  - phase victory: animation dead + portail retour ouvert
+ * Dark Link reveal controller (Sacred Realm).
+ * Same pattern as VecnaReveal:
+ *  - walk phase   : Dark Link walks to his position (gameplay frozen)
+ *  - settle phase : rotation to face the camera (gameplay frozen)
+ *  - fight phase  : combat, idle animation + hit on each blow
+ *  - victory phase: dead animation + return portal opened
  */
 export class DarkLinkReveal implements BossRevealController {
   readonly bossId = 'darklink' as const;
@@ -62,9 +62,9 @@ export class DarkLinkReveal implements BossRevealController {
     await this.darkLinkVisual.warmup(renderer, scene, camera);
   }
 
-  // PointLights ajoutées dynamiquement pendant le combat : flash strobe +
-  // glow de Dark Link + lumière de la cible. Sert au prewarm des variantes de
-  // shaders au preload (cf. BossRevealOrchestrator.preloadAll).
+  // PointLights added dynamically during the fight: strobe flash +
+  // Dark Link glow + target light. Used to prewarm shader variants at
+  // preload (see BossRevealOrchestrator.preloadAll).
   dynamicPointLightCount(): number {
     return 3;
   }
@@ -179,7 +179,7 @@ export class DarkLinkReveal implements BossRevealController {
     this.targetPulse  = null;
   }
 
-  // ── Privé ────────────────────────────────────────────────────────────────
+  // ── Private ──────────────────────────────────────────────────────────────
 
   private startWalkPhase(): void {
     this.targetPulse?.reset();

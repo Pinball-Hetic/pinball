@@ -24,18 +24,18 @@ describe('NoSignal', () => {
 
   test("n'affiche aucune raison quand le prop est absent", () => {
     const { container } = render(<NoSignal />)
-    // Seuls 2 enfants dans CENTER : le titre, pas de bloc raison.
+    // Only the title in CENTER, no reason block.
     expect(screen.queryByText('MAP INTROUVABLE')).toBeNull()
-    // Le wrapper contient title uniquement (style/scanlines/grain à part).
+    // The wrapper contains the title only (style/scanlines/grain aside).
     expect(container.querySelector('[aria-label="no signal"]')).not.toBeNull()
   })
 
   test('traite une raison vide ("") comme absente (branche falsy)', () => {
     const { container } = render(<NoSignal reason="" />)
-    // reason="" est falsy → le bloc REASON n'est pas rendu, seul le titre reste.
+    // reason="" is falsy → the REASON block is not rendered, only the title.
     const wrap = container.querySelector('[aria-label="no signal"]')
     expect(wrap?.textContent).toContain('NO SIGNAL')
-    // Aucun bloc texte supplémentaire (la raison) après le titre.
+    // No extra text block (the reason) after the title.
     const titles = screen.getAllByText('NO SIGNAL')
     expect(titles).toHaveLength(1)
   })

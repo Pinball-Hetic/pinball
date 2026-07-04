@@ -190,7 +190,7 @@ describe("PlayfieldMusicDirector", () => {
       early.playing = false;
       early.handoffBlocked = true;
       director.onBossFightEnd("demogorgon", BOSSES);
-      // bridge — early ne reprend pas
+      // bridge — early does not resume
       expect(early.log).not.toContain("engageSync");
       assertNoMusicOverlap(early, boss);
     });
@@ -252,7 +252,7 @@ describe("PlayfieldMusicDirector", () => {
       expect(director.getDebugState().musicBridgeActive).toBe(false);
       expect(boss.activeUrl).toBe(VECNA_THEME);
       expect(boss.log.some((e) => e.op === "start" && e.url === VECNA_THEME)).toBe(true);
-      // changement de piste : stop de l'ancienne avant start de la nouvelle
+      // track change: stop the old one before starting the new one
       expect(boss.log.filter((e) => e.op === "stop").length).toBeGreaterThan(stopsBeforeVecna);
       assertNoMusicOverlap(early, boss);
     });

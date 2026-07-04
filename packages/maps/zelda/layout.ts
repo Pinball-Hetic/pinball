@@ -12,15 +12,15 @@ import {
   PLAYFIELD_SHADE_MAX_OPACITY,
 } from '@pinball/game-engine'
 
-// Layout Zelda. Géométrie identique au plateau physique ST (même board).
-// Mettre à jour bumpers/dropTargets/sensors/shooterLane après export du GLB
-// Zelda si les positions de meshes changent.
+// Zelda layout. Geometry identical to the ST physical board (same board).
+// Update bumpers/dropTargets/sensors/shooterLane after a Zelda GLB export
+// if mesh positions change.
 export const layout: MapLayout = {
   bumpers: [
-    // Positions exactes extraites du node GLB zelda.glb (via dump-glb-meshes)
-    { x: -0.02561, y: 1.02870, z: -0.19060 }, // bumper_3 (centre bas)
-    { x: -0.09967, y: 1.04850, z: -0.32417 }, // bumper_2 (gauche haut)
-    { x: 0.05183,  y: 1.04850, z: -0.32417 }, // bumper_1 (droite haut)
+    // Exact positions extracted from the zelda.glb GLB node (via dump-glb-meshes)
+    { x: -0.02561, y: 1.02870, z: -0.19060 }, // bumper_3 (bottom center)
+    { x: -0.09967, y: 1.04850, z: -0.32417 }, // bumper_2 (top left)
+    { x: 0.05183,  y: 1.04850, z: -0.32417 }, // bumper_1 (top right)
   ],
   dropTargets: [
     { id: 'drop_left_1', x: -0.209, y: 1.022, z: -0.019, side: 'left' },
@@ -84,8 +84,8 @@ export const layout: MapLayout = {
       maxOpacity: PLAYFIELD_SHADE_MAX_OPACITY,
     },
   },
-  // Sacred Realm : atmosphère dorée / verte — à affiner avec les constantes
-  // dédiées quand le module ZeldaAtmosphere sera implémenté.
+  // Sacred Realm: golden/green atmosphere — refine with dedicated constants
+  // once the ZeldaAtmosphere module is implemented.
   atmosphere: {
     transition: {
       durationS: 2.0,

@@ -40,7 +40,7 @@ describe('MeshRoleResolver.resolve', () => {
 describe('MeshRoleResolver.resolveFromAncestry', () => {
   test('hérite du préfixe du parent (groupe)', () => {
     const r = new MeshRoleResolver();
-    // Mesh_8 (primitive) sans rôle, mais son parent Circle.018 → wall_rail_left.
+    // Mesh_8 (primitive) has no role, but its parent Circle.018 → wall_rail_left.
     expect(r.resolveFromAncestry(['Mesh_8', 'wall_rail_left'])).toEqual({
       role: 'wall',
       id: 'rail_left',
@@ -57,12 +57,12 @@ describe('MeshRoleResolver.resolveFromAncestry', () => {
 
   test('vis_ sur un enfant exclut un détail dans un groupe physique', () => {
     const r = new MeshRoleResolver();
-    // Vis décorative dans un groupe bumper_1 → non-physique (vis gagne).
+    // Decorative screw (vis) in a bumper_1 group → non-physical (vis wins).
     expect(r.resolveFromAncestry(['vis_screw', 'bumper_1'])).toEqual({
       role: 'vis',
       id: 'screw',
     });
-    // Le reste du groupe (sans nom propre) hérite bien de bumper_1.
+    // The rest of the group (no own name) inherits bumper_1.
     expect(r.resolveFromAncestry(['Mesh_3', 'bumper_1'])).toEqual({
       role: 'bumper',
       id: '1',

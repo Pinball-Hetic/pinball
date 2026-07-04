@@ -2,7 +2,7 @@ import { test, expect, describe, mock, beforeEach } from 'bun:test';
 import { createLeaderboard, anonName, aggregateCounters } from './Leaderboard';
 import type { GameRepository, LeaderboardGateway } from './ports';
 
-// Fakes des ports (DIP) — aucun prisma, aucun mock.module.
+// Fake ports — no prisma, no mock.module.
 const topByScore = mock(async (..._a: unknown[]) => [] as unknown[]);
 const allCounters = mock(async (..._a: unknown[]) => [] as unknown[]);
 const topByCombo = mock(async (..._a: unknown[]) => null as unknown);

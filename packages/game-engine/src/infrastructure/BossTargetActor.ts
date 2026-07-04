@@ -77,7 +77,7 @@ export class BossTargetActor {
     anchor.add(rig);
     this.rig = rig;
 
-    // PointLight ajoutée à la scène SEULEMENT pendant le fight (show/hide).
+    // PointLight added to the scene ONLY during the fight (show/hide).
     this.animator.createGlowLight();
 
     this.loadPromise = this.loadModel();

@@ -2,8 +2,8 @@ import { test, expect, beforeEach } from 'bun:test';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { PlungerPhysics } from './PlungerPhysics';
 
-// Stub minimal du monde Rapier : capture les descripteurs passés sans
-// instancier de vrai World (les desc builders Rapier sont purs, pas d'init()).
+// Minimal Rapier world stub: captures the passed descriptors without
+// instantiating a real World (Rapier desc builders are pure, no init()).
 type Captured = {
   bodyDesc: RAPIER.RigidBodyDesc;
   colliderDesc: RAPIER.ColliderDesc;
@@ -40,7 +40,7 @@ test('place le corps cinématique à la position demandée', () => {
 
 test('crée un corps kinematic position-based (vélocité initiale nulle)', () => {
   PlungerPhysics.createBody(stub.world as unknown as RAPIER.World, { x: 0, y: 0, z: 0 });
-  // un corps kinematicPositionBased n'a pas de vélocité linéaire prescrite
+  // a kinematicPositionBased body has no prescribed linear velocity
   expect(stub.captured.bodyDesc.linvel).toEqual({ x: 0, y: 0, z: 0 });
 });
 

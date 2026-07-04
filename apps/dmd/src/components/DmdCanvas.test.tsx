@@ -2,7 +2,7 @@ import { test, expect, afterEach, beforeEach, describe, mock } from 'bun:test'
 import { render, cleanup, act } from '@testing-library/react'
 import type { DmdDisplay } from '@pinball/shared-types'
 
-// --- Espions partages, remplis par le mock de @pinball/dmd-core. ---
+// --- Shared spies, filled by the @pinball/dmd-core mock. ---
 const calls = {
   rendererCtor: 0,
   setPalette: [] as unknown[],
@@ -42,7 +42,7 @@ class FakeMatrixRain {
   }
 }
 
-// makeLayouts retourne un Record mode -> fn ; on enregistre l'appel.
+// makeLayouts returns a Record mode -> fn; record each call.
 const makeLayouts = () =>
   new Proxy(
     {},
@@ -65,7 +65,7 @@ mock.module('@pinball/dmd-core', () => ({
   },
 }))
 
-// rAF deterministe : execute le callback exactement une fois (une frame).
+// Deterministic rAF: runs the callback exactly once (one frame).
 let rafCb: FrameRequestCallback | null = null
 beforeEach(() => {
   calls.rendererCtor = 0
@@ -78,7 +78,7 @@ beforeEach(() => {
   calls.drawBackground = 0
   rafCb = null
   globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
-    // Capture le premier callback ; ne reboucle pas (evite la boucle infinie).
+    // Capture the first callback; do not loop (avoids the infinite loop).
     if (rafCb === null) rafCb = cb
     return 1
   }) as typeof requestAnimationFrame
@@ -98,7 +98,7 @@ const score = (): DmdDisplay =>
     alternateWorld: false,
   }) as unknown as DmdDisplay
 
-// Importe le composant apres le mock.module.
+// Import the component after mock.module.
 const { default: DmdCanvas } = await import('./DmdCanvas')
 
 function frame() {
@@ -163,8 +163,8 @@ describe('DmdCanvas', () => {
       finalScore: 42,
       alternateWorld: false,
     } as unknown as DmdDisplay
-    // Demarre en SCORE puis transitionne : le burst se declenche au changement
-    // de mode (prevMode != mode), pas au montage initial.
+    // Start in SCORE then transition: the burst triggers on the mode change
+    // (prevMode != mode), not on the initial mount.
     const { rerender } = render(
       <DmdCanvas display={score()} alternateWorld={false} mapDmdContent={{}} />,
     )

@@ -15,7 +15,7 @@ function litCount(grid: Uint8Array): number {
   return n;
 }
 
-// Source de valeurs déterministes pour Math.random.
+// Deterministic value source for Math.random.
 function stubRandom(seq: number[]): ReturnType<typeof spyOn> {
   let i = 0;
   return spyOn(Math, 'random').mockImplementation(() => {
@@ -26,7 +26,7 @@ function stubRandom(seq: number[]): ReturnType<typeof spyOn> {
 }
 
 afterEach(() => {
-  // Restaure Math.random après chaque test.
+  // Restore Math.random after each test.
   if ((Math.random as { mockRestore?: () => void }).mockRestore) {
     (Math.random as unknown as { mockRestore: () => void }).mockRestore();
   }
@@ -34,13 +34,13 @@ afterEach(() => {
 
 describe('applyGlitch', () => {
   test('injecte du bruit (DOT.event) sur la grille', () => {
-    // Toutes les valeurs à 0 : bandCount=2, rows=3, y0=0, dx=-1 (shift),
-    // noise = 6 + floor(0..*) = 6, invertBand non déclenché (0 < 0.25 → true!).
-    // On choisit 0.3 pour éviter l'inversion et garder le bruit déterministe.
+    // With all values at 0: bandCount=2, rows=3, y0=0, dx=-1 (shift),
+    // noise = 6 + floor(0..*) = 6, but invertBand would fire (0 < 0.25 → true!).
+    // Use 0.3 to avoid the inversion and keep the noise deterministic.
     stubRandom([0.3]);
     const grid = emptyGrid();
     applyGlitch(grid, GRID_W, GRID_H, 1);
-    // au moins quelques dots event posés par le bruit
+    // at least a few event dots placed by the noise
     const eventDots = Array.from(grid).filter((v) => v === DOT.event).length;
     expect(eventDots).toBeGreaterThan(0);
   });
@@ -53,9 +53,9 @@ describe('applyGlitch', () => {
   });
 
   test('t01 = 1 produit plus d’itérations de bruit que t01 = 0', () => {
-    // noise = 6 + floor(random * 7 * intensity). À intensité 0 → 6 itérations.
-    // À intensité 1 avec random=0.99 → 6 + floor(6.93) = 12 itérations.
-    // On compte les appels au stub : plus d'itérations = plus d'appels.
+    // noise = 6 + floor(random * 7 * intensity). At intensity 0 → 6 iterations.
+    // At intensity 1 with random=0.99 → 6 + floor(6.93) = 12 iterations.
+    // Count stub calls: more iterations = more calls.
     const seqLow = stubRandom([0.99]);
     applyGlitch(emptyGrid(), GRID_W, GRID_H, 0);
     const callsLow = seqLow.mock.calls.length;
@@ -70,21 +70,21 @@ describe('applyGlitch', () => {
   });
 
   test('inverse une bande quand random < 0.25 au tirage final', () => {
-    // On veut déclencher invertBand. Le dernier random de applyGlitch
-    // (le test < 0.25) doit être < 0.25. Avec une seq constante 0.1,
-    // invertBand est déclenché ET ses tirages internes restent à 0.1.
+    // We want to trigger invertBand. The last random in applyGlitch
+    // (the < 0.25 check) must be < 0.25. With a constant 0.1 sequence,
+    // invertBand fires AND its internal draws stay at 0.1.
     stubRandom([0.1]);
     const grid = emptyGrid();
     applyGlitch(grid, GRID_W, GRID_H, 1);
-    // invertBand transforme les 0 en DOT.event sur une bande → beaucoup de dots
-    expect(litCount(grid)).toBeGreaterThan(GRID_W); // au moins une bande entière
+    // invertBand turns 0s into DOT.event over a band → many dots
+    expect(litCount(grid)).toBeGreaterThan(GRID_W); // at least a full band
   });
 
   test('n’écrit jamais hors des bornes de la grille', () => {
     stubRandom([0.7, 0.2, 0.9, 0.4, 0.6]);
     const grid = emptyGrid();
     expect(() => applyGlitch(grid, GRID_W, GRID_H, 0.5)).not.toThrow();
-    // toutes les valeurs sont des index palette valides
+    // all values are valid palette indices
     for (const v of grid) {
       expect(v).toBeGreaterThanOrEqual(0);
     }
@@ -95,10 +95,10 @@ describe('applyGlitch', () => {
 describe('MatrixRain', () => {
   test('le constructeur crée une colonne tous les 6 dots', () => {
     stubRandom([0.5]);
-    const rain = new MatrixRain(18, 10); // x = 0, 6, 12 → 3 colonnes
+    const rain = new MatrixRain(18, 10); // x = 0, 6, 12 → 3 columns
     const grid = emptyGrid(18, 10);
     rain.drawBackground(grid);
-    // les dots posés sont sur les colonnes 0, 6, 12 uniquement
+    // placed dots are only on columns 0, 6, 12
     for (let y = 0; y < 10; y++) {
       for (let x = 0; x < 18; x++) {
         if (grid[y * 18 + x] !== 0) {
@@ -121,10 +121,10 @@ describe('MatrixRain', () => {
     stubRandom([0.5]);
     const rain = new MatrixRain(GRID_W, GRID_H);
     const grid = emptyGrid();
-    // pré-remplit la colonne 0 entièrement avec une autre couleur
+    // pre-fill column 0 entirely with another color
     for (let y = 0; y < GRID_H; y++) grid[y * GRID_W + 0] = DOT.score;
     rain.drawBackground(grid);
-    // la colonne 0 garde DOT.score (jamais écrasée par DOT.rain)
+    // column 0 keeps DOT.score (never overwritten by DOT.rain)
     for (let y = 0; y < GRID_H; y++) {
       expect(grid[y * GRID_W + 0]).toBe(DOT.score);
     }
@@ -137,7 +137,7 @@ describe('MatrixRain', () => {
     rain.drawBurst(grid, 1);
     const goDots = Array.from(grid).filter((v) => v === DOT.rainGo).length;
     expect(goDots).toBeGreaterThan(0);
-    // toute cellule allumée est rainGo (contrairement à drawBackground)
+    // every lit cell is rainGo (unlike drawBackground)
     for (const v of grid) {
       expect(v === 0 || v === DOT.rainGo).toBe(true);
     }
@@ -147,10 +147,10 @@ describe('MatrixRain', () => {
     stubRandom([0.5]);
     const rain = new MatrixRain(GRID_W, GRID_H);
     const grid = emptyGrid();
-    // pré-remplit toute la grille avec une autre couleur
+    // pre-fill the whole grid with another color
     grid.fill(DOT.score);
     rain.drawBurst(grid, 1);
-    // au moins quelques cellules ont été remplacées par rainGo
+    // at least a few cells were replaced by rainGo
     const goDots = Array.from(grid).filter((v) => v === DOT.rainGo).length;
     expect(goDots).toBeGreaterThan(0);
   });
@@ -182,13 +182,13 @@ describe('MatrixRain', () => {
     const gB = emptyGrid();
     b.drawBurst(gB, -2);
 
-    // densité clampée à 0 dans les deux cas → même nombre de dots (traînées seules)
+    // density clamped to 0 in both cases → same dot count (trails only)
     expect(litCount(gB)).toBe(litCount(gA));
   });
 
   test('step recycle les colonnes sorties par le bas', () => {
-    // headY part de random*gridH. Avec un grand nombre de steps, aucune erreur
-    // et les dots restent dans les bornes.
+    // headY starts at random*gridH. With many steps, no error and dots stay
+    // within bounds.
     stubRandom([0.9]);
     const rain = new MatrixRain(GRID_W, GRID_H);
     const grid = emptyGrid();
@@ -196,7 +196,7 @@ describe('MatrixRain', () => {
       grid.fill(0);
       rain.drawBackground(grid);
     }
-    // tous les dots restent dans les bornes verticales
+    // all dots stay within the vertical bounds
     expect(litCount(grid)).toBeGreaterThanOrEqual(0);
     expect(grid.length).toBe(GRID_W * GRID_H);
   });

@@ -113,7 +113,7 @@ describe('laplacianSmoothPositions', () => {
   });
 
   test('sommet isolé (count 0) laissé inchangé', () => {
-    // v3 n_apparaît dans aucun triangle → counts[3] = 0.
+    // v3 appears in no triangle → counts[3] = 0.
     const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 5, 5]);
     const out = laplacianSmoothPositions(positions, [0, 1, 2], 1, 0.5);
     expect(Array.from(out).slice(9)).toEqual([5, 5, 5]);

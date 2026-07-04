@@ -19,7 +19,7 @@ describe('DetectBottomOut.check', () => {
   });
 
   test('couvre toute la largeur jusqu\'au mur droit (pas de limite couloir)', () => {
-    // Même côté couloir plongeur (x élevé), la balle doit drainer.
+    // Even on the shooter lane side (high x), the ball must drain.
     expect(detector.check({ x: WALL_RIGHT_X, z: BOTTOM_OUT_Z })).toBe(true);
   });
 

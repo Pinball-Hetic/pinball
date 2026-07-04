@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { rocketFront, rocketGlow } from './GarlandLights';
 
-// Décollage rocket des garlands (palier de score) : logique pure du balayage
-// montant (front + intensité par bulbe). Le rendu Three.js n'est pas testé ici.
+// Garland rocket liftoff (score milestone): pure logic of the rising sweep
+// (front + per-bulb intensity). Three.js rendering is not tested here.
 describe('rocketFront (balayage montant)', () => {
   test('démarre sous le premier bulbe à rocketT=1', () => {
     expect(rocketFront(1, 10)).toBeLessThan(0);

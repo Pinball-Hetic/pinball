@@ -20,9 +20,9 @@ export type AnalyticalColliderOptions = {
 };
 
 /**
- * Applier mince : traduit un ColliderSpec PUR (cf. ColliderSpecPlanner) en
- * appels Rapier createRigidBody/createCollider. Toute la math (translation /
- * halfExtents / quaternion / restitution / sensor) vit dans le planner testable.
+ * Thin applier: translates a ColliderSpec (see ColliderSpecPlanner) into
+ * Rapier createRigidBody/createCollider calls. All the math (translation /
+ * halfExtents / quaternion / restitution / sensor) lives in the planner.
  */
 function applyColliderSpec(
   world: RAPIER.World,
@@ -103,9 +103,9 @@ export class PlayfieldColliderFactory {
   }
 
   /**
-   * Colliders analytiques pour une map conventionnée (GLB role-driven) : sol
-   * lisse + bumpers + sensors + couloir plongeur. Les murs viennent des
-   * trimeshes wall_ (PlayfieldTrimeshBuilder.buildRoleDriven), pas d'ici.
+   * Analytic colliders for a conventioned map (role-driven GLB): smooth
+   * floor + bumpers + sensors + shooter lane. Walls come from the wall_
+   * trimeshes (PlayfieldTrimeshBuilder.buildRoleDriven), not from here.
    */
   static createForMap(
     world: RAPIER.World,
@@ -123,25 +123,26 @@ export class PlayfieldColliderFactory {
     layout: MapLayout,
     colliderMap: Map<number, string>,
   ): void {
-    // Sol analytique lisse (cuboïde incliné) qui remplace le trimesh bosselé du
-    // GLB (Mesh_0, exclu côté PlayfieldTrimeshBuilder). Une primitive boîte n'a
-    // aucune facette → la balle glisse sans accrocher les arêtes internes du
-    // trimesh (« ghost collisions » Rapier) qui la ralentissaient.
+    // Smooth analytic floor (tilted cuboid) replacing the bumpy GLB trimesh
+    // (Mesh_0, excluded in PlayfieldTrimeshBuilder). A box primitive has no
+    // facets → the ball glides without snagging on the trimesh's internal
+    // edges (Rapier "ghost collisions") that used to slow it down.
     PlayfieldColliderFactory.createPlayfieldFloor(world);
     PlayfieldColliderFactory.createBumpers(world, layout, colliderMap);
     PlayfieldColliderFactory.createSensors(world, layout, colliderMap);
-    // Sol analytique ACTIVÉ : le tapis GLB est splitté en 2
-    // trimeshes avec une couture à Z≈-0.286 en plein couloir (+ lèvre ~3mm
-    // sur Circle.001). Le strip lisse shadow la couture → launch fiable.
+    // Analytic floor ENABLED: the GLB playfield is split into 2 trimeshes
+    // with a seam at Z≈-0.286 right in the lane (+ a ~3mm lip on Circle.001).
+    // The smooth strip shadows the seam → reliable launch.
     PlayfieldColliderFactory.createShooterLane(world, layout, { includeFloor: true });
   }
 
   /**
-   * Couloir plongeur analytique : murs + guide (+ sol optionnel).
-   * Quand le sol GLB est multi-mesh, le sol analytique est REQUIS : le tapis GLB est
-   * splitté en 2 trimeshes (Mesh_1 / Circle.001) avec une couture + lèvre
-   * ~3mm à Z≈-0.286 en plein couloir → la bille montante déviait. Le strip
-   * lisse (createShooterLaneFloor) shadow la couture. includeFloor: true.
+   * Analytic shooter lane: walls + guide (+ optional floor).
+   * When the GLB floor is multi-mesh, the analytic floor is REQUIRED: the
+   * GLB playfield is split into 2 trimeshes (Mesh_1 / Circle.001) with a
+   * seam + ~3mm lip at Z≈-0.286 right in the lane → the climbing ball
+   * deviated. The smooth strip (createShooterLaneFloor) shadows the seam.
+   * includeFloor: true.
    */
   static createShooterLane(
     world: RAPIER.World,

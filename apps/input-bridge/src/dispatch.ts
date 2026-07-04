@@ -1,10 +1,10 @@
 import type { ButtonId, ButtonAction } from '@pinball/shared-types';
 import { parseLine } from './parser';
 
-// Mapping PUR ligne → effets, via un port `BridgeEmitter`. Aucune dépendance
-// socket ici : `handleLine` parse (parser.ts) puis dispatche vers l'emitter
-// injecté. Testable sans ouvrir de socket. L'adaptateur socket réel vit dans
-// `createSocketEmitter` (index.ts l'instancie).
+// Pure line → effects mapping via a `BridgeEmitter` port. No socket dependency
+// here: `handleLine` parses (parser.ts) then dispatches to the injected
+// emitter — testable without opening a socket. The real socket adapter is
+// `createSocketEmitter` (instantiated by index.ts).
 
 export interface BridgeEmitter {
   button(id: ButtonId, action: ButtonAction): void;
@@ -12,8 +12,8 @@ export interface BridgeEmitter {
   sensor(id: string, value: number): void;
 }
 
-// Structurel : seule la capacité d'émettre les events `input:*` est requise.
-// Découple l'adaptateur d'une instance socket.io concrète (testable).
+// Structural: only the ability to emit `input:*` events is required, so the
+// adapter is decoupled from a concrete socket.io instance.
 export interface InputSocket {
   emit(event: 'input:button', data: { id: ButtonId; action: ButtonAction }): unknown;
   emit(event: 'input:tilt', data: { state: 'TRIGGERED' }): unknown;
@@ -51,8 +51,8 @@ export function handleLine(raw: string, emitter: BridgeEmitter): void {
       emitter.sensor(parsed.id, parsed.value);
       return;
     case 'unknown':
-      // Lignes non reconnues (bruit de boot ESP32, etc.) — ignorées hors debug
-      // pour ne pas noyer les logs au démarrage du chip.
+      // Unrecognized lines (ESP32 boot noise, etc.) — ignored outside debug
+      // so the chip's startup does not flood the logs.
       if (process.env.INPUT_BRIDGE_VERBOSE) {
         console.error('[bridge] parse: unknown line:', JSON.stringify(parsed.line));
       }

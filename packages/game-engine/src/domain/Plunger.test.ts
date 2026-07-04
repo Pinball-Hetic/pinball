@@ -63,7 +63,7 @@ describe('release', () => {
     plunger.startCharge(500);
     const snapshot: PlungerState = plunger.release();
     plunger.startCharge(999);
-    // Le snapshot ne doit pas refléter la nouvelle charge.
+    // The snapshot must not reflect the new charge.
     expect(snapshot.chargeStartTime).toBe(500);
     expect(plunger.getState().chargeStartTime).toBe(999);
   });

@@ -102,7 +102,7 @@ describe('blit', () => {
   test('centre une ligne unique sur la grille', () => {
     const grid = emptyGrid();
     blit(grid, ['X'], () => 5);
-    // 1 ligne → y0 = (32-1)/2 = 15 ; 1 col → x0 = (96-1)/2 = 47
+    // 1 line → y0 = (32-1)/2 = 15; 1 col → x0 = (96-1)/2 = 47
     expect(grid[15 * GRID_W + 47]).toBe(5);
     expect(litCount(grid)).toBe(1);
   });
@@ -110,7 +110,7 @@ describe('blit', () => {
   test('saute . et espace (cellules transparentes)', () => {
     const grid = emptyGrid();
     blit(grid, ['.X '], () => 3);
-    // seule la cellule X est dessinée
+    // only the X cell is drawn
     expect(litCount(grid)).toBe(1);
   });
 
@@ -136,7 +136,7 @@ describe('blit', () => {
     const grid = emptyGrid();
     const tall = Array.from({ length: GRID_H + 10 }, () => 'X');
     blit(grid, tall, () => 1);
-    // aucune écriture hors [0, GRID_H)
+    // no write outside [0, GRID_H)
     expect(litCount(grid)).toBe(GRID_H);
   });
 
@@ -173,7 +173,7 @@ describe('drawClipFrame', () => {
   test('clampe au-delà de la dernière frame', () => {
     const grid = emptyGrid();
     drawClipFrame(grid, clip, 999999);
-    expect(litCount(grid)).toBe(3); // dernière frame 'XXX'
+    expect(litCount(grid)).toBe(3); // last frame 'XXX'
   });
 
   test('elapsed négatif → clampe à la première frame', () => {
@@ -190,8 +190,8 @@ describe('revealRadial', () => {
   test('t01=0 → rien révélé (ancre à dist 0, reveal 0)', () => {
     const grid = emptyGrid();
     revealRadial(grid, frame, charMap, 0);
-    // reveal = 0, toute cellule dist>0 cachée. La cellule à l'ancre exacte
-    // (centre-bas) a dist 0 = reveal → pas > reveal donc dessinée en front.
+    // reveal = 0, every cell with dist>0 is hidden. The cell exactly at the
+    // anchor (bottom-center) has dist 0 = reveal → not > reveal, so drawn as front.
     expect(litCount(grid)).toBeLessThanOrEqual(1);
   });
 
@@ -220,7 +220,7 @@ describe('revealRadial', () => {
   test('le front utilise la couleur accent (!)', () => {
     const grid = emptyGrid();
     revealRadial(grid, frame, charMap, 0.5);
-    // au moins une cellule de front en couleur accent (9)
+    // at least one front cell in the accent color (9)
     expect(Array.from(grid)).toContain(9);
   });
 });
@@ -233,15 +233,15 @@ describe('dissolve', () => {
     const grid = emptyGrid();
     dissolve(grid, frame, charMap, 0);
     expect(litCount(grid)).toBe(16);
-    // aucune cellule en poussière
+    // no dust cell
     expect(Array.from(grid)).not.toContain(6);
   });
 
   test('t01=1 → quasi tout disparu (seules les cellules seuil>=0.9 restent en poussière)', () => {
     const grid = emptyGrid();
     dissolve(grid, frame, charMap, 1);
-    // À t01=1, une cellule survit en poussière ssi threshold+0.1 >= 1,
-    // soit threshold >= 0.9 (hash01 max ~0.999). Tout résidu est de la poussière.
+    // At t01=1 a cell survives as dust iff threshold+0.1 >= 1, i.e.
+    // threshold >= 0.9 (hash01 max ~0.999). Any residue is dust.
     for (const v of grid) {
       if (v !== 0) expect(v).toBe(6);
     }
@@ -263,7 +263,7 @@ describe('dissolve', () => {
   });
 
   test('phase poussière (:) visible à mi-parcours', () => {
-    // À t01 intermédiaire, certaines cellules sont en (threshold, threshold+0.1].
+    // At an intermediate t01, some cells are within (threshold, threshold+0.1].
     let found = false;
     for (let t = 0.05; t < 1 && !found; t += 0.05) {
       const grid = emptyGrid();

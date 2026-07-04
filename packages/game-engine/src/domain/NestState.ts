@@ -3,11 +3,11 @@ import type { BossDefinition, BossGateContext } from './BossRegistry';
 
 export type NestState = 'locked' | 'armed' | 'revealed';
 
-// Délai avant le hint tardif du nid : armé > 45 s sans reveal.
+// Delay before the late nest hint: armed > 45 s without a reveal.
 export const NEST_LATE_HINT_MS = 45_000;
 
-// Décision pure de l'état d'un nid de boss : déclenché → revealed ;
-// sinon palier de score atteint → armed ; sinon locked.
+// Boss nest state: triggered → revealed; else score threshold met → armed;
+// else locked.
 export function resolveNestState(
   boss: BossDefinition,
   gate: BossGateContext,
@@ -17,9 +17,8 @@ export function resolveNestState(
   return bossThresholdMet(boss, gate) ? 'armed' : 'locked';
 }
 
-// Décision pure : parmi les boss candidats, lesquels doivent émettre leur
-// hint tardif maintenant (armé depuis >= 45 s, pas encore émis). Idempotent ;
-// le caller marque hintFired après émission.
+// Which candidate bosses must emit their late hint now (armed >= 45 s, not
+// yet emitted). Idempotent; the caller marks hintFired after emitting.
 export function dueLateHints(
   bossIds: readonly string[],
   armedAt: Readonly<Record<string, number>>,

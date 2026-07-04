@@ -12,9 +12,8 @@ export type BossRevealContext = BossGateContext & {
   gameState: string;
 };
 
-// Injectable sensor factory (DIP): defaults to a real BossTargetSensor, but
-// tests can substitute a fake to observe/drive per-boss sensor behaviour
-// without touching the wall clock.
+// Sensor factory: tests substitute a fake to observe/drive per-boss sensor
+// behaviour without touching the wall clock.
 export type BossTargetSensorFactory = (now: () => number) => BossTargetSensor;
 
 const defaultSensorFactory: BossTargetSensorFactory = (now) => new BossTargetSensor(now);
@@ -24,15 +23,15 @@ export class BossFightManager {
   private readonly byId = new Map<BossId, BossDefinition>();
   private readonly byRole = new Map<string, BossDefinition>();
 
-  // Définitions de boss injectées par la map (layout.bosses) — le moteur ne
-  // connaît plus de boss en dur.
+  // Boss definitions injected by the map (layout.bosses) — the engine knows
+  // no hardcoded bosses.
   constructor(
     private readonly emit: GameEventListener,
     private readonly bosses: BossDefinition[],
-    // Injected clock (DIP): threaded into each BossTargetSensor so the per-hit
+    // Injected clock: threaded into each BossTargetSensor so the per-hit
     // cooldown is deterministic in tests.
     now: () => number = () => performance.now(),
-    // Injected sensor factory (DIP): substitutable in tests, defaults to a real
+    // Injected sensor factory: substitutable in tests, defaults to a real
     // BossTargetSensor wired to `now`.
     createSensor: BossTargetSensorFactory = defaultSensorFactory,
   ) {
@@ -79,7 +78,7 @@ export class BossFightManager {
     state.sensor.beginFight(targetArmed);
   }
 
-  /** True si le combat du boss est déclenché (reveal consommé, nid « ouvert »). */
+  /** True if the boss fight is triggered (reveal consumed, nest "open"). */
   isTriggered(id: BossId): boolean {
     return this.states.get(id)?.triggered ?? false;
   }
@@ -120,11 +119,11 @@ export class BossFightManager {
   }
 
   /**
-   * DEBUG (/debug) : reveal par le VRAI chemin d'état — beginFight + emit,
-   * comme tryReveal, mais sans le gate de seuil de score. Garde les autres
-   * invariants (playing, pas déjà déclenché, un seul combat à la fois) : le
-   * boss apparaît ARMÉ et ses colliders créditent réellement les billes,
-   * contrairement à un event BOSS_REVEAL brut (visuels seuls, boss fantôme).
+   * DEBUG (/debug): reveal via the REAL state path — beginFight + emit, like
+   * tryReveal, but without the score-threshold gate. Keeps the other
+   * invariants (playing, not already triggered, one fight at a time): the
+   * boss appears ARMED and its colliders really credit balls, unlike a raw
+   * BOSS_REVEAL event (visuals only, ghost boss).
    */
   forceReveal(id: BossId, gameState: string): void {
     const def = this.byId.get(id);
@@ -143,9 +142,9 @@ export class BossFightManager {
   }
 
   /**
-   * DEBUG (/debug) : crédite UN hit par le vrai sensor (compteur réel,
-   * cooldown ignoré — bouton, pas rebond physique). Le boss meurt donc
-   * réellement après targetHits clics, états/resets cohérents.
+   * DEBUG (/debug): credits ONE hit via the real sensor (real counter,
+   * cooldown ignored — it's a button, not a physical bounce). The boss thus
+   * really dies after targetHits clicks, with consistent states/resets.
    */
   forceTargetHit(id: BossId, gameState: string): void {
     const def = this.byId.get(id);
@@ -163,8 +162,8 @@ export class BossFightManager {
         });
       },
     };
-    // Simule un passage complet de bille : contact puis sortie (le sensor
-    // exige la fin de contact avant de recompter).
+    // Simulates a full ball pass: contact then exit (the sensor requires
+    // contact end before counting again).
     sensor.handleCollision(true, gameState, opts);
     sensor.handleCollision(false, gameState, opts);
   }

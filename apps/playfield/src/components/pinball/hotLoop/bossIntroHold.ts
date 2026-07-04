@@ -1,10 +1,9 @@
 import type { BallPhysics } from "@pinball/game-engine";
 import type { InputState } from "../createApplyAction";
 
-// État du hold d'intro boss : à l'entrée en intro, on capture la position de la
-// bille et on la fige (relâche des flippers + vitesses nulles) ; stepBallSync la
-// maintient à `pos` tant que l'intro dure. Rising-edge : la capture n'a lieu
-// qu'une fois par intro.
+// Boss-intro hold state: on entering the intro, capture the ball position and
+// freeze it (release flippers + zero velocities); stepBallSync keeps it at `pos`
+// for the intro's duration. Rising-edge: capture happens only once per intro.
 export interface BossIntroHoldState {
   holding: boolean;
   pos: { x: number; y: number; z: number };

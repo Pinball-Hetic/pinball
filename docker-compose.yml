@@ -21,14 +21,14 @@ services:
       dockerfile: apps/server/Dockerfile
     environment:
       DATABASE_URL: "postgresql://user:password@db:5432/pinball?schema=public"
-      # API globale (scores mondiaux + claim QR). Sur la borne Fliphetic ces
-      # valeurs viennent des env vars par-app du dashboard (Operations), PAS du
-      # .env racine (gitignoré, absent de la borne). Le `:-` fournit un défaut
-      # vide : sans lui, compose émet un warning que l'override Fliphetic capture
-      # dans le YAML généré → load en échec. Absents → outro/QR + classement
-      # mondial dégradent en local-only (pas de crash, catché côté serveur).
+      # Global API (world scores + QR claim). On the Fliphetic cabinet these
+      # values come from the dashboard's per-app env vars (Operations), NOT the
+      # root .env (gitignored, absent from the cabinet). The `:-` provides an
+      # empty default: without it, compose emits a warning that the Fliphetic
+      # override captures in the generated YAML → load fails. Absent → outro/QR +
+      # world leaderboard degrade to local-only (no crash, caught server-side).
       GLOBAL_API_URL: "${GLOBAL_API_URL:-}"
-      BORNE_TOKEN: "${BORNE_TOKEN:-}" # token brk_ par borne, jamais en dur
+      BORNE_TOKEN: "${BORNE_TOKEN:-}" # per-cabinet brk_ token, never hardcoded
     depends_on:
       db:
         condition: service_healthy
@@ -40,9 +40,9 @@ services:
       start_period: 15s
 
   playfield:
-    # NEXT_PUBLIC_KEYBOARD_MODE est inliné au BUILD (next build) → build-arg,
-    # PAS environment runtime. `disabled` : l'ESP32 réel pilote les boutons,
-    # le clavier de jeu reste inerte (H debug toujours actif).
+    # NEXT_PUBLIC_KEYBOARD_MODE is inlined at BUILD (next build) → build-arg,
+    # NOT runtime environment. `disabled`: the real ESP32 drives the buttons,
+    # the game keyboard stays inert (H debug always active).
     build:
       context: .
       dockerfile: apps/playfield/Dockerfile
@@ -98,8 +98,8 @@ services:
       dockerfile: apps/input-bridge/Dockerfile
     restart: unless-stopped
     environment:
-      # ESP32 réel : device borne = /dev/ttyUSB0 (CP2102), flashé par Fliphetic
-      # AVANT le compose up (cf. cycle de chargement, CLAUDE.md).
+      # Real ESP32: cabinet device = /dev/ttyUSB0 (CP2102), flashed by Fliphetic
+      # BEFORE compose up (cf. load cycle, CLAUDE.md).
       INPUT_BRIDGE_MODE: serial
       SERIAL_PATH: /dev/ttyUSB0
       SERIAL_BAUD: "115200"
@@ -107,9 +107,10 @@ services:
     depends_on:
       server:
         condition: service_healthy
-    # Mapping DUR du port série hôte → conteneur. Sur la borne, Fliphetic flashe
-    # l'ESP32 → /dev/ttyUSB0 présent avant `compose up`. Sur un poste SANS ESP32,
-    # `compose up` de ce fichier échoue à créer ce conteneur (attendu : prod = borne).
+    # HARD mapping of the host serial port → container. On the cabinet, Fliphetic
+    # flashes the ESP32 → /dev/ttyUSB0 present before `compose up`. On a host
+    # WITHOUT an ESP32, `compose up` of this file fails to create this container
+    # (expected: prod = cabinet).
     devices:
       - "/dev/ttyUSB0:/dev/ttyUSB0"
 

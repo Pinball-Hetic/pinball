@@ -50,7 +50,7 @@ describe('getBossDefinition', () => {
   })
 
   test('renvoie undefined pour un id inconnu', () => {
-    // byId est un Record sans entrée → undefined (pas de fallback).
+    // byId is a Record with no entry → undefined (no fallback).
     expect(getBossDefinition('unknown' as never)).toBeUndefined()
   })
 })
@@ -82,7 +82,7 @@ describe('bosses — sémantique de reveal et de monde alternatif', () => {
     expect(b.hud.requiresAlternateWorld).toBe(false)
     expect(b.unlocksPortal).toBe(true)
     expect(b.unlocksReturnPortal).toBe(false)
-    // Ganondorf joue sa fanfare en one-shot via manifest.sounds (pas de revealSoundUrl).
+    // Ganondorf plays its fanfare one-shot via manifest.sounds (no revealSoundUrl).
     expect(b.revealSoundUrl).toBeUndefined()
   })
 

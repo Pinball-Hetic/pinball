@@ -5,8 +5,7 @@ import * as THREE from 'three';
  * Upside Down, Zelda Sacred Realm). The per-element apply-side lerps live in
  * `AtmosphereTint`; the blend integrator in `AtmosphereBlend` (domain). These
  * helpers capture/restore the scene lighting snapshot, collect the material
- * snapshots, and run the fog apply/restore lifecycle — all VERBATIM from the
- * original duplicated `setup()`/`dispose()`/`applyFog()` bodies.
+ * snapshots, and run the fog apply/restore lifecycle.
  *
  * game-engine takes THREE types only — no map import.
  */
@@ -22,10 +21,9 @@ export type SceneLighting = {
 };
 
 /**
- * Snapshot of the scene/renderer/light state captured at `setup()`. Mirrors the
- * `orig*` fields that both atmospheres duplicated verbatim. `capture()` reads
- * them off a `SceneLighting`; the caller passes the stored snapshot fields back
- * into the `AtmosphereTint` apply helpers each frame.
+ * Snapshot of the scene/renderer/light state captured at `setup()`.
+ * `capture()` reads it off a `SceneLighting`; the caller passes the stored
+ * snapshot fields back into the `AtmosphereTint` apply helpers each frame.
  */
 export class LightingSnapshot {
   readonly bg = new THREE.Color();
@@ -40,7 +38,7 @@ export class LightingSnapshot {
   readonly fillColor = new THREE.Color();
   fillIntensity = 1;
 
-  /** Read the current lighting state into this snapshot. VERBATIM capture. */
+  /** Read the current lighting state into this snapshot. */
   capture(lighting: SceneLighting): void {
     const bg = lighting.scene.background;
     if (bg instanceof THREE.Color) this.bg.copy(bg);
@@ -68,7 +66,7 @@ export type AtmosphereMaterialEntry<Extra = unknown> = {
 /**
  * Traverse `root`, snapshotting every unique `MeshStandardMaterial` into an
  * entry. `skip(obj)` drops a mesh entirely (ST flippers/garlands/bumpers);
- * `extra(obj)` adds per-map fields (ST `kind`). VERBATIM dedupe + clone.
+ * `extra(obj)` adds per-map fields (ST `kind`).
  */
 export function collectAtmosphereMaterials<Extra extends object = Record<never, never>>(
   root: THREE.Object3D,
@@ -102,7 +100,7 @@ export function collectAtmosphereMaterials<Extra extends object = Record<never, 
  * FogExp2 apply/restore lifecycle. `apply()` swaps the map fog onto the scene
  * (restoring the saved fog when `ease <= 0`) and sets its density; `restore()`
  * puts the saved fog back. The caller owns the density formula (ST folds in a
- * `revealLift` factor, Zelda does not). VERBATIM plumbing.
+ * `revealLift` factor, Zelda does not).
  */
 export class AtmosphereFog {
   private readonly fog: THREE.FogExp2;

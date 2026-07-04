@@ -1,12 +1,11 @@
-/* Styles des composants backglass Stranger Things (déplacés du globals de
-   l'app — dette CSS du refacto multi-maps résorbée). CSS Module SCOPÉ :
-   les composants accèdent aux classes via styles['nom']. Les classes
-   structurelles/génériques de l'app (tk-center, glitch-text, vhs*, tk-confetti,
-   confetti-dot, tk-kicker/score, tabular-nums) restent globales → référencées
-   par chaîne globale côté composant, ou via :global() ici. Tokens de thème
-   (--glow, --st-font, --heat, --sway-dur…) posés par l'app sur le conteneur.
-   slide-in / pulse-soft : copies locales (les originales globales servent au
-   structurel de l'app ; ici scopées avec les classes ST qui les utilisent). */
+/* Stranger Things backglass component styles. SCOPED CSS Module: components
+   access classes via styles['name']. The app's structural/generic classes
+   (tk-center, glitch-text, vhs*, tk-confetti, confetti-dot, tk-kicker/score,
+   tabular-nums) stay global → referenced by global string on the component
+   side, or via :global() here. Theme tokens (--glow, --st-font, --heat,
+   --sway-dur…) are set by the app on the container. slide-in / pulse-soft:
+   local copies (the global originals serve the app's structural needs; here
+   scoped with the ST classes that use them). */
 
 /* ---------- Joyce wall ---------- */
 .joyce-wall {
@@ -69,7 +68,7 @@
 .vine {
   transform-origin: bottom center;
   animation: vine-sway var(--sway-dur) ease-in-out infinite;
-  /* heat module la vitesse des vignes (plus chaud = plus rapide) */
+  /* heat modulates the vine speed (hotter = faster) */
   animation-duration: calc(var(--sway-dur, 5s) * (1 - var(--heat, 0) * 0.6));
 }
 @keyframes vine-sway {
@@ -85,7 +84,7 @@
   50% { transform: scaleY(1.03); }
 }
 
-/* RAMP : trait lumineux vertical sur le latéral (SideArt) */
+/* RAMP: vertical light streak on the side panel (SideArt) */
 .ramp-beam {
   position: absolute;
   top: 0;
@@ -210,7 +209,7 @@
   animation: pulse-soft 0.6s ease-in-out infinite;
 }
 
-/* milestone_30k : fusée qui traverse de bas en haut. */
+/* milestone_30k: rocket crossing bottom-to-top. */
 .tk-cine-rocket { background: radial-gradient(ellipse at 50% 60%, #1a1206, #050308 70%, #000); }
 .cine-rocket {
   position: absolute;
@@ -230,10 +229,10 @@
   100% { bottom: 120%; opacity: 0; }
 }
 
-/* milestone_big : réutilise .tk-confetti / .confetti-dot (globales app). */
+/* milestone_big: reuses .tk-confetti / .confetti-dot (app globals). */
 .tk-cine-fireworks { background: radial-gradient(ellipse at 50% 45%, #1a1206, #050308 70%, #000); }
 
-/* hetic_complete : 5 lettres géantes + explosion + FEVER. */
+/* hetic_complete: 5 giant letters + explosion + FEVER. */
 .tk-cine-hetic { background: radial-gradient(ellipse at 50% 45%, #2a1a06, #060406 70%, #000); }
 .cine-hetic-letters {
   position: absolute;
@@ -262,8 +261,8 @@
   animation: pulse-soft 0.4s ease-in-out infinite;
 }
 
-/* Copies locales des keyframes génériques utilisées par les classes ST
-   ci-dessus (les originales restent globales dans le globals de l'app). */
+/* Local copies of the generic keyframes used by the ST classes above (the
+   originals stay global in the app's globals). */
 @keyframes slide-in {
   0% { opacity: 0; transform: translateX(40px); }
   100% { opacity: 1; transform: translateX(0); }

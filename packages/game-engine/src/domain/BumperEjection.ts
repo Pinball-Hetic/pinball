@@ -5,8 +5,9 @@ export interface EjectionImpulse {
 }
 
 /**
- * Impulsion radiale d'éjection : pousse la balle loin du bumper dans le plan XZ.
- * Le garde `|| 1` évite la division par zéro quand la balle est pile au centre.
+ * Radial ejection impulse: pushes the ball away from the bumper in the XZ
+ * plane. The `|| 1` guard avoids division by zero when the ball sits exactly
+ * at the center.
  */
 export function radialEjectionImpulse(
   ballPos: { x: number; z: number },
@@ -20,8 +21,8 @@ export function radialEjectionImpulse(
 }
 
 /**
- * Impulsion latérale déterministe : bump_left pousse à droite (+X), bump_right
- * pousse à gauche (-X). Direction horizontale indépendante du point d'impact.
+ * Deterministic sided impulse: bump_left pushes right (+X), bump_right pushes
+ * left (-X). Horizontal direction is independent of the impact point.
  */
 export function sidedEjectionImpulse(side: 'left' | 'right', magnitude: number): EjectionImpulse {
   const xDir = side === 'left' ? 1 : -1;

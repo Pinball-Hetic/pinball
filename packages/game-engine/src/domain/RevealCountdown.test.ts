@@ -16,7 +16,7 @@ describe('RevealCountdown', () => {
     const c = new RevealCountdown();
     c.start(0.2);
     c.tick(0.15);
-    c.start(5); // ne doit pas réécraser les 0.05 s restantes
+    c.start(5); // must not overwrite the remaining 0.05 s
     expect(c.tick(0.1)).toBe(true);
   });
 

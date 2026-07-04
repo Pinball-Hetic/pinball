@@ -6,7 +6,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 const ROW1 = ALPHABET.slice(0, 13)
 const ROW2 = ALPHABET.slice(13)
 
-// Couleurs guirlande variées (façon mur de Joyce)
+// Varied garland colors (Joyce's wall style)
 const GARLAND = [
   '#ff3b30', '#ffcc00', '#34c759', '#00c7ff', '#bf5af2',
   '#ff9f0a', '#ff2d92', '#5e5ce6', '#30d158', '#ff6b3b',
@@ -17,7 +17,7 @@ const colorFor = (i: number) => GARLAND[i % GARLAND.length]
 
 interface JoyceWallProps {
   message: string | null
-  messageId?: number // change → ré-enfile même si le texte est identique
+  messageId?: number // change → re-enqueue even if the text is identical
   reactor?: Reactor
 }
 
@@ -29,7 +29,7 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
   const timersRef = useRef<Set<number>>(new Set())
   const hitCursorRef = useRef(0)
 
-  // Set + auto-prune : sur une borne 24/7 l'array grossissait sans fin.
+  // Set + auto-prune: on a 24/7 cabinet the array grew without end.
   const later = (fn: () => void, ms: number) => {
     const id = window.setTimeout(() => {
       timersRef.current.delete(id)
@@ -38,7 +38,7 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
     timersRef.current.add(id)
   }
 
-  // Mutation DOM directe d'une ampoule (0 re-render React)
+  // Direct DOM mutation of a bulb (0 React re-render)
   const applyGlow = (idx: number, g: number) => {
     const bulb = bulbRefs.current[idx]
     const letter = letterRefs.current[idx]
@@ -59,7 +59,7 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
     }, holdMs)
   }
 
-  // ----- File de messages (épellation lettre par lettre) -----
+  // ----- Message queue (letter-by-letter spelling) -----
   const enqueue = (text: string) => {
     queueRef.current.push(text)
     if (!busyRef.current) runNext()
@@ -79,8 +79,8 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
     letters.forEach((c, i) => {
       const idx = c.charCodeAt(0) - 65
       later(() => {
-        applyGlow(idx, 1) // flash fort
-        later(() => applyGlow(idx, 0.45), 220) // puis faiblement allumée
+        applyGlow(idx, 1) // strong flash
+        later(() => applyGlow(idx, 0.45), 220) // then dimly lit
       }, i * STEP)
     })
     const total = letters.length * STEP
@@ -90,7 +90,7 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
     }, total + 2000)
   }
 
-  // ----- Flicker d'ambiance (fréquence modulée par le heat) -----
+  // ----- Ambient flicker (frequency modulated by heat) -----
   useEffect(() => {
     let alive = true
     let timer = 0
@@ -101,7 +101,7 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
         flickerBulb(idx, 0.5, 170)
       }
       const heat = reactor?.getHeat() ?? 0
-      // calme : 1–3s ; embrasé : ~200–400ms
+      // calm: 1–3s; blazing: ~200–400ms
       const base = 1000 + Math.random() * 2000
       const delay = base * (1 - heat * 0.85)
       timer = window.setTimeout(tick, Math.max(180, delay))
@@ -120,7 +120,7 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
     // eslint-disable-next-line
   }, [messageId, message])
 
-  // ----- Réactions in-game -----
+  // ----- In-game reactions -----
   useEffect(() => {
     if (!reactor) return
     const off = reactor.on((r) => {
@@ -133,13 +133,13 @@ export default function JoyceWall({ message, messageId, reactor }: JoyceWallProp
         flickerBulb(idx, 0.4 + r.intensity * 0.6, 160)
       } else if (r.kind === 'combo') {
         if (busyRef.current) return
-        // chenillard : vague qui balaye la guirlande, vitesse ∝ combo
+        // chase light: wave sweeping the garland, speed ∝ combo
         const step = Math.max(28, 110 - r.combo * 6)
         for (let i = 0; i < 26; i++) {
           later(() => flickerBulb(i, 0.85, 140), i * step)
         }
       } else if (r.kind === 'lifeLost') {
-        // ampoules s'éteignent une à une puis ambiance reprend
+        // bulbs turn off one by one then the ambience resumes
         busyRef.current = true
         for (let i = 0; i < 26; i++) applyGlow(i, 0.4)
         for (let i = 0; i < 26; i++) {

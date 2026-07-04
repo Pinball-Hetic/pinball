@@ -11,7 +11,7 @@ export type PlayfieldCinematicStrobeConfig = {
   flashDecay?: number;
 };
 
-/** Port décor optionnel (DIP) : pilote des lumières/visuels au rythme du strobe. */
+/** Optional decor port: drives lights/visuals in time with the strobe. */
 export interface DecorLights {
   setStrobe(active: boolean, on: boolean, normalWhenOn?: boolean): void;
 }
@@ -23,7 +23,7 @@ export class PlayfieldCinematicStrobe {
   private decor: DecorLights[] = [];
   private flashIntensity = 2.4;
 
-  // La PointLight n'est DANS la scène que quand elle flashe (perf).
+  // The PointLight is IN the scene only while it flashes (perf).
   private setFlash(intensity: number): void {
     if (!this.flashLight) return;
     this.flashLight.intensity = intensity;
@@ -55,7 +55,7 @@ export class PlayfieldCinematicStrobe {
       config.flashDecay ?? 2,
     );
     this.flashLight.position.copy(config.flashPosition);
-    this.flashRoot = root; // ajout/retrait à la demande
+    this.flashRoot = root; // add/remove on demand
   }
 
   apply(on: boolean, fullMap: boolean, mix: number): void {
@@ -67,7 +67,7 @@ export class PlayfieldCinematicStrobe {
     for (const d of this.decor) d.setStrobe(active, on, fullMap);
   }
 
-  /** Flash sans shade overlay — pour les maps qui ne veulent pas de voile noir. */
+  /** Flash without shade overlay — for maps that don't want a black veil. */
   applyFlashOnly(on: boolean, mix: number): void {
     this.shade.setOpacity(0);
     this.setFlash(on ? this.flashIntensity * mix : 0);

@@ -7,9 +7,9 @@ export interface CinematicSpec {
 }
 
 /**
- * Directeur de cinématiques : généralise le pattern de pause
- * d'la transition de monde (clip joué → physique gelée pendant sa durée).
- * Le playfield combine `transitionActive || director.shouldFreeze()`.
+ * Cinematics director: generalizes the world-transition pause pattern
+ * (clip playing → physics frozen for its duration).
+ * The playfield combines `transitionActive || director.shouldFreeze()`.
  */
 export class CinematicDirector {
   private active: CinematicSpec | null = null;
@@ -25,27 +25,27 @@ export class CinematicDirector {
     return this.active !== null;
   }
 
-  /** true si la physique doit être gelée cette frame */
+  /** true if physics must be frozen this frame */
   shouldFreeze(): boolean {
     return this.active !== null && this.active.freezePhysics;
   }
 
   /**
-   * Temps écoulé (ms) depuis le début du clip actif, ou -1 si aucun.
-   * Permet au playfield de piloter un feedback (strobe) pendant le gel sans
-   * dupliquer la mesure de temps du director.
+   * Elapsed time (ms) since the active clip started, or -1 if none.
+   * Lets the playfield drive a feedback (strobe) during the freeze without
+   * duplicating the director's time measurement.
    */
   activeElapsedMs(now: number = this.now()): number {
     if (!this.active) return -1;
     return now - this.startedAt;
   }
 
-  /** Durée (ms) du clip actif, ou -1 si aucun. */
+  /** Duration (ms) of the active clip, or -1 if none. */
   activeDurationMs(): number {
     return this.active?.durationMs ?? -1;
   }
 
-  /** joue un clip ; once=true → une seule fois par partie */
+  /** plays a clip; once=true → only once per game */
   play(spec: CinematicSpec, opts?: { once?: boolean }): boolean {
     if (opts?.once && this.playedThisGame.has(spec.id)) return false;
     if (opts?.once) this.playedThisGame.add(spec.id);
@@ -55,7 +55,7 @@ export class CinematicDirector {
     return true;
   }
 
-  /** à appeler chaque frame avec performance.now() */
+  /** call every frame with performance.now() */
   update(now: number): void {
     if (!this.active) return;
     if (now - this.startedAt >= this.active.durationMs) {
@@ -65,12 +65,12 @@ export class CinematicDirector {
     }
   }
 
-  /** reset par partie (appelé au resetGame) */
+  /** per-game reset (called on resetGame) */
   resetGame(): void {
     this.playedThisGame.clear();
-    // Annule un clip encore actif (sinon shouldFreeze() resterait vrai et
-    // gèlerait la physique de la nouvelle partie). onEnd() lève le gel
-    // gameplay / restaure caméra+DMD → doit être appelé avant de nuller.
+    // Cancel a still-active clip (otherwise shouldFreeze() would stay true
+    // and freeze the new game's physics). onEnd() lifts the gameplay freeze /
+    // restores camera+DMD → must be called before nulling.
     const spec = this.active;
     this.active = null;
     spec?.onEnd?.();

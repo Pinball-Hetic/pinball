@@ -1,25 +1,25 @@
 import { mapAssetUrl, type MapManifest } from '@pinball/shared-types'
 
-// Id de la map + helper de résolution d'asset (URL publique /maps/<id>/…).
-// SEULE source du littéral d'id dans le package (assets synchronisés depuis
+// Map id + asset resolution helper (public URL /maps/<id>/…).
+// ONLY source of the id literal in the package (assets synced from
 // packages/maps/strangerthings/assets/).
 export const MAP_ID = 'strangerthings'
 export const mapAsset = (rel: string) => mapAssetUrl(MAP_ID, rel)
 
-// Manifest de la map Stranger Things. Les valeurs sont issues des
-// constantes game-engine (ScoringConstants, BossRegistry, FlipperConstants)
-// et de useGameState. Phases ultérieures : le moteur lira ces valeurs depuis
-// le manifest (injection) au lieu des constantes hardcodées.
+// Stranger Things map manifest. Values come from game-engine constants
+// (ScoringConstants, BossRegistry, FlipperConstants) and useGameState.
+// Later phases: the engine will read these from the manifest (injection)
+// instead of hardcoded constants.
 export const manifest: MapManifest = {
   id: MAP_ID,
   name: 'Stranger Things',
   version: 1,
   attractTagline: 'Hawkins National Laboratory',
-  // Tokens CSS consommés par l'overlay playfield (outro). Une map sans theme
-  // → overlay garde ses défauts neutres.
+  // CSS tokens consumed by the playfield overlay (outro). A map without
+  // theme → overlay keeps its neutral defaults.
   theme: {
     '--glow': '#ff2d2d',
-    '--glow-alt': '#b14dff', // monde inversé
+    '--glow-alt': '#b14dff', // upside down world
     '--st-font': "'Times New Roman', Georgia, serif",
     '--vignette': '#2a0606',
     '--foreground': '#ede4d3',
@@ -30,7 +30,7 @@ export const manifest: MapManifest = {
     replayLabel: 'START — Rejouer',
     qrLogo: mapAsset('playfield/demogorgon.png'),
   },
-  // Familles de cinématique (overlay fallback générique). Non listé → 'other'.
+  // Cinematic families (generic overlay fallback). Not listed → 'other'.
   clipFamilies: {
     demogorgon_rises: 'boss',
     demogorgon_slain: 'boss',
@@ -43,44 +43,44 @@ export const manifest: MapManifest = {
     milestone_30k: 'milestone',
     milestone_big: 'milestone',
   },
-  // Assets préchargés par la page playfield (URL publique /maps/<id>/…).
+  // Assets preloaded by the playfield page (public URL /maps/<id>/…).
   preload: [
     mapAsset('playfield/demogorgon.glb'),
     mapAsset('playfield/demogorgon.png'),
     mapAsset('playfield/fin_combat_vecna.png'),
-    // GLB Vecna (~28 Mo) : le fetch démarre dès la page (link rel=preload) au
-    // lieu d'attendre le mount du module — sinon il rallonge le preload boss.
+    // Vecna GLB (~28 MB): fetch starts at page load (link rel=preload)
+    // instead of waiting for module mount — otherwise it delays boss preload.
     mapAsset('playfield/vecna.glb'),
   ],
-  // Sons d'event de la map (joués via ctx.playSound(id)).
+  // Map event sounds (played via ctx.playSound(id)).
   sounds: {
     upside_down_appear: { url: mapAsset('audio/apparitionUpsideDown.mp3'), volume: 280 },
   },
-  // Libellés des compteurs (recap backglass).
+  // Counter labels (backglass recap).
   counterLabels: { demogorgons: 'DEMOGORGONS', portals: 'PORTAILS', hetic: 'HETIC' },
-  // Clés de mapState éditables par l'outil de debug (dev).
+  // mapState keys editable by the debug tool (dev).
   debugMapState: { numbers: ['hetic'], flags: ['fever'] },
-  // Timings des clips (ex-tables CLIP_*_MS) : showMs / freezeMs / takeoverMs.
+  // Clip timings: showMs / freezeMs / takeoverMs.
   clips: {
-    demogorgon_rises: { showMs: 10_000, freezeMs: 6_000 }, // 6s gel + 4s célébration
+    demogorgon_rises: { showMs: 10_000, freezeMs: 6_000 }, // 6s freeze + 4s celebration
     portal_swallow: { showMs: 4_000, freezeMs: 4_000 },
     demogorgon_slain: { showMs: 15_000, freezeMs: 2_600 },
     last_chance: { showMs: 2_000, freezeMs: 0 },
     hall_of_fame: { showMs: 25_000, freezeMs: 0 },
     milestone_5k: { showMs: 4_000, freezeMs: 0 },
-    // Paliers + lettres : PAS de gel physique. Le playfield est l'écran
-    // regardé — on ne fige pas la bille pour un clip DMD/backglass (ignorés).
-    // Le clip joue quand même (showMs), la bille continue de rouler ; le cue
-    // playfield (sweep garland + shake) reste non-bloquant.
+    // Milestones + letters: NO physics freeze. The playfield is the watched
+    // screen — don't freeze the ball for a DMD/backglass clip. The clip still
+    // plays (showMs), the ball keeps rolling; the playfield cue
+    // (garland sweep + shake) stays non-blocking.
     milestone_15k: { showMs: 8_000, freezeMs: 0 },
     milestone_30k: { showMs: 13_000, freezeMs: 0 },
     milestone_big: { showMs: 15_000, freezeMs: 0 },
     hetic_letter: { showMs: 5_000, freezeMs: 0 },
-    hetic_complete: { showMs: 40_000, freezeMs: 10_000, takeoverMs: 10_000 }, // 10s ciné + 30s fever
+    hetic_complete: { showMs: 40_000, freezeMs: 10_000, takeoverMs: 10_000 }, // 10s cinematic + 30s fever
     skill_shot: { showMs: 5_000, freezeMs: 2_000 },
   },
   glb: mapAsset('playfield/newStrangerthings.glb'),
-  // Points par rôle (ScoringConstants.ts + valeurs boss du BossRegistry).
+  // Points per role (ScoringConstants.ts + boss values from BossRegistry).
   scoring: {
     bumper: 1000, // SCORE_BUMPER
     bump: 30, // SCORE_BUMP
@@ -101,25 +101,25 @@ export const manifest: MapManifest = {
     milestoneRepeatEvery: 25_000, // MILESTONE_REPEAT_EVERY
     comboDecayMs: 2_000, // COMBO_DECAY_MS
   },
-  // Nuances matière par mesh (clé = nom conventionné). Reprend la classif
-  // historique de PlayfieldTrimeshBuilder. Défaut wall_ non listé :
-  // restitution 0.35, friction 0.15, double-sided, lissage Laplacien.
-  //   physics:'analytic' → pas de trimesh (le sol lisse analytique gère)
-  //   singleSided:1      → trimesh single-sided (normales vers l'intérieur)
-  //   doubleSided:0/1    → force le double-sided
-  //   smooth:0/1         → lissage Laplacien
+  // Per-mesh material tuning (key = conventioned name). Default for
+  // unlisted wall_ meshes: restitution 0.35, friction 0.15, double-sided,
+  // Laplacian smoothing.
+  //   physics:'analytic' → no trimesh (the smooth analytic floor handles it)
+  //   singleSided:1      → single-sided trimesh (normals facing inward)
+  //   doubleSided:0/1    → forces double-sided
+  //   smooth:0/1         → Laplacian smoothing
   elements: {
-    floor_main: { physics: 'analytic' }, // ex-Mesh_0 : sol analytique lisse
+    floor_main: { physics: 'analytic' }, // ex-Mesh_0: smooth analytic floor
     wall_main: { singleSided: 1, restitution: 0.35, friction: 0.12 }, // ex-Mesh_1
     wall_slingshot: { restitution: 0, friction: 0.1 }, // ex no-bounce (Cylinder.008)
     wall_bottom: { restitution: 0, friction: 0.1 }, // ex no-bounce (Plane.008)
-    wall_top: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.001)
+    wall_top: { restitution: 0.3, friction: 0.1 }, // plastic (Circle.001)
     wall_under_top: { restitution: 0.35, friction: 0.12 }, // rail (Circle.034)
-    wall_middle_left: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.011)
-    wall_middle_right: { restitution: 0.3, friction: 0.1 }, // plastique (Circle.018)
+    wall_middle_left: { restitution: 0.3, friction: 0.1 }, // plastic (Circle.011)
+    wall_middle_right: { restitution: 0.3, friction: 0.1 }, // plastic (Circle.018)
     wall_guide_lane: { restitution: 0.2, friction: 0.15, smooth: 0 }, // ex-Fix-Start
   },
-  // Termes ST traqués par le grep-guard anti-fuite (phase 2.6).
+  // ST terms tracked by the anti-leak grep guard.
   forbiddenInCore: [
     'demogorgon',
     'vecna',
@@ -130,10 +130,9 @@ export const manifest: MapManifest = {
     'eleven',
     'hawkins',
   ],
-  // ─── Rendu Three.js — éclairage original ST (état avant toute modification) ─
-  // Valeurs extraites du git avant les itérations de tuning Zelda.
-  // hemi et fill à intensity 0 : conservées pour UpsideDownAtmosphere qui les
-  // réanime (elle écrase les intensités via les refs lumières).
+  // ─── Three.js rendering — original ST lighting ──────────────────────────
+  // hemi and fill at intensity 0: kept for UpsideDownAtmosphere which
+  // revives them (it overwrites intensities via the light refs).
   rendering: {
     useEnvironment: false,
     toneMappingExposure: 1.12,
@@ -145,11 +144,11 @@ export const manifest: MapManifest = {
     lights: {
       ambient: { color: 0xffffff, intensity: 0.25 },
       hemi:    { sky: 0xffffff, ground: 0x111111, intensity: 0 },
-      // Double soleil latéral opposé (réglé à l'œil) : pas de highlight
-      // spéculaire dans l'axe caméra, sol débouché des deux côtés.
+      // Opposed dual side suns (tuned by eye): no specular highlight along
+      // the camera axis, floor lit from both sides.
       dir:     { color: 0xffffff, intensity: 2.54, x: 1.08,  y: 1.5,  z: 0.27 },
       dir2:    { color: 0xffffff, intensity: 5.05, x: -1.21, y: 1.5,  z: 0.55 },
-      // Contre-jour : liseré métal vers la caméra (réglé à l'œil).
+      // Backlight: metal rim toward the camera (tuned by eye).
       rim:     { color: 0xffffff, intensity: 1.1,  x: 0,     y: 1.3,  z: -1.2 },
       fill:    { color: 0xffffff, intensity: 0,    x: 0,     y: 1,    z: -1   },
     },

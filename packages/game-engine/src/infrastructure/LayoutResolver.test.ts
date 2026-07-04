@@ -4,8 +4,8 @@ import { LayoutResolver } from './LayoutResolver';
 import { MeshRoleResolver } from './MeshRoleResolver';
 import type { MapLayout, MapPoint3, DropTargetDef } from '../domain/MapLayout';
 
-// Construit un mesh cube de côté 0.02 centré sur (x,y,z). Box3.setFromObject →
-// centre = position du mesh (géométrie symétrique autour de l'origine locale).
+// Build a 0.02-side cube mesh centered on (x,y,z). Box3.setFromObject →
+// center = mesh position (geometry symmetric around the local origin).
 function cubeAt(name: string, x: number, y: number, z: number): THREE.Mesh {
   const geo = new THREE.BoxGeometry(0.02, 0.02, 0.02);
   const mesh = new THREE.Mesh(geo);
@@ -55,14 +55,14 @@ describe('LayoutResolver.derive', () => {
     const root = new THREE.Object3D();
     const group = new THREE.Object3D();
     group.name = 'bumper_3';
-    // Primitive issue d'un split matériau, nom non conventionné.
+    // Primitive from a material split, non-conventional name.
     group.add(cubeAt('Mesh_8', 0.2, 1, 0.2));
     root.add(group);
 
     const derived = LayoutResolver.derive(root, resolver());
 
-    // Le groupe est lui-même résolu comme bumper (centre du sous-arbre),
-    // l'enfant Mesh_8 hérite aussi → même slot, écrasement idempotent.
+    // The group itself resolves as bumper (subtree center), the child Mesh_8
+    // inherits too → same slot, idempotent overwrite.
     expect(derived.bumpers[2]).not.toBeNull();
     expect(derived.bumpers[2]!.x).toBeCloseTo(0.2, 5);
   });
@@ -116,7 +116,7 @@ describe('LayoutResolver.withDerivedDropTargets', () => {
     const out = LayoutResolver.withDerivedDropTargets(layout, derived);
 
     expect(out.dropTargets[0]).toEqual({ id: 'drop_a', x: 0.5, y: 0.6, z: 0.7, side: 'left' });
-    // drop_b sans mesh → conserve son littéral.
+    // drop_b without mesh → keeps its literal.
     expect(out.dropTargets[1]).toEqual({ id: 'drop_b', x: 9, y: 9, z: 9, side: 'right' });
   });
 
@@ -174,7 +174,7 @@ describe('LayoutResolver.deriveAndCompare', () => {
   test('marque HORS TOLÉRANCE quand le delta dépasse le seuil', () => {
     const root = new THREE.Object3D();
     root.add(cubeAt('bumper_1', 0.1, 1.0, -0.2));
-    // Constante éloignée de 100mm (delta > 5mm défaut).
+    // Constant off by 100mm (delta > 5mm default).
     const layout = layoutWith([{ x: 0.2, y: 1.0, z: -0.2 }], []);
 
     LayoutResolver.deriveAndCompare(root, resolver(), layout);

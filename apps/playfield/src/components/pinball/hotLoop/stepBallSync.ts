@@ -13,9 +13,9 @@ import {
 } from "@pinball/game-engine";
 import type { GameState } from "@/hooks/useGameState";
 
-// Seuil Z sous lequel le détecteur de balle coincée est actif (au-dessus = zone
-// de drain, on laisse partir). Magic number hérité — à dériver de mapLayout.sensors
-// à terme (backlog P2 Strategy), gardé littéral ici pour préserver le comportement.
+// Z threshold below which the stuck-ball detector is active (above = drain
+// zone, let the ball go). Inherited magic number — should eventually derive
+// from mapLayout.sensors; kept literal to preserve behavior.
 export const STUCK_ZONE_MAX_Z = 0.22;
 
 export interface BallSyncDeps {
@@ -33,20 +33,20 @@ export interface BallSyncDeps {
   bottomOutDetector: DetectBottomOut;
   triggerBottomOut: (reason: BallResetReason) => void;
   dt: number;
-  /** Fraction vers le prochain step physique (PhysicsWorld.interpolationAlpha)
-   * — lisse le rendu de la bille sur écran 120 Hz (physique à 60 steps/s). */
+  /** Fraction toward the next physics step (PhysicsWorld.interpolationAlpha)
+   * — smooths ball rendering on 120 Hz displays (physics at 60 steps/s). */
   alpha: number;
 }
 
-// Synchronisation bille ↔ physique pour une frame (appelée quand bille visible +
-// physique prête). Orchestration IMPÉRATIVE des locks/snaps/clamps/détecteurs —
-// les DÉCISIONS sont des helpers PURS game-engine déjà testés (computeIdleSpawnLock/
-// LaneStraightLock/SurfaceSnap/SpeedClamp) ; ici on lit/applique sur le body. Args
-// live chaque frame → aucun stale-binding. Ordre load-bearing préservé 1:1.
+// Ball ↔ physics sync for one frame (called when the ball is visible and
+// physics is ready). Imperative orchestration of locks/snaps/clamps/detectors —
+// the DECISIONS are pure game-engine helpers (computeIdleSpawnLock/
+// LaneStraightLock/SurfaceSnap/SpeedClamp); here we read/apply on the body.
+// Args are live each frame → no stale binding. The step order is load-bearing.
 export function stepBallSync(d: BallSyncDeps): void {
   const { ball, ballMesh, gameState, layout } = d;
 
-  // Boss intro : bille tenue en place (pas de physique).
+  // Boss intro: ball held in place (no physics).
   if (d.bossIntroActive && gameState === "playing") {
     const p = d.bossIntroBallPos;
     ball.body.setTranslation({ x: p.x, y: p.y, z: p.z }, true);
@@ -58,7 +58,7 @@ export function stepBallSync(d: BallSyncDeps): void {
 
   if (d.freezeFrame) return;
 
-  // Balle figée au spawn en idle (y compris pendant la charge) — évite le glissement.
+  // Ball pinned at spawn while idle (including during charge) — prevents drifting.
   if (gameState === "idle" && d.physicsReady && !d.isDragging) {
     const lock = computeIdleSpawnLock(layout.spawns.ball);
     ball.body.setTranslation(lock.translation, true);
@@ -66,7 +66,7 @@ export function stepBallSync(d: BallSyncDeps): void {
     ball.body.setAngvel(lock.angvel, true);
   }
 
-  // Verrouillage latéral du couloir pendant la montée (lancement droit).
+  // Lateral shooter-lane lock during the climb (straight launch).
   if (gameState === "playing" && !d.isDragging && !d.shooterLaneGate?.isClosed()) {
     const laneLock = computeLaneStraightLock(
       ball.body.translation(),
@@ -84,7 +84,7 @@ export function stepBallSync(d: BallSyncDeps): void {
     }
   }
 
-  // Surface snap : recolle la balle au sol incliné.
+  // Surface snap: re-sticks the ball to the tilted floor.
   if (gameState === "playing" && !d.isDragging) {
     const snap = computeSurfaceSnap(ball.body.translation(), ball.body.linvel(), layout.shooterLane);
     if (snap) {
@@ -95,7 +95,7 @@ export function stepBallSync(d: BallSyncDeps): void {
 
   ball.syncToMeshInterpolated(ballMesh, d.alpha);
 
-  // Clamp vitesse.
+  // Speed clamp.
   const clampedVel = computeSpeedClamp(ball.body.linvel());
   if (clampedVel) ball.body.setLinvel(clampedVel, true);
 
@@ -103,8 +103,8 @@ export function stepBallSync(d: BallSyncDeps): void {
   const bVel = ball.body.linvel();
   const bSpd = Math.sqrt(bVel.x ** 2 + bVel.y ** 2 + bVel.z ** 2);
 
-  // Détecteur balle coincée — hors zone de drain, et jamais pendant un drag
-  // debug (sinon une bille tenue immobile serait force-drainée = perte de vie).
+  // Stuck-ball detector — outside the drain zone, and never during a debug
+  // drag (a ball held still would be force-drained = lost life).
   if (gameState === "playing" && !d.isDragging && bPos.z < STUCK_ZONE_MAX_Z) {
     const stuck = d.stuckDetector.update(bSpd, bPos, d.dt);
     if (stuck) {
@@ -118,10 +118,10 @@ export function stepBallSync(d: BallSyncDeps): void {
     d.stuckDetector.reset();
   }
 
-  // Bottom-out fallback — zone sous les flippers hors couloir (pas pendant un
-  // drag debug : on peut traîner la bille à travers la zone sans la drainer).
+  // Bottom-out fallback — zone below the flippers outside the lane (not
+  // during a debug drag: the ball can be dragged through without draining).
   if (gameState === "playing" && !d.isDragging && d.bottomOutDetector.check(bPos)) {
     d.triggerBottomOut("bottom_out_zone");
   }
-  // Drain nominal géré par le capteur Rapier bottom_out (CollisionEventProcessor).
+  // Nominal drain is handled by the Rapier bottom_out sensor (CollisionEventProcessor).
 }

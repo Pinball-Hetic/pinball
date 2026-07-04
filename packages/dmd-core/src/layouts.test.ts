@@ -5,22 +5,22 @@ import { GRID_W, GRID_H } from './DmdRenderer';
 import { DOT } from './palette';
 import type { ClipContext } from './content';
 
-// Grille vierge (index palette par dot, 0 = éteint).
+// Blank grid (palette index per dot, 0 = off).
 const newGrid = () => new Uint8Array(GRID_W * GRID_H);
 
-// Nombre de dots allumés (index != 0).
+// Number of lit dots (index != 0).
 function litCount(grid: Uint8Array): number {
   let n = 0;
   for (const v of grid) if (v !== 0) n++;
   return n;
 }
 
-// Vrai si au moins un dot de la grille porte cet index de couleur.
+// True if at least one grid dot carries this color index.
 function hasColor(grid: Uint8Array, color: number): boolean {
   return grid.includes(color);
 }
 
-// Construit un snapshot SCORE complet (champs partagés requis par le type).
+// Builds a complete SCORE snapshot (shared fields required by the type).
 function scoreDisplay(over: Partial<Extract<DmdDisplay, { mode: 'SCORE' }>> = {}) {
   return {
     mode: 'SCORE' as const,
@@ -65,7 +65,7 @@ describe('layoutScore', () => {
     const layouts = makeLayouts();
     const grid = newGrid();
     layouts.SCORE(grid, scoreDisplay({ lives: 3 }), 0);
-    // Les vies sont des disques pleins couleur DOT.lives.
+    // Lives are filled discs in DOT.lives color.
     expect(hasColor(grid, DOT.lives)).toBe(true);
     expect(hasColor(grid, DOT.score)).toBe(true);
   });
@@ -76,8 +76,8 @@ describe('layoutScore', () => {
     const g3 = newGrid();
     layouts.SCORE(g1, scoreDisplay({ lives: 1 }), 0);
     layouts.SCORE(g3, scoreDisplay({ lives: 3 }), 0);
-    // Les vies "off" utilisent heticOff (toujours dessinées), donc le total
-    // global est identique ; mais le nombre de dots `lives` (allumés) diffère.
+    // "Off" lives use heticOff (always drawn), so the overall total is the
+    // same; but the number of (lit) `lives` dots differs.
     const livesLit = (g: Uint8Array) => [...g].filter((v) => v === DOT.lives).length;
     expect(livesLit(g1)).toBeLessThan(livesLit(g3));
   });
@@ -88,10 +88,10 @@ describe('layoutScore', () => {
     const g7 = newGrid();
     layouts.SCORE(g1, scoreDisplay({ lives: 1 }), 0);
     layouts.SCORE(g7, scoreDisplay({ lives: 7 }), 0);
-    // Mode compteur : la rangée est "N ●" en DOT.lives, sans emplacements off.
+    // Counter mode: the row is "N ●" in DOT.lives, no off slots.
     expect(hasColor(g7, DOT.lives)).toBe(true);
-    // 1 vie (mode pastilles) dessine 2 emplacements off (heticOff) ; 7 vies (mode
-    // compteur) n'en dessine aucun.
+    // 1 life (dots mode) draws 2 off slots (heticOff); 7 lives (counter mode)
+    // draws none.
     const offLit = (g: Uint8Array) => [...g].filter((v) => v === DOT.heticOff).length;
     expect(offLit(g1)).toBeGreaterThan(0);
     expect(offLit(g7)).toBe(0);
@@ -102,7 +102,7 @@ describe('layoutScore', () => {
     const grid = newGrid();
     layouts.SCORE(grid, scoreDisplay({ lives: 0 }), 0);
     expect(hasColor(grid, DOT.lives)).toBe(false);
-    // Mais les emplacements "off" (heticOff) restent dessinés.
+    // But the "off" slots (heticOff) are still drawn.
     expect(hasColor(grid, DOT.heticOff)).toBe(true);
   });
 
@@ -110,9 +110,9 @@ describe('layoutScore', () => {
     const layouts = makeLayouts();
     const grid = newGrid();
     layouts.SCORE(grid, scoreDisplay({ mapState: { fever: true } }), 0);
-    // Le bandeau fever par défaut dessine un gros score en DOT.event.
+    // The default fever banner draws a big score in DOT.event.
     expect(hasColor(grid, DOT.event)).toBe(true);
-    // En fever, la rangée de vies n'est pas dessinée (return anticipé).
+    // In fever, the lives row is not drawn (early return).
     expect(hasColor(grid, DOT.heticOff)).toBe(false);
   });
 
@@ -163,11 +163,11 @@ describe('layoutIntro / attract', () => {
 
   test('attract clignote "START !" selon clockMs', () => {
     const layouts = makeLayouts();
-    // clockMs=0 → floor(0/600)%2===0 → START affiché (DOT.event présent).
+    // clockMs=0 → floor(0/600)%2===0 → START shown (DOT.event present).
     const gOn = newGrid();
     layouts.INTRO(gOn, { mode: 'INTRO', player: 'NEO', alternateWorld: false }, 0);
     expect(hasColor(gOn, DOT.event)).toBe(true);
-    // clockMs=600 → floor(600/600)%2===1 → START masqué.
+    // clockMs=600 → floor(600/600)%2===1 → START hidden.
     const gOff = newGrid();
     layouts.INTRO(gOff, { mode: 'INTRO', player: 'NEO', alternateWorld: false }, 600);
     expect(hasColor(gOff, DOT.event)).toBe(false);
@@ -203,7 +203,7 @@ describe('layoutEvent', () => {
   test('flickerSkip occulte le draw quand la sinusoïde plonge', () => {
     const layouts = makeLayouts();
     const disp = { mode: 'EVENT', label: 'HIT', points: 10 } as DmdDisplay;
-    // flickerSkip(clockMs, 60, -0.7) : trouve un clockMs où sin < -0.7.
+    // flickerSkip(clockMs, 60, -0.7): find a clockMs where sin < -0.7.
     let skipMs = -1;
     for (let ms = 0; ms < 1000; ms++) {
       if (Math.sin(ms / 60) < -0.7) {
@@ -252,15 +252,15 @@ describe('layoutGameOver', () => {
   test('alterne GAME OVER (texte) et le score selon clockMs', () => {
     const layouts = makeLayouts();
     const disp = { mode: 'GAME_OVER', finalScore: 4242 } as DmdDisplay;
-    // clockMs=0 → floor(0/2000)%2===0 → "GAME OVER" en DOT.gameOver.
+    // clockMs=0 → floor(0/2000)%2===0 → "GAME OVER" in DOT.gameOver.
     const gText = newGrid();
     layouts.GAME_OVER(gText, disp, 0);
     expect(hasColor(gText, DOT.gameOver)).toBe(true);
-    // clockMs=2000 → floor(2000/2000)%2===1 → score (gros chiffres gameOver).
+    // clockMs=2000 → floor(2000/2000)%2===1 → score (big gameOver digits).
     const gScore = newGrid();
     layouts.GAME_OVER(gScore, disp, 2000);
     expect(hasColor(gScore, DOT.gameOver)).toBe(true);
-    // Les deux phases dessinent quelque chose mais des patterns différents.
+    // Both phases draw something, but different patterns.
     expect([...gText]).not.toEqual([...gScore]);
   });
 });
@@ -349,7 +349,7 @@ describe('layoutCinematic - résolution des handlers', () => {
 
   test('fallbackClip occulté par flickerSkip', () => {
     const layouts = makeLayouts();
-    // fallbackClip : flickerSkip(clockMs, 140, -0.6).
+    // fallbackClip: flickerSkip(clockMs, 140, -0.6).
     let skipMs = -1;
     for (let ms = 0; ms < 2000; ms++) {
       if (Math.sin(ms / 140) < -0.6) {
@@ -384,7 +384,7 @@ describe('core cinematics - valeurs par défaut & déterminisme', () => {
     const b = newGrid();
     layouts.CINEMATIC(a, display, 500);
     layouts.CINEMATIC(b, display, 500);
-    // seeded() est déterministe → même rendu pour le même clockMs.
+    // seeded() is deterministic → same rendering for the same clockMs.
     expect([...a]).toEqual([...b]);
     expect(litCount(a)).toBeGreaterThan(0);
   });
@@ -399,7 +399,7 @@ describe('core cinematics - valeurs par défaut & déterminisme', () => {
       value: 5000,
       alternateWorld: false,
     };
-    // t = min(1, ms/4000). À ms=300 (t<0.95) le texte DOT.score est dessiné.
+    // t = min(1, ms/4000). At ms=300 (t<0.95) the DOT.score text is drawn.
     const early = newGrid();
     layouts.CINEMATIC(early, display, 300);
     expect(hasColor(early, DOT.score)).toBe(true);
@@ -415,12 +415,12 @@ describe('core cinematics - valeurs par défaut & déterminisme', () => {
       value: 30000,
       alternateWorld: false,
     };
-    const phase1 = newGrid(); // ms < 2500 : étoile filante qui monte
-    const phase2 = newGrid(); // ms >= 2500 : explosion + score
+    const phase1 = newGrid(); // ms < 2500: rising shooting star
+    const phase2 = newGrid(); // ms >= 2500: explosion + score
     layouts.CINEMATIC(phase1, display, 1000);
     layouts.CINEMATIC(phase2, display, 5000);
     expect([...phase1]).not.toEqual([...phase2]);
-    // Phase 2 affiche le score formaté en DOT.score.
+    // Phase 2 shows the formatted score in DOT.score.
     expect(hasColor(phase2, DOT.score)).toBe(true);
   });
 });

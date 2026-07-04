@@ -222,7 +222,7 @@ describe('eleven assist (Demogorgon only)', () => {
     m.onReveal();
     m.tick(BLACKOUT);
     m.tick(REVEAL); // flicker, assistNextIn = 0.55
-    // 10 s suspendus — largement au-delà de first + plusieurs intervals.
+    // 10 s suspended — well past first + several intervals.
     for (let i = 0; i < 100; i++) {
       const d = m.tick(0.1, { suspendAssist: true });
       expect(d.assistFired).toBe(false);
@@ -235,9 +235,9 @@ describe('eleven assist (Demogorgon only)', () => {
     m.onReveal();
     m.tick(BLACKOUT);
     m.tick(REVEAL);
-    // 5 s suspendus : sans gel du compteur, l'assist tirerait dès la reprise.
+    // 5 s suspended: without freezing the countdown, the assist would fire on resume.
     m.tick(5.0, { suspendAssist: true });
-    // Reprise : il faut ré-écouler les 0.55 s de first en temps de jeu réel.
+    // Resume: the 0.55 s of first must elapse again in real play time.
     let d = m.tick(0.5);
     expect(d.assistFired).toBe(false);
     d = m.tick(0.1); // cumul playing = 0.6 >= 0.55
@@ -249,15 +249,15 @@ describe('eleven assist (Demogorgon only)', () => {
     m.onReveal();
     m.tick(BLACKOUT);
     m.tick(REVEAL);
-    m.tick(0.55); // fire : trigger reset elevenAssistT à 0 puis += 0.55 même tick
+    m.tick(0.55); // fire: trigger resets elevenAssistT to 0 then += 0.55 same tick
     const before = m.tick(0.1).assist;
     expect(before).not.toBeNull();
-    // Suspension : l'enveloppe ne progresse pas (dt gelé), pas de finished.
+    // Suspended: the envelope doesn't advance (dt frozen), no finished.
     const frozen = m.tick(2.0, { suspendAssist: true });
     expect(frozen.assist?.elapsed).toBeCloseTo(before?.elapsed ?? -1, 10);
     expect(frozen.assistFired).toBe(false);
     expect(frozen.assistFinished).toBe(false);
-    // Reprise : l'anim repart de là où elle était.
+    // Resume: the animation continues from where it was.
     const resumed = m.tick(0.1).assist;
     expect(resumed?.elapsed).toBeCloseTo((before?.elapsed ?? 0) + 0.1, 10);
   });

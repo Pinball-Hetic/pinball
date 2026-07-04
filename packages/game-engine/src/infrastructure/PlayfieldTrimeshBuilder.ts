@@ -24,8 +24,8 @@ import {
   reverseWoundIndices,
 } from './PlayfieldTrimeshRules';
 
-// Tuning matière par mesh (= manifest.elements). Passé en brut pour ne pas
-// coupler game-engine à shared-types.
+// Per-mesh material tuning (= manifest.elements). Passed raw to avoid
+// coupling game-engine to shared-types.
 export type MeshElements = Record<string, Record<string, number | string>>;
 
 function ancestryNames(obj: THREE.Object3D): string[] {
@@ -49,9 +49,9 @@ const COLLISION_SOLIDS = new Set([
 ]);
 
 const COLLISION_ANALYTIC = new Set([
-  // Ancienne convention (nœud unique splitté géométriquement)
+  // Old convention (single node split geometrically)
   'flipper', 'flipper_buttons', 'flipper_left_split', 'flipper_right_split',
-  // Nouvelle convention (sous-modèles nommés dans le GLB)
+  // New convention (named sub-models in the GLB)
   'flipper-left', 'flipper-right', 'flipper_left', 'flipper_right',
   'pop_bumper', 'pop_bumper_left', 'pop_bumper_right',
 ]);
@@ -85,17 +85,17 @@ const TRIMESH_DEDICATED = new Set([
 ]);
 
 /**
- * Meshes racines de scène (hors hiérarchie GLB connue) qui doivent
- * recevoir un collider trimesh. Typiquement : petites plaques/guides ajoutés
- * pour lisser une paroi où la balle se bloquait.
- * Noms normalisés (lowercase, espaces → underscores).
+ * Scene-root meshes (outside the known GLB hierarchy) that must receive a
+ * trimesh collider. Typically small guide plates added to smooth a wall
+ * where the ball used to get stuck.
+ * Normalized names (lowercase, spaces → underscores).
  */
 const STANDALONE_WALL_MESHES = new Set([
-  'mesh1.0',   // plaque-guide pour lisser la paroi haute gauche
-  'fix-start', // guide de lancement : lisse la paroi du couloir au démarrage
+  'mesh1.0',   // guide plate smoothing the upper-left wall
+  'fix-start', // launch guide: smooths the shooter lane wall at launch
 ]);
 
-// Switch sensors : source unique dans GltfNodeNames (partagée avec le rendu).
+// Switch sensors: single source in GltfNodeNames (shared with rendering).
 const HIDDEN_NODES = new Set(SWITCH_SENSOR_NODES);
 
 const EXCLUDED_NODES = new Set([
@@ -111,27 +111,27 @@ const PINBALLMAP_TRIMESH_RESTITUTION = 0.35;
 const PINBALLMAP_TRIMESH_FRICTION = 0.12;
 
 /**
- * Seuil de taille pour les sous-meshes rail (Circle.xxx).
- * Si les 2 plus petites dimensions sont toutes les deux < ce seuil,
- * le mesh est un détail décoratif (vis, clip, anneau fin) → pas de physique.
- * Exemple Circle.018 : Mesh_11 (18×29×19mm), Mesh_12 (6×0.6×6mm), Mesh_13 (24×7×24mm)
- * → exclus. Mesh_8/9/10 (86×44×290mm) → inclus.
+ * Size threshold for rail sub-meshes (Circle.xxx).
+ * If the 2 smallest dimensions are both < this threshold, the mesh is a
+ * decorative detail (screw, clip, thin ring) → no physics.
+ * Example Circle.018: Mesh_11 (18×29×19mm), Mesh_12 (6×0.6×6mm),
+ * Mesh_13 (24×7×24mm) → excluded. Mesh_8/9/10 (86×44×290mm) → included.
  */
 const RAIL_SUBMESH_MIN_PHYS_DIM = 0.025; // 25 mm
 
-// Meshes Pinballmap qui doivent rebondir fort (surfaces "bump").
-// Noms normalisés : lowercase, espaces → underscores (les tirets restent).
+// Pinballmap meshes that must bounce hard ("bump" surfaces).
+// Normalized names: lowercase, spaces → underscores (dashes stay).
 const PINBALLMAP_HIGH_BOUNCE = new Set([
   'bump-right',
   'bump-left',
 ]);
-// Restitution modérée : le sensor BumpHit fournit l'impulsion active principale.
+// Moderate restitution: the BumpHit sensor provides the main active impulse.
 const PINBALLMAP_HIGH_BOUNCE_RESTITUTION = 0.40;
 const PINBALLMAP_HIGH_BOUNCE_FRICTION    = 0.05;
 
-// Murs moulés plein plateau : trimesh single-sided (doubleSided=true créerait
-// des faces fantômes qui expulsent la balle à travers le mur). Normales
-// orientées vers l'intérieur du terrain (vérifiées Blender).
+// Full-playfield molded walls: single-sided trimesh (doubleSided=true would
+// create ghost faces that eject the ball through the wall). Normals point
+// toward the playfield interior (verified in Blender).
 const PINBALLMAP_SINGLE_SIDED_WALL = 'mesh_1';
 
 const PLASTIC_GROUPS = new Set([
@@ -143,8 +143,8 @@ function meshMatchesSet(mesh: THREE.Mesh, names: Set<string>): boolean {
 }
 
 /**
- * Décision PURE de skip d'un mesh, à partir de sa liste de noms d'ascendance
- * (self → parents) et du flag collOnly. Aucune dépendance THREE.
+ * Skip decision for a mesh, from its ancestry name list (self → parents)
+ * and the collOnly flag.
  */
 export function isSkipped(ancestryNames: string[], collOnly: boolean): boolean {
   const selfNorm = normalizeGltfName(ancestryNames[0] ?? '');
@@ -152,8 +152,8 @@ export function isSkipped(ancestryNames: string[], collOnly: boolean): boolean {
   if (isPinballmapGameplayMeshName(ancestryNames)) {
     if (collOnly && !selfNorm.startsWith('coll_')) return true;
     if (isFlipperGltfMeshName(ancestryNames)) return true;
-    // flipper_left_split / flipper_right_split ont des underscores (pas de points)
-    // → isFlipperGltfMeshName ne les détecte pas. COLLISION_ANALYTIC couvre ces noms.
+    // flipper_left_split / flipper_right_split use underscores (no dots)
+    // → isFlipperGltfMeshName misses them. COLLISION_ANALYTIC covers those names.
     if (ancestryMatchesSet(ancestryNames, COLLISION_ANALYTIC)) return true;
     return false;
   }
@@ -181,14 +181,12 @@ function isSkippedMesh(node: THREE.Object3D, collOnly: boolean): boolean {
 }
 
 /**
- * Classification PURE d'un mesh Pinballmap (routage trimesh), à partir de sa
- * liste de noms d'ascendance (self → parents) et des dimensions de sa AABB.
- * Aucune dépendance THREE/Rapier. `buildPinballmap` n'est plus qu'une boucle
- * d'application qui extrait la géométrie + crée le collider selon ce kind.
+ * Classifies a Pinballmap mesh (trimesh routing) from its ancestry name list
+ * (self → parents) and its AABB dimensions.
  *
- * Ordre = ordre des gardes de l'ancien buildPinballmap :
- * not-gameplay / flipper / analytic / non-physical-floor → 'skip' ;
- * puis bump (tag = nom self avec '-'→'_'), rail (filtre dimension), wall.
+ * Guard order is load-bearing:
+ * not-gameplay / flipper / analytic / non-physical-floor → 'skip';
+ * then bump (tag = self name with '-'→'_'), rail (dimension filter), wall.
  */
 export type PinballmapMeshClass =
   | { kind: 'skip' }
@@ -286,14 +284,14 @@ function laplacianSmooth(
 
 export class PlayfieldTrimeshBuilder {
   /**
-   * Construction role-driven (GLB conventionné). Chaque mesh est classé par
-   * son rôle (MeshRoleResolver, via la hiérarchie) :
-   *  - wall_ / lane_ → trimesh solide (matière depuis elements[nom])
-   *  - floor_        → trimesh, SAUF si elements.physics === 'analytic'
-   *  - flipper_/bumper_/slingshot_/target_/sensor_/vis_ → ignorés ici
-   *    (gérés analytiquement par PlayfieldColliderFactory, ou sans physique).
-   * Les meshes d'un même nom conventionné (ex. wall_top = Mesh_2/3/4) sont
-   * fusionnés en un seul collider.
+   * Role-driven build (conventioned GLB). Each mesh is classified by its
+   * role (MeshRoleResolver, via the hierarchy):
+   *  - wall_ / lane_ → solid trimesh (material from elements[name])
+   *  - floor_        → trimesh, UNLESS elements.physics === 'analytic'
+   *  - flipper_/bumper_/slingshot_/target_/sensor_/vis_ → ignored here
+   *    (handled analytically by PlayfieldColliderFactory, or no physics).
+   * Meshes sharing a conventioned name (e.g. wall_top = Mesh_2/3/4) are
+   * merged into a single collider.
    */
   static buildRoleDriven(
     playfieldRoot: THREE.Object3D,
@@ -319,9 +317,9 @@ export class PlayfieldTrimeshBuilder {
     resolver.warnUnresolvedOnce();
 
     for (const [key, g] of groups) {
-      // Lissage laplacien réservé au sol (anti-accroche au roulement).
-      // Sur un mur concave il aplatit la concavité → corde de collision
-      // fantôme. Défaut: floor lissé, wall/lane bruts. Override via manifest.
+      // Laplacian smoothing is floor-only (prevents snagging while rolling).
+      // On a concave wall it flattens the concavity → phantom collision
+      // chord. Default: floor smoothed, wall/lane raw. Override via manifest.
       const { restitution, friction, smooth, doubleSided } =
         resolveMaterialParams(elements[key], g.role);
       PlayfieldTrimeshBuilder.createTrimeshCollider(
@@ -339,8 +337,8 @@ export class PlayfieldTrimeshBuilder {
 
     if (hasPinballmapRoot(playfieldRoot)) {
       PlayfieldTrimeshBuilder.buildPinballmap(playfieldRoot, world, colliderMap);
-      // Les meshes hors-hiérarchie Pinballmap (ex : plaques-guide standalone)
-      // ne sont pas couverts par buildPinballmap — on les traite séparément.
+      // Meshes outside the Pinballmap hierarchy (e.g. standalone guide
+      // plates) are not covered by buildPinballmap — handled separately.
       PlayfieldTrimeshBuilder.buildStandaloneWalls(playfieldRoot, world);
       return;
     }
@@ -370,11 +368,11 @@ export class PlayfieldTrimeshBuilder {
   ): void {
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
-      // Skip rapide avant extraction de géométrie (gardes sans AABB).
+      // Fast skip before geometry extraction (guards that need no AABB).
       if (!isPinballmapGameplayMesh(child)) return;
 
-      // La AABB n'est nécessaire que pour le filtre dimension des rails ; on
-      // extrait la géométrie monde une fois et on la réutilise pour le collider.
+      // The AABB is only needed for the rail dimension filter; extract world
+      // geometry once and reuse it for the collider.
       const geo = extractWorldGeometry(child);
       geo.computeBoundingBox();
       const bb = geo.boundingBox;
@@ -386,14 +384,14 @@ export class PlayfieldTrimeshBuilder {
       if (cls.kind === 'skip') return;
 
       if (cls.kind === 'rail') {
-        // Trimesh seul (cf. createRailColliders). Réutilise la géométrie déjà extraite.
+        // Trimesh only (see createRailColliders). Reuses the extracted geometry.
         PlayfieldTrimeshBuilder.createRailColliders(world, child, cls.restitution, cls.friction, geo);
         return;
       }
 
-      // Surfaces "bump" : le trimesh EST la surface de rebond ET de détection.
-      // On active COLLISION_EVENTS + on l'enregistre dans colliderMap (tag).
-      // Murs (wall) : trimesh simple, doubleSided sauf Mesh_1 (single-sided).
+      // "bump" surfaces: the trimesh IS both the bounce surface and the
+      // detection surface. Enable COLLISION_EVENTS + register in colliderMap.
+      // Walls: plain trimesh, doubleSided except Mesh_1 (single-sided).
       const col = PlayfieldTrimeshBuilder.createTrimeshCollider(
         world,
         [geo],
@@ -410,10 +408,10 @@ export class PlayfieldTrimeshBuilder {
   }
 
   /**
-   * Crée des colliders trimesh pour les meshes standalone listés dans
-   * STANDALONE_WALL_MESHES (nœuds racines de scène, hors hiérarchie Pinballmap).
-   * Double-sided + pas de lissage : ces meshes sont déjà fins et plans,
-   * le lissage Laplacien les déformerait.
+   * Trimesh colliders for the standalone meshes in STANDALONE_WALL_MESHES
+   * (scene-root nodes outside the Pinballmap hierarchy).
+   * Double-sided + no smoothing: these meshes are already thin and planar,
+   * Laplacian smoothing would deform them.
    */
   private static buildStandaloneWalls(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
     playfieldRoot.traverse((child) => {
@@ -424,10 +422,10 @@ export class PlayfieldTrimeshBuilder {
       PlayfieldTrimeshBuilder.createTrimeshCollider(
         world,
         [extractWorldGeometry(child)],
-        0.2,   // restitution : légère — la balle glisse sans rebond marqué
-        0.15,  // friction modérée
-        false, // pas de lissage Laplacien (plaque fine déjà plane)
-        true,  // double-sided : la balle peut toucher les deux faces
+        0.2,   // slight restitution — ball glides without a marked bounce
+        0.15,  // moderate friction
+        false, // no Laplacian smoothing (thin plate already planar)
+        true,  // double-sided: ball can hit either face
       );
     });
   }
@@ -440,11 +438,11 @@ export class PlayfieldTrimeshBuilder {
     preExtracted?: THREE.BufferGeometry,
   ): void {
     const geo = preExtracted ?? extractWorldGeometry(mesh);
-    // Trimesh uniquement — le cuboid bounding-box ajouté précédemment créait
-    // 2 corps physiques superposés par sous-mesh (trimesh + cuboid).
-    // Résultat : Rapier résolvait 2 collisions simultanées avec des normales
-    // contradictoires → téléportation de la balle à grande vitesse.
-    // CCD + trimesh suffit pour les rails de la taille de Circle.018 (≥ 86mm).
+    // Trimesh only — the bounding-box cuboid used before created 2 stacked
+    // physics bodies per sub-mesh (trimesh + cuboid). Rapier then resolved 2
+    // simultaneous collisions with contradictory normals → ball teleporting
+    // at high speed. CCD + trimesh is enough for rails the size of
+    // Circle.018 (≥ 86mm).
     PlayfieldTrimeshBuilder.createTrimeshCollider(
       world,
       [geo],

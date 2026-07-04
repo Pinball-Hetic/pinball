@@ -20,7 +20,7 @@ const ALL = {
 }
 
 describe('camera cinematics — invariants communs', () => {
-  // Toutes les durées doivent être strictement positives (sinon division/anim KO).
+  // All durations must be strictly positive (otherwise division/anim breaks).
   test.each(Object.entries(ALL))('%s a des durées positives', (_name, c) => {
     const cfg = c as BossCameraCinematicConfig
     expect(cfg.zoomInDuration).toBeGreaterThan(0)

@@ -36,9 +36,9 @@ describe('DOT', () => {
   test('mappe chaque couleur vers un index 1..11 unique', () => {
     const indices = COLORS.map((c) => DOT[c])
     expect(indices).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
-    // 0 réservé au dot éteint → aucun index 0.
+    // 0 is reserved for the off dot → no index 0.
     expect(indices).not.toContain(0)
-    // unicité
+    // uniqueness
     expect(new Set(indices).size).toBe(indices.length)
   })
 })

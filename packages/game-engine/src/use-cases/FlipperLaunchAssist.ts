@@ -19,14 +19,14 @@ export interface FlipperLaunchAssistResult {
 }
 
 /**
- * Garantie de lancement flipper. Pure : aucune dépendance Rapier — l'appelant
- * lit pos/vel du corps + dérive angVel, applique le linvel renvoyé et déclenche
- * le flash. Renvoie null quand aucune correction ne s'applique.
+ * Flipper launch guarantee. Pure: no Rapier dependency — the caller reads
+ * pos/vel from the body + derives angVel, applies the returned linvel and
+ * triggers the flash. Returns null when no correction applies.
  *
- * Déclenche quand la balle est dans la zone du flipper ET la vitesse angulaire
- * de montée dépasse FLIPPER_MIN_LAUNCH_ANGVEL ET vz dépasse FLIPPER_MIN_LAUNCH_VZ :
- * on atténue vx, on clampe vz à FLIPPER_MIN_LAUNCH_VZ, on garde vy → lancement
- * garanti vers le haut du tapis.
+ * Triggers when the ball is in the flipper zone AND the upswing angular
+ * velocity exceeds FLIPPER_MIN_LAUNCH_ANGVEL AND vz is above
+ * FLIPPER_MIN_LAUNCH_VZ: attenuate vx, clamp vz to FLIPPER_MIN_LAUNCH_VZ,
+ * keep vy → guaranteed launch up the table.
  */
 export function computeFlipperLaunchAssist(
   input: FlipperLaunchAssistInput,

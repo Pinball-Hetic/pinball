@@ -3,10 +3,10 @@ import type { ButtonId } from './socket-events'
 export type GameAction = 'FLIP_LEFT' | 'FLIP_RIGHT' | 'PLUNGE' | 'START'
 
 export interface CabinetButton {
-  id: ButtonId // identifiant physique UPPER_SNAKE
-  gpio: number // pin ESP32
-  activeLow: boolean // true = pull-up interne, bouton↔GND
-  action?: GameAction // mapping jeu ; absent = bouton non mappé
+  id: ButtonId // physical id, UPPER_SNAKE
+  gpio: number // ESP32 pin
+  activeLow: boolean // true = internal pull-up, button wired to GND
+  action?: GameAction // game mapping; absent = unmapped button
 }
 
 export const CABINET_BUTTONS: readonly CabinetButton[] = [
@@ -17,9 +17,9 @@ export const CABINET_BUTTONS: readonly CabinetButton[] = [
   { id: 'FRONT_LEFT_RED', gpio: 19, activeLow: true },
   { id: 'BLACK_RIGHT', gpio: 13, activeLow: true },
   { id: 'WHITE_RIGHT', gpio: 25, activeLow: true, action: 'FLIP_RIGHT' },
-  // PLUNGE (et non START) : plunger de SECOURS si le bouton PLUNGER physique
-  // lâche. Sur-ensemble strict de l'ancien START : valide le sélecteur de map,
-  // relance au game over (PLUNGE fait les deux), ET charge/lance la bille.
+  // PLUNGE (not START): BACKUP plunger in case the physical PLUNGER button
+  // fails. Strict superset of the old START: confirms the map selector,
+  // restarts at game over (PLUNGE does both), AND charges/launches the ball.
   { id: 'FRONT_WHITE', gpio: 33, activeLow: true, action: 'PLUNGE' },
   { id: 'PLUNGER', gpio: 32, activeLow: true, action: 'PLUNGE' },
 ]

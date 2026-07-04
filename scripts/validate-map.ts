@@ -1,11 +1,11 @@
-// Valide une map : manifest (champs requis) + GLB (contrat minimal de rôles
-// via MeshRoleResolver) + cohérence layout/GLB. Bun CLI.
+// Validates a map: manifest (required fields) + GLB (minimal role contract via
+// MeshRoleResolver) + layout/GLB consistency. Bun CLI.
 //
-// Usage: bun scripts/validate-map.ts [mapId]   (défaut: strangerthings)
+// Usage: bun scripts/validate-map.ts [mapId]   (default: strangerthings)
 //        task maps:validate -- <mapId>
 //
-// Parse le chunk JSON du GLB à la main (pas de dépendance gltf), applique les
-// conventions de préfixe (mêmes que le moteur), et vérifie le contrat minimal.
+// Parses the GLB JSON chunk by hand (no gltf dependency), applies the prefix
+// conventions (same as the engine), and checks the minimal contract.
 import { readFileSync } from 'fs'
 import { getMapPackage } from '@pinball/maps'
 import { MeshRoleResolver } from '@pinball/game-engine'
@@ -22,7 +22,7 @@ if (!pkg) {
 
 const { manifest, layout } = pkg
 
-// ── Manifest : champs requis ────────────────────────────────────────────────
+// ── Manifest: required fields ───────────────────────────────────────────────
 if (!manifest.id) errors.push('manifest.id manquant')
 if (manifest.id !== id) errors.push(`manifest.id (${manifest.id}) ≠ id demandé (${id})`)
 if (!manifest.name) errors.push('manifest.name manquant')
@@ -35,7 +35,7 @@ if (!Array.isArray(manifest.rules?.multiplierThresholds))
 if (!manifest.scoring || Object.keys(manifest.scoring).length === 0)
   warnings.push('manifest.scoring vide')
 
-// ── GLB : parse du chunk JSON + résolution des rôles ────────────────────────
+// ── GLB: parse JSON chunk + resolve roles ───────────────────────────────────
 const glbPath = `apps/playfield/public/${manifest.glb}`
 let nodes: Array<{ name?: string; mesh?: number; children?: number[] }> = []
 try {
@@ -77,7 +77,7 @@ if (unresolved.length > 0) {
   warnings.push(`${unresolved.length} mesh(es) sans rôle ni vis_ : ${unresolved.join(', ')}`)
 }
 
-// ── Contrat minimal de rôles ────────────────────────────────────────────────
+// ── Minimal role contract ───────────────────────────────────────────────────
 if (nodes.length > 0) {
   for (const req of ['floor', 'wall'] as const) {
     if (!roles.has(req)) errors.push(`contrat minimal : aucun mesh '${req}_'`)
@@ -85,24 +85,24 @@ if (nodes.length > 0) {
   const flippers = roles.get('flipper') ?? new Set()
   if (!flippers.has('left')) errors.push("contrat minimal : 'flipper_left' absent")
   if (!flippers.has('right')) errors.push("contrat minimal : 'flipper_right' absent")
-  // lane_ optionnel : le couloir plongeur peut être analytique (layout.shooterLane).
+  // lane_ optional: the shooter lane may be analytic (layout.shooterLane).
   if (!roles.has('lane')) warnings.push("pas de mesh 'lane_' (couloir analytique via layout — OK)")
 }
 
-// ── Cohérence layout ↔ GLB (drop targets référencés) ────────────────────────
+// ── Layout ↔ GLB consistency (referenced drop targets) ──────────────────────
 const targetIds = roles.get('target') ?? new Set()
 for (const dt of layout.dropTargets) {
-  // l'id layout (ex. drop_left_1) doit correspondre à un target_<side>_<n>.
+  // the layout id (e.g. drop_left_1) must map to a target_<side>_<n>.
   const sideN = dt.id.replace(/^drop_/, '') // left_1
   if (targetIds.size > 0 && !targetIds.has(sideN)) {
     warnings.push(`layout.dropTargets '${dt.id}' sans mesh target_${sideN}`)
   }
 }
 
-// ── Dette TODO(blender) : éléments en littéral alors qu'un mesh est prévu ────
-// Documente automatiquement la dette : si le layout porte des sensors mais que
-// le GLB n'a aucun mesh 'sensor_', les positions sont des littéraux explicites
-// (cf. // TODO(blender) dans layout.ts) → warning, pas erreur.
+// ── TODO(blender) debt: literal elements while a mesh is planned ────────────
+// Auto-documents the debt: if the layout carries sensors but the GLB has no
+// 'sensor_' mesh, the positions are explicit literals (cf. // TODO(blender) in
+// layout.ts) → warning, not error.
 const sensorIds = roles.get('sensor') ?? new Set()
 const layoutSensorCount =
   (layout.sensors?.popZones?.length ?? 0) +
@@ -115,7 +115,7 @@ if (layoutSensorCount > 0 && sensorIds.size === 0) {
   )
 }
 
-// ── Rapport ─────────────────────────────────────────────────────────────────
+// ── Report ──────────────────────────────────────────────────────────────────
 console.log(`Validation map '${id}' (GLB: ${manifest.glb})`)
 console.log(`  rôles détectés : ${[...roles.keys()].sort().join(', ') || '(aucun)'}`)
 for (const w of warnings) console.log(`  ⚠ ${w}`)

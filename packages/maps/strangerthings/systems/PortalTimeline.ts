@@ -5,10 +5,10 @@ import {
 } from './UpsideDownConstants';
 
 /**
- * Vecteur d'impulsion (repère monde) que l'aimant du portail applique à une
- * balle à distance horizontale `horiz` de l'ancre. `null` = hors rayon ou trop
- * proche (aucune impulsion). Math pure — l'appelant lit `body.translation()` et
- * appelle `body.applyImpulse()`. Courbe/constantes verbatim.
+ * Impulse vector (world space) the portal magnet applies to a ball at
+ * horizontal distance `horiz` from the anchor. `null` = out of radius or too
+ * close (no impulse). Pure math — the caller reads `body.translation()` and
+ * calls `body.applyImpulse()`.
  */
 export function portalMagnetImpulse(
   dx: number,
@@ -28,15 +28,15 @@ export function portalMagnetImpulse(
 }
 
 /**
- * Progression d'ouverture `p` ∈ [0,1] atteinte par la phase de « polish »
- * (`revealing`) au temps normalisé `t` ∈ [0,1] : cubic ease-out sur [0.35, 1].
+ * Opening progress `p` ∈ [0,1] reached by the "polish" phase (`revealing`)
+ * at normalized time `t` ∈ [0,1]: cubic ease-out over [0.35, 1].
  */
 export function portalRevealingProgress(t: number): number {
   const ease = 1 - Math.pow(1 - t, 3);
   return 0.35 + ease * 0.65;
 }
 
-/** Niveaux scalaires visuels dérivés de la progression d'ouverture `p`. */
+/** Visual scalar levels derived from the opening progress `p`. */
 export type PortalOpenLevels = {
   portalOn: number;
   glbOff: number;
@@ -58,9 +58,9 @@ export type PortalOpenLevels = {
 };
 
 /**
- * Mappe la progression d'ouverture `p` ∈ [0,1] vers l'ensemble des niveaux
- * scalaires du portail (opacités, intensités, échelles). Courbe/constantes
- * verbatim — consommé par le renderer pour piloter matériaux/lumières/sprites.
+ * Maps the opening progress `p` ∈ [0,1] to all portal scalar levels
+ * (opacities, intensities, scales). Consumed by the renderer to drive
+ * materials/lights/sprites.
  */
 export function portalOpenLevels(p: number): PortalOpenLevels {
   const portalOn = easeInOut(p);
@@ -87,7 +87,7 @@ export function portalOpenLevels(p: number): PortalOpenLevels {
   };
 }
 
-/** Niveaux scalaires de l'animation « idle » (pulse) du portail ouvert. */
+/** Scalar levels of the open portal's "idle" (pulse) animation. */
 export type PortalPulseLevels = {
   pulse: number;
   fast: number;
@@ -103,9 +103,9 @@ export type PortalPulseLevels = {
 };
 
 /**
- * Niveaux d'animation du portail ouvert au temps `pulseT` avec renfort
- * d'aspiration `suckBoost`. Courbe/constantes verbatim. Les positions de
- * vignes/particules restent dans le renderer (dépendent d'un état par-mesh).
+ * Open-portal animation levels at time `pulseT` with suction boost
+ * `suckBoost`. Vine/particle positions stay in the renderer (they depend on
+ * per-mesh state).
  */
 export function portalPulseLevels(pulseT: number, suckBoost: number): PortalPulseLevels {
   const pulse = 0.65 + Math.sin(pulseT * UPSIDE_DOWN_PORTAL_PULSE_SPEED) * 0.35;

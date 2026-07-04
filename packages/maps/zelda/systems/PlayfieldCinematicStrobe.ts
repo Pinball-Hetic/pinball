@@ -1,5 +1,5 @@
-// Version Zelda : pas de GarlandLights ni BumperVisuals (non implémentés).
-// Réexporte la classe unifiée de game-engine, montée sans port décor.
+// Zelda version: no GarlandLights or BumperVisuals (not implemented).
+// Re-exports the unified game-engine class, mounted without a decor port.
 export {
   PlayfieldCinematicStrobe,
   type PlayfieldCinematicStrobeConfig,

@@ -4,9 +4,9 @@ import type { CinematicClip, CinematicFamily } from '@pinball/shared-types'
 
 interface CinematicOverlayProps {
   clip: CinematicClip | null
-  /** Mapping clipId → famille (fourni par le manifest de la map). */
+  /** clipId → family mapping (provided by the map manifest). */
   clipFamilies?: Record<string, CinematicFamily>
-  /** Vidéos/images d'overlay par clipId (sinon fallback CSS). */
+  /** Overlay videos/images per clipId (CSS fallback otherwise). */
   overlayFiles?: Record<string, string>
 }
 
@@ -16,9 +16,10 @@ function isVideo(file: string): boolean {
   return file.endsWith('.webm')
 }
 
-// Overlay DOM joué pendant les gels cinématiques (au-dessus du canvas 3D,
-// sous le GameOverlay). Asset animé si présent (manifest), sinon fallback CSS
-// générique par famille. Un re-render par cinématique — jamais par frame.
+// DOM overlay played during cinematic freezes (above the 3D canvas, below
+// the GameOverlay). Animated asset when present (manifest), otherwise a
+// generic CSS fallback per family. One re-render per cinematic — never per
+// frame.
 export default function CinematicOverlay({ clip, clipFamilies, overlayFiles }: CinematicOverlayProps) {
   const [shown, setShown] = useState<CinematicClip | null>(null)
   const [visible, setVisible] = useState(false)
@@ -26,7 +27,7 @@ export default function CinematicOverlay({ clip, clipFamilies, overlayFiles }: C
   useEffect(() => {
     if (clip) {
       setShown(clip)
-      // tick suivant → transition d'opacité
+      // next tick → opacity transition
       const id = window.requestAnimationFrame(() => setVisible(true))
       return () => window.cancelAnimationFrame(id)
     }
@@ -43,11 +44,11 @@ export default function CinematicOverlay({ clip, clipFamilies, overlayFiles }: C
   const wrapStyle: CSSProperties = {
     position: 'absolute',
     inset: 0,
-    zIndex: 5, // au-dessus du canvas, sous le GameOverlay (z-10)
+    zIndex: 5, // above the canvas, below the GameOverlay (z-10)
     pointerEvents: 'none',
     opacity: visible ? 1 : 0,
     transition: `opacity ${FADE_MS}ms ease`,
-    // vignettage sombre — théâtralise sans masquer la scène 3D.
+    // dark vignette — theatrical without hiding the 3D scene.
     background: 'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0,0,0,0.55) 100%)',
   }
   const mediaStyle: CSSProperties = {

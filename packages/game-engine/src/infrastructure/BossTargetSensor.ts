@@ -8,8 +8,8 @@ export class BossTargetSensor {
   private hits = 0;
   private lastHitMs = 0;
 
-  // Injected clock (DIP): defaults to performance.now in production, a
-  // controllable fake in tests — makes the per-hit cooldown deterministic.
+  // Injected clock: defaults to performance.now in production, a controllable
+  // fake in tests — makes the per-hit cooldown deterministic.
   constructor(private readonly now: () => number = () => performance.now()) {}
 
   setFightActive(active: boolean): void {

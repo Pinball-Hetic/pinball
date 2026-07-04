@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 
-// Traînée de feu de la bille — pool fixe de sprites (planes additifs), zéro
-// alloc par frame, zéro lumière. Texture radiale générée par canvas.
+// Ball fire trail — fixed sprite pool (additive planes), zero per-frame
+// allocation, zero lights. Radial texture generated via canvas.
 
 const POOL = 24;
 const PLANE = 0.008;
 const LIFE = 0.3; // s
-const EMIT_RATE = 80; // sprites/s à intensité 1
-const DRIFT_Y = 0.02; // dérive verticale (unités/s)
+const EMIT_RATE = 80; // sprites/s at intensity 1
+const DRIFT_Y = 0.02; // vertical drift (units/s)
 
 const COLOR_FIRE = 0xff6a00;
 const COLOR_ALTERNATE = 0xb14dff;
@@ -17,7 +17,7 @@ const COLOR_FEVER_B = 0x00c8ff;
 interface TrailSprite {
   mesh: THREE.Mesh;
   mat: THREE.MeshBasicMaterial;
-  life: number; // restant ; 0 = libre
+  life: number; // remaining; 0 = free
 }
 
 function makeRadialTexture(): THREE.CanvasTexture {
@@ -40,7 +40,7 @@ export class BallTrail {
   private texture: THREE.CanvasTexture;
   private emitAccum = 0;
   private feverFlip = 0;
-  private maxActive = POOL; // plafonné par le QualityGovernor
+  private maxActive = POOL; // capped by the QualityGovernor
 
   constructor() {
     this.texture = makeRadialTexture();
@@ -66,7 +66,7 @@ export class BallTrail {
     scene.add(this.group);
   }
 
-  // Plafond du pool actif (QualityGovernor : 24 → 12 au cran le plus bas).
+  // Active pool cap (QualityGovernor: 24 → 12 at the lowest tier).
   setMaxSprites(n: number): void {
     this.maxActive = Math.max(0, Math.min(POOL, n));
   }
@@ -89,9 +89,9 @@ export class BallTrail {
   }
 
   /**
-   * @param intensity 0..1 — densité d'émission (0 = trail off).
-   * @param opts alternateWorld (teinte violette) / fever (teinte alternée).
-   * @param camQuat orientation caméra pour billboarder les planes.
+   * @param intensity 0..1 — emission density (0 = trail off).
+   * @param opts alternateWorld (purple tint) / fever (alternating tint).
+   * @param camQuat camera orientation to billboard the planes.
    */
   update(
     dt: number,
@@ -100,7 +100,7 @@ export class BallTrail {
     opts: { alternateWorld: boolean; fever: boolean },
     camQuat: THREE.Quaternion,
   ): void {
-    // Émission proportionnelle à l'intensité.
+    // Emission proportional to intensity.
     if (intensity > 0) {
       this.emitAccum += intensity * EMIT_RATE * dt;
       while (this.emitAccum >= 1) {
@@ -114,7 +114,7 @@ export class BallTrail {
       }
     }
 
-    // Avance les sprites vivants (decay scale + alpha, dérive +Y).
+    // Advance live sprites (scale + alpha decay, +Y drift).
     for (const s of this.sprites) {
       if (s.life <= 0) continue;
       s.life -= dt;

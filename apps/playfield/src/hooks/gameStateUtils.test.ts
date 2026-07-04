@@ -8,15 +8,15 @@ import {
   MILESTONE_REPEAT_EVERY,
 } from "./gameStateUtils";
 
-// --- computeMultiplier : buckets aux seuils [5,10,20,40] ---
+// --- computeMultiplier: buckets at thresholds [5,10,20,40] ---
 
 test("computeMultiplier ×1 sous le premier seuil (0..4)", () => {
   expect(computeMultiplier(0)).toBe(1);
-  expect(computeMultiplier(4)).toBe(1); // frontière basse: 4 < 5
+  expect(computeMultiplier(4)).toBe(1); // lower boundary: 4 < 5
 });
 
 test("computeMultiplier ×2 sur [5,9]", () => {
-  expect(computeMultiplier(5)).toBe(2); // frontière: 5 entre dans le bucket
+  expect(computeMultiplier(5)).toBe(2); // boundary: 5 enters the bucket
   expect(computeMultiplier(9)).toBe(2); // 9 < 10
 });
 
@@ -31,11 +31,11 @@ test("computeMultiplier ×4 sur [20,39]", () => {
 });
 
 test("computeMultiplier ×5 à 40 et au-delà", () => {
-  expect(computeMultiplier(40)).toBe(5); // frontière haute: 40 -> ×5
+  expect(computeMultiplier(40)).toBe(5); // upper boundary: 40 -> x5
   expect(computeMultiplier(1000)).toBe(5);
 });
 
-// --- nextMilestone : croisements de paliers ---
+// --- nextMilestone: milestone crossings ---
 
 test("nextMilestone retourne null sans franchissement", () => {
   const passed = new Set<number>();
@@ -51,7 +51,7 @@ test("nextMilestone franchit un seul palier", () => {
 
 test("nextMilestone retourne le plus haut palier franchi quand plusieurs sont traversés", () => {
   const passed = new Set<number>();
-  // 0 -> 16000 traverse 5k et 15k ; on retourne 15k, mais 5k est aussi marqué.
+  // 0 -> 16000 crosses 5k and 15k; returns 15k, but 5k is recorded too.
   expect(nextMilestone(0, 16_000, passed)).toBe(15_000);
   expect(passed.has(5_000)).toBe(true);
   expect(passed.has(15_000)).toBe(true);
@@ -59,43 +59,43 @@ test("nextMilestone retourne le plus haut palier franchi quand plusieurs sont tr
 
 test("nextMilestone ne re-déclenche pas un palier déjà passé", () => {
   const passed = new Set<number>([5_000]);
-  // 5k déjà passé -> ignoré ; 15k pas encore franchi (next < 15k) -> null.
+  // 5k already passed -> ignored; 15k not crossed yet (next < 15k) -> null.
   expect(nextMilestone(0, 6_000, passed)).toBeNull();
 });
 
 test("nextMilestone borne inférieure exclusive / supérieure inclusive", () => {
   const passed = new Set<number>();
-  // m > prev strict : prev=5000 n'inclut pas 5000.
+  // strict m > prev: prev=5000 does not include 5000.
   expect(nextMilestone(5_000, 14_000, passed)).toBeNull();
-  // m <= next inclusif : next pile sur 15000 le franchit.
+  // inclusive m <= next: next exactly at 15000 crosses it.
   expect(nextMilestone(14_000, 15_000, passed)).toBe(15_000);
 });
 
 test("nextMilestone gère le palier répétitif tous les 25k au-delà de 50k", () => {
   const passed = new Set<number>();
-  // 30k -> 50k : franchit 50k (premier palier répétitif).
+  // 30k -> 50k: crosses 50k (first repeating milestone).
   expect(nextMilestone(30_000, 50_000, passed)).toBe(50_000);
   expect(passed.has(50_000)).toBe(true);
 
   const passed2 = new Set<number>();
-  // 50k -> 80k : franchit 75k (50k exclu car == prev).
+  // 50k -> 80k: crosses 75k (50k excluded because == prev).
   expect(nextMilestone(50_000, 80_000, passed2)).toBe(75_000);
   expect(passed2.has(75_000)).toBe(true);
 });
 
 test("nextMilestone retourne le plus haut répétitif quand plusieurs 25k sont franchis", () => {
   const passed = new Set<number>();
-  // 40k -> 105k : franchit 50k, 75k, 100k -> plus haut = 100k.
+  // 40k -> 105k: crosses 50k, 75k, 100k -> highest = 100k.
   expect(nextMilestone(40_000, 105_000, passed)).toBe(100_000);
   expect(passed.has(50_000)).toBe(true);
   expect(passed.has(75_000)).toBe(true);
   expect(passed.has(100_000)).toBe(true);
 });
 
-// --- generatePlayerName : forme + charset (valeur via spy) ---
+// --- generatePlayerName: shape + charset (value via spy) ---
 
 afterEach(() => {
-  // Restaure les spies Math.random posés dans les tests.
+  // Restore the Math.random spies set in the tests.
   (Math.random as unknown as { mockRestore?: () => void }).mockRestore?.();
 });
 
@@ -115,7 +115,7 @@ test("generatePlayerName borne haute (random proche de 1)", () => {
   expect(generatePlayerName()).toBe("PLAYER9999");
 });
 
-// --- garde-fous constantes (source de vérité des seuils) ---
+// --- constant guards (source of truth for thresholds) ---
 
 test("constantes exportées conformes au contrat", () => {
   expect(MULTIPLIER_THRESHOLDS).toEqual([5, 10, 20, 40]);

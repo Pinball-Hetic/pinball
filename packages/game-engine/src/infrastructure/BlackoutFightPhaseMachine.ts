@@ -11,8 +11,7 @@ import { easeIn, easeOut, strobeOn } from './CinematicEasing';
  *
  * Map-specific differences (shade vs flash-only, billboard, eleven assist) are
  * NOT decided here — the renderer reads the descriptor scalars/flags and chooses
- * which Three calls to make. Every number below is copied verbatim from the
- * original *Reveal.update(dt).
+ * which Three calls to make.
  */
 
 export type BlackoutFightPhase =
@@ -36,7 +35,7 @@ export type BlackoutFightConfig = {
 
 /**
  * Optional eleven-assist (Stranger Things only). Pass null to disable the whole
- * assist sub-machine (Ganondorf). All numbers are verbatim from DemogorgonReveal.
+ * assist sub-machine (Ganondorf).
  */
 export type ElevenAssistConfig = {
   /** Seconds before the first assist fires (ELEVEN_ASSIST_FIRST). */
@@ -49,7 +48,7 @@ export type ElevenAssistConfig = {
   scoreIncrement: number;
 };
 
-/** Per-frame envelope of the eleven-assist animation (verbatim maths). */
+/** Per-frame envelope of the eleven-assist animation. */
 export type ElevenAssistFrame = {
   active: boolean;
   /** Normalised progress t in [0,1]. */
@@ -93,10 +92,8 @@ export type BlackoutFightDescriptor = {
   assistFinished: boolean;
 };
 
-// Flicker shade constants (Demogorgon). Ganondorf passes a flat shade of 0 by
-// supplying its own flicker via the descriptor (flickerShade computed the same
-// way but with zeroed terms — see config). To stay verbatim we keep the exact
-// Demogorgon formula and expose its inputs through config.
+// Flicker shade constants (Demogorgon formula). Ganondorf gets a flat shade
+// of 0 by zeroing the terms via config — same formula, different inputs.
 export type FlickerShadeConfig = {
   base: number;
   breatheAmp: number;
@@ -191,14 +188,14 @@ export class BlackoutFightPhaseMachine {
   }
 
   /**
-   * @param opts.suspendAssist true quand le jeu n'est pas en cours (bille
-   * drainée, partie non relancée). Le sous-timer assist est alors GELÉ (le dt
-   * ne s'écoule pas) : un simple « ne pas émettre » laisserait le compteur
-   * descendre et l'assist tirerait à l'instant du relancement (rattrapage).
-   * Le reste du combat (strobe, flicker, phases) continue normalement.
+   * @param opts.suspendAssist true while the game is not in play (ball
+   * drained, game not relaunched). The assist sub-timer is then FROZEN (dt
+   * does not flow): merely "not emitting" would let the counter keep running
+   * down and the assist would fire the instant play resumes (catch-up).
+   * The rest of the fight (strobe, flicker, phases) keeps running normally.
    */
   tick(dt: number, opts?: { suspendAssist?: boolean }): BlackoutFightDescriptor {
-    // pulseT advances every frame (verbatim: even in idle for Demogorgon).
+    // pulseT advances every frame — even in idle.
     this.pulseT += dt;
 
     const idleDesc = this.makeIdleDescriptor();
@@ -256,8 +253,8 @@ export class BlackoutFightPhaseMachine {
     if (this.phase === 'flicker') {
       const flickerShade = this.computeFlickerShade();
       const flickerBlink = strobeOn(this.strobeT, this.config.fightFlickerHz);
-      // Hors playing : assist suspendu (compteur ET enveloppe d'anim gelés),
-      // sinon l'assist score +100 en boucle pendant que la bille est au spawn.
+      // Outside playing: assist suspended (counter AND anim envelope frozen),
+      // otherwise the assist scores +100 in a loop while the ball sits at spawn.
       const suspendAssist = opts?.suspendAssist === true;
       const assistDt = suspendAssist ? 0 : dt;
       let assistFired = false;

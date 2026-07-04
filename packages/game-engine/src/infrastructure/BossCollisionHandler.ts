@@ -17,7 +17,7 @@ import type { BossFightManager } from './BossFightManager';
  *
  * canHandle() owns every boss collider role, so this handler must be registered
  * FIRST in the processor: a boss role is always consumed here and never falls
- * through to the generic handlers (identical to the previous inline behaviour).
+ * through to the generic handlers.
  */
 export class BossCollisionHandler implements CollisionHandler {
   // Last BOSS_LOCKED_HIT emission per boss, used for the 2s anti-spam throttle.
@@ -32,8 +32,8 @@ export class BossCollisionHandler implements CollisionHandler {
     private readonly getAlternateWorldActive: () => boolean,
     /** Reads the live gate context (score baselines) for threshold checks. */
     private readonly getGateContext: () => BossGateContext,
-    // Injected clock (DIP): defaults to performance.now in production, a
-    // controllable fake in tests — makes the anti-spam throttle deterministic.
+    // Injected clock: tests pass a fake to make the anti-spam throttle
+    // deterministic.
     private readonly now: () => number = () => performance.now(),
   ) {
     for (const b of bosses) this.bossByRole.set(b.colliderRole, b);

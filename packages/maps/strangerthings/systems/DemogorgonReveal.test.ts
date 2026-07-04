@@ -51,7 +51,7 @@ if (typeof g.Image === 'undefined') {
   };
 }
 
-// Importe APRES le stub (le loader de texture est touché au mount).
+// Import AFTER the stub (the texture loader is touched at mount).
 const { DemogorgonReveal } = await import('./DemogorgonReveal');
 
 const BLACKOUT = 0.12;
@@ -140,8 +140,8 @@ describe('DemogorgonReveal resetTargetMaterials (regression)', () => {
 });
 
 describe('DemogorgonReveal assist gate hors playing (regression score gratuit)', () => {
-  // Bug d'origine : bille drainée (gameState 'idle'), combat encore actif →
-  // l'assist Eleven continuait d'émettre ASSIST (+100) toutes les ~4 s.
+  // Original bug: ball drained (gameState 'idle'), fight still active →
+  // the Eleven assist kept emitting ASSIST (+100) every ~4 s.
   function makeReveal(isPlaying: () => boolean) {
     const reveal = new DemogorgonReveal();
     const emitted: GameEvent[] = [];
@@ -156,7 +156,7 @@ describe('DemogorgonReveal assist gate hors playing (regression score gratuit)',
     reveal.setEmit((e) => emitted.push(e));
     reveal.onGameEvent(REVEAL_EVENT);
     reveal.update(BLACKOUT + 0.001);
-    reveal.update(REVEAL + 0.001); // → flicker, assist armé
+    reveal.update(REVEAL + 0.001); // → flicker, assist armed
     return { reveal, emitted };
   }
 

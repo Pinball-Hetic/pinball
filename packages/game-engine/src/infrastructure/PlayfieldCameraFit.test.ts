@@ -50,15 +50,15 @@ describe('fillPlayfieldBoxCorners', () => {
     );
     const reuse: THREE.Vector3[] = [{ junk: true } as unknown as THREE.Vector3];
     const corners = fillPlayfieldBoxCorners(box, reuse);
-    expect(corners).toBe(reuse); // même référence (réutilisé)
+    expect(corners).toBe(reuse); // same reference (reused)
     expect(corners).toHaveLength(8);
-    // chaque composante doit appartenir à min/max sur son axe
+    // each component must belong to min/max on its axis
     for (const c of corners) {
       expect([-1, 1]).toContain(c.x);
       expect([-2, 2]).toContain(c.y);
       expect([-3, 3]).toContain(c.z);
     }
-    // unicité des 8 coins
+    // uniqueness of the 8 corners
     const keys = new Set(corners.map((c) => `${c.x},${c.y},${c.z}`));
     expect(keys.size).toBe(8);
   });
@@ -87,7 +87,7 @@ describe('boundingBoxPlayfieldWallFootprint', () => {
     expect(box.max.x).toBeCloseTo(WALL_RIGHT_X, 6);
     expect(box.min.z).toBeCloseTo(WALL_TOP_Z, 6);
     expect(box.max.z).toBeCloseTo(WALL_BOTTOM_Z, 6);
-    // Y borné par la surface aux deux extrémités Z
+    // Y bounded by the surface at both Z ends
     const ys = [surfaceYAtZ(WALL_TOP_Z), surfaceYAtZ(WALL_BOTTOM_Z)];
     expect(box.min.y).toBeCloseTo(Math.min(...ys), 6);
     expect(box.max.y).toBeCloseTo(Math.max(...ys), 6);
@@ -100,7 +100,7 @@ describe('boundingBoxPlayfieldWallFootprint', () => {
     expect(padded.max.x).toBeCloseTo(base.max.x + 0.05, 6);
     expect(padded.min.z).toBeCloseTo(base.min.z - 0.05, 6);
     expect(padded.max.z).toBeCloseTo(base.max.z + 0.05, 6);
-    // Y inchangé
+    // Y unchanged
     expect(padded.min.y).toBeCloseTo(base.min.y, 6);
     expect(padded.max.y).toBeCloseTo(base.max.y, 6);
   });
@@ -128,7 +128,7 @@ describe('fillPlayfieldWallFootprintCorners', () => {
 describe('portraitOrthoHalfWidth', () => {
   test('échelle par défaut applique le scale portrait (> dimension brute)', () => {
     const hw = portraitOrthoHalfWidth(1);
-    // avec ndc=1 et aspect=1 : max(halfWidth, halfDepth) * 1.08
+    // with ndc=1 and aspect=1: max(halfWidth, halfDepth) * 1.08
     const halfDepth = (WALL_BOTTOM_Z - WALL_TOP_Z) * 0.5;
     const expected = Math.max(PLAYFIELD_PORTRAIT_HALF_WIDTH, halfDepth) * 1.08;
     expect(hw).toBeCloseTo(expected, 6);
@@ -150,7 +150,7 @@ describe('portraitOrthoHalfWidth', () => {
       lookYBias: 0,
       lookZBias: 0,
     });
-    // ndc=2 réduit de moitié, scale=1 → < défaut
+    // ndc=2 halves it, scale=1 → < default
     expect(tuned).toBeLessThan(portraitOrthoHalfWidth(1));
   });
 
@@ -220,7 +220,7 @@ describe('stratégies par mode de vue', () => {
     const up2 = playfieldCameraUpForMode('portrait-fill');
     expect(up1).not.toBe(up2);
     expect(up1).not.toBe(PLAYFIELD_PORTRAIT_CAMERA_UP);
-    // Muter le retour ne doit pas toucher la constante partagée.
+    // Mutating the return must not touch the shared constant.
     up1.set(9, 9, 9).normalize();
     expect(PLAYFIELD_PORTRAIT_CAMERA_UP.z).toBe(-1);
     expect(playfieldCameraUpForMode('portrait-fill').z).toBe(-1);

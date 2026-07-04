@@ -1,25 +1,23 @@
-// Effets partagés VERBATIM entre les modules de map (ST, Zelda) sur
-// onGameEvent. Chaque helper est un effet fin piloté par un sous-ensemble de
-// MapContext (DIP) pour rester testable avec un faux ctx (spies), sans dépendre
-// du MapContext complet. Comportement identique aux anciens if-blocks inline.
+// onGameEvent effects shared between map modules (ST, Zelda). Each helper
+// takes only the MapContext subset it needs, so it can be tested with a fake
+// ctx (spies) without the full MapContext.
 
 import type { GameEvent } from './GameEvents';
 
-// Sous-ensemble de MapContext nécessaire au bandeau DMD des events partagés.
+// MapContext subset needed by the shared-events DMD banner.
 export interface DmdEventContext {
   pushDmdEvent(label: string, points: number): void;
 }
 
-// BOSS_LOCKED_HIT → bandeau DMD "ENCORE <remaining> PTS". Identique ST/Zelda.
+// BOSS_LOCKED_HIT → DMD banner "ENCORE <remaining> PTS".
 export function handleBossLockedHit(ctx: DmdEventContext, e: GameEvent): void {
   if (e.type !== 'BOSS_LOCKED_HIT') return;
   ctx.pushDmdEvent(`ENCORE ${e.remaining} PTS`, 0);
 }
 
-// BOSS_ARMED → horodate l'armement du nid + bandeau DMD "LE NID S EVEILLE".
-// Le hint tardif (dueLateHints) consomme armedAt. Le caller (map) gère les
-// effets visuels spécifiques (garlands celebrate, screenShake). Identique
-// ST/Zelda pour la partie armedAt + DMD.
+// BOSS_ARMED → timestamps the nest arming + DMD banner "LE NID S EVEILLE".
+// The late hint (dueLateHints) consumes armedAt. The caller (map) handles
+// map-specific visual effects (garlands celebrate, screenShake).
 export function handleBossArmed(
   ctx: DmdEventContext,
   e: GameEvent,
@@ -31,16 +29,14 @@ export function handleBossArmed(
   ctx.pushDmdEvent('LE NID S EVEILLE', 0);
 }
 
-// Vrai si l'event est un game over par drain (DRAIN/BOTTOM_OUT + gameState
-// game_over) : le caller doit alors terminer tous les combats boss. Décision
-// pure identique ST/Zelda.
+// True when the event is a drain game over (DRAIN/BOTTOM_OUT + gameState
+// game_over): the caller must then end all boss fights.
 export function isGameOverDrain(e: GameEvent, gameState: string): boolean {
   return (e.type === 'DRAIN' || e.type === 'BOTTOM_OUT') && gameState === 'game_over';
 }
 
-// Décision pure : le hitCount atteint-il le seuil de victoire d'un boss ?
-// Centralise le pattern `boss && e.hitCount >= boss.targetHits` répété pour
-// chaque boss dans les deux maps.
+// Does hitCount reach a boss victory threshold? Centralizes the
+// `boss && e.hitCount >= boss.targetHits` pattern repeated per boss.
 export function isBossTargetDefeated(
   targetHits: number | undefined,
   hitCount: number,

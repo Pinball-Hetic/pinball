@@ -1,5 +1,5 @@
 /**
- * Pure phase state-machine for "shape A" boss reveals (walk → settle → fight →
+ * Phase state-machine for "shape A" boss reveals (walk → settle → fight →
  * victory). Owns {phase, elapsed} and the sequencing/timer logic, with NO Three
  * dependency. Map-specific scalars (fight flicker shade/flashMix, victory
  * duration, target hit count) are passed in via config so the same machine
@@ -8,9 +8,6 @@
  * Walk/settle exit is gated by the renderer's visual (path completion / settle
  * completion booleans) because that timing lives in Three-side animation; the
  * machine consumes those booleans but owns the phase transitions.
- *
- * The descriptor returned by tick() is a faithful, verbatim translation of what
- * the original *Reveal.update(dt) computed each frame.
  */
 
 export type WalkFightPhase = 'idle' | 'walk' | 'settle' | 'fight' | 'victory';

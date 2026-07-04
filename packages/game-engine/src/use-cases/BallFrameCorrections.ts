@@ -10,10 +10,10 @@ export interface BallBodyState {
 }
 
 /**
- * Verrou de la balle au spawn tant qu'on est idle (y compris pendant la charge
- * du plongeur) : sinon la gravité/inclinaison la fait glisser contre le mur
- * droit (frottement → ralentissement au lancement). Pure : l'appelant lit
- * spawn depuis le layout et applique translation/linvel/angvel sur le corps.
+ * Locks the ball at the spawn while idle (including during plunger charge):
+ * otherwise gravity/tilt makes it slide against the right wall (friction →
+ * slower launch). Pure: the caller reads spawn from the layout and applies
+ * translation/linvel/angvel to the body.
  */
 export function computeIdleSpawnLock(spawn: { x: number; y: number; z: number }): BallBodyState {
   const z = spawn.z;
@@ -25,15 +25,14 @@ export function computeIdleSpawnLock(spawn: { x: number; y: number; z: number })
 }
 
 /**
- * Verrouillage latéral du couloir : pendant la montée (partie droite du
- * couloir, avant l'ouverture de sortie), on fige X sur la ligne de spawn et on
- * annule la vitesse latérale → lancement parfaitement droit, sans dépendre de
- * la géométrie GLB. La balle est libérée dès qu'elle atteint la zone de sortie
- * (Z <= lane.leftWallTopZ) pour partir naturellement dans le terrain.
+ * Shooter lane lateral lock: during the climb (straight right part of the
+ * lane, before the exit opening), X is pinned to the spawn line and lateral
+ * velocity is cancelled → perfectly straight launch, independent of GLB
+ * geometry. The ball is released once it reaches the exit zone
+ * (Z <= lane.leftWallTopZ) so it enters the playfield naturally.
  *
- * Pure : renvoie l'état à appliquer quand la balle est dans la partie droite,
- * le signal 'close' quand elle a dépassé exitX (l'appelant ferme la gate), ou
- * null quand rien à faire.
+ * Returns the state to apply while in the straight part, the 'close' signal
+ * once past exitX (the caller closes the gate), or null when nothing to do.
  */
 export function computeLaneStraightLock(
   pos: Vec3,
@@ -55,13 +54,12 @@ export function computeLaneStraightLock(
 }
 
 /**
- * Clamp de vitesse. Reproduit VERBATIM les deux setLinvel séquentiels du game
- * loop, appliqués sur la MÊME vélocité initiale (le second lit l'original, pas
- * le résultat du premier) :
- *   1. si la vitesse totale dépasse BALL_MAX_SPEED → scale x/y/z.
- *   2. si le Y INITIAL > 1.25 → écrase par { x, y: 0.35, z } avec x/z INITIAUX,
- *      ce qui remplace intégralement le résultat de l'étape 1.
- * Pure : renvoie la linvel finale à appliquer, ou null si aucune correction.
+ * Speed clamp. Both rules read the SAME initial velocity (the second does not
+ * see the result of the first):
+ *   1. if total speed exceeds BALL_MAX_SPEED → scale x/y/z.
+ *   2. if INITIAL y > 1.25 → overwrite with { x, y: 0.35, z } using the
+ *      INITIAL x/z, fully replacing the result of step 1.
+ * Returns the final linvel to apply, or null when no correction is needed.
  */
 export function computeSpeedClamp(vel: Vec3): Vec3 | null {
   let out: Vec3 | null = null;

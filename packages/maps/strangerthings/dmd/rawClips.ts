@@ -1,14 +1,14 @@
-// Clips ASCII des cinématiques DMD. Format texte éditable :
-//   # fps: N           → cadence
-//   # commentaire       → ignoré
-//   <lignes de chars>   → une frame
-//   ===                 → séparateur de frame
-// Mapping caractère (résolu par clip via charMap dans AsciiClipPlayer) :
-//   '.' ou ' ' = éteint ; ':' = dim ; '#' = mid ; '@' = full ; '!' = accent
-// Template literals (pas d'import raw) — priorité à la simplicité.
+// ASCII clips for DMD cinematics. Editable text format:
+//   # fps: N           → frame rate
+//   # comment           → ignored
+//   <char lines>        → one frame
+//   ===                 → frame separator
+// Character mapping (resolved per clip via charMap in AsciiClipPlayer):
+//   '.' or ' ' = off; ':' = dim; '#' = mid; '@' = full; '!' = accent
+// Template literals (no raw import) — simplicity first.
 
 export const RAW_CLIPS = {
-  // Spirale qui grandit depuis le centre et avale l'écran.
+  // Spiral growing from the center, swallowing the screen.
   portal_swallow: `
 # fps: 3
             @
@@ -50,7 +50,7 @@ export const RAW_CLIPS = {
  @@@@@@@@@@@@@@@@@@
 `,
 
-  // Un cercle géant qui pulse 2 fois.
+  // A giant circle pulsing twice.
   last_chance: `
 # fps: 5
        :##:
@@ -78,7 +78,7 @@ export const RAW_CLIPS = {
      :#@@@@#:
 `,
 
-  // Cadre étoilé (le score roule par-dessus en fin de clip — géré par le layout).
+  // Starry frame (the score rolls over it at clip end — handled by the layout).
   hall_of_fame: `
 # fps: 2
  !  :  !  :  !  :  !  :  !

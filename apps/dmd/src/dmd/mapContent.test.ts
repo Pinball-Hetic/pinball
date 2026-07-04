@@ -1,10 +1,10 @@
 import { test, expect, describe, mock, beforeEach, afterEach } from 'bun:test'
 
-// mapContent.ts résout le contenu DMD de la map active (build-time) via le
-// registry et retombe sur `{}` quand aucune map ne fournit de contenu DMD.
-// On mocke le registry pour piloter les deux branches, en posant le mock AVANT
-// le `await import('./mapContent')`. Un suffixe `?xxx` casse le cache de module
-// de Bun entre les deux scénarios.
+// mapContent.ts resolves the active map's DMD content (build-time) via the
+// registry and falls back to `{}` when no map provides DMD content.
+// The registry is mocked to drive both branches; the mock must be set BEFORE
+// the `await import('./mapContent')`. A `?xxx` suffix busts Bun's module
+// cache between the two scenarios.
 
 const fakeDmd = {
   ScoreTakeover: () => null,

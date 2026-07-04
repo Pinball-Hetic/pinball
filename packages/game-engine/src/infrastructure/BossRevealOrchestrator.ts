@@ -27,11 +27,10 @@ export class BossRevealOrchestrator {
       ),
     );
 
-    // Variantes d'éclairage : tout compte de PointLights jamais rencontré
-    // déclenche une recompilation de TOUS les matériaux éclairés à la frame du
-    // reveal (freeze). On pré-compile 0..max+1 — le +1 absorbe une lumière
-    // dynamique concurrente hors reveal (ex. cœur de portail actif pendant un
-    // combat).
+    // Lighting variants: any PointLight count never seen before triggers a
+    // recompile of ALL lit materials on the reveal frame (freeze). Pre-compile
+    // 0..max+1 — the +1 absorbs a concurrent dynamic light outside the reveal
+    // (e.g. an active portal core during a fight).
     const maxLights = Math.max(
       0,
       ...[...this.reveals.values()].map((r) => r.dynamicPointLightCount?.() ?? 0),

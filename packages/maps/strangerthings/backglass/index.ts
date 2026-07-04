@@ -1,6 +1,6 @@
-// Composants d'art backglass Stranger Things (relocalisés depuis apps/backglass).
-// Les classes CSS restent dans le globals.css de l'app (TODO : extraire le
-// thème ST). Le type Reactor est structurel (cf. reactor.ts).
+// Stranger Things backglass art components. CSS classes stay in the app's
+// globals.css (TODO: extract the ST theme). The Reactor type is structural
+// (see reactor.ts).
 export { default as JoyceWall } from './JoyceWall'
 export { default as SideArt } from './SideArt'
 export { default as DemogorgonTakeover } from './DemogorgonTakeover'
@@ -11,7 +11,7 @@ export { backglassTheme, backglassThemeAlternate } from './theme'
 export type { ThemeTokens } from './theme'
 import { manifest } from '../manifest'
 import type { ClipTimings } from '@pinball/shared-types'
-// Data légère du manifest exposée au backglass (pas de getMapPackage lourd).
+// Lightweight manifest data exposed to the backglass (no heavy getMapPackage).
 export const counterLabels: Record<string, string> = manifest.counterLabels ?? {}
-// Timings des clips (manifest.clips) — durées de takeover backglass.
+// Clip timings (manifest.clips) — backglass takeover durations.
 export const clips: Record<string, ClipTimings> = manifest.clips ?? {}

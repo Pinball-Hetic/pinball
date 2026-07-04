@@ -3,9 +3,9 @@ import { render, screen, cleanup, act } from '@testing-library/react'
 import type { LeaderboardEntry } from '@pinball/shared-types'
 import AttractScene from './AttractScene'
 
-// La rotation de panneau s'appuie sur window.setInterval. bun:test n'a pas de
-// faux timers d'intervalle, alors on intercepte setInterval pour capturer le
-// callback et le déclencher à la main (bascule panneau 0 → 1).
+// Panel rotation relies on window.setInterval. bun:test has no fake interval
+// timers, so we intercept setInterval to capture the callback and trigger it
+// by hand (panel 0 → 1 switch).
 const realSetInterval = window.setInterval
 let tick: (() => void) | null = null
 
@@ -57,7 +57,7 @@ describe('AttractScene', () => {
     captureInterval()
     const entries = [entry({ rank: 10, name: 'TEN', score: 123456 })]
     render(<AttractScene entries={entries} />)
-    act(() => tick?.()) // bascule vers le panneau 1
+    act(() => tick?.()) // switch to panel 1
     expect(screen.getByText('SCORE À BATTRE')).toBeDefined()
     expect(screen.getByText('123 456')).toBeDefined()
   })
@@ -73,9 +73,9 @@ describe('AttractScene', () => {
   test('rotation cyclique : panneau 1 puis retour panneau 0', () => {
     captureInterval()
     render(<AttractScene entries={[entry({ rank: 1, name: 'ZED' })]} />)
-    act(() => tick?.()) // → panneau 1
+    act(() => tick?.()) // → panel 1
     expect(screen.getByText('UNE PIÈCE, UNE LÉGENDE')).toBeDefined()
-    act(() => tick?.()) // → panneau 0
+    act(() => tick?.()) // → panel 0
     expect(screen.getByText('HALL OF FAME')).toBeDefined()
     expect(screen.getByText('ZED')).toBeDefined()
   })

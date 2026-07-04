@@ -4,7 +4,7 @@ import type { MapLayout, DropTargetDef } from '../domain/MapLayout';
 import type { GameEvent } from '../domain/GameEvents';
 import { SCORE_DROP_TARGET, SCORE_DROP_COMPLETE } from '../domain/ScoringConstants';
 
-// Layout minimal : le handler ne lit que `dropTargets` (id + side).
+// Minimal layout: the handler only reads `dropTargets` (id + side).
 function makeLayout(targets: DropTargetDef[]): MapLayout {
   return { dropTargets: targets } as unknown as MapLayout;
 }
@@ -57,7 +57,7 @@ test('handle: idempotent — une cible déjà down ne réémet rien', () => {
 test('handle: cible inconnue (absente du layout) → HIT seul, pas de complete', () => {
   const { handler, events } = setup([dt('drop_a', 'left')]);
   handler.handle('drop_x', 'playing', true);
-  // HIT émis (état tracké par rôle), mais find() ne trouve rien → early return.
+  // HIT emitted (state tracked per role), but find() finds nothing → early return.
   expect(events).toEqual([
     { type: 'DROP_TARGET_HIT', targetId: 'drop_x', scoreIncrement: SCORE_DROP_TARGET },
   ]);
@@ -74,7 +74,7 @@ test('handle: toutes les cibles du côté down → COMPLETE une fois + reset du 
     { type: 'DROP_TARGET_COMPLETE', side: 'left', scoreIncrement: SCORE_DROP_COMPLETE },
   ]);
 
-  // Après reset, le côté est de nouveau jouable (re-HIT sans erreur).
+  // After reset, the side is playable again (re-HIT without error).
   handler.handle('drop_a', 'playing', true);
   expect(events.at(-1)).toEqual({
     type: 'DROP_TARGET_HIT',
@@ -90,27 +90,27 @@ test('handle: un seul côté complété ne reset pas/affecte pas l’autre côt�
     dt('drop_c', 'right'),
     dt('drop_d', 'right'),
   ]);
-  handler.handle('drop_c', 'playing', true); // right partiel (drop_d encore up)
+  handler.handle('drop_c', 'playing', true); // right partial (drop_d still up)
   handler.handle('drop_a', 'playing', true);
-  handler.handle('drop_b', 'playing', true); // left complet → COMPLETE left + reset left
+  handler.handle('drop_b', 'playing', true); // left complete → COMPLETE left + reset left
 
   const completes = events.filter((e) => e.type === 'DROP_TARGET_COMPLETE');
   expect(completes).toEqual([
     { type: 'DROP_TARGET_COMPLETE', side: 'left', scoreIncrement: SCORE_DROP_COMPLETE },
   ]);
 
-  // drop_c (right) doit rester down : un nouveau contact est idempotent (rien émis).
+  // drop_c (right) must stay down: a new contact is idempotent (nothing emitted).
   const before = events.length;
   handler.handle('drop_c', 'playing', true);
   expect(events.length).toBe(before);
 });
 
 test('resetDropTargets: réinitialise aussi un rôle orphelin (absent du layout) — régression', () => {
-  // Régression : resetDropTargets ne réinitialisait que les ids présents dans
-  // layout.dropTargets ; un rôle 'drop_*' orphelin (dans colliderMap mais pas
-  // le layout) restait down à vie. Doit maintenant redevenir jouable.
+  // Regression: resetDropTargets only reset the ids present in
+  // layout.dropTargets; an orphan 'drop_*' role (in colliderMap but not the
+  // layout) stayed down forever. It must now become playable again.
   const { handler, events } = setup([dt('drop_a', 'left')]);
-  handler.handle('drop_orphan', 'playing', true); // met un rôle inconnu down
+  handler.handle('drop_orphan', 'playing', true); // sets an unknown role down
   expect(events.at(-1)).toEqual({
     type: 'DROP_TARGET_HIT',
     targetId: 'drop_orphan',
@@ -120,7 +120,7 @@ test('resetDropTargets: réinitialise aussi un rôle orphelin (absent du layout)
   handler.resetDropTargets();
   events.length = 0;
 
-  handler.handle('drop_orphan', 'playing', true); // doit ré-émettre après reset
+  handler.handle('drop_orphan', 'playing', true); // must re-emit after reset
   expect(events).toEqual([
     { type: 'DROP_TARGET_HIT', targetId: 'drop_orphan', scoreIncrement: SCORE_DROP_TARGET },
   ]);
@@ -134,7 +134,7 @@ test('resetDropTargets: remet tout up et émet DROP_TARGET_RESET', () => {
   handler.resetDropTargets();
   expect(events).toEqual([{ type: 'DROP_TARGET_RESET' }]);
 
-  // drop_a est de nouveau up : un contact réémet un HIT.
+  // drop_a is up again: a contact re-emits a HIT.
   handler.handle('drop_a', 'playing', true);
   expect(events.at(-1)).toEqual({
     type: 'DROP_TARGET_HIT',

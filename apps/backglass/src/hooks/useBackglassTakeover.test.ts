@@ -12,9 +12,9 @@ import type { PinballSocket } from '@pinball/shared-types/src/socket-client';
 import { MapContentProvider, EMPTY_CONTENT } from '@/map/content';
 import type { BackglassContent } from '@/map/content';
 
-// ── Faux socket INJECTÉ dans le hook : capture les handlers .on() pour les
-// déclencher à la main, compte les .off() au nettoyage. Le hook ne crée plus son
-// propre socket (il est lifté dans BackglassStage et passé en argument). ──
+// ── Fake socket INJECTED into the hook: captures .on() handlers to fire them
+// manually, counts .off() on cleanup. The hook no longer creates its own socket
+// (it is lifted in BackglassStage and passed as an argument). ──
 type Handler = (...args: unknown[]) => void;
 
 let handlers: Record<string, Handler>;
@@ -36,18 +36,18 @@ function makeSocket(): PinballSocket {
   } as unknown as PinballSocket;
 }
 
-// ── Horloge déterministe : performance.now() pilotée par la variable `clock`. ─
+// ── Deterministic clock: performance.now() driven by the `clock` variable. ───
 let clock: number;
 const realNow = performance.now.bind(performance);
 
-// ── Capture du tick (window.setInterval @ 250 ms du hook). ───────────────────
+// ── Capture the tick (the hook's window.setInterval @ 250 ms). ───────────────
 let tickCallback: (() => void) | null;
 let tickHandle: ReturnType<typeof setInterval> | null;
 let clearIntervalCalls: number;
 const realSetInterval = window.setInterval.bind(window);
 const realClearInterval = window.clearInterval.bind(window);
 
-// Avance l'horloge à `t` puis exécute un tick de la machine à états.
+// Advances the clock to `t` then runs one state-machine tick.
 function tickAt(t: number) {
   clock = t;
   act(() => {
@@ -99,7 +99,7 @@ async function importHook() {
   return mod.useBackglassTakeover;
 }
 
-// Contenu de map de test : clipBehavior data-driven + clips timings.
+// Test map content: data-driven clipBehavior + clip timings.
 function makeContent(over: Partial<BackglassContent> = {}): BackglassContent {
   return {
     ...EMPTY_CONTENT,
@@ -120,7 +120,7 @@ function renderTakeover(
   return renderHook(() => __hook(entries, socket), { wrapper });
 }
 
-// __hook est rempli juste avant chaque renderTakeover (importHook async).
+// __hook is filled just before each renderTakeover (async importHook).
 let __hook: Awaited<ReturnType<typeof importHook>>;
 
 beforeEach(async () => {
@@ -147,19 +147,19 @@ describe('useBackglassTakeover — état initial', () => {
 describe('useBackglassTakeover — game:over', () => {
   test('high score → scène HIGH_SCORE projetée au tick suivant', () => {
     const { result } = renderTakeover();
-    // finalScore 5000 > 10e place (1000) → qualifie.
+    // finalScore 5000 > 10th place (1000) → qualifies.
     act(() => emit('game:over', { player: 'NEO', finalScore: 5000 }));
     tickAt(10);
     expect(result.current.takeover?.scene).toBe('HIGH_SCORE');
-    // rank : 1 entrée (9000) au-dessus de 5000 → rang 2.
+    // rank: 1 entry (9000) above 5000 → rank 2.
     expect((result.current.takeover?.payload as { rank: number }).rank).toBe(2);
-    // Joyce reçoit le nom du joueur.
+    // Joyce receives the player name.
     expect(result.current.joyce.text).toBe('NEO');
   });
 
   test('score non qualifiant → scène RECAP + Joyce GAME OVER', () => {
     const { result } = renderTakeover();
-    // 500 < 10e place (1000) → ne qualifie pas.
+    // 500 < 10th place (1000) → does not qualify.
     act(() => emit('game:over', { player: 'BOB', finalScore: 500 }));
     tickAt(10);
     expect(result.current.takeover?.scene).toBe('RECAP');
@@ -172,10 +172,10 @@ describe('useBackglassTakeover — game:over', () => {
     tickAt(100);
     expect(result.current.takeover?.scene).toBe('HIGH_SCORE');
 
-    // HIGH_SCORE_MS = 5000 → expire, followUp RECAP poussé.
+    // HIGH_SCORE_MS = 5000 → expires, RECAP followUp pushed.
     tickAt(5_100);
     expect(result.current.takeover?.scene).toBe('RECAP');
-    // Le rang reste surligné pendant la fenêtre highlight.
+    // The rank stays highlighted during the highlight window.
     expect(result.current.highlightRank).toBe(2);
   });
 });
@@ -194,8 +194,8 @@ describe('useBackglassTakeover — dmd:display CINEMATIC', () => {
     tickAt(10);
     expect(result.current.takeover?.scene).toBe('CINEMATIC');
     expect(result.current.takeover?.clip).toBe('demogorgon');
-    // Event poussé à clock=0 → expiresAt = 0 + DEFAULT_CLIP_SHOW_MS (4000).
-    // Toujours actif juste avant, purgé à l’instant exact d’expiration.
+    // Event pushed at clock=0 → expiresAt = 0 + DEFAULT_CLIP_SHOW_MS (4000).
+    // Still active just before, purged at the exact expiry instant.
     tickAt(3_999);
     expect(result.current.takeover?.scene).toBe('CINEMATIC');
     tickAt(4_000);
@@ -255,7 +255,7 @@ describe('useBackglassTakeover — dmd:display CINEMATIC', () => {
     act(() => emit('dmd:display', { mode: 'CINEMATIC', clip: 'quick' }));
     tickAt(10);
     expect(result.current.takeover?.scene).toBe('CINEMATIC');
-    // Expire à 1000, pas à 4000.
+    // Expires at 1000, not at 4000.
     tickAt(1_000);
     expect(result.current.takeover).toBeNull();
   });
@@ -292,7 +292,7 @@ describe('useBackglassTakeover — dmd:display EVENT / flashs', () => {
   test('EVENT non mappé → pas de takeover mais agitation déclenchée', () => {
     const { result } = renderTakeover();
     act(() => emit('dmd:display', { mode: 'EVENT', label: 'UNKNOWN' }));
-    // agitation démarre à clock courant (0) ; tick juste après → > 0.
+    // agitation starts at current clock (0); tick just after → > 0.
     tickAt(100);
     expect(result.current.takeover).toBeNull();
     expect(result.current.agitation).toBeGreaterThan(0);
@@ -329,8 +329,8 @@ describe('useBackglassTakeover — cycle de vie', () => {
     const { unmount } = renderTakeover();
     unmount();
     expect(clearIntervalCalls).toBe(1);
-    // Socket partagé (lifté dans BackglassStage) : le hook retire ses 4 handlers
-    // (game:start, score:update, game:over, dmd:display) sans le déconnecter.
+    // Shared socket (lifted in BackglassStage): the hook removes its 4 handlers
+    // (game:start, score:update, game:over, dmd:display) without disconnecting it.
     expect(offCalls).toBe(4);
   });
 });

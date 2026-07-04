@@ -109,12 +109,12 @@ export class CollisionEventProcessor {
     });
   }
 
-  /** DEBUG (/debug) : reveal par le vrai chemin d'état (boss armé, pas fantôme). */
+  /** DEBUG (/debug): reveal via the real state path (boss armed, not a ghost). */
   debugRevealBoss(id: BossId, gameState: string): void {
     this.bossFights.forceReveal(id, gameState);
   }
 
-  /** DEBUG (/debug) : crédite un hit par le vrai sensor (compteur/défaite réels). */
+  /** DEBUG (/debug): credits a hit via the real sensor (real counter/defeat). */
   debugBossTargetHit(id: BossId, gameState: string): void {
     this.bossFights.forceTargetHit(id, gameState);
   }
@@ -144,8 +144,8 @@ export class CollisionEventProcessor {
     // The DRAIN-vs-rescue split (1 before 2) is the load-bearing invariant:
     // a map that rescues on the last ball must see the pre-decrement count.
     private readonly emit: GameEventListener,
-    // Injected clock (DIP): defaults to performance.now in production, a
-    // controllable fake in tests — makes the anti-spam throttles deterministic.
+    // Injected clock: tests pass a controllable fake to make the anti-spam
+    // throttles deterministic.
     private readonly now: () => number = () => performance.now(),
   ) {
     this.bossFights = new BossFightManager(emit, layout.bosses, this.now);
@@ -199,11 +199,11 @@ export class CollisionEventProcessor {
 
   flushPendingPhysics(): void {
     if (this.pendingPhysics.length === 0) return;
-    // Vide EN PLACE (splice) — ne PAS réassigner : les handlers de collision
-    // capturent cette même référence de tableau à la construction. Un
-    // `this.pendingPhysics = []` la détacherait → après le 1er flush, les
-    // handlers pousseraient dans l'ancien tableau et plus rien ne s'exécuterait
-    // (bumpers muets, drain/game-over jamais déclenchés).
+    // Drain IN PLACE (splice) — do NOT reassign: the collision handlers
+    // capture this same array reference at construction. A
+    // `this.pendingPhysics = []` would detach it → after the 1st flush the
+    // handlers would push into the old array and nothing would run anymore
+    // (silent bumpers, drain/game-over never fired).
     const pending = this.pendingPhysics.splice(0);
     for (const run of pending) run();
   }

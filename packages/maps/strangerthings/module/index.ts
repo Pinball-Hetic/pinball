@@ -28,24 +28,23 @@ import { createLastLifeRescue } from './lastLifeRescue'
 import { playMilestoneCinematic } from './milestoneCinematic'
 import { createScoopCapture } from './scoopCapture'
 
-// Module de comportement Stranger Things. Possède tous ses systèmes en
-// closure ; n'expose que le contrat MapModule (aucun bridge vers le
-// composant playfield).
+// Stranger Things behavior module. Owns all its systems in closure; exposes
+// only the MapModule contract (no bridge to the playfield component).
 export function createModule(): MapModule {
   let ctxRef: MapContext | null = null
-  // Compteurs ST (alimentent mapState + GameStats.counters).
+  // ST counters (feed mapState + GameStats.counters).
   let demogorgons = 0
   let portals = 0
   let hetic = 0
-  // Nid : armé depuis (ms) + hint tardif déjà émis, par boss.
+  // Nest: armed-since timestamp (ms) + late hint already fired, per boss.
   const armedAt: Record<string, number> = {}
   const hintFired = new Set<string>()
-  // Liste des ids de boss (statique après setup) — hoistée pour éviter une
-  // allocation de tableau à chaque tick d'update (hint tardif du nid).
+  // Boss id list (static after setup) — hoisted to avoid an array allocation
+  // on every update tick (nest late hint).
   let bossIds: readonly string[] = []
-  // Timers de restauration du timescale après défaite d'un boss (~200 ms).
-  // Suivis par bossId pour éviter les fuites (annulés au reset/dispose, jamais
-  // empilés). Cf. createBossDefeatTimers (game-engine).
+  // Timescale-restore timers after a boss defeat (~200 ms). Tracked per
+  // bossId to avoid leaks (cancelled on reset/dispose, never stacked).
+  // See createBossDefeatTimers (game-engine).
   const bossDefeatTimers = createBossDefeatTimers()
   let garlands: GarlandLights | null = null
   let bumperVisuals: BumperVisuals | null = null
@@ -57,28 +56,26 @@ export function createModule(): MapModule {
   let demogorgonReveal: DemogorgonReveal | null = null
   let vecnaReveal: VecnaReveal | null = null
   const lastLifeRescue = createLastLifeRescue()
-  // Trou scoop (saucer) : state machine capture → hold → kick.
+  // Scoop hole (saucer): capture → hold → kick state machine.
   const scoop = createScoopCapture()
 
-  // ── Handlers onGameEvent (closures sur l'état/systèmes ST) ────────────────
-  // Chacun garde le contrat de l'ancien if-block : test de type + effet.
+  // ── onGameEvent handlers (closures over ST state/systems) ────────────────
   function onMilestone(ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'MILESTONE') return
-    // Palier de score : cinématique rocket + décollage garlands (balayage
-    // montant orange, cohérent avec la fusée DMD/backglass) + shake. Remplace
-    // l'ancien chenillard jaune « celebrate » (unité rocket cross-écrans).
+    // Score milestone: rocket cinematic + garland liftoff (rising orange
+    // sweep, matching the DMD/backglass rocket) + shake.
     playMilestoneCinematic(ctx, e.threshold, () => garlands?.rocketBurst())
   }
 
   function onScoop(_ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'SCOOP_ENTER') return
-    // Contact capteur = ARME seulement. La capture (et les récompenses) n'a
-    // lieu que si la bille SE POSE dans la zone (dwell, cf. scoopCapture.ts) —
-    // une bille qui traverse le couloir ressort sans aucun effet.
+    // Sensor contact only ARMS. Capture (and rewards) happens only if the
+    // ball SETTLES in the zone (dwell, see scoopCapture.ts) — a ball just
+    // passing through the lane exits with no effect.
     scoop.arm()
   }
 
-  // Récompenses + juice à l'instant de la capture (phase 'capture', une frame).
+  // Rewards + juice at capture instant (phase 'capture', one frame).
   function grantScoopRewards(ctx: MapContext): void {
     ctx.addScore(SCORE_SCOOP, 'SCOOP')
     ctx.addLife()
@@ -90,7 +87,7 @@ export function createModule(): MapModule {
 
   function onPortalTransitionEnd(ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'PORTAL_TRANSITION_END') return
-    // Entrée Upside Down confirmée : portail actif + baseline core + nid UD.
+    // Upside Down entry confirmed: portal active + core baseline + UD nest.
     portal?.reset()
     portal?.setUpsideDownActive(true)
     ctx.resetPortalTrigger()
@@ -99,20 +96,20 @@ export function createModule(): MapModule {
   }
 
   function onGameOverDrain(ctx: MapContext, e: GameEvent): void {
-    // Game over en drainant : fin de tous les combats boss.
+    // Game over on drain: end all boss fights.
     if (isGameOverDrain(e, ctx.gameState())) bossReveals?.endAllFights()
   }
 
   function onBossArmed(ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'BOSS_ARMED') return
-    // Le nid s'éveille : bandeau DMD + horodatage hint (partagé) + celebrate + shake.
+    // Nest wakes up: DMD banner + hint timestamp (shared) + celebrate + shake.
     handleBossArmed(ctx, e, armedAt, performance.now())
     garlands?.celebrate()
     ctx.screenShake(0.3)
   }
 
   function onDemogorgon(ctx: MapContext, e: GameEvent): void {
-    // Cinématiques boss Demogorgon (reveal + victoire).
+    // Demogorgon boss cinematics (reveal + victory).
     if (e.type === 'BOSS_REVEAL' && e.bossId === 'demogorgon') {
       ctx.playCinematic('demogorgon_rises', { once: true })
     }
@@ -132,7 +129,7 @@ export function createModule(): MapModule {
   }
 
   function onBossDefeatedCounter(ctx: MapContext, e: GameEvent): void {
-    // Compteur ST demogorgons → mapState.
+    // ST demogorgons counter → mapState.
     if (e.type !== 'BOSS_TARGET_HIT') return
     const boss = ctx.layout.bosses.find((b) => b.id === e.bossId)
     if (boss && isBossTargetDefeated(boss.targetHits, e.hitCount)) {
@@ -211,8 +208,8 @@ export function createModule(): MapModule {
   }
 
   function reconcileNestMarkers(ctx: MapContext): void {
-    // Reconciliation des marqueurs de nid après chaque event : déclenché →
-    // revealed ; sinon palier atteint → armed ; sinon locked. Idempotent.
+    // Nest marker reconciliation after each event: triggered → revealed;
+    // else threshold reached → armed; else locked. Idempotent.
     if (!nestMarker) return
     const gate = ctx.bossGateContext()
     nestMarker.setUpsideDown(gate.alternateWorldActive)
@@ -273,8 +270,8 @@ export function createModule(): MapModule {
           ctx.emitGameEvent({ type: 'BOSS_FIGHT_END', bossId: 'demogorgon' });
         },
         onTargetReady: () => ctx.setBossTargetArmed('demogorgon', true),
-        // Gate assist Eleven : hors 'playing' (drain, attente relance) le
-        // sous-timer est suspendu — sinon +100 pts en boucle sans jouer.
+        // Eleven assist gate: outside 'playing' (drain, waiting for relaunch)
+        // the sub-timer is suspended — otherwise +100 pts loops without playing.
         isPlaying: () => ctx.gameState() === 'playing',
       })
       demogorgonReveal.setEmit(ctx.emitGameEvent)
@@ -330,7 +327,7 @@ export function createModule(): MapModule {
       if (!ctx) return
       lastLifeRescue.onGameEvent(ctx, e)
 
-      // Dispatch ordonné (même ordre, mêmes effets que l'ancien cascade).
+      // Ordered dispatch — order is load-bearing.
       handleBossLockedHit(ctx, e)
       onMilestone(ctx, e)
       onScoop(ctx, e)
@@ -352,9 +349,9 @@ export function createModule(): MapModule {
       portal?.update(dt)
       bossReveals?.update(dt)
       nestMarker?.update(dt)
-      transition?.update(dt) // no-op si inactif (gardé en interne)
+      transition?.update(dt) // no-op when inactive (guarded internally)
 
-      // Hint tardif du nid : armé > 45 s sans reveal → bandeau DMD une fois.
+      // Nest late hint: armed > 45 s without reveal → DMD banner once.
       const ctx = ctxRef
       if (ctx && nestMarker) {
         const marker = nestMarker
@@ -367,9 +364,9 @@ export function createModule(): MapModule {
         }
       }
 
-      // Scoop : dwell (bille posée dans la zone ?) → capture → hold → kick.
-      // NOTE: passe par ctx.ball.body (RigidBody brut) — cf. backlog P2
-      // "IMapBallPhysics.body expose le body brut" (à remplacer par holdAt/kick).
+      // Scoop: dwell (ball settled in zone?) → capture → hold → kick.
+      // NOTE: uses ctx.ball.body (raw RigidBody) — to be replaced by
+      // holdAt/kick helpers.
       const scoopPos = ctx?.layout.sensors.scoop
       if (ctx?.ball && scoopPos) {
         const bp = ctx.ball.body.translation()
@@ -384,15 +381,15 @@ export function createModule(): MapModule {
         if (phase === 'capture') {
           grantScoopRewards(ctx)
         } else if (phase === 'hold') {
-          // Physique gelée pendant le hold (shouldFreezePhysics) → il suffit
-          // de centrer la bille dans le trou, au repos. resetStuck en défensif.
+          // Physics is frozen during hold (shouldFreezePhysics) → just center
+          // the ball in the hole, at rest. resetStuck is defensive.
           ctx.ball.body.setTranslation({ x: scoopPos.x, y: scoopPos.y, z: scoopPos.z }, true)
           ctx.ball.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
           ctx.ball.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
           ctx.resetStuck()
         } else if (phase === 'eject') {
-          // Téléport-eject : replace la bille au point de sortie (absolu, posée
-          // sur la surface) avec une vitesse de sortie directe (cf. ScoopConfig).
+          // Teleport-eject: place the ball at the exit point (absolute,
+          // resting on the surface) with a direct exit velocity (see ScoopConfig).
           const p = scoop.config.ejectPos
           ctx.ball.body.setTranslation(
             { x: p.x, y: ballCenterOnSurface(p.z), z: p.z },
@@ -407,9 +404,9 @@ export function createModule(): MapModule {
       return (
         (transition?.isActive() ?? false) ||
         (bossReveals?.isGameplayFrozen() ?? false) ||
-        // Hold scoop : gel → bille immobile au trou (pas de gravité ni de
-        // surface-snap/stuck-detector qui lutteraient), jusqu'au kick.
-        // (PAS pendant 'armed' : la bille doit pouvoir rouler/se poser.)
+        // Scoop hold: freeze → ball motionless in the hole (no gravity or
+        // surface-snap/stuck-detector fighting it) until the kick.
+        // (NOT during 'armed': the ball must be able to roll/settle.)
         scoop.isHolding()
       )
     },
@@ -423,18 +420,18 @@ export function createModule(): MapModule {
     setSporesEnabled(enabled: boolean): void {
       atmosphere?.setSporesEnabled(enabled)
     },
-    // ── Contrat des trois hooks de reset (responsabilités disjointes) ─────────
-    // releaseWorld : sortie « douce » du monde alternatif EN COURS de partie
-    //   (retour normal via portail). Désactive l'Upside Down + atmosphère et
-    //   coupe le combat Vecna, sans toucher au portail-objet ni aux compteurs.
-    //   Déclenché par `releaseAlternateWorld` (PinballPlayfield).
-    // resetWorld : teardown MONDE/PORTAIL/COMBATS sur relance depuis game_over.
-    //   Ne touche PAS aux compteurs ni au nid (c'est le rôle d'onGameReset).
-    // onGameReset : reset LOGIQUE de partie — compteurs, rescue, hints de nid,
-    //   mapState. Ne touche PAS au monde/portail/atmosphère (rôle de resetWorld).
-    // resetWorld et onGameReset sont tous deux appelés sur la relance game_over
-    // (par des chemins distincts de PinballPlayfield) et couvrent des cibles
-    // disjointes : aucune duplication d'effet entre eux.
+    // ── Contract of the three reset hooks (disjoint responsibilities) ─────────
+    // releaseWorld: "soft" exit from the alternate world MID-game (normal
+    //   return via portal). Disables Upside Down + atmosphere and ends the
+    //   Vecna fight, without touching the portal object or counters.
+    //   Triggered by `releaseAlternateWorld` (PinballPlayfield).
+    // resetWorld: WORLD/PORTAL/FIGHTS teardown on restart from game_over.
+    //   Does NOT touch counters or nest (that is onGameReset's job).
+    // onGameReset: LOGICAL game reset — counters, rescue, nest hints,
+    //   mapState. Does NOT touch world/portal/atmosphere (resetWorld's job).
+    // resetWorld and onGameReset are both called on game_over restart
+    // (via distinct PinballPlayfield paths) and cover disjoint targets:
+    // no duplicated effect between them.
     releaseWorld(): void {
       portal?.setUpsideDownActive(false)
       atmosphere?.reset()

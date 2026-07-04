@@ -1,7 +1,7 @@
 import { easeInOut, easeOut } from './CinematicEasing';
 
 /**
- * Pure cinematic FSM for the boss camera move (idle → zoomIn → hold → zoomOut →
+ * Cinematic FSM for the boss camera move (idle → zoomIn → hold → zoomOut →
  * idle). Owns {phase, elapsed} only — NO Three dependency. Given (dt, config) it
  * advances the timeline and returns per-phase blend factors in [0,1] that the
  * caller (PlayfieldCameraDirector) feeds into its vector/distance lerps:
@@ -9,8 +9,6 @@ import { easeInOut, easeOut } from './CinematicEasing';
  *  - lookAtT   : panFrom → bossFocus (zoomIn) / bossFocus → baseTarget (zoomOut)
  *  - distanceT : baseDistance → zoomedDistance (zoomIn) / reverse (zoomOut)
  *  - dirT      : baseDir → faceDir blend amount
- *
- * Every threshold/easing is copied verbatim from the original director update().
  */
 
 export type CinematicPhase = 'idle' | 'zoomIn' | 'hold' | 'zoomOut';

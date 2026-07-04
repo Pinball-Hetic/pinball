@@ -38,8 +38,8 @@ import type { CinematicClip, ScoreUpdate } from "@pinball/shared-types";
 import { clipFreezeMs, DEFAULT_MAP_ID } from "@pinball/shared-types";
 
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID;
-// Résolu au niveau module (MAP_ID = constante build-time) — utilisé comme
-// fallback si aucun mapId n'est fourni en prop.
+// Resolved at module level (MAP_ID is a build-time constant) — fallback
+// when no mapId prop is provided.
 const DEFAULT_RESOLVED_MAP = getMapPackage(MAP_ID);
 
 import { createPlayfieldScene } from "./scene/createPlayfieldScene";
@@ -102,12 +102,12 @@ type AlternateWorldPersistence = "until_game_over" | "until_drain";
 const ALTERNATE_WORLD_PERSISTENCE: AlternateWorldPersistence = "until_game_over";
 
 /**
- * Mode du clavier — `NEXT_PUBLIC_KEYBOARD_MODE` :
- * - `direct` : applique localement (defaut). Latence ~0.
- * - `simulate-esp32` : émet un event Socket.io `dev:simulate-button` au
- *   server qui le retransforme en `input:button` broadcast. Permet de
- *   valider la chaîne réseau sans hardware.
- * - `disabled` : ignore le clavier de jeu. Touche `H` (debug) reste active.
+ * Keyboard mode — `NEXT_PUBLIC_KEYBOARD_MODE`:
+ * - `direct`: applies locally (default). ~0 latency.
+ * - `simulate-esp32`: emits a `dev:simulate-button` Socket.io event to the
+ *   server, which turns it into an `input:button` broadcast. Validates the
+ *   network chain without hardware.
+ * - `disabled`: game keys ignored. `H` (debug) stays active.
  */
 type KeyboardMode = "direct" | "simulate-esp32" | "disabled";
 const KEYBOARD_MODE: KeyboardMode =
@@ -117,15 +117,14 @@ const PLAYFIELD_VIEW_MODE = parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYF
 const IS_PORTRAIT_FILL = PLAYFIELD_VIEW_MODE === 'portrait-fill';
 
 type PinballPlayfieldProps = {
-  /** HUD + cadre portrait pour écran de flipper physique (`/pinball?cabinet`) */
+  /** HUD + portrait frame for the physical cabinet screen (`/pinball?cabinet`) */
   cabinetMode?: boolean;
-  /** Id de la map à charger. Si absent → NEXT_PUBLIC_MAP_ID ou DEFAULT_MAP_ID. */
+  /** Map id to load. Absent → NEXT_PUBLIC_MAP_ID, then DEFAULT_MAP_ID. */
   mapId?: string;
 };
 
-// Garde NO SIGNAL : map introuvable → écran de veille plein écran (pas de
-// crash). Wrapper sans hook → l'Inner (tous les hooks) n'est monté que si la
-// map existe.
+// NO SIGNAL guard: unknown map → fullscreen standby, no crash. Hook-free
+// wrapper so the Inner (all the hooks) only mounts when the map exists.
 export default function PinballPlayfield(props: PinballPlayfieldProps) {
   const resolvedMap = props.mapId ? getMapPackage(props.mapId) : DEFAULT_RESOLVED_MAP;
   if (!resolvedMap) return <NoSignal reason={`MAP "${props.mapId ?? MAP_ID}" INTROUVABLE`} />;
@@ -133,10 +132,9 @@ export default function PinballPlayfield(props: PinballPlayfieldProps) {
 }
 
 function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlayfieldProps & { resolvedMap: ResolvedMap }) {
-  // Boss, clips et sons dérivés de la map sélectionnée (prop — change au remount).
+  // Bosses, clips and sounds derive from the selected map (prop — changes on remount).
   const mapBosses = resolvedMap.layout.bosses ?? [];
   const mapClips = resolvedMap.manifest.clips;
-  // Audio de la map (branchement URLs + liste de préchauffe) : hooks/useMapAudio.
   useMapAudio(resolvedMap.manifest);
   const mapSoundUrls = collectMapSoundUrls(resolvedMap);
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -160,7 +158,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   cameraDebugTuningRef.current = cameraDebugTuning;
   const playfieldRootHandleRef = useRef<THREE.Object3D | null>(null);
   const refitCameraRef = useRef<((root: THREE.Object3D) => void) | null>(null);
-  // Overlay cinématique DOM (un re-render par cinématique, pas par frame).
+  // DOM cinematic overlay (one re-render per cinematic, not per frame).
   const [cinematicClip, setCinematicClip] = useState<CinematicClip | null>(null);
   const debugVisibleRef = useRef(false);
 
@@ -172,14 +170,14 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
   const [physicsReady, setPhysicsReady] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [plungerCharge, setPlungerCharge] = useState<number | null>(null);
-  // Outro game-over : URL de claim (arrive async via game:registered) + score
-  // figé affiché dans l'overlay. Le QR est rendu client-side (StyledQrCode).
+  // Game-over outro: claim URL (arrives async via game:registered) + frozen
+  // score shown in the overlay. QR is rendered client-side (StyledQrCode).
   const [gameOverClaimUrl, setGameOverClaimUrl] = useState<string | null>(null);
   const [gameOverCode, setGameOverCode] = useState<string | null>(null);
   const [finalScore, setFinalScore] = useState(0);
   const physicsReadyRef = useRef(false);
   const sessionStartedRef = useRef(false);
-  /** Appelé depuis le game loop quand la session démarre (affiche la balle). */
+  /** Called from the game loop when the session starts (shows the ball). */
   const onSessionStartRef = useRef<(() => void) | null>(null);
 
   const handleCameraTuningChange = useCallback((next: PlayfieldCameraDebugTuning) => {
@@ -213,9 +211,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     notifyBootPhase(bootPhase);
   }, [bootPhase]);
 
-  // Auto-spawn : la map étant déjà sélectionnée en amont, dès que la physique
-  // est prête on démarre la session sans attendre START/ESPACE. La balle
-  // apparaît alors dans le couloir plongeur, prête à être lancée.
+  // Auto-spawn: the map is already selected upstream, so start the session as
+  // soon as physics is ready — no START/SPACE wait. The ball appears in the
+  // shooter lane, ready to launch.
   useEffect(() => {
     if (shouldAutoBeginSession({ physicsReady, sessionStarted })) {
       beginSessionRef.current();
@@ -227,21 +225,21 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     setGameOverCode(d.code);
   });
 
-  // Directeur de cinématiques (stable). Ref → accessible depuis les
-  // callbacks render-scope (onLifeLost) et la boucle animate (useEffect).
+  // Cinematic director (stable). Ref → reachable from render-scope callbacks
+  // (onLifeLost) and the animate loop (useEffect).
   const cinematicsRef = useRef<CinematicDirector | null>(null);
   if (!cinematicsRef.current) cinematicsRef.current = new CinematicDirector();
   const cinematics = cinematicsRef.current;
 
-  // Map résolue (garantie non-null par le garde NO SIGNAL du wrapper).
+  // Resolved map (guaranteed non-null by the wrapper's NO SIGNAL guard).
   const mapPackageRef = useRef<ResolvedMap>(resolvedMap);
-  // Ref vers le module (accessible depuis les callbacks render-scope, ex. reset).
+  // Module ref (reachable from render-scope callbacks, e.g. reset).
   const mapModuleRef = useRef<MapModule | null>(null);
-  // emit (défini dans l'effet) exposé aux callbacks useGameState render-scope.
+  // emit (defined inside the effect) exposed to render-scope useGameState callbacks.
   const emitRef = useRef<GameEventListener | null>(null);
   const mapLayout = mapPackageRef.current.layout;
   const mapManifest = mapPackageRef.current.manifest;
-  // manifest.glb est déjà une URL publique absolue (/maps/<id>/…).
+  // manifest.glb is already an absolute public URL (/maps/<id>/…).
   const playfieldUrl = mapManifest.glb;
 
   const playCinematic = useCallback(
@@ -250,8 +248,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       opts?: { once?: boolean; value?: number; onEnd?: () => void },
     ): boolean => {
       const freezeMs = clipFreezeMs(mapManifest.clips, clip);
-      // Clip avec gel → passe par le director (pause physique). Sans gel
-      // (freeze 0) → simple push DMD, le jeu continue.
+      // Freezing clip → goes through the director (physics pause). No freeze
+      // (0 ms) → plain DMD push, the game keeps running.
       if (freezeMs > 0) {
         const accepted = cinematics.play(
           {
@@ -259,18 +257,18 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
             durationMs: freezeMs,
             freezePhysics: true,
             onEnd: () => {
-              setCinematicClip(null); // overlay DOM masqué à la reprise
+              setCinematicClip(null); // hide DOM overlay on resume
               opts?.onEnd?.();
             },
           },
           { once: opts?.once },
         );
         if (!accepted) return false;
-        setCinematicClip(clip); // overlay DOM visible pendant le gel
+        setCinematicClip(clip); // show DOM overlay during the freeze
       } else {
         opts?.onEnd?.();
       }
-      dmd.pushCinematic(clip, opts?.value); // duration SHOW gérée par l'orchestrator
+      dmd.pushCinematic(clip, opts?.value); // SHOW duration handled by the orchestrator
       return true;
     },
     [cinematics, dmd],
@@ -295,9 +293,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     buildEmit,
     addLife,
   } = useGameState({
-    // Callbacks DMD/backglass extraits + testés (dmdScoreCallbacks.ts). Déps
-    // résolues paresseusement (lambda) : scoreSnapshot/mapStateExtraRef/… sont
-    // déclarés plus bas (TDZ au render sinon), les callbacks courent post-render.
+    // Deps resolved lazily (lambda): scoreSnapshot/mapStateExtraRef/… are
+    // declared further down (TDZ at render otherwise); the callbacks run
+    // post-render.
     ...createDmdScoreCallbacks(() => ({
       dmd,
       mapBosses,
@@ -319,8 +317,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       resetMapModule: () => mapModuleRef.current?.onGameReset(),
       openShooterLaneGate: () => shooterLaneGateRef.current?.open(),
     })),
-    // milestones + boss-armed (cinématiques/celebrate/shake/hint) gérés par le
-    // module de map (events MILESTONE / BOSS_ARMED).
+    // Milestone + boss-armed effects (cinematics/celebrate/shake/hint) are
+    // handled by the map module (MILESTONE / BOSS_ARMED events).
     onMilestone: (threshold) => emitRef.current?.({ type: "MILESTONE", threshold }),
     onBossArmed: (bossId) => emitRef.current?.({ type: "BOSS_ARMED", bossId }),
   }, {
@@ -330,22 +328,21 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     bosses: mapBosses,
   });
 
-  // Patches de mapState poussés par le module de map (ctx.setMapState). Fusionnés
-  // dans chaque snapshot. les compteurs map restent fournis par useGameState pour
-  // l'instant (migreront dans le module en phase 4.3d).
+  // mapState patches pushed by the map module (ctx.setMapState), merged into
+  // every snapshot.
   const mapStateExtraRef = useRef<Record<string, number | boolean>>({});
 
-  // Construction unique du mapState injecté dans chaque snapshot DMD/score.
-  // les compteurs map viennent du module de map (mapStateExtraRef) ;
-  // fever reste piloté par useGameState (mécanisme multiplicateur).
+  // Single builder for the mapState injected into every DMD/score snapshot.
+  // Map counters come from the map module (mapStateExtraRef); fever stays
+  // driven by useGameState (multiplier mechanism).
   const buildMapState = (fever: boolean = isFeverActive()) => ({
     ...mapStateExtraRef.current,
     fever,
   });
 
-  // Snapshot score courant (DMD/backglass) — `over` écrase les champs quand la
-  // valeur fraîche n'est pas encore dans la ref (ex. vies juste décrémentées).
-  // Référencé par les callbacks useGameState (exécutés post-render → TDZ ok).
+  // Current score snapshot (DMD/backglass) — `over` overrides fields when the
+  // fresh value isn't in the ref yet (e.g. lives just decremented).
+  // Referenced by useGameState callbacks (run post-render → TDZ ok).
   const scoreSnapshot = (over: Partial<ScoreUpdate> = {}): ScoreUpdate => ({
     player: playerRef.current,
     score: scoreRef.current,
@@ -370,7 +367,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     resetBallRef.current?.();
   }, []);
 
-  // Auto-exit outro/QR 20s → reload → sélecteur (hooks/useOutroAutoExit).
+  // Outro/QR auto-exit after 20s → reload → selector.
   useOutroAutoExit(gameState);
 
   const { callbacksRef: physicalInputsRef, simulateButton, isConnectedRef } = usePhysicalInputs();
@@ -380,12 +377,11 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const mountEl = mountRef.current;
     if (!mountEl) return;
 
-    // ── Config par-map — doit précéder tout setup physique / caméra ─────────
+    // ── Per-map config — must precede any physics/camera setup ──────────────
     configureSurfaceCoefficients(resolvedMap.layout.geometry.coefficients);
     configureBallRadius(mapManifest.ballRadius ?? DEFAULT_BALL_RADIUS);
 
     // ── Three.js setup ───────────────────────────────────────────────────────
-    // Bootstrap scène/renderer/env/lumières/caméra délégué au factory (SRP).
     const rendering = mapManifest.rendering;
     const {
       scene,
@@ -432,17 +428,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     refitCameraRef.current = (root) => cameraRig.syncToRoot(root);
 
     // ── Flipper visual state ─────────────────────────────────────────────────
-    // Résolution/attache des flippers (setupFlippers) — un seul struct
-    // (meshes/pivots/objs/flashMats/zones) au lieu de vars éparpillées.
     let flipperSetup: FlipperSetupResult | null = null;
-    // Accumulateurs de frame flippers (swing lissé + hit-flash) — un seul objet,
-    // muté par les steps du hot loop. Cf. hotLoop/flipperFrame.ts.
+    // Flipper frame accumulators (smoothed swing + hit flash), mutated by the
+    // hot-loop steps.
     const flipperFrame = createFlipperFrameState();
-    // État d'entrée mutable partagé (flippers + plunger) — possédé ici, muté par
-    // applyAction ET lu par la boucle animate. Cf. createApplyAction.ts.
+    // Shared mutable input state (flippers + plunger) — owned here, mutated by
+    // applyAction AND read by the animate loop.
     const inputState: InputState = createInputState();
 
-    // ── Juice : screen shake ─────────────────────────────────────────────────
+    // ── Juice: screen shake ──────────────────────────────────────────────────
     const screenShake = screenShakeRef.current!;
 
     // ── Physics / game objects ───────────────────────────────────────────────
@@ -456,16 +450,16 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     let collisionProcessor: CollisionEventProcessor | null = null;
     const mapModule: MapModule | null = mapPackageRef.current?.module?.() ?? null;
     mapModuleRef.current = mapModule;
-    // Hoisté : le MapContext (construit tôt) le référence via closures, mais il
-    // n'est assigné qu'une fois le pipeline d'events prêt (plus bas).
+    // Hoisted: the MapContext (built early) references it via closures, but it
+    // is only assigned once the event pipeline is ready (below).
     let emit: GameEventListener;
     let ballTrail: BallTrail | null = null;
     let shooterLaneGate: ShooterLaneGate | null = null;
 
-    // Feedback playfield pendant le gel des cinématiques (ex. gain de lettre
-    // HETIC) : un flash strobé rend le freeze lisible comme intentionnel et
-    // pointe vers le DMD, plutôt qu'une scène morte figée. Flash-only (pas de
-    // voile noir) — le DMD porte le contenu. Tunable via FREEZE_FEEDBACK.
+    // Playfield feedback during cinematic freezes (e.g. HETIC letter gain):
+    // a strobed flash makes the freeze read as intentional and points to the
+    // DMD, instead of a dead frozen scene. Flash-only (no black veil) — the
+    // DMD carries the content. Tunable via FREEZE_FEEDBACK.
     const freezeFeedbackStrobe = new PlayfieldCinematicStrobe();
     const FREEZE_FEEDBACK: CinematicFreezeFeedbackConfig = {
       hz: 9,
@@ -474,7 +468,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       fadeOutFraction: 0.4,
     };
 
-    // Gouverneur de qualité : ajuste pixelRatio + flags selon le frame time.
+    // Quality governor: adjusts pixelRatio + feature flags from frame time.
     const quality = new QualityGovernor((tier) => {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, tier.dpr));
       renderer.setSize(
@@ -484,12 +478,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       ballTrail?.setMaxSprites(tier.trailMax);
       mapModuleRef.current?.setSporesEnabled?.(tier.sporesOn);
     });
-    // Corps cinématiques + hulls/pivot markers debug (buildFlipperBodies) —
-    // un seul struct au lieu de 8 vars éparpillées.
     let flipperRig: FlipperBodiesResult | null = null;
     let physicsReady = false;
-    // Handlers clavier stockés en scope-effet (pas de monkeypatch sur
-    // physicsWorld) → cleanup sûr même si init() est annulé avant le câblage.
+    // Keyboard handlers kept in effect scope → safe cleanup even if init() is
+    // cancelled before wiring.
     let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
     let keyupHandler: ((e: KeyboardEvent) => void) | null = null;
     let prevFrameTime = 0;
@@ -497,7 +489,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const bossIntroHold = createBossIntroHoldState();
 
 
-    // ── Rapier debug renderer — tous les colliders ───────────────────────────
+    // ── Rapier debug renderer — all colliders ────────────────────────────────
     const rapierDebugGeo = new THREE.BufferGeometry();
     const rapierDebugMat = new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false });
     const rapierDebugLines = new THREE.LineSegments(rapierDebugGeo, rapierDebugMat);
@@ -505,8 +497,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     rapierDebugLines.renderOrder = 1000;
     scene.add(rapierDebugLines);
     disposableMats.push(rapierDebugMat);
-    // Façade des meshes debug (état collidersOn + toggle H) — assignée après la
-    // construction des hulls/pivots flippers (buildFlipperBodies).
+    // Debug meshes (collidersOn state + H toggle) — assigned after the flipper
+    // hulls/pivot markers are built (buildFlipperBodies).
     let debugMeshManager: DebugMeshManager | null = null;
 
     const stuckDetector = new StuckBallDetector();
@@ -514,20 +506,19 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const diag = new BallDiagnostics(mapLayout);
     let lastDebugPush = 0;
 
-    // Point de déclenchement UNIQUE du bottom-out : quelle que soit la source de
-    // détection (capteur Rapier, balle perdue, coincée, ou zone géométrique sous
-    // les flippers), c'est ici qu'on décide → un seul execute (idempotent via le
-    // latch de BottomOutBall) + journalisation de la cause. Supprime les trois
-    // sites de déclenchement dupliqués dans la boucle animate.
+    // SINGLE bottom-out trigger point: whatever the detection source (Rapier
+    // sensor, lost ball, stuck ball, or the geometric zone below the flippers),
+    // the decision happens here → one execute (idempotent via BottomOutBall's
+    // latch) + cause logging.
     const triggerBottomOut = (reason: BallResetReason) => {
       bottomOutBallUC?.execute();
       diag.noteReset(reason);
     };
 
-    // ── Debug : déplacer la bille à la souris (toggle `M`) ───────────────────
-    // Drag la bille n'importe où sur le tapis pour tester les coincements.
-    // Pendant le drag : orbit désactivé, vitesse forcée à 0 (suit le curseur),
-    // locks du couloir bypassés. Au relâché : la physique reprend.
+    // ── Debug: drag the ball with the mouse (`M` toggle) ─────────────────────
+    // Drag the ball anywhere on the table to test stuck spots. While dragging:
+    // orbit disabled, velocity forced to 0 (follows the cursor), shooter-lane
+    // locks bypassed. On release physics resumes.
     const ballDragController = new BallDragController({
       renderer,
       camera,
@@ -538,7 +529,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     });
     ballDragController.attach();
 
-    // Logs de diagnostic gérés par le toggle HUD `[J]` → silence total en prod.
+    // Diagnostic logs gated by the HUD `[J]` toggle → fully silent in prod.
     const debugLog = (...args: unknown[]) => {
       if (!debugVisibleRef.current) return;
       // eslint-disable-next-line no-console
@@ -555,10 +546,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
     const init = async () => {
       try {
         const gltf = await loadPlayfieldGlb(loader, playfieldUrl);
-        if (cancelled) return; // StrictMode : démontage du 1er mount en vol
-        // Assemblage scène (GLB dressing + trail + flash de gel + mesh bille)
-        // extrait : scene/assemblePlayfieldModel.ts. garlands/bumperVisuals/
-        // nestMarker/reveals : créés par le module de map (bridge, plus bas).
+        if (cancelled) return; // StrictMode: first mount was unmounted mid-flight
+        // garlands/bumperVisuals/nestMarker/reveals are created by the map
+        // module, not here.
         const assembled = assemblePlayfieldModel(gltf, {
           scene,
           modelRoot,
@@ -577,24 +567,22 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         modelRoot.updateMatrixWorld(true);
 
-        // Résolution + attache des flippers extraite (physics/setupFlippers.ts).
         const flippers = setupFlippers(playfieldRoot, mapLayout.flipperPivots, getBallRadius());
         flipperSetup = flippers;
 
         // ── Physics ──────────────────────────────────────────────────────────
         physicsWorld = await PhysicsWorld.create();
-        if (cancelled) return; // bail avant colliders/bille — World nettoyé au cleanup
+        if (cancelled) return; // bail before colliders/ball — World disposed in cleanup
         const world = physicsWorld.world;
-        // colliderMap créé ici (avant le ctx) pour être injecté dans le module.
+        // colliderMap created here (before the ctx) so it can be injected into the module.
         const colliderMap = new Map<number, string>();
 
-        // ── MapContext : construit TÔT (avant UpsideDownTransition L~1034) pour
-        // que module.setup puisse créer ses systèmes avant qu'ils soient
-        // consommés. emit est hoisté (assigné plus bas) → utilisé via closures.
+        // ── MapContext: built EARLY so module.setup can create its systems
+        // before they are consumed. emit is hoisted (assigned further down) →
+        // reached via closures.
         if (mapModule) {
-          // MapContext extrait (createMapContext.ts). Les forward-refs
-          // (ball/ballMesh/collisionProcessor/emit, assignés plus bas) sont
-          // passés en getters live-bound.
+          // Forward refs (ball/ballMesh/collisionProcessor/emit, assigned
+          // later) are passed as live-bound getters.
           const mapCtx = createMapContext({
             scene,
             root: playfieldRoot,
@@ -634,10 +622,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           });
           mapModule.setup(mapCtx);
         }
-        // Préchargement asynchrone du module (ex. reveals boss) — bloque le
-        // chargement comme avant.
+        // Async module preload (e.g. boss reveals) — blocks loading.
         await mapModule?.preload?.();
-        if (cancelled) return; // bail avant la création de la bille/colliders
+        if (cancelled) return; // bail before ball/collider creation
 
         shooterLaneGate = new ShooterLaneGate();
         shooterLaneGate.bind(world, mapLayout.shooterLane);
@@ -645,9 +632,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
         modelRoot.updateMatrixWorld(true);
 
-        // GLB role-driven : trimeshes (murs/couloir) + drop targets dérivés +
-        // colliders analytiques (sol/bumpers/sensors). Extrait dans
-        // physics/buildPlayfieldColliders.ts (side-effects world + colliderMap).
+        // Role-driven GLB: trimeshes (walls/lane) + derived drop targets +
+        // analytic colliders (floor/bumpers/sensors). Side effects on world +
+        // colliderMap.
         buildPlayfieldColliders({
           world,
           root: playfieldRoot,
@@ -656,15 +643,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           colliderMap,
         });
 
-        // upsideDownTransition créé/possédé par le module (récupéré via le
-        // bridge). L'orchestration (isActive/start, cycle de monde) reste ici
-        // car elle pilote la bille (spawns).
-
         ballPhysicsInst = new BallPhysics(world, mapLayout);
 
-        // ── Flipper : corps cinématiques + hulls debug + pivot markers ────────
-        // Construction extraite (physics/buildFlipperBodies.ts) — les refs
-        // retournées sont assignées dans les vars de closure lues par animate.
+        // ── Flippers: kinematic bodies + debug hulls + pivot markers ──────────
         flipperRig = buildFlipperBodies({
           world,
           scene,
@@ -691,8 +672,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         ballPhysicsInst.body.wakeUp();
 
         // ── Plunger visual + kinematic body ──────────────────────────────────
-        // Setup extrait (physics/buildPlungerBody.ts). animate lit
-        // mesh/body/restZ après assignation.
         const plungerSetup = buildPlungerBody({
           world,
           scene,
@@ -704,7 +683,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         plungerBody = plungerSetup.body;
         plungerRestZ = plungerSetup.restZ;
 
-        // ── Caméra cabine fixe (non rotatable) — tapis jouable uniquement ───────
+        // ── Fixed cabinet camera (non-rotatable) — playable table only ─────────
         modelRoot.updateMatrixWorld(true);
         cameraRig.director.setBosses(mapBosses);
         const camFrameBox = cameraRig.syncToRoot(playfieldRoot);
@@ -713,12 +692,12 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           cameraRig.restoreBoss();
         };
 
-        // ── OrbitControls — caméra libre ─────────────────────────────────────
+        // ── OrbitControls — free camera ──────────────────────────────────────
         cameraRig.attachOrbit(renderer.domElement);
 
-        // ── Use-cases + routeur d'events : câblage extrait (wireGameplay.ts).
-        // Le cycle intentionnel processor↔emit vit dans la factory. Les résultats
-        // sont assignés dans les `let` de closure lus par animate/applyAction/ctx.
+        // ── Use-case + event-router wiring. The intentional processor↔emit
+        // cycle lives in the factory; results are assigned into closure `let`s
+        // read by animate/applyAction/ctx.
         const wiring = wireGameplay({
           ball: ballPhysicsInst,
           colliderMap,
@@ -744,22 +723,11 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         });
         const plunger = wiring.plunger;
         emit = wiring.emit;
-        emitRef.current = emit; // expose aux callbacks useGameState (milestone/boss-armed)
+        emitRef.current = emit; // exposed to useGameState callbacks (milestone/boss-armed)
         launchBallUC = wiring.launchBallUC;
         drainBallUC = wiring.drainBallUC;
         bottomOutBallUC = wiring.bottomOutBallUC;
         collisionProcessor = wiring.collisionProcessor;
-
-        // upsideDownPortal créé/possédé par le module de map (récupéré plus
-        // haut via le bridge). Ses resets / setAlternateWorldActive / aimant
-        // restent pilotés ici (flow transition + cycle de monde).
-
-        // upsideDownAtmosphere créé/possédé par le module de map (récupéré
-        // plus haut via le bridge). On garde ici le binding boss + les resets.
-        // Le binding atmosphère du boss fait par le module (setup).
-
-        // onPortalEnter / onReturnPortalEnter (bascule de monde) gérés par le
-        // module de map (mapModule.onGameEvent sur PORTAL_ENTER/RETURN_PORTAL_ENTER).
 
         resetBallRef.current = () => {
           if (!drainBallUC || !sessionStartedRef.current) return;
@@ -770,30 +738,27 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           stuckDetector.reset();
           bottomOutBallUC?.resetLatch();
           if (ballMesh) ballMesh.visible = true;
-          // Reset manuel (touche R / game-over-hide) : réarme le latch drain
-          // pour rester répétable, puis force le drain.
+          // Manual reset (R key / game-over hide): re-arm the drain latch so
+          // it stays repeatable, then force the drain.
           drainBallUC.resetLatch();
           drainBallUC.execute();
         };
 
-        // le reveal boss setEmit fait par le module (ctx.emitGameEvent).
-
         // ── Input handling ────────────────────────────────────────────────────
         console.log("[PinballPlayfield] KEYBOARD_MODE =", KEYBOARD_MODE);
 
-        // Sortie de l'écran outro/QR (game over) → recommencer le workflow
-        // DEPUIS LE DÉBUT : reload complet → boot pinball.tsx → MapSelectorScreen
-        // (multi-map) ou attract de la map forcée (mono-map Fliphetic via
-        // NEXT_PUBLIC_MAP_ID), avec un état moteur/sockets/refs vierge. Même
-        // chemin pour le replay manuel (START/PLUNGE) et l'auto-exit 20s (effet
-        // React) — on ne rejoue jamais la même map en place.
+        // Leaving the outro/QR screen (game over) → restart the workflow FROM
+        // THE START: full reload → pinball.tsx boot → MapSelectorScreen
+        // (multi-map) or forced-map attract (Fliphetic mono-map via
+        // NEXT_PUBLIC_MAP_ID), with fresh engine/sockets/refs state. Same path
+        // for manual replay (START/PLUNGE) and the 20s auto-exit (React
+        // effect) — we never replay the same map in place.
         const restartWorkflow = () => window.location.reload();
 
-        // Routeur d'actions de jeu → effets (flippers/plunger/reset). Source de
-        // vérité unique, appelée par les events réseau `input:button` comme par
-        // le clavier dev. Logique extraite + testée (createApplyAction.ts) ;
-        // toute la collaboration passe par des getters/callbacks + l'objet
-        // `inputState` partagé avec la boucle animate.
+        // Game-action router → effects (flippers/plunger/reset). Single source
+        // of truth, called by `input:button` network events and by the dev
+        // keyboard. All collaboration goes through getters/callbacks + the
+        // `inputState` object shared with the animate loop.
         const applyAction = createApplyAction({
           state: inputState,
           now: () => performance.now(),
@@ -808,17 +773,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           debugLog,
         });
 
-        // Handlers réseau (input:*) + routage clavier→bouton extraits + testés
-        // (wireInputs.ts).
         physicalInputsRef.current = createPhysicalInputHandlers({
           applyAction,
           emit: (e) => emit(e),
           mapBosses,
           getCollisionProcessor: () => collisionProcessor,
           getGameState: () => gameStateRef.current,
-          // Cheat-code borne : 3 boutons façade gauche simultanés → reset bille
-          // (même chemin que la touche R — resetBall se garde tout seul :
-          // no-op hors session ou en game_over).
+          // Cabinet cheat code: 3 left-facade buttons held together → ball
+          // reset (same path as the R key — resetBall guards itself: no-op
+          // outside a session or in game_over).
           onCheatReset: () => resetBallRef.current?.(),
         });
 
@@ -829,8 +792,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           onButton: (data) => physicalInputsRef.current.onButton?.(data),
         });
 
-        // Routeur clavier dev extrait (createKeyboardRouter.ts) : jeu (via
-        // keyboardMap) + toggles debug (H via DebugMeshManager, J/M/R).
         const { onKeyDown, onKeyUp } = createKeyboardRouter({
           unlockAudio: unlockPinballAudio,
           dispatchButton,
@@ -877,11 +838,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       const dt = computeFrameDt(prevFrameTime, time);
       prevFrameTime = time;
 
-      // visuals + garlands (incl. setFever via ctx.isFeverActive) + bosses +
-      // monde alternatif : update(dt) géré par mapModule.update.
-
-      // Hint tardif du nid : géré par le module de map (mapModule.update).
-
       cinematics.update(time);
       mapModule?.update(dt);
       const bossIntroActive = mapModule?.isIntroHolding?.() ?? false;
@@ -889,9 +845,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       const freezeFrame =
         (mapModule?.shouldFreezePhysics?.() ?? false) || cinematics.shouldFreeze();
 
-      // Feedback playfield pendant un gel de cinématique (flash-only strobé) :
-      // rend le freeze lisible + pointe vers le DMD. Piloté par le temps écoulé
-      // du director → 0 quand aucun clip n'est actif (mix retombe, flash retiré).
+      // Playfield feedback during a cinematic freeze (flash-only strobe):
+      // makes the freeze readable + points to the DMD. Driven by the
+      // director's elapsed time → 0 when no clip is active (mix decays,
+      // flash removed).
       const freezeFb = cinematicFreezeFeedback(
         cinematics.shouldFreeze() ? cinematics.activeElapsedMs(time) : -1,
         cinematics.activeDurationMs(),
@@ -899,19 +856,18 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       );
       freezeFeedbackStrobe.applyFlashOnly(freezeFb.on, freezeFb.mix);
 
-      // Hold d'intro boss (rising-edge : capture + gel de la bille) —
-      // hotLoop/bossIntroHold.ts.
+      // Boss intro hold (rising edge: capture + freeze the ball).
       stepBossIntroHold(bossIntroHold, bossIntroActive, ballPhysicsInst, inputState);
 
       if (physicsWorld && !freezeFrame) {
         const world = physicsWorld;
         world.update(dt, {
           onBeforeStep: () => {
-            // ── Flipper physique : cibles kinématiques posées PAR STEP ──────
-            // Avancer le swing au rythme du rendu faisait balayer un arc
-            // double par step à 120 Hz → le hull sautait par-dessus la bille
-            // (tunneling, pas de CCD sur les kinématiques). Ici : un pas de
-            // swing par world.step(), stepDt fixe → arc constant.
+            // ── Flipper physics: kinematic targets set PER STEP ─────────────
+            // Advancing the swing at render rate swept a double arc per step
+            // at 120 Hz → the hull jumped over the ball (tunneling; no CCD on
+            // kinematic bodies). Here: one swing step per world.step(), fixed
+            // stepDt → constant arc.
             if (flipperSetup && flipperRig) {
               stepFlipperPhysics(flipperFrame, {
                 input: inputState,
@@ -928,8 +884,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
           },
           onStep: () => {
             collisionProcessor?.process(world.eventQueue, gameStateRef.current);
-            // Capture la position post-step pour l'interpolation de rendu
-            // (bornes prev/curr du lerp dans syncToMeshInterpolated).
+            // Capture the post-step position for render interpolation
+            // (prev/curr lerp bounds in syncToMeshInterpolated).
             ballPhysicsInst?.noteStepped();
           },
           onAfterSteps: () => {
@@ -939,10 +895,10 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       }
 
       if (!freezeFrame && flipperSetup && flipperRig) {
-        // ── Flipper visuel (hotLoop/flipperFrame) — APRÈS les steps : la pose
-        // Three affichée suit le swing lissé au refresh rate ; au prochain step
-        // physique, stepFlipperPhysics repose le pivot depuis le phys-swing
-        // (applyFlipperSwing = rotation.set absolu, pas d'accumulation).
+        // ── Flipper visuals — AFTER the steps: the displayed Three pose
+        // follows the smoothed swing at refresh rate; on the next physics
+        // step, stepFlipperPhysics re-poses the pivot from the phys-swing
+        // (applyFlipperSwing = absolute rotation.set, no accumulation).
         stepFlipperKinematics(flipperFrame, {
           input: inputState,
           leftPivot: flipperSetup.leftPivot,
@@ -964,8 +920,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         && gameStateRef.current === 'playing'
         && flipperSetup?.zones
       ) {
-        // Assistance de lancement (hotLoop/flipperFrame). angVel dérivée des
-        // deltas physiques par step → stepDt fixe, pas le dt de rendu.
+        // Launch assist: angVel derived from per-step physics deltas → fixed
+        // stepDt, not the render dt.
         stepFlipperAssist(flipperFrame, ballPhysicsInst, flipperSetup.zones, PhysicsWorld.STEP_INTERVAL);
       }
 
@@ -985,7 +941,6 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         mapModule?.applyBallMagnet?.();
       }
 
-      // Ball sync (orchestration extraite : hotLoop/stepBallSync.ts).
       if (ballMesh?.visible && ballPhysicsInst) {
         stepBallSync({
           ball: ballPhysicsInst,
@@ -1006,11 +961,9 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         });
       }
 
-      // Jauge UI de charge du plongeur (throttle extrait : computePlungerVisual).
       plungerChargeUi.step(time, inputState.isChargingPlunger, inputState.chargeStartTime);
 
       if (plungerMesh && plungerRestZ > 0) {
-        // FSM visuelle extraite (hotLoop/computePlungerVisual, pure + testée).
         const pv = computePlungerVisual(inputState, time, plungerRestZ);
         inputState.plungerState = pv.plungerState;
         plungerMesh.position.z = pv.z;
@@ -1026,15 +979,15 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       // ── OrbitControls update ─────────────────────────────────────────────
       cameraRig.updateFrame(dt, { freeze: freezeFrame, cinematicActive: cameraCinematicActive });
 
-      // ── Rapier debug render (tous colliders) — hotLoop/rapierDebugRender ──
+      // ── Rapier debug render (all colliders) ─────────────────────────────
       if (debugMeshManager?.collidersOn && physicsWorld) {
         updateRapierDebugGeometry(rapierDebugGeo, physicsWorld.world.debugRender());
       }
 
-      // ── Gouverneur de qualité (frame time → crans) ──────────────────────
+      // ── Quality governor (frame time → tiers) ───────────────────────────
       quality.frame(dt * 1000);
 
-      // ── Traînée de feu (intensité ∝ combo, max en fever) ────────────────
+      // ── Fire trail (intensity ∝ combo, max during fever) ────────────────
       if (ballTrail) {
         const feverNow = isFeverActive();
         const playing = !!ballMesh?.visible && gameStateRef.current === "playing";
@@ -1048,8 +1001,8 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
         );
       }
 
-      // ── Screen shake : offset transitoire appliqué APRÈS le placement
-      // caméra, restauré après le rendu (pas d'accumulation côté OrbitControls).
+      // ── Screen shake: transient offset applied AFTER camera placement,
+      // restored after render (no accumulation inside OrbitControls).
       const shake = screenShake.update(dt);
       camera.position.x += shake.x;
       camera.position.y += shake.y;
@@ -1060,7 +1013,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
 
     frameId = requestAnimationFrame(animate);
 
-    // ── Resize (extrait : scene/attachResizeHandler.ts) ──────────────────────
+    // ── Resize ────────────────────────────────────────────────────────────────
     const detachResize = attachResizeHandler({
       mountEl,
       camera,
@@ -1080,7 +1033,7 @@ function PinballPlayfieldInner({ cabinetMode = false, resolvedMap }: PinballPlay
       if (keydownHandler) document.removeEventListener("keydown", keydownHandler);
       if (keyupHandler) document.removeEventListener("keyup", keyupHandler);
       if (mountEl.contains(renderer.domElement)) mountEl.removeChild(renderer.domElement);
-      // bumperVisuals + garlands + bossReveals + nestMarker : dispose géré par
+      // bumperVisuals + garlands + bossReveals + nestMarker are disposed by
       // mapModule.dispose.
       ballTrail?.dispose();
       freezeFeedbackStrobe.dispose();

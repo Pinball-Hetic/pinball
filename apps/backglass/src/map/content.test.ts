@@ -2,9 +2,9 @@ import { test, expect, describe, mock, afterEach } from 'bun:test'
 import { render, screen, renderHook, cleanup } from '@testing-library/react'
 import { createElement } from 'react'
 
-// content.ts n'a plus d'effet de bord à l'import (plus de getBackglassContent
-// appelé au chargement du module) : la résolution du contenu vit dans la page.
-// On mocke tout de même le registry pour rester découplé du contenu réel.
+// content.ts no longer has an import side effect (no getBackglassContent called
+// at module load): content resolution lives in the page. We still mock the
+// registry to stay decoupled from the real content.
 
 const fakeContent = {
   JoyceWall: () => createElement('div', { 'data-testid': 'joyce' }, 'JOYCE'),

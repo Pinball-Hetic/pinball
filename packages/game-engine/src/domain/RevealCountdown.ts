@@ -1,12 +1,12 @@
 /**
- * Compte à rebours piloté par dt (frames de jeu), pas par horloge murale :
- * un setTimeout/performance.now continuerait de courir pendant les gels
- * physique (cinématiques, time-scale), alors que le délai doit suivre le jeu.
+ * Countdown driven by dt (game frames), not wall clock: a
+ * setTimeout/performance.now would keep running during physics freezes
+ * (cinematics, time-scale), while the delay must follow game time.
  */
 export class RevealCountdown {
   private remainingS = 0;
 
-  /** Idempotent : un countdown déjà en cours n'est pas réécrasé. */
+  /** Idempotent: a countdown already running is not overwritten. */
   start(delayS: number): void {
     if (this.remainingS > 0) return;
     this.remainingS = delayS;
@@ -20,7 +20,7 @@ export class RevealCountdown {
     return this.remainingS > 0;
   }
 
-  /** Retourne true uniquement au frame où le délai expire. */
+  /** Returns true only on the frame where the delay expires. */
   tick(dt: number): boolean {
     if (this.remainingS <= 0) return false;
     this.remainingS -= dt;

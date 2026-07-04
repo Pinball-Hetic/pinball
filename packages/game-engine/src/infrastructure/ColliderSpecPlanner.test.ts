@@ -100,7 +100,7 @@ function cuboid(spec: { shape: { kind: string } }): CuboidShape {
   return spec.shape as CuboidShape;
 }
 
-/** Quaternion attendu d'une rotation autour de X (tilt du tapis). */
+/** Expected quaternion for a rotation about X (playfield tilt). */
 function quatX(angle: number) {
   return { x: Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) };
 }

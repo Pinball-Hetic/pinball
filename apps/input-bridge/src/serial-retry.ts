@@ -1,28 +1,27 @@
-// Politique PURE de retry/reopen du device série, séparée de l'IO réelle (stty
-// + createReadStream). Le device est ouvert via le port `openDevice` injecté :
-// soit il échoue tout de suite (device absent → on reprogramme une tentative),
-// soit il s'ouvre et appellera `reopen` plus tard (stream error/close). Dans les
-// deux cas, on reprogramme la prochaine tentative via le port `schedule`
-// injecté, après `RETRY_DELAY_MS`. Testable avec un faux openDevice/schedule.
+// Serial device retry/reopen policy, separated from the real IO (stty +
+// createReadStream). The device opens via the injected `openDevice` port:
+// either it fails right away (device absent → schedule a new attempt), or it
+// opens and will call `reopen` later (stream error/close). Either way the next
+// attempt is scheduled via the injected `schedule` port after
+// `RETRY_DELAY_MS`. Testable with a fake openDevice/schedule.
 
 export const RETRY_DELAY_MS = 3000;
 
-// Résultat d'une tentative d'ouverture du device.
-// - 'failed' : ouverture impossible maintenant (device absent / pas énuméré).
-// - 'opened' : device ouvert ; une reconnexion future passera par `reopen`.
+// Outcome of a device open attempt.
+// - 'failed': cannot open right now (device absent / not enumerated).
+// - 'opened': device open; a future reconnection will go through `reopen`.
 export type OpenOutcome = 'failed' | 'opened';
 
 export interface SerialRetryPorts {
-  // Tente d'ouvrir le device. Reçoit `reopen` à rappeler si le device s'ouvre
-  // puis tombe (error/close). Retourne l'issue immédiate de la tentative.
+  // Attempts to open the device. Receives `reopen` to call back if the device
+  // opens then drops (error/close). Returns the attempt's immediate outcome.
   openDevice(reopen: () => void): OpenOutcome;
-  // Reprogramme `run` après `delayMs` (setTimeout en prod).
+  // Reschedules `run` after `delayMs` (setTimeout in production).
   schedule(run: () => void, delayMs: number): void;
 }
 
-// Boucle de (ré)ouverture infinie, à délai fixe — comportement identique à
-// l'ancien `openSerial` : retry illimité, 3 s entre chaque tentative, aussi bien
-// après un échec d'ouverture qu'après une chute du stream.
+// Infinite (re)open loop at fixed delay: unlimited retries, 3 s between
+// attempts, both after an open failure and after a stream drop.
 export function runWithRetry(ports: SerialRetryPorts): void {
   const attempt = (): void => {
     const reopen = (): void => ports.schedule(attempt, RETRY_DELAY_MS);

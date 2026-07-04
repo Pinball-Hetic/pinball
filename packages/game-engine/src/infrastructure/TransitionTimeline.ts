@@ -1,7 +1,7 @@
 import { easeIn, easeOut, strobeOn } from './CinematicEasing';
 
 /**
- * Pure phase clock for world-transition cinematics (Upside Down / Sacred Realm).
+ * Phase clock for world-transition cinematics (Upside Down / Sacred Realm).
  * Owns {phase, elapsed, strobeT} and the regression-prone scalar maths (strobe
  * gating, blackout/reveal/restore eases, shade + billboard opacity mixes) with
  * NO Three dependency. Drives the same machine for the Stranger Things
@@ -10,8 +10,7 @@ import { easeIn, easeOut, strobeOn } from './CinematicEasing';
  *
  * Map-specific IO (camera/billboard/ball, which strobe call to make) lives in
  * the renderer: it reads the descriptor scalars/flags and chooses the Three
- * calls. Every number below is copied verbatim from the original
- * *Transition.update(dt). The tremor offset maths live in `tremorOffset`.
+ * calls. The tremor offset maths live in `tremorOffset`.
  */
 
 export type TransitionPhase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore' | 'tremor';
@@ -158,10 +157,10 @@ export class TransitionTimeline {
 }
 
 /**
- * Pure camera/playfield tremor offset for world transitions.
+ * Camera/playfield tremor offset for world transitions.
  *
- * Verbatim maths shared by UpsideDownTransition (rampDuration 0.45, amp 0.0032)
- * and ZeldaTransition (rampDuration 0.3, amp 0.003). Caller adds these offsets
+ * Shared by UpsideDownTransition (rampDuration 0.45, amp 0.0032) and
+ * ZeldaTransition (rampDuration 0.3, amp 0.003). Caller adds these offsets
  * to the captured base camera position / playfield rotation.
  */
 export type TremorOffset = {

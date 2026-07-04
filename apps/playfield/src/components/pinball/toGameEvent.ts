@@ -11,7 +11,7 @@ import {
 import { type ResolvedMap } from "@pinball/maps";
 import type { DevGameEventTrigger } from "@pinball/shared-types";
 
-// Mapping debug → GameEvent valide (valeurs par défaut depuis ScoringConstants).
+// Maps a debug trigger → valid GameEvent (defaults from ScoringConstants).
 export function toGameEvent(d: DevGameEventTrigger, mapBosses: ResolvedMap['layout']['bosses']): GameEvent | null {
   switch (d.type) {
     case "BUMPER_HIT":
@@ -44,7 +44,7 @@ export function toGameEvent(d: DevGameEventTrigger, mapBosses: ResolvedMap['layo
     case "ASSIST":
       return { type: "ASSIST", assistId: "assist", scoreIncrement: ASSIST_SCORE };
     case "DEBUG_ADD_SCORE":
-      // Score brut → le pipeline score/paliers réagit naturellement.
+      // Raw score → the score/tier pipeline reacts naturally.
       return { type: "ZONE_HIT", zone: "debug", scoreIncrement: d.amount ?? 1000 };
     case "DRAIN":
       return { type: "DRAIN" };

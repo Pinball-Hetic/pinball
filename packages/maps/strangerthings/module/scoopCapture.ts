@@ -1,39 +1,39 @@
-// Mécanique du trou scoop (saucer) : arme au contact, capture SEULEMENT une
-// bille posée (dwell), puis récompenses → hold → kick (téléport-eject).
-// State machine PURE (temps en ms), testable sans Three/Rapier.
+// Scoop hole (saucer) mechanic: arms on contact, captures ONLY a settled
+// ball (dwell), then rewards → hold → kick (teleport-eject).
+// Pure state machine (time in ms), testable without Three/Rapier.
 //
-// Pourquoi le dwell : le capteur est à hauteur de bille roulante, dans un
-// couloir de passage (rampe rocket). Sans dwell, toute bille qui TRAVERSE la
-// zone déclenchait la capture (gel + téléport en plein jeu = « impulsions »
-// irréalistes). Un vrai saucer ne capture que la bille qui s'y pose.
+// Why the dwell: the sensor sits at rolling-ball height in a pass-through
+// lane (rocket ramp). Without dwell, any ball merely CROSSING the zone
+// triggered capture (freeze + teleport mid-play = unrealistic "impulses").
+// A real saucer only captures a ball that settles into it.
 
 export interface ScoopConfig {
-  /** temps de présence continue dans la zone avant capture (ms) */
+  /** continuous in-zone time before capture (ms) */
   armDwellMs: number;
-  /** rayon (m) autour du capteur dans lequel la bille doit rester pour capturer */
+  /** radius (m) around the sensor the ball must stay within to capture */
   captureRadius: number;
-  /** vitesse (m/s) sous laquelle la bille est considérée « posée » */
+  /** speed (m/s) below which the ball counts as "settled" */
   settleSpeed: number;
-  /** durée de capture avant éjection (ms) — le temps de l'anim */
+  /** capture duration before eject (ms) — time for the anim */
   holdMs: number;
-  /** valeur du multiplicateur accordé */
+  /** multiplier value granted */
   multiplier: number;
-  /** durée du multiplicateur (ms) */
+  /** multiplier duration (ms) */
   multiplierMs: number;
   /**
-   * Téléport-eject (standard flipper) : à l'éjection la bille est REPLACÉE à
-   * `ejectPos` (absolu, posée sur la surface via ballCenterOnSurface) avec une
-   * vitesse de sortie directe. Aucune impulse ne sort d'un trou GLB profond.
-   * Même pattern que les portails (spawnFromAlternateWorld).
+   * Teleport-eject (pinball standard): on eject the ball is PLACED at
+   * `ejectPos` (absolute, resting on the surface via ballCenterOnSurface)
+   * with a direct exit velocity. No impulse escapes a deep GLB hole.
+   * Same pattern as the portals (spawnFromAlternateWorld).
    */
   ejectPos: { x: number; z: number };
-  /** vitesse de sortie (m/s) posée telle quelle (setLinvel) — À TUNER au smoke */
+  /** exit velocity (m/s) applied as-is (setLinvel) — TUNE at smoke test */
   ejectVelocity: { x: number; y: number; z: number };
 }
 
-// Défauts tunables au smoke. Sortie : position pointée EN 3D par l'auteur de la
-// map (0.143, −0.172), projetée vers la GAUCHE (−x). (y observé 1.041 =
-// ballCenterOnSurface(−0.172) → formule conservée.)
+// Defaults tunable at smoke test. Exit: position picked in 3D by the map
+// author (0.143, −0.172), projected LEFT (−x). (Observed y 1.041 =
+// ballCenterOnSurface(−0.172) → formula kept.)
 export const DEFAULT_SCOOP_CONFIG: ScoopConfig = {
   armDwellMs: 300,
   captureRadius: 0.03,
@@ -46,28 +46,28 @@ export const DEFAULT_SCOOP_CONFIG: ScoopConfig = {
 };
 
 /**
- * Phase rendue à chaque tick :
- * - idle    : rien à faire
- * - armed   : contact eu lieu, on attend que la bille se pose (ou reparte)
- * - capture : transition armed→hold (UNE frame) — le module donne les récompenses
- * - hold    : tenir la bille au trou
- * - eject   : kick de sortie (UNE frame)
+ * Phase returned each tick:
+ * - idle    : nothing to do
+ * - armed   : contact happened, waiting for the ball to settle (or leave)
+ * - capture : armed→hold transition (ONE frame) — the module grants rewards
+ * - hold    : keep the ball in the hole
+ * - eject   : exit kick (ONE frame)
  */
 export type ScoopPhase = 'idle' | 'armed' | 'capture' | 'hold' | 'eject';
 
 export interface ScoopBallState {
-  /** bille dans le rayon de capture du capteur */
+  /** ball within the sensor capture radius */
   inZone: boolean;
-  /** vitesse ≤ settleSpeed */
+  /** speed ≤ settleSpeed */
   slow: boolean;
 }
 
 export interface ScoopCapture {
-  /** true pendant le hold (le playfield gèle la physique sur ce flag) */
+  /** true during hold (the playfield freezes physics on this flag) */
   isHolding(): boolean;
-  /** contact capteur (SCOOP_ENTER) → arme le dwell (no-op si déjà armé/capturé) */
+  /** sensor contact (SCOOP_ENTER) → arms the dwell (no-op if already armed/captured) */
   arm(): void;
-  /** avance d'une frame ; cf. ScoopPhase */
+  /** advance one frame; see ScoopPhase */
   tick(dtMs: number, ball: ScoopBallState): ScoopPhase;
   reset(): void;
   readonly config: ScoopConfig;
@@ -91,17 +91,17 @@ export function createScoopCapture(config: ScoopConfig = DEFAULT_SCOOP_CONFIG): 
       if (state === 'idle') return 'idle';
 
       if (state === 'armed') {
-        // Bille repartie → flythrough : désarme sans aucun effet.
+        // Ball left → flythrough: disarm with no effect.
         if (!ball.inZone) {
           state = 'idle';
           return 'idle';
         }
-        // Le dwell ne compte que bille posée (lente) dans la zone.
+        // Dwell only counts while the ball is settled (slow) in the zone.
         if (ball.slow) dwellRemaining -= dtMs;
         if (dwellRemaining > 0) return 'armed';
         state = 'hold';
         holdRemaining = config.holdMs;
-        return 'capture'; // une frame : le module donne les récompenses ici
+        return 'capture'; // one frame: the module grants rewards here
       }
 
       // hold

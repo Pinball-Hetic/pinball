@@ -77,6 +77,6 @@ describe('isBossTargetDefeated', () => {
   });
 });
 
-// Garde-fou: le type GameEvent doit couvrir les events utilisés ici.
+// Guard: the GameEvent type must cover the events used here.
 const _sample: GameEvent = { type: 'BOSS_LOCKED_HIT', bossId: 'x', remaining: 1 };
 void _sample;

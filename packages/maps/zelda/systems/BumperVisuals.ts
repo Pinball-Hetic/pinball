@@ -3,7 +3,7 @@ import type { GameEvent, BumperMatchRule } from '@pinball/game-engine';
 import { collectBumperParts, tickPunchTimers, applyPunchScale } from '@pinball/game-engine';
 import { layout } from '../layout';
 
-// Matche vis_bumper, vis_bumper.001, vis_bumper.002, vis_bumper_1, etc.
+// Matches vis_bumper, vis_bumper.001, vis_bumper.002, vis_bumper_1, etc.
 const VIS_BUMPER = /^vis_bumper/;
 
 type BumperKind = 'vis';
@@ -12,8 +12,8 @@ const MATCH_RULES: readonly BumperMatchRule<BumperKind>[] = [
   { pattern: VIS_BUMPER, result: { action: 'part', kind: 'vis' } },
 ];
 
-const PUNCH_DURATION = 0.18; // secondes
-const PUNCH_PEAK     = 0.28; // +28% scale au pic
+const PUNCH_DURATION = 0.18; // seconds
+const PUNCH_PEAK     = 0.28; // +28% scale at peak
 
 type BumperPart = {
   mesh: THREE.Mesh;
@@ -34,8 +34,8 @@ export class BumperVisuals {
       baseScale:   ctx.baseScale,
     }));
 
-    // Échoue bruyamment : aucun mesh matché = effets bumper silencieusement
-    // morts (convention de nommage GLB changée). Parité diagnostic avec ST.
+    // Fail loudly: no matched mesh = bumper effects silently dead (GLB
+    // naming convention changed). Diagnostic parity with ST.
     if (this.parts.length === 0) {
       console.warn(
         '[BumperVisuals] aucun mesh bumper reconnu (VIS_BUMPER) — ' +
@@ -51,12 +51,12 @@ export class BumperVisuals {
 
   update(dt: number): void {
     tickPunchTimers(this.punchTimers, dt);
-    // Animation scale : 1 → 1+PEAK → 1 avec easeOutBack.
+    // Scale animation: 1 → 1+PEAK → 1 with easeOutBack.
     applyPunchScale(this.parts, this.punchTimers, PUNCH_DURATION, PUNCH_PEAK);
   }
 
   dispose(): void {
-    // Remet les scales à leur valeur d'origine avant de vider.
+    // Restore scales to their original value before clearing.
     for (const part of this.parts) {
       part.mesh.scale.copy(part.baseScale);
     }

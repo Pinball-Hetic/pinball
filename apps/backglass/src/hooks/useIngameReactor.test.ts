@@ -8,9 +8,9 @@ import {
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { createRef } from 'react';
 
-// ── Faux socket INJECTÉ dans le hook : capture les handlers .on() pour les
-// déclencher à la main, et compte les .off() au nettoyage. Le hook ne crée plus
-// son propre socket (il est lifté dans BackglassStage et passé en argument). ──
+// ── Fake socket INJECTED into the hook: captures .on() handlers to trigger
+// them by hand, and counts .off() on cleanup. The hook no longer creates its
+// own socket (it is lifted into BackglassStage and passed as an argument). ──
 type Handler = (...args: unknown[]) => void;
 
 let handlers: Record<string, Handler>;
@@ -32,16 +32,16 @@ function makeSocket() {
   } as unknown as import('@pinball/shared-types/src/socket-client').PinballSocket;
 }
 
-// ── Contrôle de la boucle RAF : on capture le callback du hook et on l'avance
-// manuellement avec des timestamps déterministes. ───────────────────────────
+// ── RAF loop control: capture the hook's callback and advance it manually
+// with deterministic timestamps. ─────────────────────────────────────────────
 let rafCallback: FrameRequestCallback | null;
 let rafCancelled: boolean;
 let nextRafId: number;
 const realRaf = globalThis.requestAnimationFrame;
 const realCancelRaf = globalThis.cancelAnimationFrame;
 
-// Avance la boucle d'un cran au temps `t` (ms). La boucle se ré-arme via raf,
-// on récupère donc le nouveau callback pour le prochain frame.
+// Advances the loop one step to time `t` (ms). The loop re-arms via raf,
+// so we pick up the new callback for the next frame.
 function frame(t: number) {
   const cb = rafCallback;
   rafCallback = null;
@@ -78,7 +78,7 @@ async function importHook() {
 }
 
 function makeTarget() {
-  // Élément réel happy-dom : on lira --heat via son style.
+  // Real happy-dom element: --heat is read via its style.
   const el = document.createElement('div');
   const ref = createRef<HTMLElement | null>();
   (ref as { current: HTMLElement | null }).current = el;
@@ -99,7 +99,7 @@ describe('useIngameReactor — listeners', () => {
 
     off();
     act(() => emit('game:start', { player: 'TREY' }));
-    // Plus rien après désabonnement.
+    // Nothing more after unsubscribing.
     expect(received).toHaveLength(1);
   });
 
@@ -128,16 +128,16 @@ describe('useIngameReactor — events dmd:display', () => {
     const received: Array<{ kind: string; intensity?: number }> = [];
     result.current.on((r) => received.push(r as never));
 
-    // Premier SCORE : prev=null → pas de hit, juste mémorise le score.
+    // First SCORE: prev=null → no hit, just remembers the score.
     act(() => emit('dmd:display', { mode: 'SCORE', score: 1000 }));
     expect(received).toHaveLength(0);
     expect(result.current.getHeat()).toBe(0);
 
-    // Deuxième SCORE plus haut : hit émis, heat monte.
+    // Second, higher SCORE: hit emitted, heat rises.
     act(() => emit('dmd:display', { mode: 'SCORE', score: 1500 }));
     expect(received).toHaveLength(1);
     expect(received[0].kind).toBe('hit');
-    // delta 500 / 500 = 1 (clampé à 1), heat += 1 * 0.3.
+    // delta 500 / 500 = 1 (clamped to 1), heat += 1 * 0.3.
     expect(received[0].intensity).toBe(1);
     expect(result.current.getHeat()).toBeCloseTo(0.3, 5);
   });
@@ -152,10 +152,10 @@ describe('useIngameReactor — events dmd:display', () => {
     });
 
     act(() => emit('dmd:display', { mode: 'SCORE', score: 0 }));
-    // Tout petit delta → clamp bas à 0.1.
+    // Tiny delta → clamped low at 0.1.
     act(() => emit('dmd:display', { mode: 'SCORE', score: 10 }));
     expect(hits[0]).toBe(0.1);
-    // Gros delta → clamp haut à 1.
+    // Big delta → clamped high at 1.
     act(() => emit('dmd:display', { mode: 'SCORE', score: 99999 }));
     expect(hits[1]).toBe(1);
   });
@@ -170,8 +170,8 @@ describe('useIngameReactor — events dmd:display', () => {
     });
 
     act(() => emit('dmd:display', { mode: 'SCORE', score: 1000 }));
-    act(() => emit('dmd:display', { mode: 'SCORE', score: 1000 })); // égal
-    act(() => emit('dmd:display', { mode: 'SCORE', score: 500 })); // baisse
+    act(() => emit('dmd:display', { mode: 'SCORE', score: 1000 })); // equal
+    act(() => emit('dmd:display', { mode: 'SCORE', score: 500 })); // lower
     expect(hits).toHaveLength(0);
   });
 
@@ -217,7 +217,7 @@ describe('useIngameReactor — events dmd:display', () => {
 
     act(() => emit('dmd:display', { mode: 'SCORE', score: 1000 }));
     act(() => emit('game:start', { player: 'NEO' })); // reset lastScore=null
-    // Le SCORE suivant repart de zéro → prev=null → pas de hit.
+    // The next SCORE starts from scratch → prev=null → no hit.
     act(() => emit('dmd:display', { mode: 'SCORE', score: 2000 }));
     expect(hits).toHaveLength(0);
   });
@@ -264,16 +264,16 @@ describe('useIngameReactor — boucle heat (RAF)', () => {
     const { ref, el, socket } = makeTarget();
     const { result } = renderHook(() => useIngameReactor(ref, socket));
 
-    // Monte le heat via deux SCORE (delta 500 → +0.3).
+    // Raise the heat via two SCOREs (delta 500 → +0.3).
     act(() => emit('dmd:display', { mode: 'SCORE', score: 0 }));
     act(() => emit('dmd:display', { mode: 'SCORE', score: 500 }));
     expect(result.current.getHeat()).toBeCloseTo(0.3, 5);
 
-    // Premier frame : last=null → pas de decay, écrit 0.3.
+    // First frame: last=null → no decay, writes 0.3.
     frame(0);
     expect(el.style.getPropertyValue('--heat')).toBe('0.3');
 
-    // 1 s plus tard : decay 0.5/s → 0.3 - 0.5 = clamp 0 → écrit 0.
+    // 1 s later: decay 0.5/s → 0.3 - 0.5 = clamp 0 → writes 0.
     frame(1000);
     expect(result.current.getHeat()).toBe(0);
     expect(el.style.getPropertyValue('--heat')).toBe('0');
@@ -289,7 +289,7 @@ describe('useIngameReactor — boucle heat (RAF)', () => {
     expect(result.current.getHeat()).toBe(1);
     expect(el.style.getPropertyValue('--heat')).toBe('1');
 
-    // Même après du temps, reste verrouillé à 1 (pas de decay).
+    // Even after time passes, stays locked at 1 (no decay).
     frame(5000);
     expect(result.current.getHeat()).toBe(1);
   });
@@ -299,12 +299,12 @@ describe('useIngameReactor — boucle heat (RAF)', () => {
     const { ref, el, socket } = makeTarget();
     renderHook(() => useIngameReactor(ref, socket));
 
-    frame(0); // heat 0 → écrit "0"
+    frame(0); // heat 0 → writes "0"
     expect(el.style.getPropertyValue('--heat')).toBe('0');
-    // Force une valeur différente puis remet : on vérifie juste que setProperty
-    // a bien été appelé une 1re fois (idempotence couverte par l’absence d’erreur).
+    // Force a different value then check: the sentinel surviving the next
+    // frame proves --heat is not rewritten when rounded heat is unchanged.
     el.style.setProperty('--heat', 'sentinel');
-    frame(16); // heat reste 0 (déjà à 0) → rounded inchangé → pas de ré-écriture
+    frame(16); // heat stays 0 (already 0) → rounded unchanged → no rewrite
     expect(el.style.getPropertyValue('--heat')).toBe('sentinel');
   });
 });
@@ -317,8 +317,8 @@ describe('useIngameReactor — cycle de vie', () => {
 
     unmount();
     expect(rafCancelled).toBe(true);
-    // Le socket est partagé (lifté dans BackglassStage) : le hook retire ses
-    // propres handlers (game:start + dmd:display) sans déconnecter le socket.
+    // The socket is shared (lifted into BackglassStage): the hook removes its
+    // own handlers (game:start + dmd:display) without disconnecting the socket.
     expect(offCalls).toBe(2);
   });
 });

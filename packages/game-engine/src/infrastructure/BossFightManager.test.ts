@@ -4,8 +4,8 @@ import { BossTargetSensor } from './BossTargetSensor';
 import type { BossDefinition } from '../domain/BossRegistry';
 import type { GameEvent } from '../domain/GameEvents';
 
-// Définitions de boss FIXTURES génériques (pas de contenu ST) : la mécanique
-// du moteur doit marcher sur n'importe quelles définitions injectées.
+// Generic FIXTURE boss definitions (no ST content): the engine mechanics must
+// work on any injected definitions.
 function boss(over: Partial<BossDefinition> & Pick<BossDefinition, 'id' | 'colliderRole'>): BossDefinition {
   return {
     target: { x: 0, y: 1, z: 0 },
@@ -47,9 +47,9 @@ function boss(over: Partial<BossDefinition> & Pick<BossDefinition, 'id' | 'colli
   };
 }
 
-// boss_a : monde normal, palier 3000, +150 reveal, 5 hits @250.
+// boss_a: normal world, threshold 3000, +150 reveal, 5 hits @250.
 const BOSS_A = boss({ id: 'boss_a', colliderRole: 'a_target', unlocksPortal: true });
-// boss_b : monde alternatif, palier 3000, +200 reveal, 10 hits @300.
+// boss_b: alternate world, threshold 3000, +200 reveal, 10 hits @300.
 const BOSS_B = boss({
   id: 'boss_b',
   colliderRole: 'b_target',
@@ -212,12 +212,12 @@ test('sensor factory is injectable: one sensor built per boss, wired to the cloc
   ]);
 });
 
-// ── Triggers debug (/debug) : vrai chemin d'état, pas d'event fantôme ────────
+// ── Debug triggers (/debug): real state path, no phantom event ──────────────
 
 test('forceReveal: arme le VRAI combat (isTriggered) + émet BOSS_REVEAL, sans gate de seuil', () => {
   const events: GameEvent[] = [];
   const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 0);
-  // Aucun score marqué (seuil 3000 PAS atteint) → tryReveal refuserait.
+  // No score earned (threshold 3000 NOT reached) → tryReveal would refuse.
   mgr.forceReveal('boss_a', 'playing');
   expect(mgr.isTriggered('boss_a')).toBe(true);
   expect(events).toEqual([
@@ -237,7 +237,7 @@ test('forceReveal: garde les invariants — pas hors jeu, pas de double reveal',
 
 test('forceTargetHit: crédite le vrai compteur (cooldown ignoré) → défaite réelle à maxHits', () => {
   const events: GameEvent[] = [];
-  // Horloge FIGÉE : le cooldown 450ms bloquerait des hits répétés — forceTargetHit doit passer outre.
+  // FROZEN clock: the 450ms cooldown would block repeated hits — forceTargetHit must bypass it.
   const mgr = new BossFightManager((e) => events.push(e), [BOSS_A], () => 1000);
   mgr.forceReveal('boss_a', 'playing');
   mgr.setTargetArmed('boss_a', true); // le module arme la cible après l'anim de reveal

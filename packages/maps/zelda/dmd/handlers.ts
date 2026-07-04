@@ -9,9 +9,9 @@ import {
   type ClipHandler,
 } from '@pinball/dmd-core'
 
-// Handlers de cinématiques Zelda.
-// TODO: ajouter des frames hero Ganondorf (équivalent DEMOGORGON_HERO) quand
-// les assets dot-art seront disponibles.
+// Zelda cinematic handlers.
+// TODO: add Ganondorf hero frames (DEMOGORGON_HERO equivalent) once
+// dot-art assets are available.
 
 const HETIC_LETTERS = 'HETIC'.split('')
 
@@ -70,7 +70,7 @@ function clipHeticComplete(grid: Uint8Array, ms: number): void {
   }
 }
 
-// Placeholder hero Ganondorf : texte ASCII en attendant un vrai dot-art.
+// Ganondorf hero placeholder: ASCII text until real dot-art exists.
 function clipGanondorfRises(grid: Uint8Array, ms: number): void {
   const p = Math.min(1, ms / 2000)
   const y = Math.round(15 - p * 10)
@@ -100,7 +100,7 @@ export const cinematicHandlers: Record<string, ClipHandler> = {
   ganondorf_slain: (grid, clockMs) => clipGanondorfSlain(grid, clockMs),
   hetic_letter: (grid, clockMs, ctx) => clipHeticLetter(grid, ctx.value || 1, clockMs),
   hetic_complete: (grid, clockMs) => clipHeticComplete(grid, clockMs),
-  // sacred_realm : TODO — ajouter un clip dot-art du portail / Triforce.
+  // sacred_realm: TODO — add a portal / Triforce dot-art clip.
   last_chance: (grid) => {
     drawCentered(grid, 'DERNIERE VIE', 25, FONT_5X7, DOT.lives)
   },

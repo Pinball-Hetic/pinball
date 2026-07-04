@@ -34,7 +34,7 @@ export interface WireGameplayDeps {
   screenShake: ScreenShake;
   diag: BallDiagnostics;
   buildEmit: (hideBall: () => void) => GameEventListener;
-  /** cache la bille au game over (lit le mesh live) */
+  /** hides the ball at game over (reads the live mesh) */
   hideBallMesh: () => void;
   restoreBossCamera: () => void;
   clearAlternateWorldSession: () => void;
@@ -57,12 +57,12 @@ export interface GameplayWiring {
   collisionProcessor: CollisionEventProcessor;
 }
 
-// Câble le cœur gameplay : routeur d'events (createEmitRouter), use-cases, et
-// CollisionEventProcessor. ⚠ CYCLE INTENTIONNEL documenté : le processor est
-// construit AVEC `emit`, et `emit` route vers le processor via des getters
-// paresseux — les getters ci-dessous se résolvent sur les locals de CETTE
-// factory, assignés avant tout event. Ne pas casser ce cycle (contrat JSDoc
-// dans CollisionEventProcessor / createEmitRouter).
+// Wires the gameplay core: event router (createEmitRouter), use-cases, and
+// CollisionEventProcessor. ⚠ INTENTIONAL CYCLE: the processor is built WITH
+// `emit`, and `emit` routes to the processor through lazy getters — the
+// getters below resolve to THIS factory's locals, assigned before any event.
+// Do not break this cycle (JSDoc contract in CollisionEventProcessor /
+// createEmitRouter).
 export function wireGameplay(d: WireGameplayDeps): GameplayWiring {
   const plunger = new Plunger();
 
@@ -78,7 +78,7 @@ export function wireGameplay(d: WireGameplayDeps): GameplayWiring {
     d.clearAlternateWorldSession();
   };
 
-  // Forward-refs du cycle : assignés plus bas, lus paresseusement par le routeur.
+  // Cycle forward refs: assigned below, read lazily by the router.
   let drainBallUC: DrainBall | null = null;
   let bottomOutBallUC: BottomOutBall | null = null;
   let collisionProcessor: CollisionEventProcessor | null = null;

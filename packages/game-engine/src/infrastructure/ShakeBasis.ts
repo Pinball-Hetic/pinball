@@ -2,12 +2,11 @@ import * as THREE from 'three';
 
 /**
  * Snapshot of the camera + playfield-root transforms taken before a tremor,
- * restored once the shake ends. Shared verbatim by the Stranger Things
+ * restored once the shake ends. Shared by the Stranger Things
  * UpsideDownTransition and the Zelda ZeldaTransition.
  *
  * No map import here (game-engine never imports a map): the THREE objects are
- * injected by the caller. `capture`/`restore` are null-safe, matching the
- * original `if (this.camera) / if (this.playfieldRoot)` guards.
+ * injected by the caller. `capture`/`restore` are null-safe.
  */
 export class ShakeBasis {
   readonly camPos = new THREE.Vector3();

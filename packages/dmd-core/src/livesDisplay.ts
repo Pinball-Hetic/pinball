@@ -1,10 +1,10 @@
-// Règle d'affichage des vies sur le DMD (pure, testée).
+// DMD lives display rule.
 //
-// Jusqu'à 3 vies : rangée de pastilles ● (comptage visuel direct). Au-delà
-// (vies bonus / rescue), les pastilles ne passent pas à l'échelle → on bascule
-// sur un compteur compact "N ●". Piloté par le VRAI nombre de vies, jamais
-// plafonné à 3 (sinon désync DMD ↔ jeu). Partagé par le rendu canvas
-// (drawLivesRow) et le rendu JSX plat (apps/dmd ?flat).
+// Up to 3 lives: row of ● dots (direct visual count). Beyond that (bonus /
+// rescue lives) dots don't scale → switch to a compact "N ●" counter. Driven
+// by the REAL number of lives, never capped at 3 (otherwise DMD ↔ game
+// desync). Shared by the canvas rendering (drawLivesRow) and the flat JSX
+// rendering (apps/dmd ?flat).
 
 export const DOTS_MAX_LIVES = 3;
 

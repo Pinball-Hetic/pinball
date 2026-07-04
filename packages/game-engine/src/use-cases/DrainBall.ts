@@ -10,19 +10,19 @@ export class DrainBall {
   ) {}
 
   /**
-   * Réarme le use-case. À appeler quand une nouvelle bille est mise en jeu
-   * (chemin `BALL_LAUNCHED`), symétrique de `BottomOutBall.resetLatch`.
+   * Re-arms the use-case. Call when a new ball enters play (`BALL_LAUNCHED`
+   * path), symmetric to `BottomOutBall.resetLatch`.
    */
   resetLatch(): void {
     this.latched = false;
   }
 
   /**
-   * Émet DRAIN et remet la bille au spawn. Le délai visuel est géré par la
-   * couche interface. Latch anti-rebond : le capteur de drain (Rapier) peut
-   * déclencher `execute()` sur 2 frames consécutives avant que le reset au
-   * spawn ne soit pris en compte → sans ce garde, double DRAIN / double perte
-   * de vie. Le latch est levé par `resetLatch()` au (re)lancement de la bille.
+   * Emits DRAIN and resets the ball to spawn. The visual delay is handled by
+   * the interface layer. Debounce latch: the drain sensor (Rapier) can fire
+   * `execute()` on 2 consecutive frames before the spawn reset takes effect →
+   * without this guard, double DRAIN / double life loss. The latch is lifted
+   * by `resetLatch()` when the ball is (re)launched.
    */
   execute(): void {
     if (this.latched) return;

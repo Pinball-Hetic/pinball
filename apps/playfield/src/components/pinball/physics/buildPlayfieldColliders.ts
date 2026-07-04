@@ -11,27 +11,27 @@ import type { MapManifest } from "@pinball/shared-types";
 
 export interface BuildPlayfieldCollidersDeps {
   world: RAPIER.World;
-  /** racine GLB résolue (playfieldRoot) */
+  /** resolved GLB root (playfieldRoot) */
   root: THREE.Object3D;
   manifest: MapManifest;
   layout: MapLayout;
-  /** rempli par la factory : handle collider → nom de rôle (consommé ensuite
-   * par CollisionEventProcessor) */
+  /** filled by the factory: collider handle → role name (later consumed by
+   * CollisionEventProcessor) */
   colliderMap: Map<number, string>;
 }
 
-// Construit tous les colliders physiques depuis le GLB conventionné role-driven
-// (setup, inerte) : murs/couloir = trimeshes classés par rôle ; drop targets
-// dérivés du GLB (LayoutResolver) ; sol/bumpers/sensors = analytiques du layout.
-// Side-effects sur `world` + `colliderMap`. Behavior-preserving 1:1.
+// Builds every physics collider from the role-driven GLB (inert setup):
+// walls/lane = trimeshes classified by role; drop targets derived from the
+// GLB (LayoutResolver); floor/bumpers/sensors = analytic from the layout.
+// Side effects on `world` + `colliderMap`.
 export function buildPlayfieldColliders(deps: BuildPlayfieldCollidersDeps): void {
   const { world, root, manifest, layout, colliderMap } = deps;
 
   const meshResolver = new MeshRoleResolver(manifest.meshAliases);
   PlayfieldTrimeshBuilder.buildRoleDriven(root, world, meshResolver, manifest.elements ?? {});
 
-  // Drop targets dérivés du GLB (deltas ≤ 0.7 mm validés) ; bumpers gardés au
-  // littéral (centre Box3 ≠ collider tuné). Le log de comparaison reste actif.
+  // Drop targets derived from the GLB (deltas ≤ 0.7 mm validated); bumpers
+  // kept literal (Box3 center ≠ tuned collider). The comparison log stays on.
   const derivedLayout = LayoutResolver.deriveAndCompare(root, meshResolver, layout);
   const resolvedLayout = LayoutResolver.withDerivedDropTargets(layout, derivedLayout);
   PlayfieldColliderFactory.createForMap(world, resolvedLayout, colliderMap);

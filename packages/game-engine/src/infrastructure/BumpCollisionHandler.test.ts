@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { BumpCollisionHandler } from './BumpCollisionHandler';
 import { BUMP_HIT_COOLDOWN_MS, BUMP_EJECT_SCALE } from '../domain/Ball';
 
-// Fake BumpHit : on capture les appels execute(side, scale).
+// Fake BumpHit: capture the execute(side, scale) calls.
 type Call = { side: 'left' | 'right'; scale: number };
 function makeBumpHitUC() {
   const calls: Call[] = [];
@@ -12,14 +12,14 @@ function makeBumpHitUC() {
   };
 }
 
-// Horloge injectée (DIP) : pilotée par le test, aucun stub global de
-// performance.now — déterministe et sans fuite entre tests.
+// Injected clock: driven by the test, no global performance.now stub —
+// deterministic and no leak between tests.
 function makeClock(start = 1000) {
   const clock = { t: start };
   return { now: () => clock.t, set: (ms: number) => { clock.t = ms; } };
 }
 
-// Vide la file pendingPhysics : le handler diffère l'exécution.
+// Drain the pendingPhysics queue: the handler defers execution.
 function drain(pending: Array<() => void>) {
   for (const fn of pending) fn();
   pending.length = 0;
@@ -103,7 +103,7 @@ test('cooldown indépendant par côté (left vs right)', () => {
   const h = new BumpCollisionHandler(pending, uc as never, makeClock().now);
 
   h.handle('bump_left', 'playing', true);
-  // Même instant : le côté droit n'est pas en cooldown.
+  // Same instant: the right side is not on cooldown.
   h.handle('bump_right', 'playing', true);
   expect(pending.length).toBe(2);
 });

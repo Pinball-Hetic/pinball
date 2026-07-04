@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-// Smoke playfield : l'écran d'accueil monorepo charge et propose le lien vers
-// la scène 3D. Cibler avec PLAYWRIGHT_BASE_URL=<host:port_playfield>.
+// Playfield smoke: the monorepo home screen loads and offers the link to the
+// 3D scene. Target with PLAYWRIGHT_BASE_URL=<host:port_playfield>.
 test.describe('playfield kiosk', () => {
   test('home page loads with title and playfield link', async ({ page }) => {
     await page.goto('/')

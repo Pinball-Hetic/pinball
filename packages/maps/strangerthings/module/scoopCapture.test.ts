@@ -15,15 +15,15 @@ describe('createScoopCapture — dwell (anti-flythrough)', () => {
   test('bille qui TRAVERSE la zone → désarmé sans capture (aucun effet)', () => {
     const s = createScoopCapture(CFG)
     s.arm()
-    expect(s.tick(100, passing)).toBe('armed') // dans la zone mais rapide
+    expect(s.tick(100, passing)).toBe('armed') // in zone but fast
     expect(s.tick(100, gone)).toBe('idle') // repartie → flythrough
-    expect(s.tick(1000, posed)).toBe('idle') // plus armé : rien ne se déclenche
+    expect(s.tick(1000, posed)).toBe('idle') // no longer armed: nothing triggers
   })
 
   test('bille rapide dans la zone : le dwell ne compte pas', () => {
     const s = createScoopCapture(CFG)
     s.arm()
-    expect(s.tick(1000, passing)).toBe('armed') // 1s rapide → toujours pas capturé
+    expect(s.tick(1000, passing)).toBe('armed') // 1s fast → still not captured
     expect(s.tick(300, posed)).toBe('capture') // se pose → dwell 300ms → capture
   })
 
@@ -32,7 +32,7 @@ describe('createScoopCapture — dwell (anti-flythrough)', () => {
     s.arm()
     expect(s.tick(150, posed)).toBe('armed')
     expect(s.tick(150, posed)).toBe('capture')
-    expect(s.tick(16, posed)).toBe('hold') // frame suivante = hold, pas re-capture
+    expect(s.tick(16, posed)).toBe('hold') // next frame = hold, no re-capture
     expect(s.isHolding()).toBe(true)
   })
 })
@@ -50,12 +50,12 @@ describe('createScoopCapture — hold → eject', () => {
     expect(s.tick(600, posed)).toBe('hold')
     expect(s.tick(600, posed)).toBe('eject') // 1200 > 1000
     expect(s.isHolding()).toBe(false)
-    expect(s.tick(16, posed)).toBe('idle') // pas de second kick
+    expect(s.tick(16, posed)).toBe('idle') // no second kick
   })
 
   test('arm ignoré pendant hold (pas de re-capture en boucle)', () => {
     const s = captured()
-    s.arm() // contact re-déclenché pendant le hold → no-op
+    s.arm() // contact re-triggered during hold → no-op
     expect(s.tick(500, posed)).toBe('hold')
     expect(s.tick(600, posed)).toBe('eject')
   })

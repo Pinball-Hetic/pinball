@@ -45,7 +45,7 @@ describe("createPhysicalInputHandlers.onButton", () => {
 
   test("bouton non mappé → drop silencieux", () => {
     const unmapped = CABINET_BUTTONS.find((b) => !b.action);
-    if (!unmapped) return; // tous mappés → rien à tester
+    if (!unmapped) return; // all mapped → nothing to test
     const { h, calls } = handlersHarness();
     h.onButton({ id: unmapped.id, action: "DOWN" });
     expect(calls.apply.length).toBe(0);
@@ -131,10 +131,10 @@ describe("cheat-code RESET_CHORD (3 boutons façade gauche simultanés)", () => 
     const chord = createButtonChord(RESET_CHORD, () => (fires += 1));
     chord({ id: G, action: "DOWN" });
     chord({ id: Y, action: "DOWN" });
-    expect(fires).toBe(0); // 2/3 seulement
+    expect(fires).toBe(0); // only 2/3
     chord({ id: R, action: "DOWN" });
-    expect(fires).toBe(1); // accord complet
-    chord({ id: R, action: "DOWN" }); // répétition DOWN en maintien → pas de re-tir
+    expect(fires).toBe(1); // full chord
+    chord({ id: R, action: "DOWN" }); // repeated DOWN while held → no re-fire
     expect(fires).toBe(1);
   });
 
@@ -163,6 +163,6 @@ describe("cheat-code RESET_CHORD (3 boutons façade gauche simultanés)", () => 
     const { h, calls } = handlersHarness();
     for (const id of RESET_CHORD) h.onButton({ id, action: "DOWN" });
     expect(calls.cheatResets).toBe(1);
-    expect(calls.apply.length).toBe(0); // non mappés → aucune action jeu
+    expect(calls.apply.length).toBe(0); // unmapped → no game action
   });
 });

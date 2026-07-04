@@ -4,7 +4,7 @@ import { GameStateManager } from '../infrastructure/GameStateManager';
 import type { GameOver, GameRegistered, LeaderboardEntry } from '@pinball/shared-types';
 import { createSocketGateway, type IoLike, type SocketLike } from './socketGateway';
 
-// Fakes injectés (DIP) — aucun mock.module.
+// Injected fakes — no mock.module.
 const registerScore = mock((_data: GameOver): Promise<GameRegistered> =>
   Promise.resolve({ code: '', claimUrl: '' }));
 const worldTopTen = mock((_mapId?: string): Promise<LeaderboardEntry[]> => Promise.resolve([]));
@@ -20,8 +20,8 @@ beforeEach(() => {
   worldTopTen.mockResolvedValue([]);
 });
 
-// Fake io + fake socket minimaux ; on capture les socket.on(event, cb).
-// Structurellement compatibles avec IoLike / SocketLike → aucun cast.
+// Minimal fake io + fake socket; capture socket.on(event, cb) handlers.
+// Structurally compatible with IoLike / SocketLike → no cast.
 type Handler = (...args: unknown[]) => void;
 
 function makeFakeIo() {
@@ -58,10 +58,10 @@ function invoke(gameState?: GameStateManager, role?: string) {
   const fsock = makeFakeSocket(role);
   handle(fio.io, fsock.socket);
   return {
-    ioEmit: fio.emit, // io.emit → broadcast à tous
+    ioEmit: fio.emit, // io.emit → broadcast to everyone
     to: fio.to,
     toEmit: fio.toEmit,
-    socketEmit: fsock.emit, // socket.emit → l'émetteur uniquement
+    socketEmit: fsock.emit, // socket.emit → the sender only
     join: fsock.join,
     fire: fsock.fire,
   };

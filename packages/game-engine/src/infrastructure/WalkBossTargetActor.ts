@@ -84,8 +84,7 @@ const _facingPos = new THREE.Vector3();
 /**
  * Composed lifecycle for the "walk-in target boss" actors (Vecna / Dark Link):
  * spawn → walk along the tilted playfield → settle facing the camera → fight
- * idle, with hit flashes and a victory/dead finisher. Behaviour is verbatim
- * from the former VecnaTargetVisual / DarkLinkTargetVisual; the only per-map
+ * idle, with hit flashes and a victory/dead finisher. The only per-map
  * variation is injected via config (constants, emissive/glow, fight-idle mode,
  * scale boost) and the resolveClips function (raw vs subclipped GLTF clips).
  */

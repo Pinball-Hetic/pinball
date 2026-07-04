@@ -1,8 +1,8 @@
 import styles from './art.module.css'
 
-// Résout un nom de classe : scopé s'il est défini dans art.module.css (contenu
-// Zelda), sinon renvoyé tel quel (classe structurelle globale de l'app :
-// tk-center, glitch-text, vhs*, tk-confetti…). Importer ce module charge aussi
-// le CSS du contenu Zelda.
+// Resolves a class name: scoped if defined in art.module.css (Zelda
+// content), otherwise returned as-is (global structural app class:
+// tk-center, glitch-text, vhs*, tk-confetti…). Importing this module also
+// loads the Zelda content CSS.
 export const cx = (...names: string[]): string =>
   names.map((n) => styles[n] ?? n).join(' ')

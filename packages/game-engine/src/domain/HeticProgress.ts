@@ -1,20 +1,20 @@
-// Décisions pures partagées par les modules de map (ST, Zelda) : progression
-// du compteur HETIC et sélection de clip milestone par palier de score.
+// Pure decisions shared by map modules (ST, Zelda): HETIC counter progression
+// and milestone clip selection per score threshold.
 
 export interface HeticProgress {
   display: number;
   completed: boolean;
 }
 
-// Décision pure : état d'affichage du compteur HETIC après incrément.
-// count >= 5 → mot complet (display 5, completed). Le caller gère le reset.
+// Display state of the HETIC counter after an increment.
+// count >= 5 → full word (display 5, completed). The caller handles the reset.
 export function resolveHeticProgress(count: number): HeticProgress {
   if (count < 5) return { display: count, completed: false };
   return { display: 5, completed: true };
 }
 
-// Sous-ensemble de MapContext nécessaire au rollover HETIC. Permet de tester
-// advanceHetic avec un faux ctx (spies) sans dépendre du MapContext complet.
+// MapContext subset needed by the HETIC rollover, so advanceHetic can be
+// tested with a fake ctx (spies).
 export interface HeticContext {
   setMapState(patch: { hetic: number }): void;
   playCinematic(clipId: string, opts?: { value?: number; onEnd?: () => void }): void;
@@ -22,10 +22,9 @@ export interface HeticContext {
   refreshScoreSnapshot(): void;
 }
 
-// Effet partagé du rollover HETIC (DROP_TARGET_COMPLETE) : incrémente le
-// compteur, joue la cinématique de lettre ou de mot complet (avec Fever 30s),
-// et retourne le prochain compteur (remis à 0 après complétion). Le caller
-// stocke la valeur retournée. Identique entre ST et Zelda.
+// Shared HETIC rollover effect (DROP_TARGET_COMPLETE): increments the counter,
+// plays the letter or full-word cinematic (with 30s Fever), and returns the
+// next counter value (reset to 0 after completion). The caller stores it.
 export function advanceHetic(ctx: HeticContext, currentCount: number): number {
   const next = currentCount + 1;
   const progress = resolveHeticProgress(next);
@@ -37,7 +36,7 @@ export function advanceHetic(ctx: HeticContext, currentCount: number): number {
   ctx.setMapState({ hetic: progress.display });
   ctx.playCinematic('hetic_complete', {
     onEnd: () => {
-      // Fever 30s : multiplicateur forcé + reprise immédiate du SCORE.
+      // 30s Fever: forced multiplier + immediate SCORE refresh.
       ctx.forceMultiplier(5, 30_000);
       ctx.refreshScoreSnapshot();
     },
@@ -52,7 +51,7 @@ export type MilestoneClipId =
   | 'milestone_30k'
   | 'milestone_big';
 
-// Décision pure : clip milestone pour un palier de score donné.
+// Milestone clip for a given score threshold.
 export function selectMilestoneClip(threshold: number): MilestoneClipId {
   if (threshold === 5000) return 'milestone_5k';
   if (threshold === 15000) return 'milestone_15k';

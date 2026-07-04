@@ -4,13 +4,13 @@ import { scoreOverlay, feverBanner } from './overlays'
 import { attractFrame } from './attract'
 import { PALETTE_ZELDA, PALETTE_SACRED_REALM } from './palette'
 
-// Contenu DMD Zelda injecté dans le moteur @pinball/dmd-core.
+// Zelda DMD content injected into the @pinball/dmd-core engine.
 export const dmdContent: DmdMapContent = {
-  // Palette normale : vert émeraude / or / bleu saphir (identité Zelda).
+  // Normal palette: emerald green / gold / sapphire blue (Zelda identity).
   paletteNormal: PALETTE_ZELDA,
-  // Palette monde alternatif (Sacred Realm) : vert vif + or éclatant.
+  // Alternate world palette (Sacred Realm): bright green + vivid gold.
   paletteAlternateWorld: PALETTE_SACRED_REALM,
-  // Couleur des bandeaux NeonBand haut/bas de l'écran DMD.
+  // Color of the top/bottom NeonBand strips of the DMD screen.
   neonColor: '#FFD700',
   cinematicHandlers,
   scoreOverlay,

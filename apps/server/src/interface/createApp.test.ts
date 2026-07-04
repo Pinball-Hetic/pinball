@@ -2,7 +2,7 @@ import { test, expect, describe, mock, beforeEach } from 'bun:test';
 import request from 'supertest';
 import { createApp, type LeaderboardQueries } from './createApp';
 
-// Fakes injectés (DIP) — aucun mock.module, import statique.
+// Injected fakes — no mock.module, static import.
 const worldTopTen = mock(async (..._a: unknown[]) => [] as unknown);
 const globalStats = mock(async (..._a: unknown[]) => ({}) as unknown);
 const app = createApp({ worldTopTen, globalStats } as unknown as LeaderboardQueries);

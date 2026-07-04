@@ -9,9 +9,9 @@ import {
 } from './DmdRenderer'
 import { INDEX_TO_COLOR, PALETTE_NORMAL, type Palette } from './palette'
 
-// --- Faux canvas / contexte 2D -------------------------------------------
-// On évite tout WebGL/canvas réel : un contexte stub qui enregistre les
-// appels permet d'observer le comportement de render()/buildSprites().
+// --- Fake canvas / 2D context ---------------------------------------------
+// Avoid any real WebGL/canvas: a stub context that records calls lets us
+// observe render()/buildSprites() behavior.
 
 type Call = { method: string; args: unknown[] }
 
@@ -28,7 +28,7 @@ function makeFakeCtx(calls: Call[]): CanvasRenderingContext2D {
   return ctx as unknown as CanvasRenderingContext2D
 }
 
-// Canvas factice : getContext renvoie le ctx stub (ou null selon le flag).
+// Fake canvas: getContext returns the stub ctx (or null depending on the flag).
 function makeFakeCanvas(
   calls: Call[],
   opts: { contextAvailable?: boolean } = {},
@@ -42,11 +42,11 @@ function makeFakeCanvas(
   return canvas as unknown as HTMLCanvasElement
 }
 
-// document.createElement('canvas') est appelé par makeSprite. On installe un
-// global minimal pour rester indépendant de happy-dom.
+// document.createElement('canvas') is called by makeSprite. Install a minimal
+// global to stay independent of happy-dom.
 const originalDocument = (globalThis as { document?: unknown }).document
 let spriteCanvasContextAvailable = false
-// Appels enregistrés par les contextes des sprites offscreen (createElement).
+// Calls recorded by the offscreen sprite contexts (createElement).
 let spriteCalls: Call[] = []
 
 beforeEach(() => {
@@ -120,9 +120,9 @@ describe('render', () => {
     r.render()
     const fills = calls.filter((c) => c.method === 'fillRect')
     expect(fills.length).toBe(1)
-    // couvre tout le canvas 1920x640
+    // covers the whole 1920x640 canvas
     expect(fills[0].args).toEqual([0, 0, GRID_W * PITCH, GRID_H * PITCH])
-    // aucun dot → aucun drawImage
+    // no dot → no drawImage
     expect(calls.some((c) => c.method === 'drawImage')).toBe(false)
   })
 
@@ -135,15 +135,15 @@ describe('render', () => {
   })
 
   test('dessine un sprite à la position pixel attendue pour un dot allumé', () => {
-    // les sprites n'existent que si le contexte du canvas offscreen est dispo.
+    // sprites only exist if the offscreen canvas context is available.
     spriteCanvasContextAvailable = true
     const calls: Call[] = []
     const r = new DmdRenderer(makeFakeCanvas(calls))
-    // allume le dot (x=3, y=2) avec l'index couleur 1
+    // light dot (x=3, y=2) with color index 1
     const x = 3
     const y = 2
     r.grid[y * GRID_W + x] = 1
-    calls.length = 0 // ignore les appels de construction des sprites
+    calls.length = 0 // ignore sprite-construction calls
     r.render()
     const draws = calls.filter((c) => c.method === 'drawImage')
     expect(draws.length).toBe(1)
@@ -153,16 +153,16 @@ describe('render', () => {
   })
 
   test('n appelle pas drawImage quand le sprite est null (ctx offscreen indispo)', () => {
-    // makeSprite renvoie un canvas SANS sprite réel, mais le sprite stocké
-    // n est jamais null dans ce cas (makeSprite renvoie toujours s). Pour
-    // forcer un sprite null on utiliserait l index 0 qui est déjà éteint.
+    // makeSprite returns a canvas WITHOUT a real sprite, but the stored
+    // sprite is never null in that case (makeSprite always returns s). To
+    // force a null sprite we would use index 0, which is already off.
     spriteCanvasContextAvailable = false
     const calls: Call[] = []
     const r = new DmdRenderer(makeFakeCanvas(calls))
     r.grid[0] = 1
     calls.length = 0
     r.render()
-    // sprite existe (makeSprite renvoie le canvas) donc drawImage est appelé
+    // sprite exists (makeSprite returns the canvas) so drawImage is called
     expect(calls.filter((c) => c.method === 'drawImage').length).toBe(1)
   })
 
@@ -183,9 +183,9 @@ describe('setPalette', () => {
   test('ne reconstruit pas les sprites si palette identique (no-op)', () => {
     spriteCanvasContextAvailable = true
     const r = new DmdRenderer(makeFakeCanvas([]))
-    // createRadialGradient (sur spriteCalls) = preuve d une (re)construction.
+    // createRadialGradient (on spriteCalls) = proof of a (re)construction.
     const before = spriteCalls.filter((c) => c.method === 'createRadialGradient').length
-    r.setPalette(PALETTE_NORMAL) // même référence que la palette par défaut
+    r.setPalette(PALETTE_NORMAL) // same reference as the default palette
     const after = spriteCalls.filter((c) => c.method === 'createRadialGradient').length
     expect(after).toBe(before)
   })
@@ -197,7 +197,7 @@ describe('setPalette', () => {
     const before = spriteCalls.filter((c) => c.method === 'createRadialGradient').length
     r.setPalette(custom)
     const after = spriteCalls.filter((c) => c.method === 'createRadialGradient').length
-    // un gradient par couleur de la palette (= INDEX_TO_COLOR.length)
+    // one gradient per palette color (= INDEX_TO_COLOR.length)
     expect(after - before).toBe(INDEX_TO_COLOR.length)
   })
 
@@ -207,10 +207,10 @@ describe('setPalette', () => {
     const r = new DmdRenderer(makeFakeCanvas(calls))
     const custom: Palette = { ...PALETTE_NORMAL, lives: '#FFFFFF' }
     r.setPalette(custom)
-    r.grid[0] = 2 // index 'lives'
+    r.grid[0] = 2 // 'lives' index
     calls.length = 0
     r.render()
-    // toujours capable de dessiner le dot après changement de palette
+    // still able to draw the dot after a palette change
     expect(calls.filter((c) => c.method === 'drawImage').length).toBe(1)
   })
 })
@@ -219,7 +219,7 @@ describe('buildSprites (via construction)', () => {
   test('construit un sprite par couleur quand le ctx offscreen est dispo', () => {
     spriteCanvasContextAvailable = true
     new DmdRenderer(makeFakeCanvas([]))
-    // chaque sprite crée un radial gradient
+    // each sprite creates one radial gradient
     expect(
       spriteCalls.filter((c) => c.method === 'createRadialGradient').length,
     ).toBe(INDEX_TO_COLOR.length)
@@ -236,8 +236,8 @@ describe('buildSprites (via construction)', () => {
 
 describe('SpriteFactory injectée (sans document global)', () => {
   test('buildSprites appelle la factory une fois par couleur, dans l ordre', () => {
-    // Pas besoin du document global : la factory est injectée. On retire
-    // le stub pour prouver qu il n est jamais touché.
+    // No need for the global document: the factory is injected. Remove the
+    // stub to prove it is never touched.
     delete (globalThis as { document?: unknown }).document
     const seen: string[] = []
     const fakeFactory: SpriteFactory = (color) => {

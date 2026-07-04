@@ -1,7 +1,7 @@
 import type { LeaderboardEntry, GlobalStats } from '@pinball/shared-types'
 
-// Predicats de forme : kiosk-safe, une reponse mal formee ne doit jamais
-// remplacer un etat valide. On valide statut + forme avant d'accepter.
+// Shape predicates: kiosk-safe — a malformed response must never replace a
+// valid state. Status + shape are validated before accepting.
 
 export function isLeaderboardShape(x: unknown): x is LeaderboardEntry[] {
   return Array.isArray(x)
@@ -17,9 +17,9 @@ type FetchImpl = (url: string) => Promise<{
   json: () => Promise<unknown>
 }>
 
-// Fetch generique valide par un type-guard. Rejette (Error) sur statut non-OK
-// ou forme invalide ; renvoie la donnee typee sinon. fetch injectable pour les
-// tests.
+// Generic fetch validated by a type guard. Rejects (Error) on a non-OK status
+// or invalid shape; returns the typed data otherwise. fetch is injectable
+// for tests.
 export async function safeFetch<T>(
   url: string,
   guard: (x: unknown) => x is T,

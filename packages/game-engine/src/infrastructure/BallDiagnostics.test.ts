@@ -3,12 +3,12 @@ import { BallDiagnostics, RESET_LABELS, LOST_LABELS } from './BallDiagnostics';
 import type { Vec3 } from './BallDiagnostics';
 import type { MapLayout } from '../domain/MapLayout';
 
-// Corps Rapier minimal (lecture seule) : on injecte pos/vel à la main.
+// Minimal Rapier body (read-only): pos/vel injected by hand.
 function body(pos: Vec3, vel: Vec3 = { x: 0, y: 0, z: 0 }) {
   return { translation: () => pos, linvel: () => vel };
 }
 
-// Layout minimal : seules shooterLane + spawns.ball sont lues par le diag.
+// Minimal layout: the diag only reads shooterLane + spawns.ball.
 function makeLayout(): MapLayout {
   return {
     shooterLane: {
@@ -34,7 +34,7 @@ function makeLayout(): MapLayout {
   } as unknown as MapLayout;
 }
 
-// Point de jeu valide (centre plateau, sur la surface, hors couloir/limites).
+// Valid play point (playfield center, on the surface, outside lane/bounds).
 const SAFE: Vec3 = { x: 0, y: 1.0, z: 0 };
 
 describe('BallDiagnostics — labels', () => {
@@ -92,7 +92,7 @@ describe('BallDiagnostics — classification de zone', () => {
   });
 
   test('dans la bbox du couloir → lane', () => {
-    // x dans [xMin,xMax], z dans [topZ,bottomZ]
+    // x in [xMin,xMax], z in [topZ,bottomZ]
     diag.update(body({ x: 0.23, y: 1, z: 0.1 }), 'playing');
     expect(diag.getSnapshot().zone).toBe('lane');
   });
@@ -103,7 +103,7 @@ describe('BallDiagnostics — classification de zone', () => {
   });
 
   test('zone bottom-out (bas du terrain, côté gauche du séparateur) → drain_zone', () => {
-    // BOTTOM_OUT_Z est positif (vers le bas) ; x faible (< laneSepX) côté gauche.
+    // BOTTOM_OUT_Z is positive (downward); small x (< laneSepX) is the left side.
     diag.update(body({ x: -0.2, y: 1, z: 0.4 }), 'playing');
     expect(diag.getSnapshot().zone).toBe('drain_zone');
   });
@@ -260,7 +260,7 @@ describe('BallDiagnostics — traceur de traversée du mur gauche', () => {
 
 describe('BallDiagnostics — mode verbose et console', () => {
   afterEach(() => {
-    // restauration faite via mockRestore dans chaque test
+    // restore is done via mockRestore in each test
   });
 
   test('verbose=false → pas de console.error lors d’une perte', () => {

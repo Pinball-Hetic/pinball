@@ -8,18 +8,18 @@ export interface RegisterScoreDeps {
 }
 
 /**
- * Use-case factory (DIP): receives a game repository + score gateway as ports,
- * so it is unit-testable with in-memory fakes — no prisma, no fetch, no mocking.
+ * Receives a game repository + score gateway as ports, so it is unit-testable
+ * with in-memory fakes — no prisma, no fetch, no mocking.
  */
 export function createRegisterScore({ games, scores }: RegisterScoreDeps) {
   return async function registerScore(data: GameOver): Promise<GameRegistered> {
-    const score = Math.max(1, Math.min(99_999_999, data.finalScore)); // contrat [1..99999999]
-    const playedAt = new Date().toISOString(); // ISO avec offset (Z)
-    // Idempotence : un seul gameId par partie, constant sur tous les retries
-    // internes de postScore → le global dédoublonne (pas de double insert).
+    const score = Math.max(1, Math.min(99_999_999, data.finalScore)); // API contract [1..99999999]
+    const playedAt = new Date().toISOString(); // ISO with offset (Z)
+    // Idempotency: one gameId per game, constant across all internal postScore
+    // retries → the global API dedupes on it (no double insert).
     const gameId = randomUUID();
 
-    // 1) record local d'abord (jamais perdu, même si global KO)
+    // 1) local record first (never lost, even if the global API is down)
     const local = await games.create({
       player: data.player,
       mapId: data.mapId,
@@ -30,7 +30,7 @@ export function createRegisterScore({ games, scores }: RegisterScoreDeps) {
       durationS: data.stats.durationS,
     });
 
-    // 2) global → code + claimUrl
+    // 2) global API → code + claimUrl
     const reg = await scores.postScore({
       gameId,
       mapId: data.mapId,
@@ -42,7 +42,7 @@ export function createRegisterScore({ games, scores }: RegisterScoreDeps) {
       playedAt,
     });
 
-    // 3) lier le code au record local (support/debug)
+    // 3) link the claim code to the local record (support/debug)
     await games.setCode(local.id, reg.code);
     console.log('[server] score global enregistré scoreId=', reg.scoreId, 'code=', reg.code);
 

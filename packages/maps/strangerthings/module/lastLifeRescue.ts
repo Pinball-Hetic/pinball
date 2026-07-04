@@ -12,16 +12,16 @@ export type LastLifeRescue = {
   reset(): void
   onGameEvent(ctx: MapContext, e: GameEvent): void
   /**
-   * Appelé AVANT le décrément de vie (handleDrain) sur un DRAIN/BOTTOM_OUT, avec
-   * le nombre de vies PRÉ-décrément (explicite, sans lire `ctx.lives()`). Fait
-   * DEUX choses, sur ce compte explicite :
-   *   1. Sauvetage : si armé et l'objectif atteint sur la dernière vie
-   *      (`livesBeforeDrain === 1`), accorde une vie ici — avant que le décrément
-   *      ne tombe à 0, donc le game over est évité.
-   *   2. Armement : selon le nombre de vies restant APRÈS ce drain
-   *      (`livesBeforeDrain + (vie accordée ? 1 : 0) - 1`), arme le sauvetage si
-   *      le joueur entre dans sa dernière vie (1 restante), sinon le désarme.
-   * Retourne true si une vie a été accordée (sauvetage réussi).
+   * Called BEFORE the life decrement (handleDrain) on a DRAIN/BOTTOM_OUT,
+   * with the PRE-decrement life count (explicit, without reading
+   * `ctx.lives()`). Does TWO things on that explicit count:
+   *   1. Rescue: if armed and the goal is reached on the last life
+   *      (`livesBeforeDrain === 1`), grants a life here — before the
+   *      decrement hits 0, so game over is avoided.
+   *   2. Arming: based on lives remaining AFTER this drain
+   *      (`livesBeforeDrain + (life granted ? 1 : 0) - 1`), arms the rescue
+   *      if the player enters their last life (1 left), else disarms it.
+   * Returns true if a life was granted (successful rescue).
    */
   onPreDrain(ctx: MapContext, livesBeforeDrain: number): boolean
   isArmed(): boolean
@@ -56,9 +56,9 @@ export function createLastLifeRescue(): LastLifeRescue {
       : LAST_LIFE_RESCUE_POINTS,
   })
 
-  // Tentative de sauvetage : si armé et objectif atteint sur la dernière vie,
-  // on accorde la vie maintenant (avant que handleDrain ne tombe à 0) → game
-  // over évité. Renvoie true si une vie a été accordée.
+  // Rescue attempt: if armed and the goal is reached on the last life,
+  // grant the life now (before handleDrain hits 0) → game over avoided.
+  // Returns true if a life was granted.
   const tryRescue = (ctx: MapContext, livesBeforeDrain: number): boolean => {
     if (!active) return false
     if (livesBeforeDrain !== 1) return false
@@ -68,14 +68,14 @@ export function createLastLifeRescue(): LastLifeRescue {
     return true
   }
 
-  // Avant le décrément : d'abord la tentative de sauvetage, puis l'armement
-  // décidé sur le compte de vies EXPLICITE post-drain — sans lire ctx.lives()
-  // (donc sans dépendre de l'ordre du décrément handleDrain).
+  // Before the decrement: rescue attempt first, then arming decided on the
+  // EXPLICIT post-drain life count — without reading ctx.lives()
+  // (so no dependence on handleDrain's decrement ordering).
   const onPreDrain = (ctx: MapContext, livesBeforeDrain: number): boolean => {
     const rescued = tryRescue(ctx, livesBeforeDrain)
-    // Vies restant après ce drain (handleDrain retirera 1 ; le sauvetage a pu
-    // en ajouter 1 juste avant). 1 restante = le joueur entre dans sa dernière
-    // vie → on arme + compte ; sinon on désarme.
+    // Lives left after this drain (handleDrain will remove 1; the rescue may
+    // have added 1 just before). 1 left = player enters their last life
+    // → arm + count; otherwise disarm.
     const livesAfterDrain = livesBeforeDrain + (rescued ? 1 : 0) - 1
     if (livesAfterDrain === 1) {
       if (!active) arm(ctx)
@@ -86,8 +86,8 @@ export function createLastLifeRescue(): LastLifeRescue {
   }
 
   const onGameEvent = (ctx: MapContext, e: GameEvent) => {
-    // L'armement/désarmement sur DRAIN/BOTTOM_OUT est traité dans onPreDrain
-    // (compte de vies explicite). Ici on ignore ces events.
+    // Arming/disarming on DRAIN/BOTTOM_OUT is handled in onPreDrain
+    // (explicit life count). Ignore those events here.
     if (e.type === 'DRAIN' || e.type === 'BOTTOM_OUT') return
 
     if (ctx.lives() !== 1) {

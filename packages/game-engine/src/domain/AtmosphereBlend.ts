@@ -4,7 +4,7 @@
  * lastAppliedMix} only — NO Three/material/light dependency. Each map class keeps
  * its own setup/dispose and a thin applyEase(ease) that mutates materials/lights.
  *
- * Integration (verbatim from the original update()/applyMix()):
+ * Integration rules:
  *  - step = dt / blendDuration ; mix moves toward targetMix, clamped.
  *  - ease = smoothstep(mix) = mix*mix*(3 - 2*mix).
  *  - fullyActive = mix >= 1 && targetMix >= 1.

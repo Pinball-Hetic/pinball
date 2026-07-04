@@ -1,8 +1,8 @@
 import { mapAsset } from '../manifest';
 
-/** Cinématique entrée Upside Down (premier passage portail). */
+/** Upside Down entry cinematic (first portal pass). */
 export const PORTAL_ENTER_TEXTURE_URL = mapAsset('playfield/upsidedown.jpg');
-/** Cinématique retour après victoire Vecna (passage balle dans le trou). */
+/** Return cinematic after Vecna victory (ball passes through the hole). */
 export const RETURN_PORTAL_TEXTURE_URL = mapAsset('playfield/fin_combat_vecna.png');
 
 export const UPSIDE_DOWN_TRANSITION_DURATION = 4;
@@ -19,9 +19,9 @@ export const UPSIDE_DOWN_TRANSITION_HOLD =
 
 export const UPSIDE_DOWN_PORTAL_REVEAL_DELAY = 3;
 /**
- * Délai (s) d'apparition du portail RETOUR après la défaite du boss : au coup
- * fatal la bille est collée au boss (= au portail) — ouvrir immédiatement
- * l'aspirerait instantanément au lieu de la laisser en jeu.
+ * Delay (s) before the RETURN portal appears after the boss defeat: on the
+ * fatal hit the ball is stuck to the boss (= to the portal) — opening
+ * immediately would suck it in instantly instead of leaving it in play.
  */
 export const RETURN_PORTAL_REVEAL_DELAY_S = 5;
 export const UPSIDE_DOWN_PORTAL_OPEN_DURATION = 2.5;

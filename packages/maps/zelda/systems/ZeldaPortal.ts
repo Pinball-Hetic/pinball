@@ -21,15 +21,15 @@ type SetupConfig = {
 };
 
 /**
- * Portail Sacred Realm (Zelda) — visuel Three.js + sensor Rapier.
+ * Sacred Realm portal (Zelda) — Three.js visual + Rapier sensor.
  *
- * Pattern identique à UpsideDownPortal (ST) :
- *  - Le sensor Rapier est créé SEULEMENT quand le portail s'ouvre (open / enableReturn).
- *  - Le sensor est détruit physiquement à hide() et reset().
- *  - Impossible de déclencher le portail quand il est invisible.
+ * Same pattern as UpsideDownPortal (ST):
+ *  - The Rapier sensor is created ONLY when the portal opens (open / enableReturn).
+ *  - The sensor is physically destroyed on hide() and reset().
+ *  - The portal cannot be triggered while invisible.
  */
 export class ZeldaPortal {
-  // ── Rapier (créé / détruit dynamiquement) ────────────────────────────────
+  // ── Rapier (created / destroyed dynamically) ─────────────────────────────
   private world:          RAPIER.World | null     = null;
   private sensorBody:     RAPIER.RigidBody | null = null;
   private sensorCollider: RAPIER.Collider | null  = null;
@@ -70,17 +70,17 @@ export class ZeldaPortal {
     const pos = config.layout.sensors.portal;
     this.sensorPos.set(pos.x, pos.y, pos.z);
 
-    // Visuel Three.js — masqué au départ. Sensor PAS encore créé.
+    // Three.js visual — hidden initially. Sensor NOT created yet.
     this.portalGroup = this.buildVisual();
     this.portalGroup.position.set(pos.x, pos.y + 0.020, pos.z);
-    this.portalGroup.rotation.x = 96 * Math.PI / 180;  // à plat sur le plateau
+    this.portalGroup.rotation.x = 96 * Math.PI / 180;  // flat on the playfield
     this.portalGroup.visible = false;
     config.root.add(this.portalGroup);
 
     config.onOpenChange(false);
   }
 
-  /** Ouvre le portail après la défaite de Ganondorf. */
+  /** Opens the portal after Ganondorf's defeat. */
   open(): void {
     if (this.openState) return;
     this.openState = true;
@@ -95,8 +95,8 @@ export class ZeldaPortal {
   }
 
   /**
-   * Cache le visuel et **détruit le sensor Rapier**.
-   * Appelé dès que la balle entre dans le portail — impossible de le reprendre.
+   * Hides the visual and **destroys the Rapier sensor**.
+   * Called as soon as the ball enters the portal — cannot be re-taken.
    */
   hide(): void {
     this.returnCountdown.cancel();
@@ -106,15 +106,15 @@ export class ZeldaPortal {
   }
 
   /**
-   * Programme le sensor pour le portail RETOUR (Sacred Realm → monde normal).
-   * Différé : au coup fatal la bille colle à Dark Link — activer immédiatement
-   * l'aspirerait sans laisser jouer. Le sensor est créé par update(dt).
+   * Schedules the sensor for the RETURN portal (Sacred Realm → normal world).
+   * Deferred: on the fatal hit the ball sticks to Dark Link — activating
+   * immediately would suck it in without play. The sensor is created by update(dt).
    */
   enableReturn(): void {
     this.returnCountdown.start(RETURN_PORTAL_REVEAL_DELAY_S);
   }
 
-  /** Réinitialise complètement le portail (game reset). */
+  /** Fully resets the portal (game reset). */
   reset(): void {
     this.returnCountdown.cancel();
     this.openState = false;
@@ -134,8 +134,8 @@ export class ZeldaPortal {
   }
 
   update(dt: number): void {
-    // Avant le early-return visuel : le groupe est invisible dans le Sacred
-    // Realm, mais le countdown retour doit quand même s'écouler.
+    // Before the visual early-return: the group is invisible in the Sacred
+    // Realm, but the return countdown must still run.
     if (this.returnCountdown.tick(dt)) {
       this.createSensor();
       this.onOpenChangeCb?.(true);
@@ -206,7 +206,7 @@ export class ZeldaPortal {
     this.animT     = 0;
   }
 
-  // ── Sensor Rapier (créé / détruit dynamiquement) ─────────────────────────
+  // ── Rapier sensor (created / destroyed dynamically) ──────────────────────
 
   private createSensor(): void {
     if (!this.world || !this.colliderMap || this.sensorCollider) return;
@@ -238,7 +238,7 @@ export class ZeldaPortal {
     this.sensorBody     = null;
   }
 
-  // ── Visuel Three.js ───────────────────────────────────────────────────────
+  // ── Three.js visual ───────────────────────────────────────────────────────
 
   private buildVisual(): THREE.Group {
     const group = new THREE.Group();

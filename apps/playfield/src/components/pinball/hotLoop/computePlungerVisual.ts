@@ -1,9 +1,9 @@
 import { plungerChargeProgress, plungerLaunchFactor, PLUNGER_CHARGE_MS } from "@pinball/game-engine";
 import type { PlungerState } from "../createApplyAction";
 
-// Throttle de la jauge UI de charge (React setState max ~25 Hz pour ne pas
-// re-render à 60/120 Hz), + reset à null au relâchement. Stateful par design
-// (dernier push + jauge affichée) — possédé par la closure d'init.
+// Charge-gauge UI throttle (React setState capped at ~25 Hz to avoid
+// re-rendering at 60/120 Hz), + reset to null on release. Stateful by design
+// (last push + displayed gauge) — owned by the init closure.
 export const PLUNGER_CHARGE_UI_INTERVAL_MS = 40;
 
 export function createPlungerChargeUi(push: (charge: number | null) => void) {
@@ -35,20 +35,19 @@ export interface PlungerVisualInput {
 }
 
 export interface PlungerVisualResult {
-  /** position Z du mesh plongeur cette frame */
+  /** plunger mesh Z position this frame */
   z: number;
-  /** état FSM après cette frame (transitions releasing→returning→idle) */
+  /** FSM state after this frame (releasing→returning→idle transitions) */
   plungerState: PlungerState;
 }
 
-// FSM visuelle du plongeur (pure) : calcule la position Z du mesh + la
-// transition d'état pour une frame donnée. Extrait du hot loop → testable sans
-// Three/Rapier. `restZ` = position de repos (>0). Behavior-preserving 1:1.
+// Plunger visual FSM (pure): computes the mesh Z position + the state
+// transition for a given frame. `restZ` = rest position (>0).
 //
-// - en charge : recul ∝ facteur de charge (pullback)
-// - releasing : coup vers l'avant, puis → returning après 10% du temps de charge
-// - returning : retour au repos → idle
-// - idle : au repos
+// - charging: pullback ∝ charge factor
+// - releasing: forward strike, then → returning after 10% of the charge time
+// - returning: back to rest → idle
+// - idle: at rest
 export function computePlungerVisual(
   s: PlungerVisualInput,
   time: number,

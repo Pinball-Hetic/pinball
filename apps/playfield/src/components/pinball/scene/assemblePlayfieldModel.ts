@@ -14,8 +14,8 @@ import type { MapManifest } from "@pinball/shared-types";
 const GLB_LOAD_MAX_ATTEMPTS = 3;
 const GLB_LOAD_RETRY_BASE_MS = 1500;
 
-// Charge le GLB avec retries (réseau borne parfois lent au boot) : backoff
-// linéaire 1.5s/3s entre les tentatives.
+// Loads the GLB with retries (cabinet network can be slow at boot): linear
+// 1.5s/3s backoff between attempts.
 export async function loadPlayfieldGlb(loader: GLTFLoader, url: string): Promise<GLTF> {
   for (let attempt = 1; attempt <= GLB_LOAD_MAX_ATTEMPTS; attempt++) {
     try {
@@ -35,7 +35,7 @@ export interface AssembleModelDeps {
   rendering: MapManifest["rendering"];
   layout: MapLayout;
   freezeFeedbackStrobe: PlayfieldCinematicStrobe;
-  /** enregistre geo/mats d'un sous-arbre pour dispose + active les ombres */
+  /** registers a subtree's geos/mats for dispose + enables shadows */
   collectDisposables: (root: THREE.Object3D) => void;
   disposableGeos: THREE.BufferGeometry[];
   disposableMats: THREE.Material[];
@@ -47,10 +47,10 @@ export interface AssembledModel {
   ballTrail: BallTrail;
 }
 
-// Assemblage scène après chargement GLB (setup, inerte) : montage du root +
-// nettoyage des meshes inutiles + préparation matériaux, traînée de feu, flash
-// de gel (monté sur modelRoot — repère scène, indépendant des meshes de map),
-// et mesh de la bille (caché jusqu'au début de session). Behavior-preserving.
+// Scene assembly after GLB load (inert setup): mounts the root + strips
+// useless meshes + prepares materials, fire trail, freeze flash (mounted on
+// modelRoot — scene space, independent of map meshes), and the ball mesh
+// (hidden until the session starts).
 export function assemblePlayfieldModel(
   gltf: GLTF,
   d: AssembleModelDeps,

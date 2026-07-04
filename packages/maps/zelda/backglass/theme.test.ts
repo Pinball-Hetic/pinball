@@ -1,8 +1,8 @@
 import { test, expect, describe } from 'bun:test'
 import { backglassTheme, backglassThemeAlternate } from './theme'
 
-// Toutes les clés de tokens doivent être des CSS custom properties (--xxx),
-// contrat porté par le type ThemeTokens = Record<`--${string}`, string>.
+// All token keys must be CSS custom properties (--xxx), a contract carried
+// by the ThemeTokens = Record<`--${string}`, string> type.
 const isCssVar = (key: string) => key.startsWith('--')
 
 describe('backglassTheme (base Hyrule)', () => {

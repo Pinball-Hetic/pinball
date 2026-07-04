@@ -5,7 +5,7 @@ import { getBallRadius, WALL_BOTTOM_Z, resetBallRadius } from '../domain/Ball';
 
 afterEach(() => resetBallRadius());
 
-// Helper : mesh box (taille 1) positionné, nommé.
+// Helper: positioned, named box mesh.
 function laneMesh(name: string, z: number, depth = 0.1): THREE.Mesh {
   const m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, depth), new THREE.MeshBasicMaterial());
   m.name = name;
@@ -33,7 +33,7 @@ describe('computeLauncherLaneZBounds', () => {
   });
 
   test('derives bounds from a launcher mesh bbox with radius padding', () => {
-    // box depth 0.1 centrée à z=0.2 → min.z=0.15, max.z=0.25
+    // box depth 0.1 centered at z=0.2 → min.z=0.15, max.z=0.25
     const root = rootWith(laneMesh('launcher', 0.2, 0.1));
     const r = getBallRadius();
     const { minZ, maxZ } = computeLauncherLaneZBounds(root);

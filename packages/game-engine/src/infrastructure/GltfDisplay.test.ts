@@ -40,12 +40,12 @@ test('darkens a table material exactly once (colorDarken applied a single time)'
 test('shared material across meshes is not double-darkened', () => {
   const shared = new THREE.MeshStandardMaterial({ color: 0xffffff });
   const root = new THREE.Group();
-  // Deux meshes "playfield" partagent le MÊME matériau.
+  // Two "playfield" meshes share the SAME material.
   root.add(playfieldMesh(shared, 'playfield'));
   root.add(playfieldMesh(shared, 'playfield'));
 
   prepareGltfMaterialsForDisplay(root, renderingWith(0.5));
 
-  // Sans le garde, ce serait 0.25 (0.5 * 0.5). Avec, une seule passe → 0.5.
+  // Without the guard it'd be 0.25 (0.5 * 0.5). With it, a single pass → 0.5.
   expect(shared.color.r).toBeCloseTo(0.5, 6);
 });

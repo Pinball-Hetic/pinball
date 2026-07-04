@@ -75,7 +75,7 @@ describe('computeSpeedClamp', () => {
   });
 
   it('caps a fast upward y to 0.35 using ORIGINAL x/z (overwrites the scale step)', () => {
-    // both conditions fire: speed>max AND y>1.25. Verbatim: second setter wins
+    // both conditions fire: speed>max AND y>1.25. The second rule wins,
     // with ORIGINAL x/z (not scaled).
     const vel = { x: 3, y: 8, z: 0 };
     const r = computeSpeedClamp(vel);

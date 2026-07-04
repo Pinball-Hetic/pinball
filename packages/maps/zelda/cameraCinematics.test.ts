@@ -6,7 +6,7 @@ import {
   DARK_LINK_VICTORY_CAMERA_CINEMATIC,
 } from './cameraCinematics'
 
-// Toutes les durées d'une cinématique caméra doivent être strictement positives.
+// All camera cinematic durations must be strictly positive.
 function expectPositiveDurations(c: {
   zoomInDuration: number
   holdDuration: number
@@ -60,7 +60,7 @@ describe('cameraCinematics', () => {
   })
 
   test('les victoires sont plus rapides et plus reculées que les reveals', () => {
-    // zoom-in court + plus de recul (distanceScale plus grand) = plan large rapide.
+    // short zoom-in + more pull-back (larger distanceScale) = fast wide shot.
     expect(GANONDORF_VICTORY_CAMERA_CINEMATIC.zoomInDuration).toBeLessThan(
       GANONDORF_CAMERA_CINEMATIC.zoomInDuration,
     )

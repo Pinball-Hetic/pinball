@@ -1,5 +1,5 @@
-// Ports (DIP): the use-case layer depends on these interfaces, never on prisma
-// or fetch directly. Infrastructure provides adapters; tests provide fakes.
+// The use-case layer depends on these interfaces, never on prisma or fetch
+// directly. Infrastructure provides adapters; tests provide fakes.
 
 export interface NewGame {
   player: string;

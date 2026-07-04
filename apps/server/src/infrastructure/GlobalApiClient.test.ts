@@ -6,7 +6,7 @@ import {
   type ScorePayload,
 } from './GlobalApiClient';
 
-// Helper : construit une réponse fetch minimale.
+// Builds a minimal fetch Response.
 function makeRes(opts: {
   status: number;
   json?: unknown;
@@ -94,7 +94,7 @@ describe('postScore', () => {
     const client = makeClient(fetchMock as never);
 
     await expect(client.postScore(PAYLOAD)).rejects.toThrow(/400: bad request/);
-    expect(fetchMock).toHaveBeenCalledTimes(1); // un seul essai
+    expect(fetchMock).toHaveBeenCalledTimes(1); // single attempt
   });
 
   test('5xx persistant → retry jusqu\'à 3 fois puis jette (épuisé)', async () => {
@@ -142,13 +142,12 @@ describe('postScore', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  // Régression (server-abort) : le timer d'abort (setTimeout 10 s) doit être
-  // nettoyé sur CHAQUE sortie, exactement une fois. Avant le fix, les chemins de
-  // throw (4xx définitif, 5xx épuisé) clearaient deux fois (clear eager après
-  // fetch + clear dans le catch) — symptôme d'un cleanup non centralisé. Un
-  // `finally` unique rend le nettoyage invariant : un clear par essai, ni plus,
-  // ni moins. On instrumente setTimeout/clearTimeout globaux, on marque les
-  // timers d'abort (ms === 10_000) et on compte les clears par handle.
+  // Regression: the abort timer (setTimeout 10 s) must be cleared on EVERY
+  // exit, exactly once. Before the fix, throw paths (definitive 4xx, exhausted
+  // 5xx) cleared twice (eager clear after fetch + clear in the catch). A single
+  // `finally` makes the cleanup invariant: one clear per attempt, no more, no
+  // less. We instrument global setTimeout/clearTimeout, tag abort timers
+  // (ms === 10_000) and count clears per handle.
   function countAbortTimerClears(fetchImpl: typeof fetch) {
     const setSpy = spyOn(globalThis, 'setTimeout');
     const clearSpy = spyOn(globalThis, 'clearTimeout');
@@ -161,7 +160,7 @@ describe('postScore', () => {
         created.push(handle);
         return handle as unknown as ReturnType<typeof setTimeout>;
       }
-      // backoff (500 ms * attempt) : résout tout de suite pour ne pas ralentir.
+      // backoff timer (500 ms * attempt): resolve immediately to keep the test fast.
       if (typeof fn === 'function') fn();
       return {} as ReturnType<typeof setTimeout>;
     }) as unknown as typeof setTimeout);
@@ -177,7 +176,7 @@ describe('postScore', () => {
           await createGlobalApiClient({ fetch: fetchImpl, config: CONFIG, cache: new Map() })
             .postScore(PAYLOAD);
         } catch {
-          // certains chemins jettent (4xx, 5xx épuisé) — attendu.
+          // some paths throw (4xx, exhausted 5xx) — expected.
         }
         setSpy.mockRestore();
         clearSpy.mockRestore();
@@ -249,17 +248,17 @@ describe('getWorldLeaderboard', () => {
     const fetchMock = mock(async (_url: string, init?: RequestInit) => {
       n += 1;
       if (n === 1) return makeRes({ status: 200, json: board, etag: 'W/"v1"' });
-      // 2e appel : doit porter If-None-Match
+      // 2nd call: must carry If-None-Match
       expect((init?.headers as Record<string, string>)['If-None-Match']).toBe('W/"v1"');
       return makeRes({ status: 304 });
     });
-    // Cache frais injecté → isolation sans clé unique.
+    // Fresh injected cache → isolation without a unique key.
     const client = makeClient(fetchMock as never, CONFIG, new Map());
 
     const first = await client.getWorldLeaderboard('etagmap', 7);
     expect(first).toEqual(board);
     const second = await client.getWorldLeaderboard('etagmap', 7);
-    expect(second).toEqual(board); // body servi depuis le cache
+    expect(second).toEqual(board); // body served from the cache
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 

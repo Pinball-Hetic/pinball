@@ -2,7 +2,7 @@ import express, { type Express } from 'express';
 import type { LeaderboardEntry, GlobalStats } from '@pinball/shared-types';
 
 /**
- * Read queries the HTTP API depends on. Injected (DIP) so createApp can be
+ * Read queries the HTTP API depends on. Injected so createApp can be
  * unit-tested with in-memory fakes — no prisma, no module mocking.
  */
 export interface LeaderboardQueries {

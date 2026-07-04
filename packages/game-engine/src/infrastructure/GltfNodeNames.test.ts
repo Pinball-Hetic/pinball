@@ -25,7 +25,7 @@ import {
   isJunkGltfMeshName,
 } from './GltfNodeNames';
 
-// Helper : crée un Object3D nommé.
+// Helper: create a named Object3D.
 function node(name: string, ...children: THREE.Object3D[]): THREE.Object3D {
   const o = new THREE.Object3D();
   o.name = name;
@@ -33,7 +33,7 @@ function node(name: string, ...children: THREE.Object3D[]): THREE.Object3D {
   return o;
 }
 
-// Helper : crée un Mesh nommé avec géométrie réelle.
+// Helper: create a named Mesh with real geometry.
 function mesh(name: string): THREE.Mesh {
   const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
   m.name = name;

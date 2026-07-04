@@ -6,7 +6,7 @@ import type {
 } from '../use-cases/ports';
 export type { ScorePayload, ScoreRegistered } from '../use-cases/ports';
 
-// Cache ETag : évite de re-télécharger un board inchangé. Clé = `${mapId}:${limit}`.
+// ETag cache: avoids re-downloading an unchanged board. Key = `${mapId}:${limit}`.
 export type LeaderboardCache = Map<string, { etag: string; body: unknown }>;
 
 export interface GlobalApiConfig {
@@ -28,14 +28,14 @@ export function createGlobalApiClient({ fetch, config, cache }: GlobalApiDeps): 
   async function postScore(p: ScorePayload): Promise<ScoreRegistered> {
     if (!base || !token) throw new Error('GLOBAL_API_URL / BORNE_TOKEN manquants');
 
-    // cabinetId déduit du token côté serveur global → plus dans le payload.
+    // cabinetId is derived from the token by the global server → not in the payload.
     const body = JSON.stringify(p);
-    // score borné au contrat [1, 99_999_999] (clamp fait par l'appelant — voir G2)
+    // score is clamped to the contract [1, 99_999_999] by the caller.
 
     const MAX = 3;
     for (let attempt = 1; attempt <= MAX; attempt++) {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 10_000); // timeout généreux
+      const t = setTimeout(() => ctrl.abort(), 10_000); // generous timeout
       try {
         const res = await fetch(`${base}/v1/scores`, {
           method: 'POST',
@@ -43,27 +43,27 @@ export function createGlobalApiClient({ fetch, config, cache }: GlobalApiDeps): 
           body,
           signal: ctrl.signal,
         });
-        // 200 = replay idempotent (gameId déjà vu), 201 = créé. Même corps.
+        // 200 = idempotent replay (gameId already seen), 201 = created. Same body.
         if (res.status === 200 || res.status === 201) {
           return (await res.json()) as ScoreRegistered;
         }
-        // 4xx = définitif (pas de retry) → marqué pour que le catch rethrow direct.
+        // 4xx = definitive (no retry) → flagged so the catch rethrows directly.
         if (res.status >= 400 && res.status < 500) {
           const e = new Error(`global /v1/scores ${res.status}: ${await res.text()}`);
           (e as { definitive?: boolean }).definitive = true;
           throw e;
         }
-        // 5xx → retry. Épuisé au dernier essai.
+        // 5xx → retry. Exhausted on the last attempt.
         if (attempt === MAX) throw new Error(`global /v1/scores ${res.status} (épuisé)`);
       } catch (err) {
-        // 4xx définitif → pas de retry. gameId rend timeout/réseau/5xx sûrs à
-        // retenter (le global dédoublonne sur gameId → idempotent).
+        // Definitive 4xx → no retry. gameId makes timeout/network/5xx safe to
+        // retry (the global API dedupes on gameId → idempotent).
         if ((err as { definitive?: boolean }).definitive) throw err;
         if (attempt === MAX) throw err;
       } finally {
         clearTimeout(t);
       }
-      await new Promise((r) => setTimeout(r, 500 * attempt)); // backoff
+      await new Promise((r) => setTimeout(r, 500 * attempt)); // linear backoff
     }
     throw new Error('global /v1/scores: inatteignable');
   }

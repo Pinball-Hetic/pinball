@@ -4,36 +4,36 @@ import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { layout } from '../layout';
 
 // ── Timings ────────────────────────────────────────────────────────────────
-/** Durée du flash violet montant (entrée Sacred Realm). */
+/** Duration of the rising purple flash (Sacred Realm entry). */
 const BLACKOUT_DURATION = 0.45; // s
-/** Durée du fade-out avant la phase tremor. */
+/** Fade-out duration before the tremor phase. */
 const RESTORE_DURATION  = 0.55; // s
-/** Durée du tremor (secousses caméra + playfield). */
+/** Tremor duration (camera + playfield shakes). */
 const TREMOR_DURATION   = 0.55; // s
-/** Fréquence du strobe pendant le flash. */
+/** Strobe frequency during the flash. */
 const STROBE_HZ = 6;
 
 type SetupConfig = {
-  /** Racine de la scène (playfield root) — secouée pendant le tremor. */
+  /** Scene root (playfield root) — shaken during the tremor. */
   root: THREE.Object3D;
-  /** Caméra — secouée pendant le tremor. */
+  /** Camera — shaken during the tremor. */
   camera: THREE.Camera;
 };
 
 type StartConfig = {
-  /** Mesh de la bille — masqué pendant la transition. */
+  /** Ball mesh — hidden during the transition. */
   ballMesh: THREE.Object3D;
 };
 
 /**
- * Transition Sacred Realm (Zelda) — aller ET retour.
+ * Sacred Realm transition (Zelda) — both entry AND return.
  *
- * Séquence : flash violet (blackout) → fade (restore) → tremor → callback.
- * Le module appelle `onComplete` pour téléporter la balle et émettre
- * `PORTAL_TRANSITION_END` ou `RETURN_PORTAL_TRANSITION_END`.
+ * Sequence: purple flash (blackout) → fade (restore) → tremor → callback.
+ * The module calls `onComplete` to teleport the ball and emit
+ * `PORTAL_TRANSITION_END` or `RETURN_PORTAL_TRANSITION_END`.
  *
- * Le tremor (secousses de caméra + playfield) suit la restauration de l'écran,
- * avant de rendre la balle visible — même pattern que UpsideDownTransition ST.
+ * The tremor (camera + playfield shakes) follows the screen restore, before
+ * the ball becomes visible — same pattern as ST's UpsideDownTransition.
  */
 export class ZeldaTransition {
   private cinematicStrobe = new PlayfieldCinematicStrobe();
@@ -51,7 +51,7 @@ export class ZeldaTransition {
   private ballMesh: THREE.Object3D | null = null;
   private onComplete: (() => void) | null = null;
 
-  // Références pour le tremor.
+  // Tremor references.
   private camera:        THREE.Camera | null       = null;
   private playfieldRoot: THREE.Object3D | null     = null;
   private shakeBasis     = new ShakeBasis();
@@ -78,9 +78,9 @@ export class ZeldaTransition {
   }
 
   /**
-   * Démarre la transition.
-   * Appelé depuis `onGameEvent(PORTAL_ENTER | RETURN_PORTAL_ENTER)`.
-   * La balle doit déjà être tenue avant l'appel.
+   * Starts the transition.
+   * Called from `onGameEvent(PORTAL_ENTER | RETURN_PORTAL_ENTER)`.
+   * The ball must already be held before the call.
    */
   start(config: StartConfig, onComplete: () => void): void {
     this.active     = true;

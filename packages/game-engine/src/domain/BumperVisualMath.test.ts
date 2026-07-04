@@ -38,7 +38,7 @@ describe('nearestBumperIndex', () => {
       { x: -1, y: 0, z: 0 },
       { x: 1, y: 0, z: 0 },
     ];
-    // équidistant de 0 -> le premier gagne car le second n'est pas strictement plus proche
+    // equidistant from 0 -> the first wins because the second is not strictly closer
     expect(nearestBumperIndex({ x: 0, y: 0, z: 0 }, pts)).toBe(0);
   });
 });
@@ -58,12 +58,12 @@ describe('bumperPunchScale', () => {
   });
 
   test('milieu (prog=0.5) atteint le pic 1+peak (easeOutBack(1)=1)', () => {
-    // remaining = duration/2 -> prog = 0.5 -> branche basse, prog*2 = 1 -> easeOutBack(1) = 1
+    // remaining = duration/2 -> prog = 0.5 -> lower branch, prog*2 = 1 -> easeOutBack(1) = 1
     expect(bumperPunchScale(DURATION / 2, DURATION, PEAK)).toBeCloseTo(1 + PEAK, 6);
   });
 
   test('branche haute redescend vers 1', () => {
-    // prog = 0.75 -> env = 1 - (0.25)*2 = 0.5 -> facteur = 1 + peak*0.5
+    // prog = 0.75 -> env = 1 - (0.25)*2 = 0.5 -> factor = 1 + peak*0.5
     const remaining = DURATION * 0.25;
     expect(bumperPunchScale(remaining, DURATION, PEAK)).toBeCloseTo(1 + PEAK * 0.5, 6);
   });
@@ -74,8 +74,8 @@ describe('bumperPunchScale', () => {
   });
 
   test('clamp max(0, env): jamais sous 1', () => {
-    // toute valeur de remaining dans (0, duration) donne env >= 0 dans cette courbe;
-    // vérifie la borne basse au tout début et toute fin
+    // any remaining in (0, duration) yields env >= 0 on this curve;
+    // check the lower bound at the very start and very end
     expect(bumperPunchScale(DURATION * 0.999, DURATION, PEAK)).toBeGreaterThanOrEqual(1);
     expect(bumperPunchScale(DURATION * 0.001, DURATION, PEAK)).toBeGreaterThanOrEqual(1);
   });
@@ -98,8 +98,8 @@ describe('tickPunchTimers', () => {
       [1, 0.04],
     ]);
     tickPunchTimers(timers, 0.05);
-    expect(timers.has(0)).toBe(false); // 0.05 - 0.05 = 0 -> supprimé
-    expect(timers.has(1)).toBe(false); // négatif -> supprimé
+    expect(timers.has(0)).toBe(false); // 0.05 - 0.05 = 0 -> deleted
+    expect(timers.has(1)).toBe(false); // negative -> deleted
   });
 
   test('map vide -> no-op', () => {
@@ -147,7 +147,7 @@ describe('applyPunchScale', () => {
 
   test('part au pic -> baseScale x (1+peak)', () => {
     const t = makeTarget(0, 2);
-    // remaining = duration/2 -> pic -> facteur 1+peak
+    // remaining = duration/2 -> peak -> factor 1+peak
     applyPunchScale([t], new Map([[0, 0.18 / 2]]), 0.18, 0.28);
     expect(t.mesh.scale.x).toBeCloseTo(2 * 1.28, 6);
   });
@@ -157,6 +157,6 @@ describe('applyPunchScale', () => {
     const b = makeTarget(1, 1);
     applyPunchScale([a, b], new Map([[0, 0.18 / 2]]), 0.18, 0.28);
     expect(a.mesh.scale.x).toBeCloseTo(1.28, 6);
-    expect(b.mesh.scale.x).toBeCloseTo(1, 6); // pas de timer -> baseScale
+    expect(b.mesh.scale.x).toBeCloseTo(1, 6); // no timer -> baseScale
   });
 });

@@ -74,14 +74,14 @@ describe('feverBanner', () => {
     const grid = newGrid()
     feverBanner(grid, 9000, 0)
     const used = colorsUsed(grid)
-    // chenillard utilise combo OU multi selon la position
+    // chase uses combo OR multi depending on position
     expect(used.has(DOT.combo) || used.has(DOT.multi)).toBe(true)
     expect(used.has(DOT.event)).toBe(true)
   })
 
   test('affiche "FEVER X5" sur la frame on du clignotement', () => {
-    // floor(0/350)%2===0 → on. On compare le nombre de dots event entre une
-    // frame "on" et une frame "off" pour isoler le texte clignotant.
+    // floor(0/350)%2===0 → on. Compare event dot counts between an "on"
+    // frame and an "off" frame to isolate the blinking text.
     const on = newGrid()
     feverBanner(on, 1000, 0)
     const off = newGrid()
@@ -91,7 +91,7 @@ describe('feverBanner', () => {
 
   test('le score apparaît dans la grille quelle que soit la frame', () => {
     const grid = newGrid()
-    feverBanner(grid, 42, 350) // frame off : pas de FEVER X5, mais le score reste
+    feverBanner(grid, 42, 350) // off frame: no FEVER X5, but the score stays
     expect(countColor(grid, DOT.event)).toBeGreaterThan(0)
   })
 })

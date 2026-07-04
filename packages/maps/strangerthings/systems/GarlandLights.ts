@@ -9,19 +9,19 @@ const TWINKLE_AMP = 0.28;
 const HIT_SURGE_DURATION = 0.3;
 const HIT_SURGE_BOOST = 0.55;
 
-// Largeur (en nombre de bulbes) de la bande lumineuse du décollage rocket.
+// Width (in bulb count) of the rocket-liftoff light band.
 const ROCKET_BAND = 3;
 
-// Position du front lumineux du décollage rocket, indexé sur les bulbes.
-// rocketT décroît de 1 → 0 ; le front monte de -ROCKET_BAND (avant le premier
-// bulbe) jusqu'à count (au-delà du dernier) → balayage complet montant. Pur.
+// Position of the rocket-liftoff light front, indexed on bulbs.
+// rocketT decays 1 → 0; the front rises from -ROCKET_BAND (before the first
+// bulb) to count (past the last) → full upward sweep. Pure.
 export function rocketFront(rocketT: number, count: number): number {
   const progress = 1 - Math.max(0, Math.min(1, rocketT));
   return -ROCKET_BAND + progress * (count + ROCKET_BAND);
 }
 
-// Intensité [0,1] d'un bulbe donné pour un front rocket : 1 au front, décroît
-// linéairement sur ROCKET_BAND en dessous, 0 ailleurs. Pur.
+// Intensity [0,1] of a given bulb for a rocket front: 1 at the front, falls
+// off linearly over ROCKET_BAND below it, 0 elsewhere. Pure.
 export function rocketGlow(index: number, front: number): number {
   const d = front - index;
   if (d < 0 || d > ROCKET_BAND) return 0;
@@ -29,14 +29,13 @@ export function rocketGlow(index: number, front: number): number {
 }
 
 /**
- * Chaque guirlande dans le GLB newStrangerthings.glb possède :
- *  - baseColorTexture  : câble sombre + bulbes colorés
- *  - emissiveTexture   : carte de brillance des bulbes
- *  - emissiveFactor    : [1,1,1] (blanc = multiplicateur neutre)
+ * Each garland in newStrangerthings.glb has:
+ *  - baseColorTexture  : dark cable + colored bulbs
+ *  - emissiveTexture   : bulb glow map
+ *  - emissiveFactor    : [1,1,1] (white = neutral multiplier)
  *
- * On ne remplace PLUS le matériau. On conserve le matériau GLB d'origine
- * et on anime uniquement emissiveIntensity pour le scintillement et les
- * réactions aux événements de jeu.
+ * We NO LONGER replace the material. The original GLB material is kept and
+ * only emissiveIntensity is animated for twinkle and game-event reactions.
  */
 type GarlandBulb = {
   mesh: THREE.Mesh;
@@ -60,19 +59,19 @@ export class GarlandLights {
   private celebrateT = 0;
   private rocketT = 0;
 
-  // Chenillard continu pendant le fever (vague permanente).
+  // Continuous chase during fever (permanent wave).
   setFever(on: boolean): void {
     this.feverActive = on;
   }
 
-  // 1s de chenillard ponctuel (palier franchi).
+  // 1s one-shot chase (milestone crossed).
   celebrate(): void {
     this.celebrateT = 1;
   }
 
-  // Décollage rocket (palier de score) : balayage montant orange/or, cohérent
-  // avec la fusée du backglass/DMD. Remplace le chenillard jaune « celebrate »
-  // sur les paliers pour l'unité rocket cross-écrans.
+  // Rocket liftoff (score milestone): rising orange/gold sweep, matching the
+  // backglass/DMD rocket. Replaces the yellow "celebrate" chase on
+  // milestones for cross-screen rocket consistency.
   rocketBurst(): void {
     this.rocketT = 1;
   }
@@ -161,7 +160,7 @@ export class GarlandLights {
       }
     }
 
-    // Vague (chenillard) — fever continu OU célébration ponctuelle.
+    // Wave (chase) — continuous fever OR one-shot celebration.
     if (this.celebrateT > 0) this.celebrateT = Math.max(0, this.celebrateT - dt);
     if (this.feverActive || this.celebrateT > 0) {
       const speed = this.feverActive ? 6 : 9;
@@ -178,8 +177,8 @@ export class GarlandLights {
       }
     }
 
-    // Décollage rocket (palier) : bande lumineuse orange/or qui remonte les
-    // guirlandes une fois, puis retombe. Cohérent avec la fusée backglass/DMD.
+    // Rocket liftoff (milestone): orange/gold light band climbs the garlands
+    // once, then fades. Matches the backglass/DMD rocket.
     if (this.rocketT > 0) {
       this.rocketT = Math.max(0, this.rocketT - dt);
       const front = rocketFront(this.rocketT, this.bulbs.length);
@@ -191,9 +190,9 @@ export class GarlandLights {
           bulb.material.emissiveIntensity,
           bulb.origIntensity * (0.6 + glow * 2.4),
         );
-        // Flamme de fusée (blanc-chaud → orange vif → rouge), PAS le jaune du
-        // chenillard « celebrate » → lecture « décollage » distincte + cohérente
-        // avec la fusée DMD/backglass.
+        // Rocket flame (warm white → bright orange → red), NOT the yellow of
+        // the "celebrate" chase → distinct "liftoff" read, consistent with
+        // the DMD/backglass rocket.
         bulb.material.emissive.setHex(
           glow > 0.8 ? 0xffffff : glow > 0.5 ? 0xff7a1a : 0xff2200,
         );

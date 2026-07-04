@@ -1,6 +1,6 @@
-// Interpolation de rendu : la physique tourne à 60 steps/s réels mais l'écran
-// peut rafraîchir à 120/144 Hz. Le rendu lerpe la position de la bille entre
-// les deux derniers états physiques — purement visuel, zéro impact simulation.
+// Render interpolation: physics runs at 60 real steps/s but the screen may
+// refresh at 120/144 Hz. Rendering lerps the ball position between the last
+// two physics states — purely visual, zero impact on the simulation.
 
 export interface Vec3Like {
   x: number;
@@ -9,17 +9,17 @@ export interface Vec3Like {
 }
 
 /**
- * Distance max plausible parcourue par la bille en UN step physique :
- * BALL_MAX_SPEED (7 m/s) × SIM_TIMESTEP (1/98 s) ≈ 0.071 m. Au-delà, c'est
- * forcément un téléport externe (setTranslation direct : scoop de map, hold
- * d'intro boss, drag debug, locks stepBallSync) → le rendu doit snapper au
- * lieu de lerper, sinon la bille "streake" à travers le terrain une frame.
+ * Max plausible distance the ball can travel in ONE physics step:
+ * BALL_MAX_SPEED (7 m/s) × SIM_TIMESTEP (1/98 s) ≈ 0.071 m. Anything beyond is
+ * necessarily an external teleport (direct setTranslation: map scoop, boss
+ * intro hold, debug drag, stepBallSync locks) → rendering must snap instead of
+ * lerping, or the ball streaks across the playfield for a frame.
  */
 export const BALL_INTERPOLATION_TELEPORT_DIST = 0.08;
 
 /**
- * Lerp composante par composante, alpha clampé [0,1] (jamais d'extrapolation).
- * Écrit dans `out` fourni par l'appelant — zéro allocation dans le hot path.
+ * Per-component lerp, alpha clamped to [0,1] (never extrapolates).
+ * Writes into the caller-provided `out` — zero allocation in the hot path.
  */
 export function lerpVec3(prev: Vec3Like, curr: Vec3Like, alpha: number, out: Vec3Like): Vec3Like {
   const t = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;

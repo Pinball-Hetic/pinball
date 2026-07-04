@@ -1,9 +1,9 @@
 import { DEFAULT_BOSS_FACE_DIR, type BossCameraCinematicConfig } from '@pinball/game-engine'
 
-// Direction caméra → face du boss (identique à ST pour cohérence).
+// Camera direction → boss face (same as ST for consistency).
 const BOSS_FACE_DIR = DEFAULT_BOSS_FACE_DIR
 
-// ── Ganondorf (monde normal) ──────────────────────────────────────────────
+// ── Ganondorf (normal world) ──────────────────────────────────────────────
 
 export const GANONDORF_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
   lookAtLift: 0.06,

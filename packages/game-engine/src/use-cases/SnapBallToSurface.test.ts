@@ -3,11 +3,11 @@ import { computeSurfaceSnap } from './SnapBallToSurface';
 import { SURFACE_SNAP_THRESHOLD } from '../domain/Ball';
 import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
 
-// Point de jeu valide (centre plateau, hors couloir de lancement).
+// Valid play point (playfield center, outside the shooter lane).
 const X = 0;
 const Z = 0;
 const surfaceY = ballCenterOnSurface(Z);
-// Config couloir injectée (anciennes constantes SHOOTER_LANE_*).
+// Injected lane config.
 const LANE = { leftWallTopZ: -0.28, lockX: 0.19 };
 
 test('snaps a ball that lifted above the threshold', () => {
@@ -49,7 +49,7 @@ test('returns null when within the jitter threshold', () => {
 });
 
 test('returns null inside the straight shooter lane', () => {
-  // z > LEFT_WALL_TOP_Z (-0.28) et x > LOCK_X (0.19) → couloir droit.
+  // z > LEFT_WALL_TOP_Z (-0.28) and x > LOCK_X (0.19) → straight lane.
   const snap = computeSurfaceSnap(
     { x: 0.235, y: 1.2, z: 0.16 },
     { x: 0, y: 5, z: 0 },

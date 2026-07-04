@@ -116,7 +116,7 @@ describe("stepFlipperPhysics", () => {
     stepFlipperPhysics(s, d, STEP);
     expect(s.physPrevLeft).toBe(afterOne);
     expect((s.physLeftSwing - s.physPrevLeft) / STEP).toBeGreaterThan(0);
-    // Cohérence avec l'intégrateur partagé (même modèle que le visuel).
+    // Consistent with the shared integrator (same model as the visual).
     expect(s.physLeftSwing).toBeCloseTo(computeSwingStep(afterOne, 1, STEP), 10);
   });
 

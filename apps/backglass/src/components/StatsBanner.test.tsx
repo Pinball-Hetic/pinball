@@ -37,7 +37,7 @@ describe('StatsBanner', () => {
   })
 
   test('totalGames undefined/null → fmt rend 0 (pas de crash)', () => {
-    // Défense en profondeur : stat manquante = "0".
+    // Defense in depth: missing stat = "0".
     render(
       <StatsBanner
         stats={baseStats({ totalGames: undefined as unknown as number })}
@@ -48,8 +48,8 @@ describe('StatsBanner', () => {
   })
 
   test('dernier slide invitation quand aucune entrée rang 10', () => {
-    // idx démarre à 0 (PARTIES JOUÉES). On vérifie via rotation : voir test suivant.
-    // Ici on vérifie juste que le composant rend sans 10e entrée.
+    // idx starts at 0 (PARTIES JOUÉES). Verified via rotation: see next test.
+    // Here we only check the component renders without a 10th entry.
     const { container } = render(<StatsBanner stats={baseStats()} entries={[]} />)
     expect(container.querySelector('.stats-banner')).toBeDefined()
   })
@@ -60,7 +60,7 @@ describe('StatsBanner', () => {
       bestToday: { score: 9999, player: 'TRINITY' },
     })
     render(<StatsBanner stats={stats} entries={[]} />)
-    // idx démarre à 0 → PARTIES JOUÉES toujours visible au montage.
+    // idx starts at 0 → PARTIES JOUÉES always visible at mount.
     expect(screen.getByText(/PARTIES JOUÉES/)).toBeDefined()
   })
 
@@ -74,7 +74,7 @@ describe('StatsBanner', () => {
 
   test('rend le placeholder QrSlot (BIENTÔT)', () => {
     const { container } = render(<StatsBanner stats={baseStats()} entries={[]} />)
-    // Le texte est scindé par un <br/> ; on cible le conteneur.
+    // The text is split by a <br/>; target the container.
     expect(container.querySelector('.qr-caption')!.textContent).toContain('BIENTÔT')
   })
 

@@ -1,8 +1,8 @@
 interface QrSlotProps {
-  url?: string // branchement futur (feature site web)
+  url?: string // future wiring (website feature)
 }
 
-// Placeholder : PAS de vraie lib QR. Motif décoratif + invitation.
+// Placeholder: NO real QR lib. Decorative pattern + invitation.
 export default function QrSlot({ url }: QrSlotProps) {
   void url
   return (

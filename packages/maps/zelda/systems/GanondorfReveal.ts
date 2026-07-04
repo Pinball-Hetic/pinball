@@ -21,7 +21,7 @@ const FIGHT_FLICKER_HZ = 3;
 const FIGHT_FLASH_MIX = 0.45;
 const FLASH_INTENSITY = 1.5;
 
-// Flash violet Ganondorf.
+// Ganondorf purple flash.
 const FLASH_COLOR = 0x9900ff;
 
 export type GanondorfSetup = {
@@ -83,9 +83,9 @@ export class GanondorfReveal implements BossRevealController {
     if (this.targetGroup) await renderer.compileAsync(this.targetGroup, camera, scene);
   }
 
-  // PointLights ajoutées dynamiquement pendant le combat : flash strobe +
-  // glow de Ganondorf + lumière de la cible. Sert au prewarm des variantes de
-  // shaders au preload (cf. BossRevealOrchestrator.preloadAll).
+  // PointLights added dynamically during the fight: strobe flash +
+  // Ganondorf glow + target light. Used to prewarm shader variants at
+  // preload (see BossRevealOrchestrator.preloadAll).
   dynamicPointLightCount(): number {
     return 3;
   }
@@ -160,7 +160,7 @@ export class GanondorfReveal implements BossRevealController {
     if (d.phase === 'idle') return;
 
     if (d.phase === 'blackout') {
-      // Flash violet sans voile noir.
+      // Purple flash without black veil.
       this.cinematicStrobe.applyFlashOnly(d.on, d.blackoutMix);
       return;
     }
@@ -175,7 +175,7 @@ export class GanondorfReveal implements BossRevealController {
     }
 
     if (d.phase === 'flicker') {
-      // Pas de shade, seulement le flash violet au rythme du flicker.
+      // No shade, only the purple flash at the flicker rhythm.
       this.cinematicStrobe.applyFightFlicker(0, d.flickerBlink ? FIGHT_FLASH_MIX : 0);
       return;
     }
@@ -194,7 +194,7 @@ export class GanondorfReveal implements BossRevealController {
         this.resetAtmosphere();
         return;
       }
-      // Pas de shade pendant la restauration.
+      // No shade during restore.
       this.cinematicStrobe.stop();
     }
   }

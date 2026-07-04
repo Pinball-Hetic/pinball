@@ -9,7 +9,7 @@ const LAUNCHER_LANE_MESH_NAMES = new Set([
   'separator_right',
 ]);
 
-/** Bornes Z du couloir plongeur depuis le GLB (fallback = anciennes constantes). */
+/** Shooter-lane Z bounds from the GLB (fallback = legacy constants). */
 export function computeLauncherLaneZBounds(playfieldRoot: THREE.Object3D): {
   minZ: number;
   maxZ: number;

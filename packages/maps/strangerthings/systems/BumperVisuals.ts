@@ -26,16 +26,16 @@ const IDLE_PULSE_SPEED = 1.35;
 const IDLE_PULSE_AMP = 0.18;
 const HIT_FLASH_DURATION = 0.2;
 const HIT_FLASH_BOOST = 1.1;
-const PUNCH_DURATION = 0.15; // durée du pop en secondes
-const PUNCH_PEAK = 0.20; // ampleur : 0.20 = grossit à 1.20×
+const PUNCH_DURATION = 0.15; // pop duration in seconds
+const PUNCH_PEAK = 0.20; // amplitude: 0.20 = grows to 1.20×
 
 const _emissiveA = new THREE.Color();
 const _emissiveB = new THREE.Color();
 
 type BumperKind = 'gltf' | 'base' | 'ring';
 
-// Ordre = ancien if/else (première règle gagnante) : legacy hide, puis gltf,
-// puis base, puis ring.
+// Order matters (first matching rule wins): legacy hide, then gltf,
+// then base, then ring.
 const MATCH_RULES: readonly BumperMatchRule<BumperKind>[] = [
   { pattern: LEGACY_BUMPER, result: { action: 'hide' } },
   { pattern: GLTF_BUMPER, result: { action: 'part', kind: 'gltf' } },
@@ -50,7 +50,7 @@ type BumperPart = {
   material: THREE.MeshStandardMaterial;
   bumperIndex: number;
   kind: BumperKind;
-  glow: GlowSprite | null; // remplace l'ancienne PointLight (coût shader nul)
+  glow: GlowSprite | null; // replaces the former PointLight (zero shader cost)
   glowColor: number;
   baseIntensity: number;
   baseScale: THREE.Vector3;
@@ -148,9 +148,9 @@ export class BumperVisuals {
       };
     });
 
-    // Échoue bruyamment : si aucun mesh n'a matché (ex. convention de nommage
-    // GLB changée), tous les effets bumper sont silencieusement morts. On le
-    // signale plutôt que de laisser croire que l'animation est branchée.
+    // Fail loudly: if no mesh matched (e.g. GLB naming convention changed),
+    // all bumper effects are silently dead. Report it rather than pretend
+    // the animation is wired.
     if (this.parts.length === 0) {
       console.warn(
         '[BumperVisuals] aucun mesh bumper reconnu (GLTF_BUMPER/LEGACY_*) — ' +
@@ -170,7 +170,7 @@ export class BumperVisuals {
 
     tickPunchTimers(this.hitTimers, dt);
 
-    // Scale punch (mesh visuel uniquement, colliders inchangés).
+    // Scale punch (visual mesh only, colliders unchanged).
     tickPunchTimers(this.punchTimers, dt);
     applyPunchScale(this.parts, this.punchTimers, PUNCH_DURATION, PUNCH_PEAK);
 
@@ -210,7 +210,7 @@ export class BumperVisuals {
 
         if (part.glow) {
           part.glow.setColor(upsideDown && strobeFlash > 0.45 ? 0xff2244 : BUMPER_LIGHT_COLOR);
-          // opacité ∝ ancienne intensité lumière (normalisée), pulse en scale.
+          // opacity ∝ former light intensity (normalized), pulse via scale.
           const v = (BUMPER_LIGHT_INTENSITY * slowBreath + hitFactor * 0.35) * moodMul;
           part.glow.set(Math.min(1, v * 0.55), 0.9 + hitFactor * 0.5);
         }
@@ -236,8 +236,8 @@ export class BumperVisuals {
   }
 
   dispose(): void {
-    // Remet les scales à leur valeur d'origine avant de vider (parité Zelda) :
-    // sinon un bumper disposé en plein punch reste agrandi.
+    // Restore scales to their original value before clearing: otherwise a
+    // bumper disposed mid-punch stays enlarged.
     for (const part of this.parts) {
       part.mesh.scale.copy(part.baseScale);
       part.glow?.dispose();

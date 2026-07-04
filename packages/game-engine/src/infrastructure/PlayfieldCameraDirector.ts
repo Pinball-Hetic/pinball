@@ -145,11 +145,11 @@ export class PlayfieldCameraDirector {
   }
 
   private finish(): void {
-    // Pas de applyView ici : `finish()` n'est appelé que par `update()` sur la
-    // tick finale de zoomOut, où `blend = { lookAtT: 1, distanceT: 1, dirT: 0 }`.
-    // Cette tick a déjà exécuté `applyView(base.target, base.distance)` (lerp à
-    // t=1 → base exact, lerpViewDir(0) → dir de base) ; le rejouer était un
-    // no-op prouvable. `restore()` conserve son applyView (chemin indépendant).
+    // No applyView here: `finish()` is only called by `update()` on the final
+    // zoomOut tick, where `blend = { lookAtT: 1, distanceT: 1, dirT: 0 }`. That
+    // tick already ran `applyView(base.target, base.distance)` (lerp at t=1 →
+    // exact base, lerpViewDir(0) → base dir); replaying it is a provable no-op.
+    // `restore()` keeps its own applyView (independent path).
     this.resetState();
   }
 

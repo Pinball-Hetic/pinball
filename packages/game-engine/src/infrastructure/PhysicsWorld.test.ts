@@ -3,7 +3,7 @@ import { PhysicsWorld } from './PhysicsWorld';
 
 const STEP = 1 / 60;
 
-/** Joue `seconds` de temps réel à `fps` et renvoie le nombre total de steps. */
+/** Plays `seconds` of real time at `fps` and returns the total step count. */
 function simulateSteps(fps: number, seconds: number): number {
   const dt = 1 / fps;
   const frames = Math.round(fps * seconds);
@@ -49,7 +49,7 @@ test('interpolation alpha: fraction of the way to the next step, clamped [0,1]',
   expect(PhysicsWorld.interpolationAlphaFor(0)).toBe(0);
   expect(PhysicsWorld.interpolationAlphaFor(STEP / 2)).toBeCloseTo(0.5, 6);
   expect(PhysicsWorld.interpolationAlphaFor(STEP)).toBe(1);
-  // Hors bornes (backlog résiduel / valeur négative) → clamp, jamais d'extrapolation.
+  // Out of bounds (residual backlog / negative value) → clamp, never extrapolate.
   expect(PhysicsWorld.interpolationAlphaFor(STEP * 3)).toBe(1);
   expect(PhysicsWorld.interpolationAlphaFor(-STEP)).toBe(0);
 });
@@ -59,9 +59,9 @@ test('STEP_INTERVAL exposé = 1/60 (contrat des cibles kinématiques par step)',
 });
 
 test('hooks : onBeforeStep AVANT chaque step, onStep après, onAfterSteps une fois', () => {
-  // Monde stubé (pas de WASM sous bun test) : on ne vérifie que l'ordonnancement
-  // de update(), qui est le contrat anti-tunneling (cible kinématique posée
-  // avant que Rapier n'en infère la vitesse).
+  // Stubbed world (no WASM under bun test): we only check update()'s ordering,
+  // which is the anti-tunneling contract (kinematic target set before Rapier
+  // infers its velocity).
   const calls: string[] = [];
   const pw = Object.create(PhysicsWorld.prototype) as PhysicsWorld;
   Object.assign(pw, {
@@ -71,7 +71,7 @@ test('hooks : onBeforeStep AVANT chaque step, onStep après, onAfterSteps une fo
     timeScale: 1,
     crashed: false,
   });
-  // 2 intervalles (+epsilon flottant) → exactement 2 steps.
+  // 2 intervals (+float epsilon) → exactly 2 steps.
   pw.update(2 * STEP + 1e-9, {
     onBeforeStep: () => calls.push('before'),
     onStep: () => calls.push('after-step'),
@@ -85,7 +85,7 @@ test('hooks : onBeforeStep AVANT chaque step, onStep après, onAfterSteps une fo
 });
 
 test('caps steps per frame (anti spiral-of-death) on a huge dt spike', () => {
-  // 10 s d'un coup (onglet refocus) → borné à 5 steps, pas une avalanche.
+  // 10 s at once (tab refocus) → capped at 5 steps, not an avalanche.
   const { steps, remainder } = PhysicsWorld.planSteps(10);
   expect(steps).toBe(5);
   expect(remainder).toBeLessThan(STEP);

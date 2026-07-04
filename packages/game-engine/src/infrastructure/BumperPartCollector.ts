@@ -8,9 +8,9 @@ import {
 } from '../domain/BumperVisualMath';
 
 /**
- * Contexte passé au callback `build` pour chaque mesh bumper reconnu :
- * le mesh, sa catégorie résolue (`kind`), l'index de bumper de layout le
- * plus proche (position monde) et sa scale d'origine clonée.
+ * Context passed to the `build` callback for each recognized bumper mesh:
+ * the mesh, its resolved category (`kind`), the nearest layout bumper index
+ * (world position) and its cloned original scale.
  */
 export interface BumperPartContext<K extends string> {
   mesh: THREE.Mesh;
@@ -20,13 +20,13 @@ export interface BumperPartContext<K extends string> {
 }
 
 /**
- * Traverse `root` et construit la liste des "parts" bumper via le matcher
- * configurable (`rules`) partagé. Logique commune ST/Zelda extraite verbatim :
- * - `hide` : masque le nœud (et ses descendants) sans créer de part.
- * - `part` : sur un THREE.Mesh, calcule l'index bumper le plus proche +
- *   capture `baseScale`, puis délègue à `build` la construction du part map-spécifique.
+ * Traverses `root` and builds the bumper "parts" list via the shared
+ * configurable matcher (`rules`). Common ST/Zelda logic:
+ * - `hide`: hides the node (and its descendants) without creating a part.
+ * - `part`: on a THREE.Mesh, computes the nearest bumper index + captures
+ *   `baseScale`, then delegates the map-specific part construction to `build`.
  *
- * `build` peut retourner `null` pour ignorer (parité avec le `continue` implicite).
+ * `build` may return `null` to skip.
  */
 export function collectBumperParts<K extends string, P>(
   root: THREE.Object3D,

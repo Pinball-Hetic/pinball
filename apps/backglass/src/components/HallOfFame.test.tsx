@@ -14,7 +14,7 @@ const entry = (over: Partial<LeaderboardEntry> = {}): LeaderboardEntry => ({
   ...over,
 })
 
-// Reactor factice : on capture le listener pour pouvoir émettre à la main.
+// Fake reactor: capture the listener so we can emit by hand.
 function fakeReactor(): { reactor: Reactor; emit: (r: Reaction) => void } {
   const listeners = new Set<(r: Reaction) => void>()
   return {
@@ -45,7 +45,7 @@ describe('HallOfFame', () => {
   test('rend une entrée réelle avec nom et score formaté fr-FR', () => {
     render(<HallOfFame entries={[entry({ name: 'BOB', score: 1234567 })]} />)
     expect(screen.getByText('BOB')).toBeDefined()
-    // 1234567 → "1 234 567" (espaces insécables fr-FR)
+    // 1234567 → "1 234 567" (fr-FR non-breaking spaces)
     expect(screen.getByText(/1\s234\s567/)).toBeDefined()
   })
 
@@ -69,7 +69,7 @@ describe('HallOfFame', () => {
     expect(container.querySelectorAll('.hof-gold').length).toBe(1)
     expect(container.querySelectorAll('.hof-silver').length).toBe(1)
     expect(container.querySelectorAll('.hof-bronze').length).toBe(1)
-    // rang 4 : aucune classe médaille
+    // rank 4: no medal class
     const dRow = screen.getByText('D').closest('.hof-row')!
     expect(dRow.className).not.toContain('hof-gold')
   })
@@ -97,7 +97,7 @@ describe('HallOfFame', () => {
   })
 
   test('date invalide → shortDate ne crash pas (rend la ligne)', () => {
-    // new Date("nope") donne NaN → getDate() = NaN → "NaN" padStart, pas de throw.
+    // new Date("nope") gives NaN → getDate() = NaN → "NaN" padStart, no throw.
     render(<HallOfFame entries={[entry({ name: 'ZED', date: 'not-a-date' })]} />)
     expect(screen.getByText('ZED')).toBeDefined()
   })
@@ -118,10 +118,10 @@ describe('HallOfFame', () => {
     expect(container.querySelector('.hof')!.className).not.toContain('hof-shake')
   })
 
-  // Régression : anonName (server) génère des pseudos "PLAYERxxxx" pouvant
-  // entrer en collision → deux entrées de rangs différents peuvent partager
-  // le même `name`. La key React doit rester unique (basée sur rank), sinon
-  // React râle "same key" et fusionne/glitch les lignes.
+  // Regression: anonName (server) generates "PLAYERxxxx" names that can
+  // collide → two entries with different ranks may share the same `name`.
+  // The React key must stay unique (rank-based), otherwise React complains
+  // "same key" and merges/glitches the rows.
   test('noms dupliqués (collisions anonName) : keys uniques, pas de warning React', () => {
     const errSpy = spyOn(console, 'error').mockImplementation(() => {})
     try {
@@ -134,9 +134,9 @@ describe('HallOfFame', () => {
           ]}
         />,
       )
-      // Les 3 lignes réelles sont rendues distinctement (positionnées par rang).
+      // The 3 real rows render distinctly (positioned by rank).
       expect(container.querySelectorAll('.hof-row:not(.hof-ghost)').length).toBe(3)
-      // Aucun warning React de type "same key" / "unique key".
+      // No React "same key" / "unique key" warning.
       const keyWarning = errSpy.mock.calls.some((args) =>
         args.some(
           (a) =>

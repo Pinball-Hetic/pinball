@@ -66,7 +66,7 @@ describe('cinematicZoomDistance', () => {
   });
 
   test('valeur exactement au minimum reste au minimum', () => {
-    // base*scale*mul == DISTANCE_MIN (mul=1 en non-portrait)
+    // base*scale*mul == DISTANCE_MIN (mul=1 when not portrait)
     expect(cinematicZoomDistance(CAMERA_CINEMATIC_DISTANCE_MIN, 1, false)).toBe(
       CAMERA_CINEMATIC_DISTANCE_MIN,
     );

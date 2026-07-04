@@ -2,9 +2,9 @@ import { test, expect, describe, mock, beforeEach } from 'bun:test';
 import { surfaceYAtZ, resetSurfaceCoefficients } from '../domain/PlayfieldGeometry';
 
 // ── Mock RAPIER (wasm) ───────────────────────────────────────────────────────
-// On évite d'initialiser le module natif : seules les fabriques de descripteurs
-// sont utilisées par ShooterLaneGate. On capture les arguments via des stubs
-// chaînables pour vérifier la géométrie du portail.
+// Avoid initializing the native module: ShooterLaneGate only uses the
+// descriptor factories. Capture the arguments via chainable stubs to check the
+// gate geometry.
 type Captured = {
   translation?: { x: number; y: number; z: number };
   rotation?: { x: number; y: number; z: number; w: number };
@@ -198,7 +198,7 @@ describe('ShooterLaneGate', () => {
 
     expect(gate.isClosed()).toBe(false);
     expect(world.removedColliders).toHaveLength(1);
-    // Après dispose le world est null : un nouveau close() ne crée rien.
+    // After dispose the world is null: a new close() creates nothing.
     gate.close();
     expect(world.createdBodies).toBe(1);
   });

@@ -1,27 +1,27 @@
 import type { DotColor } from '@pinball/dmd-core'
 
-// Palette normale Zelda (monde Hyrule) — vert émeraude + or + bleu.
-// Remplace la palette orange/rouge de ST par défaut.
+// Zelda normal palette (Hyrule world) — emerald green + gold + blue.
+// Replaces the default ST orange/red palette.
 export const PALETTE_ZELDA: Record<DotColor, string> = {
-  score:    '#22cc44', // vert émeraude — chiffres du score
-  lives:    '#FFD700', // or — cœurs / vies
-  heticOn:  '#FFD700', // or — lettre HETIC allumée
-  heticOff: '#0a1a00', // vert très sombre — lettre HETIC éteinte
-  combo:    '#FFD700', // or — combo flash
-  multi:    '#4a80ff', // bleu saphir — multiplicateur
-  event:    '#FFD700', // or — libellé d'event
-  gameOver: '#ff453a', // rouge rubis — game over
-  marquee:  '#22cc44', // vert — marquee / titres
-  rain:     '#1a7a30', // vert foncé — pluie de fond
-  rainGo:   '#FFD700', // or — burst de sortie
+  score:    '#22cc44', // emerald green — score digits
+  lives:    '#FFD700', // gold — hearts / lives
+  heticOn:  '#FFD700', // gold — lit HETIC letter
+  heticOff: '#0a1a00', // very dark green — unlit HETIC letter
+  combo:    '#FFD700', // gold — combo flash
+  multi:    '#4a80ff', // sapphire blue — multiplier
+  event:    '#FFD700', // gold — event label
+  gameOver: '#ff453a', // ruby red — game over
+  marquee:  '#22cc44', // green — marquee / titles
+  rain:     '#1a7a30', // dark green — background rain
+  rainGo:   '#FFD700', // gold — exit burst
 }
 
-// Palette du Sacred Realm (vert lumineux / or vif) — appliquée quand
-// display.alternateWorld est actif (monde altéré).
+// Sacred Realm palette (luminous green / vivid gold) — applied when
+// display.alternateWorld is active.
 export const PALETTE_SACRED_REALM: Record<DotColor, string> = {
-  score:    '#B8F59A', // vert clair intense
-  lives:    '#FFD700', // or
-  heticOn:  '#AAFF55', // vert-jaune vif
+  score:    '#B8F59A', // intense light green
+  lives:    '#FFD700', // gold
+  heticOn:  '#AAFF55', // bright yellow-green
   heticOff: '#0F2200',
   combo:    '#44FF88',
   multi:    '#88FFAA',

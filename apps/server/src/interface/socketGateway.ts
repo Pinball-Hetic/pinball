@@ -23,9 +23,9 @@ const RELAY_EVENTS = [
   'dev:trigger-game-event',
 ] as const satisfies readonly (keyof ClientToServerEvents & keyof ServerToClientEvents)[];
 
-// Narrow structural seams (DIP): only the members the connection handler
-// actually touches. Both the real socket.io `Server`/`Socket` (composition
-// root) AND the unit-test fakes satisfy these — no `as unknown` double-cast.
+// Narrow structural seams: only the members the connection handler touches.
+// Both the real socket.io `Server`/`Socket` AND the unit-test fakes satisfy
+// these — no `as unknown` double-cast.
 //
 // Listeners/emitters are typed against the event maps so payloads stay
 // inferred. The signatures are deliberately wide enough (a single broad
@@ -57,7 +57,7 @@ export interface SocketLike extends Emitter<ServerToClientEvents> {
 }
 
 /**
- * Collaborators the socket gateway needs. Injected (DIP) so the connection
+ * Collaborators the socket gateway needs. Injected so the connection
  * handler is unit-testable with fakes — no prisma, no module mocking.
  */
 export interface SocketGatewayDeps {
@@ -93,7 +93,7 @@ export function createSocketGateway(deps: SocketGatewayDeps) {
       io.emit('map:selected', { mapId });
     });
 
-    // Data-driven relays (OCP/DRY): each just logs + broadcasts verbatim.
+    // Data-driven relays: each just logs + broadcasts verbatim.
     for (const event of RELAY_EVENTS) {
       socket.on(event, (...args: unknown[]) => {
         console.log('[server]', event, '→ broadcast');

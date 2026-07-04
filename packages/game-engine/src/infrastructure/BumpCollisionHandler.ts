@@ -15,8 +15,8 @@ export class BumpCollisionHandler implements CollisionHandler {
   constructor(
     private readonly pendingPhysics: Array<() => void>,
     private readonly bumpHitUC: BumpHit,
-    // Injected clock (DIP): defaults to performance.now in production, a
-    // controllable fake in tests — no global monkey-patch needed.
+    // Injected clock: tests pass a controllable fake — no global
+    // monkey-patch needed.
     private readonly now: () => number = () => performance.now(),
   ) {}
 
