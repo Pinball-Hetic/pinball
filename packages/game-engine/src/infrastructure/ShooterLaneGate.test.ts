@@ -1,84 +1,32 @@
-import { test, expect, describe, mock, beforeAll, afterAll, beforeEach } from 'bun:test';
-import * as actualRapier from '@dimforge/rapier3d-compat';
+import { test, expect, describe, beforeAll, beforeEach } from 'bun:test';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import { surfaceYAtZ, resetSurfaceCoefficients } from '../domain/PlayfieldGeometry';
 
-// ── Mock RAPIER (wasm) ───────────────────────────────────────────────────────
-// Avoid initializing the native module: ShooterLaneGate only uses the
-// descriptor factories. Capture the arguments via chainable stubs to check the
-// gate geometry.
-type Captured = {
-  translation?: { x: number; y: number; z: number };
-  rotation?: { x: number; y: number; z: number; w: number };
-  cuboid?: { hx: number; hy: number; hz: number };
-  restitution?: number;
-  friction?: number;
-};
-
-let captured: Captured;
-
-function makeRigidBodyDesc() {
-  const desc = {
-    setTranslation(x: number, y: number, z: number) {
-      captured.translation = { x, y, z };
-      return desc;
-    },
-    setRotation(r: { x: number; y: number; z: number; w: number }) {
-      captured.rotation = r;
-      return desc;
-    },
-  };
-  return desc;
-}
-
-function makeColliderDesc() {
-  const desc = {
-    setRestitution(v: number) {
-      captured.restitution = v;
-      return desc;
-    },
-    setFriction(v: number) {
-      captured.friction = v;
-      return desc;
-    },
-  };
-  return desc;
-}
-
-const rapierStub = {
-  RigidBodyDesc: {
-    fixed: () => makeRigidBodyDesc(),
-  },
-  ColliderDesc: {
-    cuboid: (hx: number, hy: number, hz: number) => {
-      captured.cuboid = { hx, hy, hz };
-      return makeColliderDesc();
-    },
-  },
-};
-// bun's mock.module is process-global and persists across test files. Scope it
-// to this file's lifecycle so it can't poison sibling files (PlungerPhysics /
-// FlipperHullBody rely on the real Rapier). Expose the factories as named
-// exports (the SUT uses `import * as RAPIER`) and under default.
-beforeAll(() => {
-  mock.module('@dimforge/rapier3d-compat', () => ({ ...rapierStub, default: rapierStub }));
-});
-afterAll(() => {
-  mock.module('@dimforge/rapier3d-compat', () => ({ ...actualRapier, default: actualRapier }));
+// Use the real Rapier descriptor builders (no mock.module — bun's is
+// process-global and would poison sibling test files). A capturing stub world
+// records the descriptors so we can assert the gate geometry off their real
+// properties.
+beforeAll(async () => {
+  await RAPIER.init();
 });
 
-// ── Stub world ───────────────────────────────────────────────────────────────
+// ── Capturing stub world ─────────────────────────────────────────────────────
 class FakeWorld {
   createdBodies = 0;
   createdColliders = 0;
+  lastBodyDesc: RAPIER.RigidBodyDesc | null = null;
+  lastColliderDesc: RAPIER.ColliderDesc | null = null;
   removedColliders: Array<{ collider: unknown; wakeUp: boolean }> = [];
   removedBodies: unknown[] = [];
 
-  createRigidBody(_desc: unknown) {
+  createRigidBody(desc: RAPIER.RigidBodyDesc) {
     this.createdBodies += 1;
+    this.lastBodyDesc = desc;
     return { __body: true, id: this.createdBodies };
   }
-  createCollider(_desc: unknown, _body: unknown) {
+  createCollider(desc: RAPIER.ColliderDesc, _body: unknown) {
     this.createdColliders += 1;
+    this.lastColliderDesc = desc;
     return { __collider: true, id: this.createdColliders };
   }
   removeCollider(collider: unknown, wakeUp: boolean) {
@@ -104,7 +52,6 @@ async function loadGate() {
 }
 
 beforeEach(() => {
-  captured = {};
   resetSurfaceCoefficients();
 });
 
@@ -222,9 +169,10 @@ describe('ShooterLaneGate', () => {
       gate.close();
 
       const inset = 0.005;
-      expect(captured.translation!.x).toBeCloseTo(LANE.xMin + inset, 6);
+      const t = world.lastBodyDesc!.translation;
+      expect(t.x).toBeCloseTo(LANE.xMin + inset, 6);
       const midZ = (LANE.topZ + LANE.leftWallTopZ) / 2;
-      expect(captured.translation!.z).toBeCloseTo(midZ, 6);
+      expect(t.z).toBeCloseTo(midZ, 6);
     });
 
     test('hauteur Y = milieu surface + moitié de wallHeight', async () => {
@@ -238,7 +186,7 @@ describe('ShooterLaneGate', () => {
       const yTop = surfaceYAtZ(LANE.topZ);
       const yBot = surfaceYAtZ(LANE.leftWallTopZ);
       const expectedY = (yTop + yBot) / 2 + LANE.wallHeight / 2;
-      expect(captured.translation!.y).toBeCloseTo(expectedY, 6);
+      expect(world.lastBodyDesc!.translation.y).toBeCloseTo(expectedY, 6);
     });
 
     test('demi-dimensions cuboid = thickness/2, wallHeight/2, halfZ', async () => {
@@ -250,9 +198,11 @@ describe('ShooterLaneGate', () => {
       gate.close();
 
       const halfZ = (LANE.leftWallTopZ - LANE.topZ) / 2;
-      expect(captured.cuboid!.hx).toBeCloseTo(0.01 / 2, 6);
-      expect(captured.cuboid!.hy).toBeCloseTo(LANE.wallHeight / 2, 6);
-      expect(captured.cuboid!.hz).toBeCloseTo(halfZ, 6);
+      const he = (world.lastColliderDesc!.shape as { halfExtents: { x: number; y: number; z: number } })
+        .halfExtents;
+      expect(he.x).toBeCloseTo(0.01 / 2, 6);
+      expect(he.y).toBeCloseTo(LANE.wallHeight / 2, 6);
+      expect(he.z).toBeCloseTo(halfZ, 6);
     });
 
     test('applique restitution et friction du lane', async () => {
@@ -263,8 +213,8 @@ describe('ShooterLaneGate', () => {
 
       gate.close();
 
-      expect(captured.restitution).toBe(LANE.restitution);
-      expect(captured.friction).toBe(LANE.friction);
+      expect(world.lastColliderDesc!.restitution).toBe(LANE.restitution);
+      expect(world.lastColliderDesc!.friction).toBe(LANE.friction);
     });
 
     test('rotation = quaternion d inclinaison autour de X (tilt du tapis)', async () => {
@@ -278,10 +228,11 @@ describe('ShooterLaneGate', () => {
       const yTop = surfaceYAtZ(LANE.topZ);
       const yBot = surfaceYAtZ(LANE.leftWallTopZ);
       const tilt = Math.atan2(yTop - yBot, LANE.leftWallTopZ - LANE.topZ);
-      expect(captured.rotation!.x).toBeCloseTo(Math.sin(tilt / 2), 6);
-      expect(captured.rotation!.y).toBe(0);
-      expect(captured.rotation!.z).toBe(0);
-      expect(captured.rotation!.w).toBeCloseTo(Math.cos(tilt / 2), 6);
+      const r = world.lastBodyDesc!.rotation;
+      expect(r.x).toBeCloseTo(Math.sin(tilt / 2), 6);
+      expect(r.y).toBeCloseTo(0, 6);
+      expect(r.z).toBeCloseTo(0, 6);
+      expect(r.w).toBeCloseTo(Math.cos(tilt / 2), 6);
     });
   });
 });
