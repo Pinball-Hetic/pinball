@@ -15,20 +15,16 @@ import type { GameState } from "@/hooks/useGameState";
 type KeyboardMode = "direct" | "simulate-esp32" | "disabled";
 type Bosses = ResolvedMap["layout"]["bosses"];
 
-// Ball-reset cheat-code buttons: the 3 left-facade buttons (not mapped to a
-// game action) pressed TOGETHER → ball reset. Cabinet rescue when the ball is
-// stuck out of the stuck-detector's reach.
+// Cheat code: 3 unmapped left-facade buttons pressed together → ball reset.
+// Cabinet rescue when the ball is stuck out of the stuck-detector's reach.
 export const RESET_CHORD: readonly ButtonId[] = [
   "FRONT_LEFT_GREEN",
   "FRONT_LEFT_YELLOW",
   "FRONT_LEFT_RED",
 ];
 
-/**
- * Chord detector: tracks DOWN/UP state of the given buttons and fires
- * `onFire` on the RISING edge of "all pressed". Does not re-fire until at
- * least one button is released (no repeat while held).
- */
+// Fires on the RISING edge of "all pressed"; re-arms only once a button is
+// released (no repeat while held).
 export function createButtonChord(ids: readonly ButtonId[], onFire: () => void) {
   const down = new Set<ButtonId>();
   let fired = false;
@@ -53,16 +49,12 @@ export interface PhysicalInputHandlersDeps {
   /** live — assigned after gameplay wiring; required for debug boss triggers */
   getCollisionProcessor: () => CollisionEventProcessor | null;
   getGameState: () => GameState;
-  /** RESET_CHORD cheat code (3 left-facade buttons together) → ball reset */
   onCheatReset: () => void;
 }
 
-// Handlers for physical network events (input:*). onButton translates the
-// physical id → game action via BUTTON_ACTION (drops unmapped ids) then
-// delegates to applyAction (single source of truth). onDevEvent injects into
-// the EXISTING emit → full chain (cinematics, freeze, DMD, backglass);
-// DRAIN/BOTTOM_OUT go through the real use-cases. Tilt/sensor: logged only
-// (logic not implemented — Fliphetic TODO).
+// Handlers for physical network events (input:*). onDevEvent reuses the real
+// emit chain (cinematics/freeze/DMD/backglass, use-cases for DRAIN/BOTTOM_OUT).
+// Tilt/sensor: logged only — logic not implemented (Fliphetic TODO).
 export function createPhysicalInputHandlers(d: PhysicalInputHandlersDeps) {
   const resetChord = createButtonChord(RESET_CHORD, d.onCheatReset);
   return {

@@ -2,9 +2,7 @@ import type { GameAction, ButtonAction } from "@pinball/shared-types";
 import type { GameState } from "@/hooks/useGameState";
 import { createPlungerInput, type PlungerInput } from "./createPlungerInput";
 
-// Mutable input state SHARED between the action router (createApplyAction)
-// and the animate loop (flipper swing + plunger physics). Single object owned
-// by the init closure.
+// Mutable state shared with the animate loop (flipper swing + plunger physics).
 export type PlungerState = "idle" | "charging" | "releasing" | "returning";
 
 export interface InputState {
@@ -35,17 +33,14 @@ export interface ApplyActionDeps {
   isPhysicsReady: () => boolean;
   getGameState: () => GameState;
   beginSession: () => void;
-  /** plunger.startCharge(t) */
   startPlungerCharge: (t: number) => void;
-  /** launchBallUC?.execute(factor) */
   launchBall: (factor: number) => void;
   setPlungerCharge: (v: number | null) => void;
-  /** outro/game-over exit → reload → map selector */
+  /** game-over exit → reload → map selector */
   restartWorkflow: () => void;
   debugLog: (...args: unknown[]) => void;
 }
 
-// Actions that can start a session before it began (DOWN + physics ready).
 const SESSION_START_ACTIONS: ReadonlySet<GameAction> = new Set(["PLUNGE", "START"]);
 
 // Injected deps bundled so handlers stay pure functions of (btnAction, ctx).
@@ -95,14 +90,10 @@ const ACTION_HANDLERS: Record<GameAction, (btnAction: ButtonAction, ctx: ActionC
 };
 
 /**
- * Translates a game action (FLIP_LEFT/RIGHT, PLUNGE, START) into game-loop
- * effects. SINGLE source of truth for input effects — called by
- * `input:button` network events as well as the dev keyboard. Keyed on the
- * ACTION (not the physical id); the ButtonId→GameAction adapter lives
- * upstream.
- *
- * No Three.js / React dependency: all collaboration goes through `deps`
- * (state getters, callbacks, injected clock).
+ * Single source of truth for input effects: same path for `input:button`
+ * network events and the dev keyboard. Keyed on the ACTION, not the physical id
+ * (the ButtonId→GameAction adapter lives upstream). No Three.js/React — all
+ * collaboration goes through injected `deps`.
  */
 export function createApplyAction(deps: ApplyActionDeps) {
   const plunger = createPlungerInput({
