@@ -15,7 +15,6 @@ export interface PlungerInput {
   isCharging(): boolean;
 }
 
-// Mechanics only — game-state gating stays upstream in applyAction.
 export function createPlungerInput(d: PlungerInputDeps): PlungerInput {
   return {
     beginCharge() {

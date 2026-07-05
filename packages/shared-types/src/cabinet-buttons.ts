@@ -17,8 +17,6 @@ export const CABINET_BUTTONS: readonly CabinetButton[] = [
   { id: 'FRONT_LEFT_RED', gpio: 19, activeLow: true },
   { id: 'BLACK_RIGHT', gpio: 13, activeLow: true },
   { id: 'WHITE_RIGHT', gpio: 25, activeLow: true, action: 'FLIP_RIGHT' },
-  // Backup plunger if the physical PLUNGER fails; PLUNGE is a strict superset
-  // of the old START mapping.
   { id: 'FRONT_WHITE', gpio: 33, activeLow: true, action: 'PLUNGE' },
   { id: 'PLUNGER', gpio: 32, activeLow: true, action: 'PLUNGE' },
 ]
