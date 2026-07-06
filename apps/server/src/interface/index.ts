@@ -37,7 +37,13 @@ export const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpSer
 
 const gameState = new GameStateManager();
 const handleConnection = createSocketGateway({ registerScore, worldTopTen, gameState });
-io.on('connection', (socket) => handleConnection(io, socket));
+io.on('connection', (socket) => {
+  console.log('[server] transport:', socket.conn.transport.name, '-', socket.id);
+  socket.conn.on('upgrade', () =>
+    console.log('[server] upgraded →', socket.conn.transport.name, '-', socket.id),
+  );
+  handleConnection(io, socket);
+});
 
 if (import.meta.main) {
   httpServer.listen(PORT, () => {
