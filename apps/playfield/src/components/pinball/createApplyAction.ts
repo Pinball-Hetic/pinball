@@ -1,16 +1,11 @@
 import type { GameAction, ButtonAction } from "@pinball/shared-types";
-import { plungerChargeProgress, plungerLaunchFactor } from "@pinball/game-engine";
 import type { GameState } from "@/hooks/useGameState";
+import { createPlungerInput, type PlungerInput } from "./createPlungerInput";
 
-// Mutable input state SHARED between the action router (createApplyAction)
-// and the animate loop (flipper swing + plunger physics). Single object owned
-// by the init closure.
 export type PlungerState = "idle" | "charging" | "releasing" | "returning";
 
 export interface InputState {
-  /** left flipper swing target: 1 = pressed, 0 = released */
   leftTarget: number;
-  /** right flipper swing target: 1 = pressed, 0 = released */
   rightTarget: number;
   isChargingPlunger: boolean;
   plungerState: PlungerState;
@@ -29,115 +24,89 @@ export function createInputState(): InputState {
 
 export interface ApplyActionDeps {
   state: InputState;
-  /** injected clock (performance.now in prod) — tests pass a fake */
   now: () => number;
   isSessionStarted: () => boolean;
   isPhysicsReady: () => boolean;
   getGameState: () => GameState;
   beginSession: () => void;
-  /** plunger.startCharge(t) */
   startPlungerCharge: (t: number) => void;
-  /** launchBallUC?.execute(factor) */
   launchBall: (factor: number) => void;
   setPlungerCharge: (v: number | null) => void;
-  /** outro/game-over exit → reload → map selector */
   restartWorkflow: () => void;
   debugLog: (...args: unknown[]) => void;
 }
 
-/**
- * Translates a game action (FLIP_LEFT/RIGHT, PLUNGE, START) into game-loop
- * effects. SINGLE source of truth for input effects — called by
- * `input:button` network events as well as the dev keyboard. Keyed on the
- * ACTION (not the physical id); the ButtonId→GameAction adapter lives
- * upstream.
- *
- * No Three.js / React dependency: all collaboration goes through `deps`
- * (state getters, callbacks, injected clock).
- */
+const SESSION_START_ACTIONS: ReadonlySet<GameAction> = new Set(["PLUNGE", "START"]);
+
+interface ActionContext {
+  state: InputState;
+  getGameState: () => GameState;
+  isPhysicsReady: () => boolean;
+  restartWorkflow: () => void;
+  plunger: PlungerInput;
+  debugLog: (...args: unknown[]) => void;
+}
+
+function handlePlunge(btnAction: ButtonAction, ctx: ActionContext): void {
+  if (btnAction === "DOWN") {
+    if (ctx.getGameState() === "game_over") {
+      ctx.restartWorkflow();
+      return;
+    }
+    if (ctx.getGameState() === "idle" && ctx.isPhysicsReady()) {
+      ctx.plunger.beginCharge();
+    } else {
+      ctx.debugLog(`[Plunger] DOWN ignoré — idle + physicsReady requis (gameState=${ctx.getGameState()})`);
+    }
+    return;
+  }
+  if (ctx.plunger.isCharging() && ctx.getGameState() === "idle") {
+    ctx.plunger.release();
+  } else {
+    ctx.debugLog(`[Plunger] UP ignoré — pas en charge ou pas idle (charging=${ctx.plunger.isCharging()})`);
+  }
+}
+
+const ACTION_HANDLERS: Record<GameAction, (btnAction: ButtonAction, ctx: ActionContext) => void> = {
+  FLIP_LEFT: (btnAction, ctx) => {
+    ctx.state.leftTarget = btnAction === "DOWN" ? 1 : 0;
+  },
+  FLIP_RIGHT: (btnAction, ctx) => {
+    ctx.state.rightTarget = btnAction === "DOWN" ? 1 : 0;
+  },
+  PLUNGE: handlePlunge,
+  START: (btnAction, ctx) => {
+    if (btnAction === "DOWN" && ctx.getGameState() === "game_over") ctx.restartWorkflow();
+  },
+};
+
 export function createApplyAction(deps: ApplyActionDeps) {
-  const {
-    state,
-    now,
-    isSessionStarted,
-    isPhysicsReady,
-    getGameState,
-    beginSession,
-    startPlungerCharge,
-    launchBall,
-    setPlungerCharge,
-    restartWorkflow,
-    debugLog,
-  } = deps;
+  const plunger = createPlungerInput({
+    state: deps.state,
+    now: deps.now,
+    startPlungerCharge: deps.startPlungerCharge,
+    launchBall: deps.launchBall,
+    setPlungerCharge: deps.setPlungerCharge,
+  });
+
+  const ctx: ActionContext = {
+    state: deps.state,
+    getGameState: deps.getGameState,
+    isPhysicsReady: deps.isPhysicsReady,
+    restartWorkflow: deps.restartWorkflow,
+    plunger,
+    debugLog: deps.debugLog,
+  };
 
   return function applyAction(action: GameAction, btnAction: ButtonAction): void {
-    // Before the session starts: only PLUNGE/START (DOWN, physics ready)
-    // start the game. PLUNGE while idle also primes the plunger charge.
-    if (!isSessionStarted()) {
-      if (
-        btnAction === "DOWN"
-        && isPhysicsReady()
-        && (action === "PLUNGE" || action === "START")
-      ) {
-        beginSession();
-        if (action === "PLUNGE" && getGameState() === "idle") {
-          const t = now();
-          startPlungerCharge(t);
-          state.isChargingPlunger = true;
-          state.chargeStartTime = t;
-        }
+    if (!deps.isSessionStarted()) {
+      if (btnAction === "DOWN" && deps.isPhysicsReady() && SESSION_START_ACTIONS.has(action)) {
+        deps.beginSession();
+        if (action === "PLUNGE" && deps.getGameState() === "idle") plunger.beginCharge();
       }
       return;
     }
 
-    switch (action) {
-      case "FLIP_LEFT":
-        state.leftTarget = btnAction === "DOWN" ? 1 : 0;
-        break;
-      case "FLIP_RIGHT":
-        state.rightTarget = btnAction === "DOWN" ? 1 : 0;
-        break;
-      case "PLUNGE": {
-        if (btnAction === "DOWN") {
-          debugLog(
-            `[Plunger] DOWN — gameState=${getGameState()} charging=${state.isChargingPlunger}`,
-          );
-          if (getGameState() === "game_over") {
-            restartWorkflow();
-            return;
-          }
-          if (getGameState() === "idle" && isPhysicsReady()) {
-            const t = now();
-            startPlungerCharge(t);
-            state.isChargingPlunger = true;
-            state.chargeStartTime = t;
-          } else {
-            debugLog(
-              `[Plunger] DOWN ignoré — charge impossible (idle + physicsReady requis). ` +
-                `gameState=${getGameState()}`,
-            );
-          }
-        } else if (state.isChargingPlunger && getGameState() === "idle") {
-          state.isChargingPlunger = false;
-          state.plungerState = "releasing";
-          const t = plungerChargeProgress(now(), state.chargeStartTime);
-          const factor = plungerLaunchFactor(t);
-          setPlungerCharge(null);
-          debugLog(`[Plunger] RELEASE — factor=${factor.toFixed(2)} → lancement`);
-          launchBall(factor);
-        } else {
-          debugLog(
-            `[Plunger] UP ignoré — pas en charge ou pas idle. ` +
-              `charging=${state.isChargingPlunger} gameState=${getGameState()}`,
-          );
-        }
-        break;
-      }
-      case "START":
-        if (btnAction === "DOWN" && getGameState() === "game_over") {
-          restartWorkflow();
-        }
-        break;
-    }
+    ACTION_HANDLERS[action](btnAction, ctx);
   };
 }
