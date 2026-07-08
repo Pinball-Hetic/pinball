@@ -1,13 +1,12 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// E2E Playwright — sommet de la pyramide de tests. Smoke only.
-// Ces specs tournent contre une stack live (`docker compose up`).
-// Sans la stack, ils sont attendus en échec/skip — c'est normal.
-//
-// baseURL : chaque écran (playfield/dmd/backglass) a son propre port hôte
-// dynamique en prod Fliphetic, et un port distinct en dev local. Surcharger
-// via PLAYWRIGHT_BASE_URL pour cibler l'écran voulu avant de lancer la suite.
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000'
+// Live-stack E2E. Start the app first:
+//   docker compose -f docker-compose.dev.yml up
+// then: bun run test:e2e
+// Each screen has its own dev host port; override if yours differ.
+export const PLAYFIELD_URL = process.env.PLAYFIELD_URL ?? 'http://localhost:3333'
+export const DMD_URL = process.env.DMD_URL ?? 'http://localhost:3335'
+export const BACKGLASS_URL = process.env.BACKGLASS_URL ?? 'http://localhost:3336'
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -15,13 +14,27 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
-  use: {
-    baseURL,
-    trace: 'on-first-retry',
-  },
+  use: { trace: 'on-first-retry' },
   projects: [
     {
-      name: 'chromium',
+      name: 'playfield',
+      testMatch: /playfield\.spec\.ts$/,
+      use: { ...devices['Desktop Chrome'], baseURL: PLAYFIELD_URL },
+    },
+    {
+      name: 'dmd',
+      testMatch: /dmd\.spec\.ts$/,
+      use: { ...devices['Desktop Chrome'], baseURL: DMD_URL },
+    },
+    {
+      name: 'backglass',
+      testMatch: /backglass\.spec\.ts$/,
+      use: { ...devices['Desktop Chrome'], baseURL: BACKGLASS_URL },
+    },
+    {
+      // Cross-screen flow: opens several screens at once, uses absolute URLs.
+      name: 'flow',
+      testMatch: /flow\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
   ],

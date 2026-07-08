@@ -73,3 +73,7 @@ firmware/.pio/
 lcov.info
 **/.cov/
 **/.cov-audio/
+
+# Playwright
+test-results/
+playwright-report/
