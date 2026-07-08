@@ -92,17 +92,17 @@ export interface DispatchButtonDeps {
   onButton: (data: { id: ButtonId; action: ButtonAction }) => void;
 }
 
-export function createDispatchButton(d: DispatchButtonDeps) {
+export function createDispatchButton(deps: DispatchButtonDeps) {
   return (id: ButtonId, action: ButtonAction): void => {
-    if (d.mode === "disabled") return;
-    if (d.mode === "simulate-esp32") {
-      if (d.isConnectedRef.current) {
-        d.simulateButton({ id, action });
+    if (deps.mode === "disabled") return;
+    if (deps.mode === "simulate-esp32") {
+      if (deps.isConnectedRef.current) {
+        deps.simulateButton({ id, action });
       } else {
-        d.onButton({ id, action });
+        deps.onButton({ id, action });
       }
       return;
     }
-    d.onButton({ id, action });
+    deps.onButton({ id, action });
   };
 }

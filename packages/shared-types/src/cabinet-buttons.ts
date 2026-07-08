@@ -6,7 +6,7 @@ export interface CabinetButton {
   id: ButtonId // physical id, UPPER_SNAKE
   gpio: number // ESP32 pin
   activeLow: boolean // true = internal pull-up, button wired to GND
-  action?: GameAction // game mapping; absent = unmapped button
+  action?: GameAction // game mapping; optionnal
 }
 
 export const CABINET_BUTTONS: readonly CabinetButton[] = [
@@ -23,5 +23,5 @@ export const CABINET_BUTTONS: readonly CabinetButton[] = [
 
 export const BUTTON_ACTION: Partial<Record<ButtonId, GameAction>> =
   Object.fromEntries(
-    CABINET_BUTTONS.filter((b) => b.action).map((b) => [b.id, b.action!]),
+    CABINET_BUTTONS.filter((btn) => btn.action).map((btn) => [btn.id, btn.action!]),
   )
