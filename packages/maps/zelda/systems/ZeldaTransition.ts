@@ -3,38 +3,20 @@ import { ShakeBasis, TransitionTimeline, tremorOffset } from '@pinball/game-engi
 import { PlayfieldCinematicStrobe } from './PlayfieldCinematicStrobe';
 import { layout } from '../layout';
 
-// ── Timings ────────────────────────────────────────────────────────────────
-/** Duration of the rising purple flash (Sacred Realm entry). */
 const BLACKOUT_DURATION = 0.45; // s
-/** Fade-out duration before the tremor phase. */
 const RESTORE_DURATION  = 0.55; // s
-/** Tremor duration (camera + playfield shakes). */
 const TREMOR_DURATION   = 0.55; // s
-/** Strobe frequency during the flash. */
 const STROBE_HZ = 6;
 
 type SetupConfig = {
-  /** Scene root (playfield root) — shaken during the tremor. */
   root: THREE.Object3D;
-  /** Camera — shaken during the tremor. */
   camera: THREE.Camera;
 };
 
 type StartConfig = {
-  /** Ball mesh — hidden during the transition. */
   ballMesh: THREE.Object3D;
 };
 
-/**
- * Sacred Realm transition (Zelda) — both entry AND return.
- *
- * Sequence: purple flash (blackout) → fade (restore) → tremor → callback.
- * The module calls `onComplete` to teleport the ball and emit
- * `PORTAL_TRANSITION_END` or `RETURN_PORTAL_TRANSITION_END`.
- *
- * The tremor (camera + playfield shakes) follows the screen restore, before
- * the ball becomes visible — same pattern as ST's UpsideDownTransition.
- */
 export class ZeldaTransition {
   private cinematicStrobe = new PlayfieldCinematicStrobe();
 
@@ -51,7 +33,6 @@ export class ZeldaTransition {
   private ballMesh: THREE.Object3D | null = null;
   private onComplete: (() => void) | null = null;
 
-  // Tremor references.
   private camera:        THREE.Camera | null       = null;
   private playfieldRoot: THREE.Object3D | null     = null;
   private shakeBasis     = new ShakeBasis();
@@ -77,11 +58,7 @@ export class ZeldaTransition {
     return this.active;
   }
 
-  /**
-   * Starts the transition.
-   * Called from `onGameEvent(PORTAL_ENTER | RETURN_PORTAL_ENTER)`.
-   * The ball must already be held before the call.
-   */
+  // The ball must already be held before this call.
   start(config: StartConfig, onComplete: () => void): void {
     this.active     = true;
     this.timeline.reset();

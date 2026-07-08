@@ -9,10 +9,6 @@ import type { GameStateManager } from '../infrastructure/GameStateManager';
 
 const INPUT_BRIDGE_ROOM = 'input-bridge';
 
-// Simple relay events: log + broadcast the payload verbatim to everyone.
-// Non-trivial handlers (map:select, dev:simulate-button, game:over, disconnect)
-// stay explicit below. Both keys of this list and the broadcast target are the
-// SAME event name — these are pure pass-through relays.
 const RELAY_EVENTS = [
   'input:button',
   'input:tilt',
@@ -22,15 +18,6 @@ const RELAY_EVENTS = [
   'dmd:display',
   'dev:trigger-game-event',
 ] as const satisfies readonly (keyof ClientToServerEvents & keyof ServerToClientEvents)[];
-
-// Narrow structural seams: only the members the connection handler touches.
-// Both the real socket.io `Server`/`Socket` AND the unit-test fakes satisfy
-// these — no `as unknown` double-cast.
-//
-// Listeners/emitters are typed against the event maps so payloads stay
-// inferred. The signatures are deliberately wide enough (a single broad
-// overload covering every event) that socket.io's per-event overloaded
-// methods remain assignable to them structurally.
 
 type ListenerFor<E> = E extends (...args: infer A) => void ? (...args: A) => void : never;
 
@@ -46,9 +33,6 @@ export interface SocketLike extends Emitter<ServerToClientEvents> {
   readonly id: string;
   readonly handshake: { auth: unknown };
   join(room: string): void | Promise<void>;
-  // Return is intentionally `void`: socket.io's real `on` returns `this`,
-  // which is assignable to a void-returning signature, while test fakes can
-  // return nothing — both satisfy this without a cast.
   on<Ev extends keyof ClientToServerEvents>(
     event: Ev,
     listener: ListenerFor<ClientToServerEvents[Ev]>,
@@ -56,20 +40,12 @@ export interface SocketLike extends Emitter<ServerToClientEvents> {
   on(event: 'disconnect', listener: () => void): void;
 }
 
-/**
- * Collaborators the socket gateway needs. Injected so the connection
- * handler is unit-testable with fakes — no prisma, no module mocking.
- */
 export interface SocketGatewayDeps {
   registerScore(data: GameOver): Promise<GameRegistered>;
   worldTopTen(mapId?: string): Promise<LeaderboardEntry[]>;
   gameState: GameStateManager;
 }
 
-/**
- * Builds the `connection` handler closed over its injected collaborators.
- * The composition root wires `io.on('connection', gateway)`.
- */
 export function createSocketGateway(deps: SocketGatewayDeps) {
   const { registerScore, worldTopTen, gameState } = deps;
 
@@ -82,8 +58,6 @@ export function createSocketGateway(deps: SocketGatewayDeps) {
       console.log('[server] input-bridge joined room');
     }
 
-    // Sync the newly connected client with the current map so DMD/backglass
-    // are up to date even if no `map:select` has been emitted yet.
     socket.emit('map:selected', { mapId: gameState.getMapId() });
 
     socket.on('map:select', ({ mapId }) => {
@@ -93,7 +67,6 @@ export function createSocketGateway(deps: SocketGatewayDeps) {
       io.emit('map:selected', { mapId });
     });
 
-    // Data-driven relays: each just logs + broadcasts verbatim.
     for (const event of RELAY_EVENTS) {
       socket.on(event, (...args: unknown[]) => {
         console.log('[server]', event, '→ broadcast');
@@ -101,9 +74,6 @@ export function createSocketGateway(deps: SocketGatewayDeps) {
       });
     }
 
-    // Dev `simulate-esp32` mode: route the event to the input-bridge room only.
-    // The input-bridge injects the raw protocol line into its mock port, its parser
-    // re-reads it and emits `input:button` back to the server, which broadcasts to all.
     socket.on('dev:simulate-button', (data) => {
       console.log('[server] dev:simulate-button', data.id, data.action, '→ input-bridge');
       io.to(INPUT_BRIDGE_ROOM).emit('dev:simulate-button', data);

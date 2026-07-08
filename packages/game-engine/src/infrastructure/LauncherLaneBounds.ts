@@ -9,7 +9,6 @@ const LAUNCHER_LANE_MESH_NAMES = new Set([
   'separator_right',
 ]);
 
-/** Shooter-lane Z bounds from the GLB (fallback = legacy constants). */
 export function computeLauncherLaneZBounds(playfieldRoot: THREE.Object3D): {
   minZ: number;
   maxZ: number;

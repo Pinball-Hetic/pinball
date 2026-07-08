@@ -2,8 +2,6 @@ import { useEffect } from "react";
 import type { ResolvedMap } from "@pinball/maps";
 import { setMapAudioUrls } from "@/audio/pinballAudio";
 
-// Wires the map's audio URLs (ambient music, game-over sound, alternate-world
-// music) as a side effect, kept out of the render body.
 export function useMapAudio(manifest: ResolvedMap["manifest"]): void {
   useEffect(() => {
     setMapAudioUrls(
@@ -20,8 +18,6 @@ export function useMapAudio(manifest: ResolvedMap["manifest"]): void {
   ]);
 }
 
-// URLs to prewarm (warmMapSounds): boss sounds + alternate-world music +
-// manifest sounds. Derived from the resolved map.
 export function collectMapSoundUrls(resolvedMap: ResolvedMap): string[] {
   const bosses = resolvedMap.layout.bosses ?? [];
   return [

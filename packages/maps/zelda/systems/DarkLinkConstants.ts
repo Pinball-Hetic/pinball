@@ -21,20 +21,16 @@ export const DARK_LINK_ANIM_IDLE_FRAMES = { start: 1,  end: 89 } as const
 export const DARK_LINK_ANIM_HIT_FRAMES  = { start: 40, end: 70 } as const
 export const DARK_LINK_ANIM_DEAD_FRAMES = { start: 20, end: 50 } as const
 
-// Walk: approximate duration of one cycle × number of cycles
 export const DARK_LINK_WALK_CLIP_DURATION = 1.0   // seconds
 export const DARK_LINK_WALK_CYCLES        = 2.2
 export const DARK_LINK_WALK_DURATION      = DARK_LINK_WALK_CLIP_DURATION * DARK_LINK_WALK_CYCLES
 export const DARK_LINK_WALK_SETTLE_FACING = 0.35
 export const DARK_LINK_WALK_FADE_OUT      = 0.2
 
-// Start point (off-screen, Sacred Realm)
 export const DARK_LINK_SPAWN = { x: 0, z: -0.32 } as const
 
-/**
- * Delay (s) before the RETURN portal activates after Dark Link's defeat: on
- * the fatal hit the ball is stuck to the boss — activating immediately would
- * suck it in instantly instead of leaving it in play (same fix as ST).
- */
+// Delay before the RETURN portal activates after Dark Link's defeat: on the
+// fatal hit the ball is stuck to the boss, so activating immediately would
+// suck it in instead of leaving it in play.
 export const RETURN_PORTAL_REVEAL_DELAY_S = 5
 

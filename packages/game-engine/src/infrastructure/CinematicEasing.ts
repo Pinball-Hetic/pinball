@@ -10,7 +10,6 @@ export function easeInOut(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-// easeOutBack: slight overshoot then return.
 export function easeOutBack(t: number): number {
   const c1 = 1.70158;
   const c3 = c1 + 1;

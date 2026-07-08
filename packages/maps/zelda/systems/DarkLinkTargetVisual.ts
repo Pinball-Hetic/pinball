@@ -90,15 +90,6 @@ function resolveDarkLinkClips(
   return { walkAction, fightIdleAction, hitAction, finisherAction };
 }
 
-/**
- * Dark Link 3D visual (GLB + animations). Delegates the whole lifecycle to
- * the generic WalkBossTargetActor (game-engine):
- *  - walks from DARK_LINK_SPAWN to DARK_LINK_TARGET
- *  - looped idle in combat
- *  - hit animation on each blow
- *  - dead animation at victory
- * Only clip resolution (subclipped) and the constants are specific.
- */
 export class DarkLinkTargetVisual {
   private readonly actor = new WalkBossTargetActor({
     logTag: 'DarkLink',

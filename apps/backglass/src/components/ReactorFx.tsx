@@ -6,7 +6,6 @@ interface ReactorFxProps {
   stageRef: RefObject<HTMLElement | null>
 }
 
-// Full-screen effects driven by the reactor (direct DOM, no re-render).
 export default function ReactorFx({ reactor, stageRef }: ReactorFxProps) {
   const portalRef = useRef<HTMLDivElement>(null)
 
@@ -15,7 +14,7 @@ export default function ReactorFx({ reactor, stageRef }: ReactorFxProps) {
     const replay = (el: HTMLElement | null, cls: string, ms: number) => {
       if (!el) return
       el.classList.remove(cls)
-      void el.offsetWidth // force reflow so the animation restarts
+      void el.offsetWidth
       el.classList.add(cls)
       const id = window.setTimeout(() => {
         handles.delete(id)
@@ -28,7 +27,6 @@ export default function ReactorFx({ reactor, stageRef }: ReactorFxProps) {
       if (r.kind === 'event' && r.label === 'PORTAL') {
         replay(portalRef.current, 'portal-wave-on', 1100)
       } else if (r.kind === 'gameStart') {
-        // wake-up: zones light up in sequence
         replay(stageRef.current, 'stage-waking', 1300)
       } else if (r.kind === 'lifeLost') {
         replay(stageRef.current, 'stage-dimmed', 1600)

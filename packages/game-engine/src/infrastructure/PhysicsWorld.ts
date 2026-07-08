@@ -1,24 +1,20 @@
 import * as RAPIER from "@dimforge/rapier3d-compat";
 import type { IPhysicsWorld } from '../domain/IPhysicsWorld';
 
-/** Hooks for the per-frame physics step cycle (see PhysicsWorld.update). */
 export interface PhysicsUpdateHooks {
   /**
-   * Called BEFORE each world.step(). Kinematic body targets (flippers) must
-   * be set here: Rapier infers a kinematic body's velocity from the
-   * target/pose gap at step time. Setting the target at RENDER rate made the
-   * flipper sweep a double arc per step at 120 Hz (tunneling — Rapier does
-   * not CCD kinematic motion) and a zero arc every other step at 60 Hz.
-   * One target per step = constant arc.
+   * Kinematic body targets (flippers) must be set here, before world.step():
+   * Rapier infers a kinematic body's velocity from the target/pose gap at step
+   * time. Setting the target at RENDER rate made the flipper sweep a double arc
+   * per step at 120 Hz (tunneling — Rapier does not CCD kinematic motion) and a
+   * zero arc every other step at 60 Hz. One target per step = constant arc.
    */
   onBeforeStep?: () => void;
   /**
-   * Called after EACH world.step() — drains collision events per step.
-   * Required with multi-step: Rapier does not keep events across steps, so
-   * draining once per frame would lose collisions from intermediate steps.
+   * Called after EACH world.step(). Rapier does not keep events across steps,
+   * so draining once per frame would lose collisions from intermediate steps.
    */
   onStep?: () => void;
-  /** Called once per frame, after all steps (including 0 steps). */
   onAfterSteps?: () => void;
 }
 
@@ -54,14 +50,8 @@ export class PhysicsWorld implements IPhysicsWorld {
   private static readonly MAX_STEPS_PER_FRAME = 5;
   private accumulator = 0;
   private timeScale = 1;
-  /** true after a Rapier WASM panic (unreachable / unsafe aliasing). */
   private crashed = false;
 
-  /**
-   * Time scale (slow-mo). 1 = normal, 1/3 = slowed. Implemented by scaling
-   * the accumulator → fewer real steps, so the ball appears to slow down
-   * without touching the fixed Rapier timestep.
-   */
   setTimeScale(scale: number): void {
     this.timeScale = scale;
   }
@@ -82,11 +72,7 @@ export class PhysicsWorld implements IPhysicsWorld {
     return new PhysicsWorld(world);
   }
 
-  /**
-   * Step planning logic. Caps the backlog at
-   * MAX_STEPS_PER_FRAME × STEP_INTERVAL before draining, which protects
-   * against the spiral-of-death while still allowing catch-up.
-   */
+  // Caps the backlog before draining to protect against the spiral-of-death.
   static planSteps(accumulator: number): { steps: number; remainder: number } {
     const maxBacklog = PhysicsWorld.MAX_STEPS_PER_FRAME * PhysicsWorld.STEP_INTERVAL;
     let acc = Math.min(accumulator, maxBacklog);
@@ -98,34 +84,19 @@ export class PhysicsWorld implements IPhysicsWorld {
     return { steps, remainder: acc };
   }
 
-  /** true if the Rapier world panicked and can no longer be used. */
   get isAlive(): boolean {
     return !this.crashed;
   }
 
-  /**
-   * Fraction of the way toward the next physics step, used to interpolate
-   * rendering between two physics states (smooth ball at 120 Hz while
-   * physics stays at 60 steps/s). Purely visual — does not affect the
-   * simulation.
-   */
   get interpolationAlpha(): number {
     return PhysicsWorld.interpolationAlphaFor(this.accumulator);
   }
 
-  /** accumulator/STEP_INTERVAL clamped to [0,1]. */
   static interpolationAlphaFor(accumulator: number): number {
     const a = accumulator / PhysicsWorld.STEP_INTERVAL;
     return a < 0 ? 0 : a > 1 ? 1 : a;
   }
 
-  /**
-   * @param dt Seconds elapsed since the last frame (capped at 0.05 in the
-   *           render loop — protects against tab freezes).
-   * @param hooks Per-step cycle: onBeforeStep (kinematic targets) →
-   *           world.step() → onStep (event drain), then onAfterSteps once
-   *           the frame is drained. See PhysicsUpdateHooks for the WHY.
-   */
   update(dt: number, hooks?: PhysicsUpdateHooks): void {
     this.accumulator += dt * this.timeScale;
     const { steps, remainder } = PhysicsWorld.planSteps(this.accumulator);
@@ -135,9 +106,8 @@ export class PhysicsWorld implements IPhysicsWorld {
       try {
         this.world.step(this.eventQueue);
       } catch (e) {
-        // Rapier WASM panic (unreachable / unsafe aliasing). Mark the world
-        // as dead so later calls do not cascade into errors. The user must
-        // reload the page to get a healthy world back.
+        // Mark the world dead on a Rapier WASM panic so later calls do not
+        // cascade into errors; the page must be reloaded to recover.
         this.crashed = true;
         console.error('[Rapier] world.step() panic — physics halted:', e);
         return;

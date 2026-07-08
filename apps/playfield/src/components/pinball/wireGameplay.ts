@@ -34,7 +34,6 @@ export interface WireGameplayDeps {
   screenShake: ScreenShake;
   diag: BallDiagnostics;
   buildEmit: (hideBall: () => void) => GameEventListener;
-  /** hides the ball at game over (reads the live mesh) */
   hideBallMesh: () => void;
   restoreBossCamera: () => void;
   clearAlternateWorldSession: () => void;
@@ -57,12 +56,9 @@ export interface GameplayWiring {
   collisionProcessor: CollisionEventProcessor;
 }
 
-// Wires the gameplay core: event router (createEmitRouter), use-cases, and
-// CollisionEventProcessor. ⚠ INTENTIONAL CYCLE: the processor is built WITH
-// `emit`, and `emit` routes to the processor through lazy getters — the
-// getters below resolve to THIS factory's locals, assigned before any event.
-// Do not break this cycle (JSDoc contract in CollisionEventProcessor /
-// createEmitRouter).
+// INTENTIONAL CYCLE: the processor is built WITH `emit`, and `emit` routes
+// back to the processor through lazy getters that resolve to this factory's
+// locals (assigned before any event fires). Do not break this cycle.
 export function wireGameplay(d: WireGameplayDeps): GameplayWiring {
   const plunger = new Plunger();
 
@@ -78,7 +74,6 @@ export function wireGameplay(d: WireGameplayDeps): GameplayWiring {
     d.clearAlternateWorldSession();
   };
 
-  // Cycle forward refs: assigned below, read lazily by the router.
   let drainBallUC: DrainBall | null = null;
   let bottomOutBallUC: BottomOutBall | null = null;
   let collisionProcessor: CollisionEventProcessor | null = null;

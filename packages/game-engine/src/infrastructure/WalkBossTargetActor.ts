@@ -19,14 +19,11 @@ import {
 
 type AnimState = 'walk' | 'fight' | 'hit' | 'finisher';
 
-/** Mixer + actions resolved by the owning map from its own GLTF clips. */
 export type WalkBossActions = {
   mixer: THREE.AnimationMixer;
   walkAction: THREE.AnimationAction | null;
-  /** Idle/settled pose action. May reuse the walk clip (Vecna). */
   fightIdleAction: THREE.AnimationAction | null;
   hitAction: THREE.AnimationAction | null;
-  /** Victory (ST) or dead (Zelda) finisher. */
   finisherAction: THREE.AnimationAction | null;
 };
 
@@ -48,15 +45,9 @@ export type WalkBossGlowConfig = {
   intensityBase: number;
 };
 
-/**
- * How the fight idle pose is held once the walk-in settles.
- *  - 'reuse-walk-frozen' (Vecna): play once + clamp + pause on a frozen pose.
- *  - 'loop-idle' (Dark Link): loop the idle clip forever.
- */
 export type WalkBossFightIdleMode = 'reuse-walk-frozen' | 'loop-idle';
 
 export type WalkBossTargetActorConfig = {
-  /** Tag for load/clip warn+error logging, e.g. "Vecna". */
   logTag: string;
   modelUrl: string;
   spawn: WalkPathPoint;
@@ -64,7 +55,6 @@ export type WalkBossTargetActorConfig = {
   footLift: number;
   modelHeight: number;
   floorClearance: number;
-  /** Optional fixed bind height (Vecna uses it; Dark Link omits). */
   bindHeight?: number;
   fitFrames: number;
   yaw: number;
@@ -73,7 +63,6 @@ export type WalkBossTargetActorConfig = {
   walkFadeOut: number;
   emissive: WalkBossEmissiveConfig;
   glow: WalkBossGlowConfig;
-  /** Anchor scale boost at peak hit flash (Vecna 0.12, Dark Link 0.10). */
   hitScaleBoost: number;
   fightIdleMode: WalkBossFightIdleMode;
   resolveClips: WalkBossClipResolver;
@@ -81,13 +70,6 @@ export type WalkBossTargetActorConfig = {
 
 const _facingPos = new THREE.Vector3();
 
-/**
- * Composed lifecycle for the "walk-in target boss" actors (Vecna / Dark Link):
- * spawn → walk along the tilted playfield → settle facing the camera → fight
- * idle, with hit flashes and a victory/dead finisher. The only per-map
- * variation is injected via config (constants, emissive/glow, fight-idle mode,
- * scale boost) and the resolveClips function (raw vs subclipped GLTF clips).
- */
 export class WalkBossTargetActor {
   private anchor: THREE.Group | null = null;
   private camera: THREE.Camera | null = null;
@@ -281,7 +263,6 @@ export class WalkBossTargetActor {
     this.hitAction.crossFadeFrom(this.fightIdleAction, 0.08, true).play();
   }
 
-  /** Play the finisher (victory for ST, dead for Zelda). */
   playFinisher(): void {
     if (!this.mixer || !this.finisherAction) {
       this.enterFightIdle();

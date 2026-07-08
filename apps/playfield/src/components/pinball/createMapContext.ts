@@ -13,11 +13,10 @@ import type { useDmdOrchestrator } from "@/hooks/useDmdOrchestrator";
 
 type Dmd = ReturnType<typeof useDmdOrchestrator>;
 
-// MapContext dependencies. Collaborators assigned AFTER this build
-// (ball / ballMesh / collisionProcessor / emit) are passed as live-bound
-// getters/closures — NEVER as snapshots, or the context freezes.
+// Collaborators assigned AFTER this build (ball / ballMesh /
+// collisionProcessor / emit) must be passed as live-bound getters, never as
+// snapshots, or the context freezes.
 export interface MapContextDeps {
-  // Passthrough (typed via MapContext → guaranteed match).
   scene: MapContext["scene"];
   root: MapContext["root"];
   camera: MapContext["camera"];
@@ -27,13 +26,11 @@ export interface MapContextDeps {
   colliderMap: MapContext["colliderMap"];
   lighting: MapContext["lighting"];
 
-  // Live forward refs.
   getBall: () => BallPhysics | null;
   getBallMesh: () => MapContext["ballMesh"];
   getCollisionProcessor: () => CollisionEventProcessor | null;
   emit: (e: GameEvent) => void;
 
-  // State refs.
   scoreRef: MutableRefObject<number>;
   comboRef: MutableRefObject<number>;
   multiplierRef: MutableRefObject<number>;
@@ -43,7 +40,6 @@ export interface MapContextDeps {
   mapStateExtraRef: MutableRefObject<Record<string, unknown>>;
   atmosphereAlternateRef: MutableRefObject<boolean>;
 
-  // Collaborators.
   dmd: Dmd;
   screenShakeAdd: (amount: number) => void;
   resetStuck: () => void;
@@ -55,9 +51,6 @@ export interface MapContextDeps {
   buildMapState: () => MapState;
 }
 
-// Builds the MapContext passed to mapModule.setup(): the bag of closures a
-// map module uses to drive scene / physics / score / DMD / cinematics. This
-// is the largest coupling surface of the init.
 export function createMapContext(deps: MapContextDeps): MapContext {
   const {
     scene, root, camera, physics, layout, manifest, colliderMap, lighting,

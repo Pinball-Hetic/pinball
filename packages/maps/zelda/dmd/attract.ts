@@ -3,8 +3,6 @@ import { GRID_W, GRID_H } from '@pinball/dmd-core'
 import { DOT } from '@pinball/dmd-core'
 import { applyGlitch } from '@pinball/dmd-core'
 
-// Zelda attract mode: pure state machine driven by clockMs.
-
 const MARQUEE_TEXT = 'DEFY GANONDORF * ENTER THE SACRED REALM'
 const MARQUEE_SPEED = 22 // dots/s
 const MARQUEE_SCALE = 3
@@ -85,7 +83,6 @@ export function attractFrame(grid: Uint8Array, display: { player: string }, cloc
   }
 }
 
-// Phase 'title' — typewriter 'PINBALL' / 'HETIC'.
 function phaseTitle(grid: Uint8Array, tLocal: number): void {
   const w1 = 'PINBALL'
   const w2 = 'HETIC'
@@ -116,13 +113,11 @@ function cursor2x2(grid: Uint8Array, x: number, y: number): void {
   for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) plot(grid, x + i, y + j, DOT.marquee)
 }
 
-// Phase 'marquee' — text enters right, exits left.
 function phaseMarquee(grid: Uint8Array, tLocal: number): void {
   const x = GRID_W - (tLocal / 1000) * MARQUEE_SPEED
   drawText(grid, GRID_W, Math.round(x), 5, MARQUEE_TEXT, FONT_5X7, DOT.marquee, 1, MARQUEE_SCALE)
 }
 
-// Phase 'coin' — falling coin + 'INSERT COIN' blink.
 function phaseCoin(grid: Uint8Array, tLocal: number): void {
   for (let dx = 0; dx < 14; dx++) {
     plot(grid, 2 + dx, 15, DOT.event)
@@ -142,17 +137,14 @@ function phaseCoin(grid: Uint8Array, tLocal: number): void {
   }
 }
 
-// Dot-art rupee (elongated diamond) replacing the ST coin.
 function drawRupee(grid: Uint8Array, cx: number, cy: number, squashed: boolean): void {
   if (squashed) {
-    // Diamond squashed on impact
     for (let dx = -4; dx <= 4; dx++) {
       const h = Math.round(2 - Math.abs(dx) * 0.5)
       for (let dy = -h; dy <= h; dy++) plot(grid, cx + dx + 4, cy + dy + 3, DOT.event)
     }
     return
   }
-  // Normal vertical diamond (7 dots tall)
   for (let dy = 0; dy < 9; dy++) {
     const w = dy <= 4 ? dy : 8 - dy
     for (let dx = -w; dx <= w; dx++) {
@@ -161,7 +153,6 @@ function drawRupee(grid: Uint8Array, cx: number, cy: number, squashed: boolean):
   }
 }
 
-// Phase 'rules' — Zelda tutorial.
 function phaseRules(grid: Uint8Array, tLocal: number): void {
   if (tLocal < 2500) {
     drawCentered(grid, 'COMPLETE', 4, DOT.score, 2)
@@ -193,7 +184,6 @@ function phaseRules(grid: Uint8Array, tLocal: number): void {
   drawCentered(grid, 'ENTRE LES BUMPERS', 18, DOT.heticOn, fitScale('ENTRE LES BUMPERS', 2))
 }
 
-// Phase 'ready' — player name + 'START !' blink.
 function phaseReady(grid: Uint8Array, tLocal: number, player: string): void {
   const name = player && player !== '—' ? player : 'PLAYER'
   const ns = fitScale(name, 2)

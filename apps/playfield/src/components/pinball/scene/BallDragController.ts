@@ -3,9 +3,6 @@ import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js
 import type { BallPhysics, PlayfieldCamera } from "@pinball/game-engine";
 import { ballCenterOnSurface } from "@pinball/game-engine";
 
-/**
- * Convert a client pointer position (px) to NDC [-1, 1] using the canvas rect.
- */
 export function pointerToNdc(
   clientX: number,
   clientY: number,
@@ -26,11 +23,6 @@ export interface BallDragControllerDeps {
   getOrbitControls: () => OrbitControls | null;
 }
 
-/**
- * Debug: drag the ball with the mouse (toggle `M`), anywhere on the playfield
- * to test stuck spots. During the drag: orbit disabled, velocity forced to 0
- * (follows the cursor), lane locks bypassed. On release: physics resumes.
- */
 export class BallDragController {
   private moveMode = false;
   private dragging = false;
@@ -43,12 +35,8 @@ export class BallDragController {
     return this.moveMode;
   }
 
-  /**
-   * true ONLY during an active drag (pointer down→up). Game-loop locks
-   * (surface-snap, lane-lock) key off this flag, NOT moveMode: a released ball
-   * immediately regains free physics/interaction even while `M` mode stays
-   * active (repositionable multiple times).
-   */
+  // Game-loop locks (surface-snap, lane-lock) key off this flag, NOT moveMode,
+  // so a released ball regains free physics even while `M` mode stays active.
   get isDragging(): boolean {
     return this.dragging;
   }

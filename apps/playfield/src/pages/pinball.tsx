@@ -16,7 +16,6 @@ const PORTRAIT_FILL =
   parsePlayfieldViewMode(process.env.NEXT_PUBLIC_PLAYFIELD_VIEW_MODE) === 'portrait-fill';
 const PORTRAIT_VIEWPORT =
   'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover';
-// <link rel=preload> resource type inferred from the extension.
 function preloadAs(path: string): string {
   if (/\.(glb|gltf|bin)$/i.test(path)) return 'fetch';
   if (/\.(png|jpe?g|webp|gif|svg)$/i.test(path)) return 'image';
@@ -24,8 +23,6 @@ function preloadAs(path: string): string {
   return 'fetch';
 }
 
-// When NEXT_PUBLIC_MAP_ID is set (e.g. Fliphetic mono-map prod), bypass the
-// selector and load that map directly.
 const FORCED_MAP_ID = process.env.NEXT_PUBLIC_MAP_ID;
 
 export default function PinballPage() {
@@ -33,8 +30,6 @@ export default function PinballPage() {
     FORCED_MAP_ID ?? null,
   );
 
-  // Emits map:select to the server (→ broadcast to DMD/backglass) then
-  // updates local state. Ephemeral socket connection: create, emit, disconnect.
   const handleSelect = useCallback((mapId: string) => {
     const socket = createPinballSocket();
     socket.once('connect', () => {
@@ -48,7 +43,6 @@ export default function PinballPage() {
     ? (getMapPackage(selectedMapId)?.manifest.preload ?? [])
     : [];
 
-  // Map selector — shown when no map is forced and none is chosen yet.
   if (!selectedMapId) {
     return <MapSelectorScreen maps={AVAILABLE_MAPS} onSelect={handleSelect} />;
   }
@@ -65,11 +59,7 @@ export default function PinballPage() {
           <link key={p} rel="preload" href={p} as={preloadAs(p)} />
         ))}
       </Head>
-      {/*
-        key={selectedMapId} → fully remounts the component when the map changes
-        (e.g. back to menu + new selection). Ensures the physics engine, Three.js
-        loaders and internal refs start from scratch.
-      */}
+      {/* key forces a full remount on map change, resetting physics + Three.js. */}
       <PinballPlayfield key={selectedMapId} mapId={selectedMapId} />
     </>
   );

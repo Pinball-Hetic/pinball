@@ -11,6 +11,7 @@
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint"],
   "rules": {
+    "no-empty": ["error", { "allowEmptyCatch": true }],
     "@typescript-eslint/no-unused-vars": [
       "error",
       {

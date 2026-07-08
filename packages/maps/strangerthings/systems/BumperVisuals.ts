@@ -26,16 +26,15 @@ const IDLE_PULSE_SPEED = 1.35;
 const IDLE_PULSE_AMP = 0.18;
 const HIT_FLASH_DURATION = 0.2;
 const HIT_FLASH_BOOST = 1.1;
-const PUNCH_DURATION = 0.15; // pop duration in seconds
-const PUNCH_PEAK = 0.20; // amplitude: 0.20 = grows to 1.20×
+const PUNCH_DURATION = 0.15;
+const PUNCH_PEAK = 0.20;
 
 const _emissiveA = new THREE.Color();
 const _emissiveB = new THREE.Color();
 
 type BumperKind = 'gltf' | 'base' | 'ring';
 
-// Order matters (first matching rule wins): legacy hide, then gltf,
-// then base, then ring.
+// First matching rule wins — order is load-bearing.
 const MATCH_RULES: readonly BumperMatchRule<BumperKind>[] = [
   { pattern: LEGACY_BUMPER, result: { action: 'hide' } },
   { pattern: GLTF_BUMPER, result: { action: 'part', kind: 'gltf' } },
@@ -50,7 +49,7 @@ type BumperPart = {
   material: THREE.MeshStandardMaterial;
   bumperIndex: number;
   kind: BumperKind;
-  glow: GlowSprite | null; // replaces the former PointLight (zero shader cost)
+  glow: GlowSprite | null;
   glowColor: number;
   baseIntensity: number;
   baseScale: THREE.Vector3;
@@ -148,9 +147,6 @@ export class BumperVisuals {
       };
     });
 
-    // Fail loudly: if no mesh matched (e.g. GLB naming convention changed),
-    // all bumper effects are silently dead. Report it rather than pretend
-    // the animation is wired.
     if (this.parts.length === 0) {
       console.warn(
         '[BumperVisuals] aucun mesh bumper reconnu (GLTF_BUMPER/LEGACY_*) — ' +
@@ -170,7 +166,6 @@ export class BumperVisuals {
 
     tickPunchTimers(this.hitTimers, dt);
 
-    // Scale punch (visual mesh only, colliders unchanged).
     tickPunchTimers(this.punchTimers, dt);
     applyPunchScale(this.parts, this.punchTimers, PUNCH_DURATION, PUNCH_PEAK);
 
@@ -210,7 +205,6 @@ export class BumperVisuals {
 
         if (part.glow) {
           part.glow.setColor(upsideDown && strobeFlash > 0.45 ? 0xff2244 : BUMPER_LIGHT_COLOR);
-          // opacity ∝ former light intensity (normalized), pulse via scale.
           const v = (BUMPER_LIGHT_INTENSITY * slowBreath + hitFactor * 0.35) * moodMul;
           part.glow.set(Math.min(1, v * 0.55), 0.9 + hitFactor * 0.5);
         }
@@ -236,8 +230,7 @@ export class BumperVisuals {
   }
 
   dispose(): void {
-    // Restore scales to their original value before clearing: otherwise a
-    // bumper disposed mid-punch stays enlarged.
+    // Restore scales before clearing, else a bumper disposed mid-punch stays enlarged.
     for (const part of this.parts) {
       part.mesh.scale.copy(part.baseScale);
       part.glow?.dispose();

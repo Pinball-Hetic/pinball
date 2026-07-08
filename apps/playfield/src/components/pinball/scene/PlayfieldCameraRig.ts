@@ -25,11 +25,6 @@ type CamFitSnapshot = {
   distance: number;
 };
 
-/**
- * Camera framing/reframing + capture of the cinematic director base.
- * The director stays exposed via `.director` for the event router
- * (play/playVictory/setBosses).
- */
 export class PlayfieldCameraRig {
   readonly director = new PlayfieldCameraDirector();
   private orbitControls: OrbitControls | null = null;
@@ -111,10 +106,6 @@ export class PlayfieldCameraRig {
     }
   }
 
-  /**
-   * Resize reframing fallback when the playfield root isn't loaded yet:
-   * re-orients the camera toward the target using the current mode's up vector.
-   */
   applyViewUpFallback(): boolean {
     if (!this.camFit) return false;
     this.deps.camera.up.copy(playfieldCameraUpForMode(this.deps.viewMode));

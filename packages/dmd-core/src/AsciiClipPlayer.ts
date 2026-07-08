@@ -1,8 +1,5 @@
 import { GRID_W, GRID_H } from './DmdRenderer';
 
-// Generic primitives for reading/transforming ASCII clips. No map content:
-// frames + charMaps are provided by the caller.
-
 export interface ParsedClip {
   fps: number;
   frames: string[][];
@@ -41,7 +38,6 @@ export function parseClip(src: string, charMap: Record<string, number>): ParsedC
   return { fps, frames, charMap };
 }
 
-// Draws the current frame of a frame-by-frame clip, centered on the grid.
 export function drawClipFrame(grid: Uint8Array, clip: ParsedClip, elapsedMs: number): void {
   if (!clip.frames.length) return;
   const raw = Math.floor((elapsedMs / 1000) * clip.fps);
@@ -53,7 +49,6 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
-// Deterministic hash (x,y) → [0,1) — stable across frames (no flicker).
 function hash01(x: number, y: number): number {
   let n = (x * 374761393 + y * 668265263) | 0;
   n = (n ^ (n >> 13)) * 1274126177;
@@ -61,7 +56,6 @@ function hash01(x: number, y: number): number {
   return ((n >>> 0) % 1000) / 1000;
 }
 
-// Generic blit: map(char, x, y) → palette index (0 = do not draw).
 export function blit(
   grid: Uint8Array,
   lines: string[],
@@ -85,8 +79,6 @@ export function blit(
   }
 }
 
-// Radial reveal: a cell only appears if its distance to the anchor
-// (bottom-center) is within the revealed radius. The 15% front is accented.
 export function revealRadial(
   grid: Uint8Array,
   frame: string[],
@@ -109,8 +101,6 @@ export function revealRadial(
   });
 }
 
-// Dissolve: each cell has a stable threshold; it disappears once t01 exceeds
-// it, passing through ':' (dust).
 export function dissolve(
   grid: Uint8Array,
   frame: string[],

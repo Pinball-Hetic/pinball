@@ -11,24 +11,12 @@ export interface PhysicalInputCallbacks {
   onButton?: (data: ButtonInput) => void;
   onTilt?: (data: TiltInput) => void;
   onSensor?: (data: SensorInput) => void;
-  // Inject a GameEvent from the /debug page (full chain).
   onDevEvent?: (data: DevGameEventTrigger) => void;
 }
 
 export interface UsePhysicalInputs {
   callbacksRef: React.MutableRefObject<PhysicalInputCallbacks>;
-  /**
-   * `isConnectedRef` is deliberately a ref to avoid triggering a re-render of
-   * the parent component (Three.js would unmount the scene). If a UI indicator
-   * is needed later, create a dedicated sub-component that subscribes to a store
-   * or event bus rather than lifting a useState up here.
-   */
   isConnectedRef: React.MutableRefObject<boolean>;
-  /**
-   * Emits a `dev:simulate-button` event to the server. Used by the
-   * `simulate-esp32` keyboard mode to validate the network chain without ESP32
-   * hardware. No-op if the socket isn't connected.
-   */
   simulateButton: (data: ButtonInput) => void;
 }
 

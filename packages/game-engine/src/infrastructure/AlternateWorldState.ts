@@ -1,9 +1,5 @@
 import type { BossGateContext } from '../domain/BossRegistry';
 
-// Value object owning the alternate-world / score-baseline state machine that
-// used to live inline in CollisionEventProcessor. Pure state only: transitions
-// mutate the four fields and never reach out to bosses/portal/collision side
-// effects — the CEP owns that orchestration and drives this object.
 export class AlternateWorldState {
   private active = false;
   private normalWorldScoreBaseline = 0;

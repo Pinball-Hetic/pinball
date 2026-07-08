@@ -1,45 +1,24 @@
 import { easeIn, easeOut, strobeOn } from './CinematicEasing';
 
-/**
- * Phase clock for world-transition cinematics (Upside Down / Sacred Realm).
- * Owns {phase, elapsed, strobeT} and the regression-prone scalar maths (strobe
- * gating, blackout/reveal/restore eases, shade + billboard opacity mixes) with
- * NO Three dependency. Drives the same machine for the Stranger Things
- * UpsideDownTransition (blackout → reveal → hold → restore → tremor) and the
- * Zelda ZeldaTransition (blackout → restore → tremor — reveal/hold skipped).
- *
- * Map-specific IO (camera/billboard/ball, which strobe call to make) lives in
- * the renderer: it reads the descriptor scalars/flags and chooses the Three
- * calls. The tremor offset maths live in `tremorOffset`.
- */
-
 export type TransitionPhase = 'idle' | 'blackout' | 'reveal' | 'hold' | 'restore' | 'tremor';
 
 export type TransitionTimelineConfig = {
   blackout: number;
-  /** Reveal + hold durations (Stranger Things). Set both to 0 to skip them (Zelda). */
   reveal: number;
   hold: number;
   restore: number;
   tremor: number;
   strobeHz: number;
-  /** Whether the reveal/hold phases run. false → blackout goes straight to restore (Zelda). */
   hasReveal: boolean;
 };
 
 export type TransitionDescriptor = {
   phase: TransitionPhase;
-  /** strobeOn(strobeT, strobeHz). */
   on: boolean;
-  /** blackout phase: easeOut(min(1, elapsed/blackout)). */
   blackoutMix: number;
-  /** reveal phase: clamped progress t = min(1, elapsed/reveal). */
   revealT: number;
-  /** restore phase: darkMix = 1 - easeIn(min(1, elapsed/restore)). */
   darkMix: number;
-  /** true once the active phase is blackout/reveal/hold/restore (drives billboard sync). */
   active: boolean;
-  /** transition flags (fired once on the frame they occur). */
   enteredReveal: boolean;
   enteredHold: boolean;
   enteredRestore: boolean;
@@ -62,7 +41,6 @@ export class TransitionTimeline {
     return this.elapsed;
   }
 
-  /** Enter blackout from idle. Returns true if it transitioned. */
   begin(): boolean {
     if (this.phase !== 'idle') return false;
     this.phase = 'blackout';
@@ -132,7 +110,6 @@ export class TransitionTimeline {
       return { ...base, phase: 'restore', on, darkMix };
     }
 
-    // tremor
     if (this.elapsed >= this.config.tremor) {
       return { ...base, phase: 'tremor', active: false, finished: true };
     }
@@ -156,13 +133,6 @@ export class TransitionTimeline {
   }
 }
 
-/**
- * Camera/playfield tremor offset for world transitions.
- *
- * Shared by UpsideDownTransition (rampDuration 0.45, amp 0.0032) and
- * ZeldaTransition (rampDuration 0.3, amp 0.003). Caller adds these offsets
- * to the captured base camera position / playfield rotation.
- */
 export type TremorOffset = {
   camX: number;
   camY: number;

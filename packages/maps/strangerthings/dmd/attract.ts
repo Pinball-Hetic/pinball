@@ -3,10 +3,6 @@ import { GRID_W, GRID_H } from '@pinball/dmd-core'
 import { DOT } from '@pinball/dmd-core'
 import { applyGlitch } from '@pinball/dmd-core'
 
-// Attract mode: PURE clock-driven state machine. No persistent state —
-// everything derives from clockMs, so it survives re-renders and Socket.io
-// reconnections.
-
 const MARQUEE_TEXT = 'DEFY THE DEMOGORGON * ENTER THE UPSIDE DOWN'
 const MARQUEE_SPEED = 22 // dots/s
 const MARQUEE_SCALE = 3
@@ -82,13 +78,11 @@ export function attractFrame(grid: Uint8Array, display: { player: string }, cloc
       break
   }
 
-  // Transition: decaying glitch over the first 250 ms of each phase.
   if (tLocal < TRANSITION_MS) {
     applyGlitch(grid, GRID_W, GRID_H, (TRANSITION_MS - tLocal) / TRANSITION_MS)
   }
 }
 
-// Phase 'title' — typewriter 'PINBALL' / 'HETIC' scale 2, then pulse.
 function phaseTitle(grid: Uint8Array, tLocal: number): void {
   const w1 = 'PINBALL'
   const w2 = 'HETIC'
@@ -119,28 +113,24 @@ function cursor2x2(grid: Uint8Array, x: number, y: number): void {
   for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) plot(grid, x + i, y + j, DOT.marquee)
 }
 
-// Phase 'marquee' — scale-3 text enters right, exits left, fully readable
-// (the phase lasts exactly one pass).
 function phaseMarquee(grid: Uint8Array, tLocal: number): void {
   const x = GRID_W - (tLocal / 1000) * MARQUEE_SPEED
   drawText(grid, GRID_W, Math.round(x), 5, MARQUEE_TEXT, FONT_5X7, DOT.marquee, 1, MARQUEE_SCALE)
 }
 
-// Phase 'coin' — coin dropping into a slot + 'INSERT COIN' blink.
 function phaseCoin(grid: Uint8Array, tLocal: number): void {
-  // Fixed slot (14×2 rect) below the coin.
   for (let dx = 0; dx < 14; dx++) {
     plot(grid, 2 + dx, 15, DOT.event)
     plot(grid, 2 + dx, 16, DOT.event)
   }
 
-  const dropCycle = 1100 // ~700ms fall + 400ms pause → ~4 drops / 5s
+  const dropCycle = 1100
   const ct = tLocal % dropCycle
   if (ct < 660) {
     const topY = -9 + (ct / 700) * 17
     drawCoin(grid, 5, topY, false)
   } else if (ct < 700) {
-    drawCoin(grid, 4, 8, true) // squash on contact
+    drawCoin(grid, 4, 8, true)
   }
 
   if (blinkOn(tLocal, 600, 400)) {
@@ -149,7 +139,6 @@ function phaseCoin(grid: Uint8Array, tLocal: number): void {
   }
 }
 
-// Dot-art coin: 9×9 ring + vertical bar (₵-like), or squashed 11×7.
 function drawCoin(grid: Uint8Array, cx: number, cy: number, squashed: boolean): void {
   if (squashed) {
     for (let dy = 0; dy < 7; dy++) {
@@ -168,8 +157,6 @@ function drawCoin(grid: Uint8Array, cx: number, cy: number, squashed: boolean): 
   for (let dy = 2; dy <= 6; dy++) plot(grid, cx + 4, cy + dy, DOT.event)
 }
 
-// Phase 'rules' — tutorial: targets → HETIC row letter by letter →
-// FEVER X5 → the nest (boss unlock). 4 sub-phases over 12s.
 function phaseRules(grid: Uint8Array, tLocal: number): void {
   if (tLocal < 2500) {
     drawCentered(grid, 'COMPLETE', 4, DOT.score, 2)
@@ -192,7 +179,6 @@ function phaseRules(grid: Uint8Array, tLocal: number): void {
     }
     return
   }
-  // The nest: 3000 pts opens it, then where to hit. 2 screens of 2s.
   if (tLocal < 10000) {
     drawCentered(grid, '3000 PTS', 4, DOT.event, fitScale('3000 PTS', 2))
     drawCentered(grid, 'LE NID S OUVRE', 18, DOT.event, fitScale('LE NID S OUVRE', 2))
@@ -202,7 +188,6 @@ function phaseRules(grid: Uint8Array, tLocal: number): void {
   drawCentered(grid, 'ENTRE LES BUMPERS', 18, DOT.heticOn, fitScale('ENTRE LES BUMPERS', 2))
 }
 
-// Phase 'ready' — player name + 'START !' blink.
 function phaseReady(grid: Uint8Array, tLocal: number, player: string): void {
   const name = player && player !== '—' ? player : 'PLAYER'
   const ns = fitScale(name, 2)

@@ -7,9 +7,6 @@ import {
   DARK_LINK_VICTORY_CAMERA_CINEMATIC,
 } from './cameraCinematics'
 
-// Zelda boss definitions.
-// Ganondorf: normal world, central target.
-// Dark Link: alternate world (Sacred Realm), higher target.
 export const bossDefinitions: BossDefinition[] = [
   {
     id: 'ganondorf',
@@ -41,8 +38,6 @@ export const bossDefinitions: BossDefinition[] = [
     unlocksReturnPortal: false,
     cameraCinematic: GANONDORF_CAMERA_CINEMATIC,
     victoryCameraCinematic: GANONDORF_VICTORY_CAMERA_CINEMATIC,
-    // No revealSoundUrl: Ganondorf's intro sound plays one-shot via
-    // manifest.sounds.ganondorf_appear → ambient resumes right after.
     targetMeshTheme: {
       ring: {
         color: 0xff6600,
@@ -104,18 +99,13 @@ export const bossDefinitions: BossDefinition[] = [
     unlocksReturnPortal: true,
     cameraCinematic: DARK_LINK_CAMERA_CINEMATIC,
     victoryCameraCinematic: DARK_LINK_VICTORY_CAMERA_CINEMATIC,
-    // ── Dark Link audio ──────────────────────────────────────────────────────
-    // Fight music started at reveal.
     revealSoundUrl: mapAsset('audio/second-boss.mp3'),
     revealSoundVolume: 100,
-    // Final phase (≥7 hits): more dynamic music.
     latePhaseSoundUrl: mapAsset('audio/last-pv-second-boss.mp3'),
     latePhaseSoundVolume: 100,
     latePhaseHitThreshold: 7,
-    // Victory: switch to the win music as soon as Dark Link is defeated.
     victoryMusicUrl: mapAsset('audio/win.mp3'),
     victoryMusicVolume: 100,
-    // Win music keeps playing during the Hyrule return cinematic.
     keepMusicUntilReturnPortal: true,
     targetMeshTheme: {
       ring: {

@@ -3,15 +3,12 @@ import type { CSSProperties } from 'react'
 interface Props {
   text: string
   position: 'top' | 'bottom'
-  /** Neon color of the band. Default: ST red #E71D23. */
   color?: string
 }
 
-// Pure-CSS decorative band — color driven by the map via the `color` prop.
 export default function NeonBand({ text, position, color = '#E71D23' }: Props) {
   const isTop = position === 'top'
 
-  // Dimmed halo color (dark variant for the drop shadow + background).
   const hexToRgba = (hex: string, a: number) => {
     const r = parseInt(hex.slice(1, 3), 16)
     const g = parseInt(hex.slice(3, 5), 16)

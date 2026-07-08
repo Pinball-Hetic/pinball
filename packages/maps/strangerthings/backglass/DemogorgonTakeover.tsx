@@ -1,7 +1,5 @@
 import { cx } from './artStyles'
-// Inlined VHS wrapper (scanlines + tracking band). Structural classes (vhs*,
-// tk-center, glitch-text) are app-global; ST classes (tk-demogorgon, demo-*)
-// are scoped via art.module.css.
+
 export default function DemogorgonTakeover() {
   return (
     <div className={cx('vhs', 'tk-demogorgon')}>

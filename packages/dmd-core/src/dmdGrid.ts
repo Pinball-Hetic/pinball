@@ -1,12 +1,9 @@
-// PURE core of the DMD renderer (no canvas/DOM dependency). Lets the grid,
-// color resolution and draw plan be tested without a 2D context.
-
 export const GRID_W = 96
 export const GRID_H = 32
 export const PITCH = 20
 
-export const CANVAS_W = GRID_W * PITCH // 1920
-export const CANVAS_H = GRID_H * PITCH // 640
+export const CANVAS_W = GRID_W * PITCH
+export const CANVAS_H = GRID_H * PITCH
 
 export function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
@@ -17,7 +14,6 @@ export function hexToRgb(hex: string): [number, number, number] {
   ]
 }
 
-// Dot color stops (halo via radial gradient).
 export type GradientStop = { offset: number; color: string }
 
 export function spriteGradientStops(color: string): GradientStop[] {
@@ -30,10 +26,8 @@ export function spriteGradientStops(color: string): GradientStop[] {
   ]
 }
 
-// One lit dot to draw: color index + pixel position.
 export type DotDraw = { colorIndex: number; px: number; py: number }
 
-// Grid scan → list of lit dots (index 0 skipped). Row-major order (y then x).
 export function gridDrawPlan(grid: Uint8Array): DotDraw[] {
   const plan: DotDraw[] = []
   for (let y = 0; y < GRID_H; y++) {

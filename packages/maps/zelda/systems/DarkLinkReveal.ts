@@ -9,7 +9,6 @@ import { DarkLinkTargetVisual } from './DarkLinkTargetVisual';
 import type { BossRevealController } from './BossRevealController';
 
 const VICTORY_DURATION = 0.65;
-// Dark Link red flash
 const FLASH_COLOR = 0xff2200;
 const FLASH_INTENSITY = 1.6;
 
@@ -21,14 +20,6 @@ export type DarkLinkSetup = {
   onTargetReady?: () => void;
 };
 
-/**
- * Dark Link reveal controller (Sacred Realm).
- * Same pattern as VecnaReveal:
- *  - walk phase   : Dark Link walks to his position (gameplay frozen)
- *  - settle phase : rotation to face the camera (gameplay frozen)
- *  - fight phase  : combat, idle animation + hit on each blow
- *  - victory phase: dead animation + return portal opened
- */
 export class DarkLinkReveal implements BossRevealController {
   readonly bossId = 'darklink' as const;
   private onFightEnd: (() => void) | null = null;
@@ -50,8 +41,6 @@ export class DarkLinkReveal implements BossRevealController {
     fightFlickerFlashMix: 0.10,
     targetHits: getBossDefinition('darklink').targetHits,
   });
-
-  // ── BossRevealController ─────────────────────────────────────────────────
 
   async preload(
     renderer: THREE.WebGLRenderer,
@@ -130,7 +119,6 @@ export class DarkLinkReveal implements BossRevealController {
       this.machine.getPhase() === 'victory',
     );
 
-    // walk/settle exit timing is Three-side; sample it for the pure machine.
     const walkPathComplete =
       this.machine.getPhase() === 'walk' && this.darkLinkVisual.isWalkPathComplete();
     const settleComplete =
@@ -178,8 +166,6 @@ export class DarkLinkReveal implements BossRevealController {
     this.targetLight  = null;
     this.targetPulse  = null;
   }
-
-  // ── Private ──────────────────────────────────────────────────────────────
 
   private startWalkPhase(): void {
     this.targetPulse?.reset();

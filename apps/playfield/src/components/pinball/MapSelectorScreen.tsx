@@ -9,7 +9,6 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
-/* ─── Per-map visual config ───────────────────────────────────────── */
 const THEME: Record<string, {
   accent: string;
   glow: string;
@@ -95,7 +94,6 @@ const THEME: Record<string, {
 
 const FALLBACK_THEME = THEME.strangerthings;
 
-/* ─── Component ───────────────────────────────────────────────────── */
 export function MapSelectorScreen({ maps, onSelect }: Props) {
   const [cursor, setCursor] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
@@ -120,11 +118,8 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [go, confirm]);
 
-  // Physical cabinet buttons (ESP32 → server → input:button). The
-  // usePhysicalInputs hook is only mounted in PinballPlayfield — not rendered
-  // yet here → without this subscription the selector ignores physical
-  // buttons. Mapped by game ACTION (BUTTON_ACTION), not by id: left/right
-  // flip = navigate, PLUNGE/START = confirm. DOWN only (no UP repeat).
+  // PinballPlayfield isn't mounted yet, so this subscription is what lets the
+  // selector receive physical cabinet buttons.
   const { callbacksRef } = usePhysicalInputs();
   useEffect(() => {
     callbacksRef.current = {
@@ -150,7 +145,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
   const active = maps[cursor];
   const t = THEME[active.id] ?? FALLBACK_THEME;
 
-  // Target dimensions: 1080 x 1920
   const CARD_W = 800;
   const CARD_H = 1300;
   const SIDE_OFFSET = 920;
@@ -168,7 +162,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
       paddingTop: 80,
       paddingBottom: 80,
     }}>
-      {/* Ambient background */}
       <div style={{
         position: "absolute", inset: 0,
         background: `radial-gradient(ellipse 80% 60% at 50% 52%, ${t.glow}22 0%, transparent 65%)`,
@@ -176,7 +169,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
         pointerEvents: "none",
       }} />
 
-      {/* Header */}
       <div style={{
         position: "relative", zIndex: 2,
         fontSize: 18, letterSpacing: 14,
@@ -187,7 +179,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
         Select Your Map
       </div>
 
-      {/* ─── Carousel ──────────────────────────────────────────────── */}
       <div style={{
         position: "relative",
         width: "100%",
@@ -240,7 +231,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
                 `,
               }}
             >
-              {/* Video */}
               {m.previewVideo && (
                 <video
                   ref={(el) => { videoRefs.current[i] = el; }}
@@ -255,13 +245,11 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
                 />
               )}
 
-              {/* Gradient overlay */}
               <div style={{
                 position: "absolute", inset: 0,
                 background: mt.gradient,
               }} />
 
-              {/* Vignette on unselected cards */}
               {!selected && (
                 <div style={{
                   position: "absolute", inset: 0,
@@ -269,7 +257,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
                 }} />
               )}
 
-              {/* Logo */}
               <div style={{
                 position: "absolute",
                 top: 0, left: 0, right: 0,
@@ -281,7 +268,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
                 {mt.logoEl}
               </div>
 
-              {/* Decorative corners */}
               {[
                 { top: 20, left: 20, borderTop: true, borderLeft: true },
                 { top: 20, right: 20, borderTop: true, borderRight: true },
@@ -303,7 +289,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
                 }} />
               ))}
 
-              {/* Card footer */}
               <div style={{
                 position: "absolute", bottom: 0, left: 0, right: 0,
                 padding: "0 40px 52px",
@@ -344,7 +329,6 @@ export function MapSelectorScreen({ maps, onSelect }: Props) {
         })}
       </div>
 
-      {/* ─── Navigation ────────────────────────────────────────────── */}
       <div style={{
         position: "relative", zIndex: 2,
         display: "flex",

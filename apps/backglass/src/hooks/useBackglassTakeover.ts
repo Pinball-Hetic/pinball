@@ -6,8 +6,6 @@ import { useMapContent } from '@/map/content'
 import { TakeoverStack } from './takeoverStack'
 import type { Takeover } from './takeoverStack'
 
-// Re-export for existing consumers (the types live in takeoverStack.ts,
-// next to the state machine).
 export type { Takeover, TakeoverScene } from './takeoverStack'
 
 interface JoyceSignal {
@@ -21,11 +19,9 @@ interface TakeoverState {
   highlightRank: number | undefined
   agitation: number
   joyce: JoyceSignal
-  // true while a portal_swallow plays → the hall of fame 3D flip is delayed
-  // until the clip ends (in sync with the playfield switch).
   holdHallFlip: boolean
   fever: boolean
-  goldWaveId: number // incremented → replays the gold wave (5k/15k milestones)
+  goldWaveId: number
 }
 
 const TICK_MS = 250
@@ -50,9 +46,6 @@ function agitationAt(elapsed: number): number {
 
 export function useBackglassTakeover(entries: LeaderboardEntry[], socket: PinballSocket) {
   const { clipBehavior, eventTakeovers, clips } = useMapContent()
-  // Refs to the map data: the useEffect([], []) closure always reads the
-  // current values without being recreated. key={mapId} on the Stage forces a
-  // full remount when the map changes → refs cleanly reinitialized.
   const clipBehaviorRef = useRef(clipBehavior)
   clipBehaviorRef.current = clipBehavior
   const eventTakeoversRef = useRef(eventTakeovers)
@@ -63,15 +56,10 @@ export function useBackglassTakeover(entries: LeaderboardEntry[], socket: Pinbal
   const entriesRef = useRef(entries)
   entriesRef.current = entries
 
-  // The state machine (scene stack) — all decision logic lives there.
   const stackRef = useRef(new TakeoverStack())
-  // Derived signals managed by the hook (outside the stack's responsibility):
-  // alternate world, agitation, Joyce wall, fever, gold wave, last game:over.
   const alternateWorldRef = useRef(false)
   const agitationStartRef = useRef(-AGITATION_MS)
   const joyceRef = useRef<JoyceSignal>({ text: null, id: 0 })
-  // Last complete game:over (with stats + rank) — feeds the hall_of_fame clip
-  // (HighScore/Recap), which does not receive it via dmd:display.
   const lastGameOverRef = useRef<(GameOver & { rank: number }) | null>(null)
   const feverRef = useRef(false)
   const goldWaveRef = useRef(0)
@@ -112,9 +100,6 @@ export function useBackglassTakeover(entries: LeaderboardEntry[], socket: Pinbal
       lastGameOverRef.current = payload
 
       if (isHigh) {
-        // HIGH_SCORE then CHAINED RECAP: the recap only starts when the high
-        // score expires (followUp), not masked in parallel.
-        // The payload (stats) travels in the entry → not clobbered by an event.
         stack.push({
           scene: 'HIGH_SCORE',
           priority: 100,
@@ -139,9 +124,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[], socket: Pinbal
       alternateWorldRef.current = d.alternateWorld ?? false
       if ('mapState' in d) feverRef.current = mapStateFlag(d.mapState, 'fever')
       if (d.mode === 'CINEMATIC') {
-        // Kiosk guard: malformed server event without a clip. An unknown clip
-        // no longer crashes (clipShowMs guarantees a number → never NaN on
-        // expiresAt): it hits the default branch → generic scene.
+        // Guard a malformed server event with no clip (would produce NaN expiresAt).
         if (d.clip == null) return
         markActivity()
         const now = performance.now()
@@ -153,16 +136,10 @@ export function useBackglassTakeover(entries: LeaderboardEntry[], socket: Pinbal
             priority: 110,
             expiresAt: now + durationMs,
             clip,
-            // hall_of_fame has no stats via dmd:display: rewire the last
-            // complete game:over (HighScore/Recap).
             payload: isHall ? lastGameOverRef.current ?? undefined : undefined,
           })
-        // Data-driven dispatch provided by the map (joyce/wave/fever/takeover).
-        // hall_of_fame + unknown clips: generic takeover via clipShowMs.
         const b = clipBehaviorRef.current[clip]
         if (b?.goldWave) goldWaveRef.current += 1
-        // fever starts with the clip: during CINEMATIC no SCORE display
-        // (fever carrier) arrives, so activate it here without delay.
         if (b?.fever) feverRef.current = true
         if (b?.joyce) pushJoyce(typeof b.joyce === 'function' ? b.joyce(d.value) : b.joyce)
         if (!b?.noTakeover) pushTk(b?.takeoverMs ?? clipShowMs(clipsRef.current, clip))
@@ -171,7 +148,6 @@ export function useBackglassTakeover(entries: LeaderboardEntry[], socket: Pinbal
       if (d.mode === 'EVENT') {
         markActivity()
         agitationStartRef.current = performance.now()
-        // Event → map takeover (label → scene), data-driven.
         const ev = d.label ? eventTakeoversRef.current[d.label] : undefined
         if (ev) {
           stack.push({
@@ -191,9 +167,6 @@ export function useBackglassTakeover(entries: LeaderboardEntry[], socket: Pinbal
 
     const interval = window.setInterval(() => {
       const now = performance.now()
-      // All decision logic (purge / chaining / attract / priority) is delegated
-      // to the state machine. The hook only feeds it the time and some map
-      // data accessors, then projects the result into state.
       const { top, highlightRank, holdHallFlip } = stack.tick(now, {
         holdsHallFlip: (clip) => clipBehaviorRef.current[clip]?.holdsHallFlip ?? false,
         attractJoyceName: () => entriesRef.current.find((e) => e.rank === 1)?.name ?? null,
@@ -216,8 +189,7 @@ export function useBackglassTakeover(entries: LeaderboardEntry[], socket: Pinbal
 
     return () => {
       window.clearInterval(interval)
-      // Shared socket (lifted into BackglassStage): remove OUR handlers
-      // without disconnecting it — the caller owns its lifecycle.
+      // Shared socket: remove our handlers but do not disconnect (caller owns it).
       socket.off('game:start', markActivity)
       socket.off('score:update', markActivity)
       socket.off('game:over', onGameOver)

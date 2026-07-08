@@ -5,7 +5,7 @@ import type { Reactor } from '@/hooks/useIngameReactor'
 interface HallOfFameProps {
   entries: LeaderboardEntry[]
   highlightRank?: number
-  inverted?: boolean // alternate world: 3D flip
+  inverted?: boolean
   reactor?: Reactor
 }
 
@@ -41,7 +41,7 @@ export default function HallOfFame({
       if (r.kind === 'event' && r.label.startsWith('DROP') && rootRef.current) {
         const el = rootRef.current
         el.classList.remove('hof-shake')
-        void el.offsetWidth // force reflow → restarts the shake animation
+        void el.offsetWidth
         el.classList.add('hof-shake')
       }
     })
@@ -55,7 +55,6 @@ export default function HallOfFame({
         </h2>
 
         <div className="hof-list" style={{ height: SLOTS * ROW_H }}>
-          {/* ghost rows for empty slots */}
           {slots.map((rank) =>
             byRank.has(rank) ? null : (
               <div
@@ -71,7 +70,6 @@ export default function HallOfFame({
             ),
           )}
 
-          {/* real entries, positioned by rank (slides on reorder) */}
           {entries.map((e) => {
             const medal = e.rank <= 3 ? MEDAL[e.rank - 1] : null
             const hot = highlightRank === e.rank

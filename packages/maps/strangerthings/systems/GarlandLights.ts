@@ -9,34 +9,19 @@ const TWINKLE_AMP = 0.28;
 const HIT_SURGE_DURATION = 0.3;
 const HIT_SURGE_BOOST = 0.55;
 
-// Width (in bulb count) of the rocket-liftoff light band.
 const ROCKET_BAND = 3;
 
-// Position of the rocket-liftoff light front, indexed on bulbs.
-// rocketT decays 1 → 0; the front rises from -ROCKET_BAND (before the first
-// bulb) to count (past the last) → full upward sweep. Pure.
 export function rocketFront(rocketT: number, count: number): number {
   const progress = 1 - Math.max(0, Math.min(1, rocketT));
   return -ROCKET_BAND + progress * (count + ROCKET_BAND);
 }
 
-// Intensity [0,1] of a given bulb for a rocket front: 1 at the front, falls
-// off linearly over ROCKET_BAND below it, 0 elsewhere. Pure.
 export function rocketGlow(index: number, front: number): number {
   const d = front - index;
   if (d < 0 || d > ROCKET_BAND) return 0;
   return 1 - d / ROCKET_BAND;
 }
 
-/**
- * Each garland in newStrangerthings.glb has:
- *  - baseColorTexture  : dark cable + colored bulbs
- *  - emissiveTexture   : bulb glow map
- *  - emissiveFactor    : [1,1,1] (white = neutral multiplier)
- *
- * We NO LONGER replace the material. The original GLB material is kept and
- * only emissiveIntensity is animated for twinkle and game-event reactions.
- */
 type GarlandBulb = {
   mesh: THREE.Mesh;
   material: THREE.MeshStandardMaterial;
@@ -59,19 +44,14 @@ export class GarlandLights {
   private celebrateT = 0;
   private rocketT = 0;
 
-  // Continuous chase during fever (permanent wave).
   setFever(on: boolean): void {
     this.feverActive = on;
   }
 
-  // 1s one-shot chase (milestone crossed).
   celebrate(): void {
     this.celebrateT = 1;
   }
 
-  // Rocket liftoff (score milestone): rising orange/gold sweep, matching the
-  // backglass/DMD rocket. Replaces the yellow "celebrate" chase on
-  // milestones for cross-screen rocket consistency.
   rocketBurst(): void {
     this.rocketT = 1;
   }
@@ -160,7 +140,6 @@ export class GarlandLights {
       }
     }
 
-    // Wave (chase) — continuous fever OR one-shot celebration.
     if (this.celebrateT > 0) this.celebrateT = Math.max(0, this.celebrateT - dt);
     if (this.feverActive || this.celebrateT > 0) {
       const speed = this.feverActive ? 6 : 9;
@@ -177,8 +156,6 @@ export class GarlandLights {
       }
     }
 
-    // Rocket liftoff (milestone): orange/gold light band climbs the garlands
-    // once, then fades. Matches the backglass/DMD rocket.
     if (this.rocketT > 0) {
       this.rocketT = Math.max(0, this.rocketT - dt);
       const front = rocketFront(this.rocketT, this.bulbs.length);
@@ -190,9 +167,6 @@ export class GarlandLights {
           bulb.material.emissiveIntensity,
           bulb.origIntensity * (0.6 + glow * 2.4),
         );
-        // Rocket flame (warm white → bright orange → red), NOT the yellow of
-        // the "celebrate" chase → distinct "liftoff" read, consistent with
-        // the DMD/backglass rocket.
         bulb.material.emissive.setHex(
           glow > 0.8 ? 0xffffff : glow > 0.5 ? 0xff7a1a : 0xff2200,
         );

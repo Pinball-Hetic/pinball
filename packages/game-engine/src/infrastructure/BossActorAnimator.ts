@@ -3,13 +3,9 @@ import * as THREE from 'three';
 export type BossActorAnimState = 'idle' | 'hit' | 'victory';
 
 export type BossActorGlowConfig = {
-  /** Hex color of the glow PointLight created on mount. */
   color: number;
-  /** Light distance (THREE.PointLight 3rd arg). */
   distance: number;
-  /** Light decay (THREE.PointLight 4th arg). */
   decay: number;
-  /** Local Y position of the glow light. */
   y: number;
 };
 
@@ -28,26 +24,15 @@ const HIT_BOOST = 1.4;
 const GLOW_INTENSITY_BASE = 0.42;
 const HIT_SCALE_BOOST = 0.2;
 
-/**
- * Pure pulse intensity multiplier shared by demogorgon/ganondorf target visuals.
- * pulse = (0.82 + sin(t*2.5)*0.12) * (hitFlash>0 ? 1.4 : 1)
- */
 export function bossActorPulse(pulseT: number, hitFlash: number): number {
   const hitBoost = hitFlash > 0 ? HIT_BOOST : 1;
   return (PULSE_BASE + Math.sin(pulseT * PULSE_SPEED) * PULSE_AMP) * hitBoost;
 }
 
-/** Pure anchor scale during a hit flash: 1 + (hitFlash/0.18)*0.2. */
 export function bossActorScale(hitFlash: number): number {
   return 1 + (hitFlash / HIT_FLASH_DURATION) * HIT_SCALE_BOOST;
 }
 
-/**
- * Composed lifecycle helper for the demogorgon/ganondorf "target boss" actors.
- * Owns the idle/hit/victory anim state machine + the glow/scale pulse math.
- * The owning class injects the glow config and feeds in the per-map mixer/actions
- * once its GLTF is fitted. GLTF/material IO stays in the owner.
- */
 export class BossActorAnimator {
   private mixer: THREE.AnimationMixer | null = null;
   private idleAction: THREE.AnimationAction | null = null;
@@ -66,7 +51,6 @@ export class BossActorAnimator {
     return this.glowLight;
   }
 
-  /** Register the per-map mixer + actions, wire the hit→idle finished listener. */
   setActions(actions: BossActorActions): void {
     this.mixer = actions.mixer;
     this.idleAction = actions.idleAction;
@@ -94,7 +78,6 @@ export class BossActorAnimator {
     return this.idleAction;
   }
 
-  /** Attach the glow light to the anchor (idempotent) and start idle. */
   show(anchor: THREE.Object3D): void {
     if (this.glowLight && !this.glowLight.parent) {
       anchor.add(this.glowLight);
@@ -102,7 +85,6 @@ export class BossActorAnimator {
     this.playIdle();
   }
 
-  /** Reset to hidden idle state: scale/rotation reset, glow off + detached. */
   hide(anchor: THREE.Object3D | null): void {
     if (anchor) {
       anchor.scale.setScalar(1);
@@ -147,7 +129,6 @@ export class BossActorAnimator {
     this.idleAction.fadeIn(0.12).play();
   }
 
-  /** Advance mixer + glow/scale pulse. Owner gates on anchor.visible before calling. */
   update(dt: number, anchor: THREE.Object3D): void {
     this.mixer?.update(dt);
 
@@ -160,7 +141,6 @@ export class BossActorAnimator {
     anchor.scale.setScalar(bossActorScale(this.hitFlash));
   }
 
-  /** Clear all anim state. `disposeGlow` matches the per-map dispose() behaviour. */
   reset(disposeGlow: boolean): void {
     if (disposeGlow && this.glowLight) {
       this.glowLight.dispose();

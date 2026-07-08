@@ -2,18 +2,8 @@ import * as THREE from 'three';
 import { MeshRoleResolver } from './MeshRoleResolver';
 import type { MapLayout, MapPoint3 } from '../domain/MapLayout';
 
-// Derives gameplay element positions from the conventioned GLB meshes
-// (world Box3 center) instead of hardcoded constants. Goal: a single source
-// of truth (the GLB), no drift on Blender re-export.
-//
-// Current GLB coverage: bumpers (bumper_<n>) + drop targets (target_<id>).
-// Sensors / portal / drain / boss targets have NO mesh → they stay explicit
-// literals in the map layout (deliberate hybrid).
-
 export interface DerivedLayout {
-  /** World Box3 center of the bumper_<n> mesh, indexed by (n-1). */
   bumpers: (MapPoint3 | null)[];
-  /** World Box3 center of the target_<id> mesh, key = `drop_<id>`. */
   dropTargets: Record<string, MapPoint3>;
 }
 
@@ -38,7 +28,6 @@ function distMm(a: MapPoint3, b: MapPoint3): number {
 }
 
 export class LayoutResolver {
-  /** Traverses the GLB and derives the positions of the supported roles. */
   static derive(playfieldRoot: THREE.Object3D, resolver: MeshRoleResolver): DerivedLayout {
     playfieldRoot.updateMatrixWorld(true);
     const bumpers: (MapPoint3 | null)[] = [];
@@ -58,11 +47,6 @@ export class LayoutResolver {
     return { bumpers, dropTargets };
   }
 
-  /**
-   * Derives and logs the delta (mm) against the constant layout. Mutates
-   * nothing. `[LayoutResolver] <id> derived={…} constant={…} delta=<mm>`;
-   * marks OK/⚠ against the tolerance.
-   */
   static deriveAndCompare(
     playfieldRoot: THREE.Object3D,
     resolver: MeshRoleResolver,
@@ -92,12 +76,8 @@ export class LayoutResolver {
     return derived;
   }
 
-  /**
-   * Returns a copy of the layout with drop target positions replaced by the
-   * GLB-derived ones (source of truth). Bumpers are NOT derived (Box3 center
-   * ≠ tuned collider point, deltas out of tolerance) → they keep their
-   * literals. A drop target without a mesh keeps its literal (fallback).
-   */
+  // Bumpers are NOT derived (Box3 center ≠ tuned collider point, deltas out of
+  // tolerance) → they keep their literals; a drop target without a mesh too.
   static withDerivedDropTargets(layout: MapLayout, derived: DerivedLayout): MapLayout {
     return {
       ...layout,

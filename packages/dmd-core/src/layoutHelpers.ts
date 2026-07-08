@@ -2,14 +2,10 @@ import { FONT_5X7, drawText, measureText } from './fonts';
 import { GRID_W, GRID_H } from './DmdRenderer';
 import { DOT } from './palette';
 
-// Generic drawing helpers shared by the layout engine and map-provided clip
-// handlers. No map-specific content.
-
 export function centerX(width: number): number {
   return Math.round((GRID_W - width) / 2);
 }
 
-// "Pulse": skips the draw for 1 frame when the sine wave dips.
 export function flickerSkip(clockMs: number, period: number, floor: number): boolean {
   return Math.sin(clockMs / period) < floor;
 }
@@ -27,8 +23,6 @@ export function drawCentered(
   drawText(grid, GRID_W, x, y, text, font, color, spacing, scale);
 }
 
-// Full-frame flash at scale 2: one line if it fits (≤ 8 chars), otherwise
-// label + value on two lines.
 export function drawFlash(grid: Uint8Array, label: string, value: string, color: number): void {
   if (!value) {
     const scale = measureText(label, FONT_5X7, 1, 2) <= GRID_W ? 2 : 1;
@@ -51,7 +45,6 @@ export function plot(grid: Uint8Array, x: number, y: number, color: number): voi
   grid[py * GRID_W + px] = color;
 }
 
-// Seeded deterministic RNG (stable across frames → no flicker).
 export function seeded(n: number): number {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
@@ -61,7 +54,6 @@ export function fmtNum(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
-// Procedural star border (hall_of_fame): stars confined to the edges.
 export function drawStarBorder(grid: Uint8Array, ms: number): void {
   const phase = Math.floor(ms / 350);
   for (let y = 0; y < GRID_H; y++) {
@@ -77,7 +69,6 @@ export function drawStarBorder(grid: Uint8Array, ms: number): void {
   }
 }
 
-// Orange/cyan chaser lights scrolling along one row.
 export function drawChenillard(grid: Uint8Array, clockMs: number, y: number): void {
   const off = Math.floor(clockMs / 60);
   for (let x = 0; x < GRID_W; x++) {

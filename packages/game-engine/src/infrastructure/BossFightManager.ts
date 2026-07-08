@@ -72,7 +72,8 @@ export class BossFightManager {
     return this.states.get(id)?.triggered ?? false;
   }
 
-  // Un seul boss actif à la fois : les cibles des boss se chevauchent physiquement, donc deux boss armés en même temps feraient compter un même coup de balle deux fois (double-comptage injuste).
+  // Only one boss active at a time: boss targets physically overlap, so two
+  // armed bosses would count the same ball hit twice (unfair double-count).
   private anyOtherFightActive(except: BossId): boolean {
     for (const [id, state] of this.states) {
       if (id !== except && state.sensor.fightActive) return true;

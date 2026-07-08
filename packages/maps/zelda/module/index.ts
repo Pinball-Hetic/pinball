@@ -19,24 +19,17 @@ import {
   BumperVisuals,
 } from '../systems'
 
-// Zelda behavior module. Handles counters, milestones, boss events and the
-// Ganondorf + Dark Link visual systems.
 export function createModule(): MapModule {
   let ctxRef: MapContext | null = null
 
-  // Zelda counters (feed mapState + GameStats.counters).
   let ganondorfs = 0
   let darklinks  = 0
   let portals    = 0
   let hetic      = 0
 
-  // Nest: armed-since timestamp (ms) + late hint already fired, per boss.
   const armedAt: Record<string, number> = {}
   const hintFired = new Set<string>()
 
-  // Timescale-restore timers after a boss defeat (~400 ms). Tracked per
-  // bossId to avoid leaks (cancelled on reset/dispose, never stacked).
-  // See createBossDefeatTimers (game-engine).
   const bossDefeatTimers = createBossDefeatTimers()
 
   let ganondorfReveal: GanondorfReveal | null = null
@@ -47,7 +40,6 @@ export function createModule(): MapModule {
   let transition:      ZeldaTransition | null = null
   let bumperVisuals:   BumperVisuals   | null = null
 
-  // ── onGameEvent handlers (closures over Zelda state/systems) ─────────────
   function onMilestone(ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'MILESTONE') return
     ctx.playCinematic(selectMilestoneClip(e.threshold), { value: e.threshold })
@@ -56,30 +48,25 @@ export function createModule(): MapModule {
 
   function onPortalTransitionEnd(ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'PORTAL_TRANSITION_END') return
-    // Sacred Realm entry confirmed (transition end). Same pattern as ST:
-    // reset() first, then enterAlternateWorld(). The RETURN sensor is only
-    // created once Dark Link is defeated.
+    // reset() must run before enterAlternateWorld(). The RETURN sensor is
+    // only created once Dark Link is defeated.
     portal?.reset()
     ctx.resetPortalTrigger()
     ctx.enterAlternateWorld()
   }
 
   function onGameOverDrain(ctx: MapContext, e: GameEvent): void {
-    // Game over: end all boss fights.
     if (isGameOverDrain(e, ctx.gameState())) bossReveals?.endAllFights()
   }
 
   function onBossArmed(ctx: MapContext, e: GameEvent): void {
     if (e.type !== 'BOSS_ARMED') return
-    // Nest wakes up: DMD banner + hint timestamp (shared) + shake.
     handleBossArmed(ctx, e, armedAt, performance.now())
     ctx.screenShake(0.3)
   }
 
   function onGanondorf(ctx: MapContext, e: GameEvent): void {
-    // Ganondorf boss cinematics.
     if (e.type === 'BOSS_REVEAL' && e.bossId === 'ganondorf') {
-      // One-shot fanfare (~5s) via manifest.sounds → ambient resumes after.
       ctx.playSound('ganondorf_appear')
       ctx.playCinematic('ganondorf_rises', { once: true })
     }
@@ -91,7 +78,6 @@ export function createModule(): MapModule {
         ctx.physics.setTimeScale(1 / 3)
         bossDefeatTimers.schedule('ganondorf', 400, () => {
           ctx.physics.setTimeScale(1)
-          // The blue Sacred Realm portal opens as soon as time resumes.
           portal?.open()
           ctx.playCinematic('ganondorf_slain', {
             onEnd: () =>
@@ -103,7 +89,6 @@ export function createModule(): MapModule {
   }
 
   function onDarkLink(ctx: MapContext, e: GameEvent): void {
-    // Dark Link boss cinematics.
     if (e.type === 'BOSS_REVEAL' && e.bossId === 'darklink') {
       ctx.playCinematic('darklink_rises', { once: true })
     }
@@ -133,18 +118,15 @@ export function createModule(): MapModule {
     if (e.type !== 'PORTAL_ENTER') return
     portals += 1
     ctx.setMapState({ portals })
-    // The portal disappears on entry — cannot be re-taken endlessly.
     portal?.hide()
     const ball = ctx.ball
     const mesh = ctx.ballMesh
     if (ball && mesh && transition && !transition.isActive()) {
-      // Sacred Realm sound (same pattern as ST "upside_down_appear").
       ctx.playSound('sacred_realm_appear')
-      // Teleport + freeze the ball before the flash.
       ball.holdAtAlternateWorldSpawn()
       ball.syncToMesh(mesh)
       transition.start({ ballMesh: mesh }, () => {
-        // Called from update() — outside Rapier's event drain, mutations are safe.
+        // Called from update(), outside Rapier's event drain — mutations are safe.
         ball.spawnFromAlternateWorld()
         ctx.resetPortalTrigger()
         ctx.resetStuck()
@@ -164,7 +146,7 @@ export function createModule(): MapModule {
       ball.holdAtNormalReturnSpawn()
       ball.syncToMesh(mesh)
       transition.start({ ballMesh: mesh }, () => {
-        // ST pattern: reset() BEFORE completeWorldCycle() (which resets portalTriggered).
+        // reset() must run BEFORE completeWorldCycle() (which resets portalTriggered).
         portal?.reset()
         bossReveals?.endAllFights()
         ball.spawnFromNormalReturn()
@@ -183,7 +165,6 @@ export function createModule(): MapModule {
     setup(ctx: MapContext): void {
       ctxRef = ctx
 
-      // ── Ganondorf ────────────────────────────────────────────────────────
       ganondorfReveal = new GanondorfReveal()
       ganondorfReveal.setup({
         root:   ctx.root,
@@ -194,7 +175,6 @@ export function createModule(): MapModule {
       })
       ganondorfReveal.setEmit(ctx.emitGameEvent)
 
-      // ── Dark Link ────────────────────────────────────────────────────────
       darkLinkReveal = new DarkLinkReveal()
       darkLinkReveal.setup({
         root:   ctx.root,
@@ -202,18 +182,15 @@ export function createModule(): MapModule {
         camera: ctx.camera,
         onFightEnd: () => {
           ctx.setBossFightActive('darklink', false)
-          // Defeating Dark Link opens the return portal.
           portal?.enableReturn()
         },
         onTargetReady: () => ctx.setBossTargetArmed('darklink', true),
       })
 
-      // ── Orchestrator ─────────────────────────────────────────────────────
       bossReveals = new BossRevealOrchestrator()
       bossReveals.register(ganondorfReveal)
       bossReveals.register(darkLinkReveal)
 
-      // ── Sacred Realm atmosphere ──────────────────────────────────────────
       sacredRealm = new SacredRealmAtmosphere()
       sacredRealm.setup({
         root: ctx.root,
@@ -227,7 +204,6 @@ export function createModule(): MapModule {
         },
       })
 
-      // ── Sacred Realm portal: blue visual + sensor (closed until Ganondorf) ─
       portal = new ZeldaPortal()
       portal.setup({
         root:        ctx.root,
@@ -237,11 +213,9 @@ export function createModule(): MapModule {
         onOpenChange: (open) => ctx.setPortalGateOpen(open),
       })
 
-      // ── Transition (purple flash → tremor → callback) ────────────────────
       transition = new ZeldaTransition()
       transition.setup({ root: ctx.root, camera: ctx.camera })
 
-      // ── VIS bumper punch animation ───────────────────────────────────────
       bumperVisuals = new BumperVisuals()
       bumperVisuals.setup(ctx.root)
     },
@@ -285,7 +259,6 @@ export function createModule(): MapModule {
       const ctx = ctxRef
       if (!ctx) return
 
-      // Nest late hint.
       const candidates = ctx.layout.bosses.map((boss) => boss.id)
       for (const id of dueLateHints(candidates, armedAt, hintFired, performance.now())) {
         hintFired.add(id)
@@ -302,13 +275,9 @@ export function createModule(): MapModule {
       return false
     },
 
-    applyBallMagnet(): void {
-      // No magnetism on the Zelda map.
-    },
+    applyBallMagnet(): void {},
 
-    setSporesEnabled(): void {
-      // No spores on the Zelda map (reserved for the ST Upside Down).
-    },
+    setSporesEnabled(): void {},
 
     releaseWorld(): void {
       sacredRealm?.reset()

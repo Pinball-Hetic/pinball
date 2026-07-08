@@ -5,10 +5,8 @@
 //   ===                 → frame separator
 // Character mapping (resolved per clip via charMap in AsciiClipPlayer):
 //   '.' or ' ' = off; ':' = dim; '#' = mid; '@' = full; '!' = accent
-// Template literals (no raw import) — simplicity first.
 
 export const RAW_CLIPS = {
-  // Spiral growing from the center, swallowing the screen.
   portal_swallow: `
 # fps: 3
             @
@@ -50,7 +48,6 @@ export const RAW_CLIPS = {
  @@@@@@@@@@@@@@@@@@
 `,
 
-  // A giant circle pulsing twice.
   last_chance: `
 # fps: 5
        :##:
@@ -78,7 +75,6 @@ export const RAW_CLIPS = {
      :#@@@@#:
 `,
 
-  // Starry frame (the score rolls over it at clip end — handled by the layout).
   hall_of_fame: `
 # fps: 2
  !  :  !  :  !  :  !  :  !

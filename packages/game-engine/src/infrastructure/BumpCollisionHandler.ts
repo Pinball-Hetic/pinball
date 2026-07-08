@@ -2,21 +2,14 @@ import type { CollisionHandler } from './CollisionHandler';
 import type { BumpHit } from '../use-cases/BumpHit';
 import { BUMP_HIT_COOLDOWN_MS, BUMP_EJECT_SCALE } from '../domain/Ball';
 
-/**
- * Handles collisions with side bumps (roles: 'bump_left', 'bump_right').
- *
- * A per-side cooldown prevents multiple consecutive ejections during a single
- * prolonged contact (Rapier may emit several 'started' events in a row).
- */
+// Per-side cooldown: Rapier may emit several 'started' events in a row for one
+// prolonged contact, which would otherwise trigger multiple ejections.
 export class BumpCollisionHandler implements CollisionHandler {
-  // Timestamp of the last hit per side, used for the anti-spam cooldown.
   private bumpLastHitMs: Record<'left' | 'right', number> = { left: 0, right: 0 };
 
   constructor(
     private readonly pendingPhysics: Array<() => void>,
     private readonly bumpHitUC: BumpHit,
-    // Injected clock: tests pass a controllable fake — no global
-    // monkey-patch needed.
     private readonly now: () => number = () => performance.now(),
   ) {}
 

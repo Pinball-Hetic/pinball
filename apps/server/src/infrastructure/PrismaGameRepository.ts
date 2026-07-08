@@ -9,10 +9,6 @@ import type {
   TodayRow,
 } from '../use-cases/ports';
 
-/**
- * Prisma-backed adapter for GameRepository. The composition root wires this in;
- * use-cases never import prisma directly.
- */
 export const prismaGameRepository: GameRepository = {
   async create(input: NewGame): Promise<{ id: string }> {
     const row = await prisma.game.create({

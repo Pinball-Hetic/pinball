@@ -62,9 +62,8 @@ export class VecnaReveal implements BossRevealController {
     await this.vecnaVisual.warmup(renderer, scene, camera);
   }
 
-  // PointLights added dynamically during the fight: strobe flash + Vecna
-  // glow + target light. Used to prewarm shader variants at preload
-  // (see BossRevealOrchestrator.preloadAll).
+  // Count of PointLights added dynamically during the fight (strobe flash,
+  // Vecna glow, target light); preloadAll prewarms shader variants for it.
   dynamicPointLightCount(): number {
     return 3;
   }
@@ -136,9 +135,8 @@ export class VecnaReveal implements BossRevealController {
       this.machine.getPhase() === 'victory',
     );
 
-    // The walk/settle exit timing lives in the visual (Three-side animation);
-    // sample it for the pure machine. updateSettle(dt) advances the settle anim
-    // and reports completion, so it must run every frame while settling.
+    // updateSettle advances the settle animation as a side effect, so it must
+    // run every frame while settling — not just when the phase result is read.
     const walkPathComplete =
       this.machine.getPhase() === 'walk' && this.vecnaVisual.isWalkPathComplete();
     const settleComplete =

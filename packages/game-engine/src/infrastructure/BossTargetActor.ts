@@ -8,46 +8,25 @@ import { BossActorAnimator, type BossActorActions, type BossActorGlowConfig } fr
 
 const _facingPos = new THREE.Vector3();
 
-/**
- * Resolved per-map animation actions for a boss target actor. The owning map
- * resolves its own clips (raw or subclipped to a Blender frame range) and wires
- * them into mixer actions — that GLTF-clip strategy is the genuine per-map diff.
- */
 export type BossTargetClipResolver = (
   mixer: THREE.AnimationMixer,
   clips: THREE.AnimationClip[],
 ) => Pick<BossActorActions, 'idleAction' | 'hitAction' | 'victoryAction'>;
 
 export type BossTargetActorConfig = {
-  /** Tag for load-error logging, e.g. "Demogorgon". */
   logTag: string;
   modelUrl: string;
-  /** Surface placement target ({x,z} used; y derived from surfaceYAtZ). */
   target: WalkPathPoint;
   footLift: number;
   modelHeight: number;
   floorClearance: number;
   fitFrames: number;
-  /** Billboard yaw offset (radians) applied on top of camera-facing. */
   yaw: number;
   glow: BossActorGlowConfig;
-  /** Map-specific GLTF clip → action wiring (raw vs subclip). */
   resolveClips: BossTargetClipResolver;
-  /**
-   * Whether dispose() also disposes the glow PointLight's GPU resources.
-   * Both maps want this true (the light leaks otherwise).
-   */
   disposeGlowOnDispose: boolean;
 };
 
-/**
- * Composed lifecycle for the "target boss" actors (Demogorgon / Ganondorf).
- * Owns mount/warmup/show/hide/update/dispose, the surface placement, the
- * camera-facing billboard, the GLTF load + skinned-model fit, and the emissive
- * material setup. The animation state machine + glow pulse live in
- * BossActorAnimator (composition). The ONLY per-map variation is injected via
- * config (scalars, glow color, log tag) and the resolveClips function.
- */
 export class BossTargetActor {
   private anchor: THREE.Group | null = null;
   private camera: THREE.Camera | null = null;
@@ -77,7 +56,6 @@ export class BossTargetActor {
     anchor.add(rig);
     this.rig = rig;
 
-    // PointLight added to the scene ONLY during the fight (show/hide).
     this.animator.createGlowLight();
 
     this.loadPromise = this.loadModel();

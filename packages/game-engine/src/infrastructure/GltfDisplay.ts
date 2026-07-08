@@ -45,15 +45,6 @@ function shouldDarkenMapMaterial(mesh: THREE.Mesh): boolean {
   return false;
 }
 
-/**
- * Prepares GLB materials for Three.js PBR rendering.
- * - Fixes texture color spaces (SRGBColorSpace).
- * - Darkens table surfaces per `rendering.colorDarken`.
- * - Boosts `envMapIntensity` based on metalness level and the map config.
- *
- * @param rendering Map rendering config (from manifest.rendering).
- *                  Absent → neutral defaults.
- */
 export function prepareGltfMaterialsForDisplay(
   root: THREE.Object3D,
   rendering?: MapRenderingConfig,
@@ -76,29 +67,22 @@ export function prepareGltfMaterialsForDisplay(
       if (processed.has(material)) continue;
       processed.add(material);
 
-      // Texture color spaces.
       for (const key of TEXTURE_KEYS) {
         const tex = material[key];
         if (tex) tex.colorSpace = THREE.SRGBColorSpace;
       }
 
-      // Selective darkening of playfield surfaces.
       if (shouldDarkenMapMaterial(obj)) {
         material.color.multiplyScalar(colorDarken);
-        // Printed surfaces (floor/plastic/stickers) = diffuse, not mirrors.
-        // High roughness + metalness 0 + near-zero envMapIntensity: even at
-        // grazing angles (fresnel), the floor no longer reflects the
-        // RoomEnvironment panels. Do NOT fall through to the boost below.
+        // Printed surfaces stay diffuse (near-zero envMapIntensity) so the floor
+        // never reflects the RoomEnvironment panels. Do NOT fall through to the
+        // boost below.
         material.roughness = Math.max(material.roughness, 0.85);
         material.metalness = 0;
         material.envMapIntensity = 0.05;
         continue;
       }
 
-      // envMapIntensity by metalness — key to the vivid PBR look.
-      // metalness = 0 → diffuse material (plastic, wood): envBase.
-      // metalness 0.2–0.5 → semi-metal: envSemi.
-      // metalness ≥ 0.5 → pure metal (gold, chrome, gems): envMetallic.
       if (material.metalness >= 0.5) {
         material.envMapIntensity = envMetallic;
       } else if (material.metalness >= 0.2) {
@@ -110,11 +94,6 @@ export function prepareGltfMaterialsForDisplay(
   });
 }
 
-/**
- * Configures the WebGL renderer for correct PBR rendering.
- * @param rendering Map config — toneMappingExposure read from rendering,
- *                  or DEFAULT when absent.
- */
 export function configureGltfRenderer(
   renderer: THREE.WebGLRenderer,
   rendering?: MapRenderingConfig,
@@ -124,10 +103,6 @@ export function configureGltfRenderer(
   renderer.toneMappingExposure = rendering?.toneMappingExposure ?? DEFAULT_TONE_MAPPING_EXPOSURE;
 }
 
-/**
- * Blur factor to pass to `pmrem.fromScene(env, blur)`.
- * 0 = sharp reflections, 0.04 = soft (Three.js default).
- */
 export function getEnvironmentBlur(rendering?: MapRenderingConfig): number {
   return rendering?.environmentBlur ?? DEFAULT_ENVIRONMENT_BLUR;
 }

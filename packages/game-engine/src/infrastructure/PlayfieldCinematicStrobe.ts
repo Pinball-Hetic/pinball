@@ -11,7 +11,6 @@ export type PlayfieldCinematicStrobeConfig = {
   flashDecay?: number;
 };
 
-/** Optional decor port: drives lights/visuals in time with the strobe. */
 export interface DecorLights {
   setStrobe(active: boolean, on: boolean, normalWhenOn?: boolean): void;
 }
@@ -23,7 +22,6 @@ export class PlayfieldCinematicStrobe {
   private decor: DecorLights[] = [];
   private flashIntensity = 2.4;
 
-  // The PointLight is IN the scene only while it flashes (perf).
   private setFlash(intensity: number): void {
     if (!this.flashLight) return;
     this.flashLight.intensity = intensity;
@@ -55,7 +53,7 @@ export class PlayfieldCinematicStrobe {
       config.flashDecay ?? 2,
     );
     this.flashLight.position.copy(config.flashPosition);
-    this.flashRoot = root; // add/remove on demand
+    this.flashRoot = root;
   }
 
   apply(on: boolean, fullMap: boolean, mix: number): void {
@@ -67,7 +65,6 @@ export class PlayfieldCinematicStrobe {
     for (const d of this.decor) d.setStrobe(active, on, fullMap);
   }
 
-  /** Flash without shade overlay — for maps that don't want a black veil. */
   applyFlashOnly(on: boolean, mix: number): void {
     this.shade.setOpacity(0);
     this.setFlash(on ? this.flashIntensity * mix : 0);

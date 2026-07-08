@@ -8,7 +8,6 @@ import {
   type FlipperPivot,
 } from "@pinball/game-engine";
 
-// Debug colors (wireframe hull + pivot sphere) per flipper.
 const LEFT_DEBUG_COLOR = 0x00ffff;
 const RIGHT_DEBUG_COLOR = 0xff00ff;
 
@@ -32,16 +31,10 @@ export interface BuildFlipperBodiesDeps {
   rightFlipper: THREE.Mesh | null;
   leftPivot: FlipperPivot | null;
   rightPivot: FlipperPivot | null;
-  // Component dispose registries — the geos/mats created here are pushed in.
   disposableGeos: THREE.BufferGeometry[];
   disposableMats: THREE.Material[];
 }
 
-// Setup-only construction (no frame work): flipper kinematic bodies + debug
-// convex hulls, plus the pivot marker spheres (visible when H is active).
-// Meshes are added to the scene and registered for dispose. Nothing reads
-// them from the animate loop during construction — the returned refs are
-// assigned in the init closure afterwards.
 export function buildFlipperBodies(
   deps: BuildFlipperBodiesDeps,
 ): FlipperBodiesResult {
@@ -90,7 +83,6 @@ export function buildFlipperBodies(
   const left = makeBody(leftFlipper, LEFT_DEBUG_COLOR);
   const right = makeBody(rightFlipper, RIGHT_DEBUG_COLOR);
 
-  // Pivot debug markers — spheres visible when H is active.
   const pivotGeo = new THREE.SphereGeometry(0.008, 12, 12);
   const pivotMatL = new THREE.MeshBasicMaterial({ color: LEFT_DEBUG_COLOR, depthTest: false });
   const pivotMatR = new THREE.MeshBasicMaterial({ color: RIGHT_DEBUG_COLOR, depthTest: false });

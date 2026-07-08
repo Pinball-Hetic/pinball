@@ -4,12 +4,6 @@ import {
   UPSIDE_DOWN_PORTAL_PULSE_SPEED,
 } from './UpsideDownConstants';
 
-/**
- * Impulse vector (world space) the portal magnet applies to a ball at
- * horizontal distance `horiz` from the anchor. `null` = out of radius or too
- * close (no impulse). Pure math — the caller reads `body.translation()` and
- * calls `body.applyImpulse()`.
- */
 export function portalMagnetImpulse(
   dx: number,
   dz: number,
@@ -27,16 +21,11 @@ export function portalMagnetImpulse(
   };
 }
 
-/**
- * Opening progress `p` ∈ [0,1] reached by the "polish" phase (`revealing`)
- * at normalized time `t` ∈ [0,1]: cubic ease-out over [0.35, 1].
- */
 export function portalRevealingProgress(t: number): number {
   const ease = 1 - Math.pow(1 - t, 3);
   return 0.35 + ease * 0.65;
 }
 
-/** Visual scalar levels derived from the opening progress `p`. */
 export type PortalOpenLevels = {
   portalOn: number;
   glbOff: number;
@@ -57,11 +46,6 @@ export type PortalOpenLevels = {
   particleScale: number;
 };
 
-/**
- * Maps the opening progress `p` ∈ [0,1] to all portal scalar levels
- * (opacities, intensities, scales). Consumed by the renderer to drive
- * materials/lights/sprites.
- */
 export function portalOpenLevels(p: number): PortalOpenLevels {
   const portalOn = easeInOut(p);
   const glbOff = easeInOut(Math.min(1, p / 0.42));
@@ -87,7 +71,6 @@ export function portalOpenLevels(p: number): PortalOpenLevels {
   };
 }
 
-/** Scalar levels of the open portal's "idle" (pulse) animation. */
 export type PortalPulseLevels = {
   pulse: number;
   fast: number;
@@ -102,11 +85,6 @@ export type PortalPulseLevels = {
   vineEmissiveIntensity: number;
 };
 
-/**
- * Open-portal animation levels at time `pulseT` with suction boost
- * `suckBoost`. Vine/particle positions stay in the renderer (they depend on
- * per-mesh state).
- */
 export function portalPulseLevels(pulseT: number, suckBoost: number): PortalPulseLevels {
   const pulse = 0.65 + Math.sin(pulseT * UPSIDE_DOWN_PORTAL_PULSE_SPEED) * 0.35;
   const accentPulse = 0.55 + Math.sin(pulseT * UPSIDE_DOWN_PORTAL_ACCENT_PULSE_SPEED) * 0.45;

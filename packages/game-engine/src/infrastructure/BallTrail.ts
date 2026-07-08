@@ -1,8 +1,5 @@
 import * as THREE from 'three';
 
-// Ball fire trail — fixed sprite pool (additive planes), zero per-frame
-// allocation, zero lights. Radial texture generated via canvas.
-
 const POOL = 24;
 const PLANE = 0.008;
 const LIFE = 0.3; // s
@@ -17,7 +14,7 @@ const COLOR_FEVER_B = 0x00c8ff;
 interface TrailSprite {
   mesh: THREE.Mesh;
   mat: THREE.MeshBasicMaterial;
-  life: number; // remaining; 0 = free
+  life: number;
 }
 
 function makeRadialTexture(): THREE.CanvasTexture {
@@ -40,7 +37,7 @@ export class BallTrail {
   private texture: THREE.CanvasTexture;
   private emitAccum = 0;
   private feverFlip = 0;
-  private maxActive = POOL; // capped by the QualityGovernor
+  private maxActive = POOL;
 
   constructor() {
     this.texture = makeRadialTexture();
@@ -66,7 +63,6 @@ export class BallTrail {
     scene.add(this.group);
   }
 
-  // Active pool cap (QualityGovernor: 24 → 12 at the lowest tier).
   setMaxSprites(n: number): void {
     this.maxActive = Math.max(0, Math.min(POOL, n));
   }
@@ -88,11 +84,6 @@ export class BallTrail {
     s.mat.opacity = 1;
   }
 
-  /**
-   * @param intensity 0..1 — emission density (0 = trail off).
-   * @param opts alternateWorld (purple tint) / fever (alternating tint).
-   * @param camQuat camera orientation to billboard the planes.
-   */
   update(
     dt: number,
     ballPos: { x: number; y: number; z: number },
@@ -100,7 +91,6 @@ export class BallTrail {
     opts: { alternateWorld: boolean; fever: boolean },
     camQuat: THREE.Quaternion,
   ): void {
-    // Emission proportional to intensity.
     if (intensity > 0) {
       this.emitAccum += intensity * EMIT_RATE * dt;
       while (this.emitAccum >= 1) {
@@ -114,7 +104,6 @@ export class BallTrail {
       }
     }
 
-    // Advance live sprites (scale + alpha decay, +Y drift).
     for (const s of this.sprites) {
       if (s.life <= 0) continue;
       s.life -= dt;
@@ -123,7 +112,7 @@ export class BallTrail {
         s.mat.opacity = 0;
         continue;
       }
-      const t = s.life / LIFE; // 1 → 0
+      const t = s.life / LIFE;
       s.mat.opacity = t;
       s.mesh.scale.setScalar(0.4 + t * 1.1);
       s.mesh.position.y += DRIFT_Y * dt;

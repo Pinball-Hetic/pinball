@@ -3,10 +3,8 @@ import { useEffect, useRef } from 'react'
 import type { Reactor } from './reactor'
 
 interface SideArtProps {
-  // Generic API (normal / alternate world): the app does not know about the
-  // Upside Down. The ST rendering is internal to the map.
   mood: 'normal' | 'alternate'
-  agitation: number // 0..1 — animation speed/amplitude
+  agitation: number
   reactor?: Reactor
 }
 
@@ -20,12 +18,12 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
       if (r.kind === 'event' && r.label === 'RAMP' && beamRef.current) {
         const el = beamRef.current
         el.classList.remove(cx('ramp-beam-on'))
-        void el.offsetWidth // reflow → restarts the animation
+        void el.offsetWidth // force reflow to restart the CSS animation
         el.classList.add(cx('ramp-beam-on'))
       }
     })
   }, [reactor])
-  const swayDur = 6 - agitation * 4 // more agitated = faster
+  const swayDur = 6 - agitation * 4
   const glow = upside ? '#b14dff' : '#ff2d2d'
   const amp = 2 + agitation * 6
 
@@ -55,7 +53,6 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
 
         <rect x="0" y="0" width="320" height="660" fill="url(#demoGrad)" />
 
-        {/* Demogorgon silhouette — body + petal head */}
         <g
           className={cx('demo-body')}
           fill="#050505"
@@ -65,7 +62,6 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
         >
           <path d="M160 250 C120 300 120 470 150 600 L170 600 C200 470 200 300 160 250 Z" />
           <ellipse cx="160" cy="235" rx="42" ry="54" />
-          {/* flower head: open petals */}
           {Array.from({ length: 6 }).map((_, i) => {
             const a = (Math.PI * (i - 2.5)) / 5
             const x = 160 + Math.cos(a - Math.PI / 2) * 60
@@ -79,12 +75,10 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
               />
             )
           })}
-          {/* thin arms */}
           <path d="M150 290 C100 320 70 400 80 470" fill="none" strokeWidth="6" />
           <path d="M170 290 C220 320 250 400 240 470" fill="none" strokeWidth="6" />
         </g>
 
-        {/* Animated vines (slow sway) */}
         {[40, 110, 200, 280].map((x, i) => (
           <path
             key={x}

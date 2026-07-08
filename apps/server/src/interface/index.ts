@@ -12,10 +12,6 @@ import { createLeaderboard } from '../use-cases/Leaderboard';
 import { createApp } from './createApp';
 import { createSocketGateway } from './socketGateway';
 
-// Composition root: wire the real adapters into the use-case factories. All
-// testable logic lives in createApp / createSocketGateway / the use-cases
-// (side-effect-free, port-injected). This module is the only place that knows
-// about prisma + the global API.
 const PORT = process.env.PORT || 3001;
 
 const games = prismaGameRepository;

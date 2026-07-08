@@ -12,7 +12,6 @@ import {
 } from '@pinball/dmd-core'
 import { mapStateNumber } from '@pinball/shared-types'
 
-// HETIC overlay (right row) drawn over SCORE mode.
 export const scoreOverlay: ScoreOverlay = (grid, display) => {
   const hetic = mapStateNumber(display.mapState, 'hetic')
   const letters = 'HETIC'
@@ -24,7 +23,6 @@ export const scoreOverlay: ScoreOverlay = (grid, display) => {
   }
 }
 
-// ST FEVER banner: top/bottom chase + big score + "FEVER X5".
 export const feverBanner: FeverBanner = (grid, score, clockMs) => {
   drawChenillard(grid, clockMs, 0)
   drawChenillard(grid, -clockMs, GRID_H - 1)

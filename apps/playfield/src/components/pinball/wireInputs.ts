@@ -64,8 +64,8 @@ export function createPhysicalInputHandlers(d: PhysicalInputHandlersDeps) {
       console.log("[playfield] sensor reçu:", data, "— logique non implémentée");
     },
     onDevEvent: (trigger: DevGameEventTrigger) => {
-      // Boss via the real state path, not a raw emit — else ghost boss
-      // (visuals play but the fight is never armed).
+      // Route bosses through the real state path, not a raw emit, or the
+      // fight is never armed (visuals play but the boss is a ghost).
       if (trigger.type === "BOSS_REVEAL" || trigger.type === "BOSS_TARGET_HIT") {
         const processor = d.getCollisionProcessor();
         const bossId = trigger.bossId ?? d.mapBosses[0]?.id;

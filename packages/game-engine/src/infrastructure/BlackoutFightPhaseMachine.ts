@@ -1,19 +1,5 @@
 import { easeIn, easeOut, strobeOn } from './CinematicEasing';
 
-/**
- * Pure phase state-machine for "shape B" boss reveals (blackout → reveal →
- * flicker → victory → restore). Owns {phase, elapsed, strobeT, pulseT} and the
- * eleven-assist sub-timer, with NO Three dependency. The fully time-driven
- * sequencing + the regression-prone scalar maths (strobe gating, blackout/reveal
- * eases, flicker shade breathe/blink, victory/restore mixes, assist envelope)
- * live here so the same machine drives Demogorgon (Stranger Things) and
- * Ganondorf (Zelda).
- *
- * Map-specific differences (shade vs flash-only, billboard, eleven assist) are
- * NOT decided here — the renderer reads the descriptor scalars/flags and chooses
- * which Three calls to make.
- */
-
 export type BlackoutFightPhase =
   | 'idle'
   | 'blackout'
@@ -29,31 +15,19 @@ export type BlackoutFightConfig = {
   victory: number;
   strobeHzIntro: number;
   fightFlickerHz: number;
-  /** Hit count required to win (from the boss definition). */
   targetHits: number;
 };
 
-/**
- * Optional eleven-assist (Stranger Things only). Pass null to disable the whole
- * assist sub-machine (Ganondorf).
- */
 export type ElevenAssistConfig = {
-  /** Seconds before the first assist fires (ELEVEN_ASSIST_FIRST). */
   first: number;
-  /** Seconds between subsequent assists (ASSIST_INTERVAL). */
   interval: number;
-  /** Assist animation duration (ELEVEN_ASSIST_ANIM). */
   anim: number;
-  /** Score increment emitted on each assist (ASSIST_SCORE). */
   scoreIncrement: number;
 };
 
-/** Per-frame envelope of the eleven-assist animation. */
 export type ElevenAssistFrame = {
   active: boolean;
-  /** Normalised progress t in [0,1]. */
   t: number;
-  /** Raw assist clock (seconds) — drives the targetGroup.rotation.z wobble. */
   elapsed: number;
   rise: number;
   fade: number;
@@ -63,37 +37,23 @@ export type ElevenAssistFrame = {
 
 export type BlackoutFightDescriptor = {
   phase: BlackoutFightPhase;
-  /** strobeOn(strobeT, strobeHzIntro) — used by blackout/reveal. */
   on: boolean;
-  /** darkMix: 1 except during restore where it eases down to 0. */
   darkMix: number;
-  /** blackout phase: darkMix * easeOut(min(1, elapsed/blackout)). */
   blackoutMix: number;
-  /** reveal phase: clamped progress t = min(1, elapsed/reveal). */
   revealT: number;
-  /** flicker phase: clamped shade scalar. */
   flickerShade: number;
-  /** flicker phase: blink = strobeOn(strobeT, fightFlickerHz). */
   flickerBlink: boolean;
-  /** victory phase: clamped progress t = min(1, elapsed/victory). */
   victoryT: number;
-  /** restore phase: FIGHT_SHADE-scaled hold shade (caller multiplies its own shade). */
   restoreDarkMix: number;
-  /** transition flags (fired once on the frame they occur) */
   enteredReveal: boolean;
   enteredFlicker: boolean;
   finishedVictory: boolean;
   finishedRestore: boolean;
-  /** eleven assist: an assist fired this frame (renderer emits ASSIST + shows fx). */
   assistFired: boolean;
-  /** eleven assist: per-frame animation envelope (null when inactive/disabled). */
   assist: ElevenAssistFrame | null;
-  /** eleven assist: the assist animation just finished this frame (renderer hides fx). */
   assistFinished: boolean;
 };
 
-// Flicker shade constants (Demogorgon formula). Ganondorf gets a flat shade
-// of 0 by zeroing the terms via config — same formula, different inputs.
 export type FlickerShadeConfig = {
   base: number;
   breatheAmp: number;
@@ -134,7 +94,6 @@ export class BlackoutFightPhaseMachine {
     return this.phase === 'victory';
   }
 
-  /** BOSS_REVEAL: enter blackout from idle. Returns true if it transitioned. */
   onReveal(): boolean {
     if (this.phase !== 'idle') return false;
     this.phase = 'blackout';
@@ -147,10 +106,6 @@ export class BlackoutFightPhaseMachine {
     return true;
   }
 
-  /**
-   * BOSS_TARGET_HIT: accepted unless idle/restore/victory. Returns victory=true
-   * when the threshold is reached (renderer begins victory).
-   */
   onHit(hitCount: number): { accepted: boolean; victory: boolean } {
     if (this.phase === 'idle' || this.phase === 'restore' || this.phase === 'victory') {
       return { accepted: false, victory: false };
@@ -163,13 +118,11 @@ export class BlackoutFightPhaseMachine {
   }
 
   private beginVictory(): void {
-    // hideElevenAssist resets the assist sub-state (renderer hides the meshes).
     this.elevenAssistActive = false;
     this.phase = 'victory';
     this.elapsed = 0;
   }
 
-  /** endFight()/reset → idle, clears all clocks + assist state. */
   reset(): void {
     this.phase = 'idle';
     this.elapsed = 0;
@@ -187,13 +140,6 @@ export class BlackoutFightPhaseMachine {
     return clamp(raw, this.flicker.clampMin, this.flicker.clampMax);
   }
 
-  /**
-   * @param opts.suspendAssist true while the game is not in play (ball
-   * drained, game not relaunched). The assist sub-timer is then FROZEN (dt
-   * does not flow): merely "not emitting" would let the counter keep running
-   * down and the assist would fire the instant play resumes (catch-up).
-   * The rest of the fight (strobe, flicker, phases) keeps running normally.
-   */
   tick(dt: number, opts?: { suspendAssist?: boolean }): BlackoutFightDescriptor {
     // pulseT advances every frame — even in idle.
     this.pulseT += dt;
@@ -286,10 +232,8 @@ export class BlackoutFightPhaseMachine {
       return { ...base, phase: 'victory', victoryT, finishedVictory };
     }
 
-    // restore
     const finishedRestore = darkMix <= 0;
     if (finishedRestore) {
-      // resetAtmosphere() in the renderer drives reset(); we report it here.
       return { ...base, phase: 'restore', finishedRestore: true };
     }
     return { ...base, phase: 'restore' };

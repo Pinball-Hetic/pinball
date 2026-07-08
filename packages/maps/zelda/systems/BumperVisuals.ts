@@ -34,8 +34,6 @@ export class BumperVisuals {
       baseScale:   ctx.baseScale,
     }));
 
-    // Fail loudly: no matched mesh = bumper effects silently dead (GLB
-    // naming convention changed). Diagnostic parity with ST.
     if (this.parts.length === 0) {
       console.warn(
         '[BumperVisuals] aucun mesh bumper reconnu (VIS_BUMPER) — ' +
@@ -51,12 +49,10 @@ export class BumperVisuals {
 
   update(dt: number): void {
     tickPunchTimers(this.punchTimers, dt);
-    // Scale animation: 1 → 1+PEAK → 1 with easeOutBack.
     applyPunchScale(this.parts, this.punchTimers, PUNCH_DURATION, PUNCH_PEAK);
   }
 
   dispose(): void {
-    // Restore scales to their original value before clearing.
     for (const part of this.parts) {
       part.mesh.scale.copy(part.baseScale);
     }
