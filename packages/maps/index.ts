@@ -11,17 +11,11 @@ import {
   createModule as zeldaCreateModule,
 } from '@pinball/map-zelda'
 
-// layout + module (game-engine types) cannot live on MapPackage
-// (shared-types does not depend on game-engine). The registry — which does
-// depend on game-engine — assembles them into this enriched type.
 export interface ResolvedMap extends MapPackage {
   layout: MapLayout
-  /** Lazy behavior-module factory (absent → no custom behavior). */
   module?: () => MapModule
 }
 
-// Maps composition root: the ONLY file in the repo that imports
-// @pinball/map-* packages. Apps resolve a map by id via getMapPackage.
 export function getMapPackage(id: string): ResolvedMap | null {
   switch (id) {
     case 'strangerthings':
@@ -33,13 +27,11 @@ export function getMapPackage(id: string): ResolvedMap | null {
   }
 }
 
-/** Lightweight metadata for the map selector (no layout, no module). */
 export interface MapMeta {
   id: string
   name: string
   tagline: string
   accentColor: string
-  /** Public URL of the preview video (looped inside the card). */
   previewVideo?: string
 }
 

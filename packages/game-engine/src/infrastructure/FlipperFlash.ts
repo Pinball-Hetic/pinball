@@ -6,9 +6,9 @@ export type FlashMat = {
   intensity: number;
 };
 
-export const FLASH_DURATION = 0.08; // retour en 80ms
+export const FLASH_DURATION = 0.08;
 export const FLASH_INTENSITY = 1.2;
-const _flashColor = new THREE.Color(0xfff0e0); // blanc chaud
+const _flashColor = new THREE.Color(0xfff0e0);
 
 export function collectFlashMats(obj: THREE.Object3D): FlashMat[] {
   const out: FlashMat[] = [];

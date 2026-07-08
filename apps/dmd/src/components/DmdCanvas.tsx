@@ -9,9 +9,6 @@ const GLITCH_MS = 350
 interface Props {
   display: DmdDisplay
   alternateWorld: boolean
-  /** DMD content of the active map (provided by the page, derived from mapId).
-   *  The component is mounted with key={mapId}: the LAYOUTS/PALETTE/BURST
-   *  constants are recomputed on each remount, never during the component's life. */
   mapDmdContent: DmdMapContent
 }
 
@@ -22,10 +19,6 @@ const canvasStyle: CSSProperties = {
   imageRendering: 'pixelated',
 }
 
-// rAF loop reading refs: ZERO re-renders per frame (project rule — a re-render
-// would unmount/remount the canvas). The LAYOUTS, ALTERNATE_PALETTE, BURST_MS
-// constants are computed once per mount (the page uses key={mapId} to force a
-// clean remount on every map change).
 export default function DmdCanvas({ display, alternateWorld, mapDmdContent }: Props) {
   const LAYOUTS = useMemo(() => makeLayouts(mapDmdContent), [mapDmdContent])
   const NORMAL_PALETTE = useMemo(
@@ -64,9 +57,8 @@ export default function DmdCanvas({ display, alternateWorld, mapDmdContent }: Pr
       const now = performance.now()
       const d = displayRef.current
 
-      // Effect triggers on mode OR clip change (two consecutive CINEMATIC
-      // clips keep mode='CINEMATIC' → the clock must still reset for the
-      // new clip).
+      // Reset on clip change too: two consecutive CINEMATIC clips keep
+      // mode='CINEMATIC', so mode-only detection would miss the clip switch.
       const clipNow = d.mode === 'CINEMATIC' ? d.clip : undefined
       if (d.mode !== prevMode || clipNow !== prevClip) {
         modeStartedAt = now
@@ -77,14 +69,12 @@ export default function DmdCanvas({ display, alternateWorld, mapDmdContent }: Pr
       }
 
       const cinematic = d.mode === 'CINEMATIC'
-      // CINEMATIC: clock relative to the mode's arrival (clip frames).
       const clock = cinematic ? now - modeStartedAt : now
 
       renderer.setPalette(alternateWorldRef.current ? ALTERNATE_PALETTE : NORMAL_PALETTE)
       renderer.clearGrid()
       LAYOUTS[d.mode](renderer.grid, d, clock)
       if (alternateWorldRef.current) rain.drawBackground(renderer.grid)
-      // Glitch/burst do NOT apply during a clip (it stands on its own).
       if (!cinematic && now < glitchUntil) {
         applyGlitch(renderer.grid, GRID_W, GRID_H, (glitchUntil - now) / GLITCH_MS)
       }

@@ -36,11 +36,6 @@ function meshCenterX(mesh: THREE.Mesh): number {
   return new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()).x;
 }
 
-/**
- * Direct resolution: the GLB already exposes two distinct sub-models named
- * `flipper-left` and `flipper-right` (normalized names with a dash).
- * Found directly — no geometric split needed.
- */
 function resolveNamedFlippers(root: THREE.Object3D): PlayfieldFlipperPair | null {
   const leftNode  = findObjectByNormalizedName(root, 'flipper-left',  'flipper_left')  ?? null;
   const rightNode = findObjectByNormalizedName(root, 'flipper-right', 'flipper_right') ?? null;
@@ -63,13 +58,10 @@ function meshSpansPlayfieldCenter(mesh: THREE.Mesh): boolean {
 }
 
 export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipperPair | null {
-  // Case 1: GLB with named flipper-left / flipper-right sub-models (new format).
   const namedPair = resolveNamedFlippers(root);
   if (namedPair) return namedPair;
 
-  // Case 2: legacy fallback — single flipper (flipper.001 / flipper001 /
-  // flipper) split geometrically at the X=0 plane.
-  // Three.js GLTFLoader sanitizes dots → flipper.001 becomes flipper001 in the scene.
+  // Three.js GLTFLoader sanitizes dots → flipper.001 becomes flipper001.
   const group = findObjectByNormalizedName(root, 'flipper.001', 'flipper001', 'flipper') ?? null;
   const meshes: THREE.Mesh[] = [];
   if (group) {
@@ -80,15 +72,8 @@ export function resolvePlayfieldFlippers(root: THREE.Object3D): PlayfieldFlipper
   }
   if (meshes.length === 0) return null;
 
-  // Multi-mesh GLB case: 2+ meshes that EACH span the full playfield width
-  // (base + plastic of the same flipper pair). Split the densest one
-  // geometrically at X=0 to get left/right half-meshes, and hide the others.
   const spanning = meshes.filter(meshSpansPlayfieldCenter);
   if (spanning.length >= 1 && (meshes.length === 1 || spanning.length === meshes.length)) {
-    // Sort by descending vertex count: primary = densest mesh (usually the
-    // main structural layer). The others are split too and attached as
-    // children of the primary half-meshes to preserve the multi-layer look
-    // (e.g. red rubber + white plastic).
     const ordered = [...spanning].sort(
       (a, b) =>
         (b.geometry.attributes.position?.count ?? 0) -
@@ -234,9 +219,7 @@ function hingeLocalPosition(
   const box = new THREE.Box3().setFromObject(flipper);
   const { min, max } = box;
   const inset = (max.x - min.x) * HINGE_INSET_FROM_EDGE;
-  // Pinball convention: hinge at far-X (playfield edge side), tip at center.
-  // LEFT → hinge at min.x (far left). RIGHT → hinge at max.x (far right).
-  // Fine pivot tuning comes from the map layout (pivots).
+  // Pinball convention: hinge at far-X (LEFT → min.x, RIGHT → max.x), tip at center.
   const baseX  = side === 'left' ? min.x + inset : max.x - inset;
   const extraX = side === 'left' ? pivots.leftX : pivots.rightX;
   const hingeWorld = new THREE.Vector3(
@@ -266,10 +249,8 @@ export function attachFlipperAtHinge(
   parent.add(pivot);
   pivot.attach(flipper);
 
-  // Pinball: horizontal swing around an axis perpendicular to the playfield.
-  // Y is close enough to the playfield normal (tilt ~6.5°) for the visual.
-  // The old `detectPivotAxis` measured the Y lift and picked X for a flat
-  // flipper — which gave a vertical tilt instead of a swing.
+  // Horizontal swing around Y: close enough to the playfield normal (tilt ~6.5°)
+  // for the visual, avoiding the vertical tilt an X axis would give.
   pivot.rotation.set(0, 0, 0);
   return { pivot, mesh: flipper, side, axis: 'y' };
 }

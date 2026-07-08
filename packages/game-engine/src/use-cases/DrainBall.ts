@@ -9,21 +9,12 @@ export class DrainBall {
     private readonly emit: GameEventListener,
   ) {}
 
-  /**
-   * Re-arms the use-case. Call when a new ball enters play (`BALL_LAUNCHED`
-   * path), symmetric to `BottomOutBall.resetLatch`.
-   */
   resetLatch(): void {
     this.latched = false;
   }
 
-  /**
-   * Emits DRAIN and resets the ball to spawn. The visual delay is handled by
-   * the interface layer. Debounce latch: the drain sensor (Rapier) can fire
-   * `execute()` on 2 consecutive frames before the spawn reset takes effect →
-   * without this guard, double DRAIN / double life loss. The latch is lifted
-   * by `resetLatch()` when the ball is (re)launched.
-   */
+  // Debounce latch: the drain sensor can fire on 2 consecutive frames before
+  // the spawn reset takes effect; without this guard, double DRAIN / life loss.
   execute(): void {
     if (this.latched) return;
     this.latched = true;

@@ -15,12 +15,8 @@ import {
 
 export { GRID_W, GRID_H, PITCH } from './dmdGrid'
 
-// Builds an offscreen sprite (pre-rendered dot) for a color. Injectable so
-// tests avoid the global `document`.
 export type SpriteFactory = (color: string) => HTMLCanvasElement | null
 
-// Default impl: pre-renders a dot via document.createElement('canvas').
-// Halo via radial gradient (NOT shadowBlur — too expensive per dot).
 export const documentSpriteFactory: SpriteFactory = (color) => {
   const s = document.createElement('canvas')
   s.width = PITCH
@@ -38,14 +34,9 @@ export const documentSpriteFactory: SpriteFactory = (color) => {
   return s
 }
 
-// Dot-matrix renderer: logical 128×32 grid of palette indices, rendered as
-// dots (circle + halo) on a 1920×480 canvas. No React. Pure logic (grid,
-// draw plan, color stops) lives in ./dmdGrid; this class is the thin canvas
-// IO caller.
 export class DmdRenderer {
   readonly grid: Uint8Array
   private ctx: CanvasRenderingContext2D
-  // sprites[colorIndex] = pre-rendered offscreen (null for index 0 = off).
   private sprites: (HTMLCanvasElement | null)[] = []
   private palette: Palette = PALETTE_NORMAL
   private spriteFactory: SpriteFactory
@@ -74,7 +65,7 @@ export class DmdRenderer {
     this.grid.fill(0)
   }
 
-  // Phosphor decay (no clearRect) + draw the lit dots.
+  // Semi-transparent fill (NOT clearRect) leaves a phosphor-decay trail.
   render(): void {
     this.ctx.fillStyle = 'rgba(0,0,0,0.28)'
     this.ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
@@ -84,7 +75,6 @@ export class DmdRenderer {
     }
   }
 
-  // Pre-renders one dot per color of the active palette.
   private buildSprites(): void {
     const palette = this.palette
     this.sprites = [null]

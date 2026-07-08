@@ -9,12 +9,6 @@ export type FlipperHullBodyResult = {
   localPts: THREE.Vector3[];
 };
 
-/**
- * Kinematic body + convex hull collider for a flipper, derived from a
- * THREE.Mesh's world geometry. No scene mutation, no debug mesh created
- * here — returns `localPts`/`hullVertices` so the caller can build its own
- * debug ConvexGeometry.
- */
 export function buildFlipperHullBody(
   world: RAPIER.World,
   flipper: THREE.Mesh,
@@ -30,7 +24,6 @@ export function buildFlipperHullBody(
   const n = posAttr.count;
   const v = new THREE.Vector3();
 
-  // Real geometric center (not the parent group's origin)
   let wSumX = 0,
     wSumY = 0,
     wSumZ = 0;
@@ -43,7 +36,6 @@ export function buildFlipperHullBody(
   const geoCenter = new THREE.Vector3(wSumX / n, wSumY / n, wSumZ / n);
   const localOffset = geoCenter.clone().sub(meshOrigin).applyQuaternion(invWorldQuat);
 
-  // Vertices in body-local space (centered on geoCenter)
   const localPts: THREE.Vector3[] = [];
   const raw: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -75,12 +67,6 @@ export function buildFlipperHullBody(
   return { body, localOffset, hullVertices, localPts };
 }
 
-/**
- * World transform of a flipper offset by its `localOffset` (expressed in the
- * flipper's local space). Offset math shared between the kinematic body sync
- * and the debug wireframes — lives here once. Calls
- * `updateMatrixWorld(true)`.
- */
 export function flipperWorldTransform(
   flipper: THREE.Object3D,
   localOffset: THREE.Vector3,
@@ -95,10 +81,6 @@ export function flipperWorldTransform(
   return { position, quaternion };
 }
 
-/**
- * Pushes a flipper's world transform (via `flipperWorldTransform`) into its
- * kinematic Rapier body. No-op if `body` or `flipper` is null.
- */
 export function syncFlipperBody(
   body: RAPIER.RigidBody | null,
   flipper: THREE.Object3D | null,

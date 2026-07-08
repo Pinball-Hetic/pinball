@@ -107,7 +107,6 @@ function renderDisplay(d: DmdDisplay): ReactElement {
       )
 
     case 'CINEMATIC':
-      // No-op placeholder: real clip rendering is done by AsciiClipPlayer.
       return (
         <div className="flex flex-col items-center gap-4">
           <div className="text-6xl font-mono font-bold tabular-nums">
@@ -128,17 +127,11 @@ export default function ScoreboardPage() {
   const router = useRouter()
   const { display, alternateWorld, connected, mapId } = useDmdState()
 
-  // Display name of the active map (top band). Falls back to the uppercased
-  // id if the map is not in AVAILABLE_MAPS (unknown map in dev).
   const mapName =
     AVAILABLE_MAPS.find((m) => m.id === mapId)?.name ?? mapId.toUpperCase()
 
-  // DMD content of the active map. key={mapId} on DmdCanvas forces a clean
-  // remount (closes the previous rAF loop, recreates LAYOUTS/PALETTE/BURST).
   const mapDmdContent = getDmdContent(mapId) ?? {}
 
-  // ?flat: legacy flat JSX rendering (debug). Wait for router.isReady to
-  // avoid mounting the canvas then switching to flat.
   if (!router.isReady) {
     return <main style={{ minHeight: '100vh', background: '#000' }} />
   }

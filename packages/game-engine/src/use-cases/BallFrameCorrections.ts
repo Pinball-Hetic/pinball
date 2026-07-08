@@ -9,12 +9,6 @@ export interface BallBodyState {
   angvel: Vec3;
 }
 
-/**
- * Locks the ball at the spawn while idle (including during plunger charge):
- * otherwise gravity/tilt makes it slide against the right wall (friction →
- * slower launch). Pure: the caller reads spawn from the layout and applies
- * translation/linvel/angvel to the body.
- */
 export function computeIdleSpawnLock(spawn: { x: number; y: number; z: number }): BallBodyState {
   const z = spawn.z;
   return {
@@ -24,16 +18,6 @@ export function computeIdleSpawnLock(spawn: { x: number; y: number; z: number })
   };
 }
 
-/**
- * Shooter lane lateral lock: during the climb (straight right part of the
- * lane, before the exit opening), X is pinned to the spawn line and lateral
- * velocity is cancelled → perfectly straight launch, independent of GLB
- * geometry. The ball is released once it reaches the exit zone
- * (Z <= lane.leftWallTopZ) so it enters the playfield naturally.
- *
- * Returns the state to apply while in the straight part, the 'close' signal
- * once past exitX (the caller closes the gate), or null when nothing to do.
- */
 export function computeLaneStraightLock(
   pos: Vec3,
   linvel: Vec3,
@@ -53,14 +37,8 @@ export function computeLaneStraightLock(
   return null;
 }
 
-/**
- * Speed clamp. Both rules read the SAME initial velocity (the second does not
- * see the result of the first):
- *   1. if total speed exceeds BALL_MAX_SPEED → scale x/y/z.
- *   2. if INITIAL y > 1.25 → overwrite with { x, y: 0.35, z } using the
- *      INITIAL x/z, fully replacing the result of step 1.
- * Returns the final linvel to apply, or null when no correction is needed.
- */
+// Both rules read the SAME initial velocity; the y > 1.25 rule fully replaces
+// (not composes with) the speed-scale result.
 export function computeSpeedClamp(vel: Vec3): Vec3 | null {
   let out: Vec3 | null = null;
   const speed = Math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2);

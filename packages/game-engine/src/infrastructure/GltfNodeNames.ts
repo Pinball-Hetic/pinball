@@ -19,7 +19,6 @@ export function isVisualOnlyGltfName(name: string): boolean {
   return n.startsWith('vis_') || n === 'glass' || n.includes('glass');
 }
 
-/** Ancestry variant: true if self OR any ancestor is visual-only. */
 export function isVisualOnlyGltfAncestry(ancestryNames: string[]): boolean {
   return ancestryNames.some(isVisualOnlyGltfName);
 }
@@ -58,10 +57,6 @@ export function hasNamedAncestor(obj: THREE.Object3D, ...names: string[]): boole
   return false;
 }
 
-/**
- * Variant of isPinballmapGameplayMesh operating on the ancestry name list
- * (self → parents) instead of a THREE.Mesh.
- */
 export function isPinballmapGameplayMeshName(ancestryNames: string[]): boolean {
   return ancestryNames.some((name) => normalizeGltfName(name) === 'pinballmap');
 }
@@ -70,16 +65,10 @@ export function isPinballmapGameplayMesh(mesh: THREE.Mesh): boolean {
   return hasNamedAncestor(mesh, 'Pinballmap');
 }
 
-/**
- * Variant of isFlipperGltfMesh operating on the ancestry name list
- * (self → parents). Stops at the 'pinballmap' boundary.
- */
 export function isFlipperGltfMeshName(ancestryNames: string[]): boolean {
   for (const name of ancestryNames) {
     const n = normalizeGltfName(name);
     if (n === 'pinballmap') return false;
-    // Old convention: single "flipper" or "flipper.001" node
-    // New convention: separate "flipper-left" / "flipper-right" sub-models
     if (
       n === 'flipper' ||
       n.startsWith('flipper.') ||
@@ -106,11 +95,6 @@ function isRailNodeName(normalized: string): boolean {
   return /^circle\.\d+$/.test(normalized) || /^plane\.\d+$/.test(normalized);
 }
 
-/**
- * Variant of isPinballmapRailMesh operating on the ancestry name list
- * (self → parents). Self is a rail if it matches circle.NNN / plane.NNN;
- * otherwise walk up the parents until the 'pinballmap' boundary.
- */
 export function isPinballmapRailMeshName(ancestryNames: string[]): boolean {
   const self = normalizeGltfName(ancestryNames[0] ?? '');
   if (isRailNodeName(self)) return true;
@@ -154,7 +138,6 @@ export const PINBALLMAP_NONPHYSICAL_FLOOR_MESHES = new Set([
   'mesh0',
 ]);
 
-/** Name-based variant of isPinballmapNonPhysicalFloorMesh (self name). */
 export function isPinballmapNonPhysicalFloorMeshName(selfName: string): boolean {
   const n = normalizeGltfName(selfName);
   const c = canonicalGltfName(selfName);
@@ -168,12 +151,8 @@ export function isPinballmapNonPhysicalFloorMesh(mesh: THREE.Mesh): boolean {
   return isPinballmapNonPhysicalFloorMeshName(mesh.name);
 }
 
-/**
- * GLB switch sensors (visual, non-gameplay sensor zones).
- * Single source shared by the 3 pipelines: trimesh (HIDDEN_NODES),
- * colliders (EXCLUDED_NODES) and rendering (VISUALLY_HIDDEN_NODES).
- * Both underscore and space variants are matched.
- */
+// Single source shared by 3 pipelines: trimesh (HIDDEN_NODES), colliders
+// (EXCLUDED_NODES) and rendering (VISUALLY_HIDDEN_NODES).
 export const SWITCH_SENSOR_NODES = new Set([
   'switch_slingshot', 'switch slingshot',
   'switch_left_pop_bumper_zone',  'switch left pop bumper zone',
@@ -184,15 +163,8 @@ export const SWITCH_SENSOR_NODES = new Set([
   'switch_out',     'switch out',
 ]);
 
-/**
- * GLB nodes present in the model that must stay invisible in game
- * (plate, switch sensors…).
- * No collision either — these nodes are already in PlayfieldTrimeshBuilder's
- * EXCLUDED_NODES.
- */
 const VISUALLY_HIDDEN_NODES = new Set(['plate', ...SWITCH_SENSOR_NODES]);
 
-/** Hides the decorative / non-gameplay GLB meshes (plate, switches). */
 export function hidePinballmapDecorNodes(root: THREE.Object3D): void {
   root.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh)) return;

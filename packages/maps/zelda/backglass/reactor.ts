@@ -1,6 +1,5 @@
-// Structural type of the backglass in-game reactor (defined app-side in
-// useIngameReactor). Duplicated here so the map's Zelda components don't
-// depend on the app; structurally identical → assignable.
+// Must stay structurally identical to the app-side reactor type
+// (useIngameReactor); duplicated here to avoid depending on the app.
 export type Reaction =
   | { kind: 'gameStart'; player: string }
   | { kind: 'hit'; intensity: number }

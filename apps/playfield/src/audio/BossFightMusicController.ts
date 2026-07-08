@@ -1,7 +1,6 @@
 import { EARLY_SOUND_LOOP_SILENCE_THRESHOLD } from "./pinballAudioConfig";
 import type { SamplePlayer } from "./SamplePlayer";
 
-/** Gapless loop for boss-fight music (e.g. spawnDG). */
 export class BossFightMusicController {
   private activeUrl: string | null = null;
 
@@ -38,7 +37,6 @@ export class BossFightMusicController {
     }
   }
 
-  /** Immediate stop — no fade. */
   stopInstant(): void {
     if (!this.activeUrl) return;
     this.samples.stopGaplessLoop(this.activeUrl);

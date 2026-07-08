@@ -66,12 +66,6 @@ function resolveVecnaClips(
   return { walkAction, fightIdleAction, hitAction, finisherAction };
 }
 
-/**
- * Vecna 3D visual (GLB + animations). Delegates the whole
- * walk/fight/hit/victory lifecycle to the generic WalkBossTargetActor
- * (game-engine); only clip resolution (raw, walk reused as frozen pose) and
- * the Vecna constants are specific.
- */
 export class VecnaTargetVisual {
   private readonly actor = new WalkBossTargetActor({
     logTag: 'Vecna',

@@ -48,21 +48,15 @@ import {
   UPSIDE_DOWN_HINT_MS,
 } from './systems/UpsideDownConstants'
 
-// ST layout. Transitional step: MapLayout is assembled from existing
-// game-engine constants (referenced, not copied → no drift). Ownership flip
-// (literals here, constants removed from game-engine) happens consumer by
-// consumer.
 export const layout: MapLayout = {
-  // Bumpers: literals (tuned collider). The Box3 center of bumper_* meshes
-  // deviates 11-15 mm (mushroom cap) → not derivable. TODO(blender): add
-  // bumper_anchor_1/2/3 (empty at the collider point) to derive eventually.
+  // Literals, not derivable: bumper_* Box3 centers deviate 11-15 mm (mushroom
+  // cap). TODO(blender): add bumper_anchor_1/2/3 empties at the collider point.
   bumpers: [
     { x: -0.020586, y: 1.0482, z: -0.1967 },
     { x: -0.097406, y: 1.0621, z: -0.30509 },
     { x: 0.059483, y: 1.0621, z: -0.30509 },
   ],
-  // Drop targets: positions derived from the GLB at runtime (LayoutResolver,
-  // target_* meshes). Literals below = fallback (≤ 0.7 mm off the derived).
+  // Fallback only: LayoutResolver derives these from target_* meshes at runtime.
   dropTargets: [
     { id: 'drop_left_1', x: -0.209, y: 1.022, z: -0.019, side: 'left' },
     { id: 'drop_left_2', x: -0.205, y: 1.026, z: -0.049, side: 'left' },
@@ -71,8 +65,7 @@ export const layout: MapLayout = {
     { id: 'drop_right_3', x: 0.137, y: 1.032, z: -0.114, side: 'right' },
   ],
   // TODO(blender): derive from the GLB once sensor_* meshes exist
-  // (sensor_pop_1/2/3, sensor_rocket, sensor_demogorgon). Explicit literals
-  // until then — no mesh in the current GLB.
+  // (sensor_pop_1/2/3, sensor_rocket, sensor_demogorgon). Literals until then.
   sensors: {
     popZones: [
       { x: -0.0225, y: 1.057, z: -0.448 },
@@ -80,27 +73,21 @@ export const layout: MapLayout = {
       { x: 0.042, y: 1.056, z: -0.438 },
     ],
     rocket: { x: 0.193, y: 1.021, z: -0.13 },
-    // Scoop hole (saucer): capture → +life/+points/×2(5s) → kick. Position to
-    // refine at smoke test (H key = collider wireframes).
     scoop: { x: 0.192, y: 1.028, z: -0.061 },
     bossReveal: { x: -0.0195, y: 1.0575, z: -0.269 },
-    // sensor_portal (sensor Ø 1.7 cm) — literal until the mesh exists.
+    // TODO: literal until sensor_portal mesh (Ø 1.7 cm) exists in the GLB.
     portal: { x: -0.000751, y: 1.015191, z: -0.064818 },
   },
-  // Spawns: analytic (no mesh expected — outside lane/hinge).
   spawns: {
     ball: { x: 0.2355, y: 1.01, z: 0.161 },
     alternateWorld: { x: -0.0225, z: -0.48 },
     alternateWorldImpulse: { x: 0, y: 0, z: 0.055 },
-    // Normal-world return → the ball EXITS THE PORTAL (= sensors.portal) with
-    // a push toward the flippers. Not the shooter lane: while `playing` the
-    // plunger does not charge (idle only) and the lane gate is closed
-    // → ball trapped. No re-trigger: the portal is closed after the cycle
-    // (portalOpen=false until a boss reopens it).
+    // Must be the portal position (= sensors.portal), not the shooter lane:
+    // while `playing` the plunger stays idle and the lane gate is closed, so a
+    // ball returned to the lane would be trapped.
     normalReturn: { x: -0.000751, z: -0.064818 },
     normalReturnImpulse: { x: 0, y: 0, z: 0.055 },
   },
-  // Shooter lane: analytic geometry (no mesh). Map literals.
   shooterLane: {
     xMin: 0.206,
     xMax: 0.265,
@@ -120,7 +107,6 @@ export const layout: MapLayout = {
     guideAngleStart: Math.PI * 1.5,
     guideAngleEnd: Math.PI * 2,
   },
-  // Fine flipper pivot tuning (offset from the bbox edge).
   flipperPivots: {
     leftX: 0.02,
     rightX: -0.02,
@@ -129,7 +115,6 @@ export const layout: MapLayout = {
   },
   bosses: bossDefinitions,
   geometry: {
-    // surfaceYAtZ(z) = 1.068 - ((z + 0.552) / 0.970) * 0.110
     coefficients: { base: 1.068, zOffset: 0.552, zSpan: 0.97, yDrop: 0.11 },
     bounds: { leftX: WALL_LEFT_X, rightX: WALL_RIGHT_X, topZ: WALL_TOP_Z, bottomZ: WALL_BOTTOM_Z },
     shade: {

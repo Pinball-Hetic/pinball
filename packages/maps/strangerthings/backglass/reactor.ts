@@ -1,6 +1,5 @@
-// Structural type of the backglass in-game reactor (defined app-side in
-// useIngameReactor). Duplicated here so the map's ST components don't
-// depend on the app; structurally identical → assignable.
+// Must stay structurally identical to the app-side useIngameReactor type;
+// the map cannot import the app, so assignability relies on structural match.
 export type Reaction =
   | { kind: 'gameStart'; player: string }
   | { kind: 'hit'; intensity: number }

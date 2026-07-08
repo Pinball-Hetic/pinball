@@ -1,12 +1,9 @@
 import { DOT } from './palette'
 
-// Effects applied on the buffer AFTER layout, before render.
-
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v))
 }
 
-// Shifts a band of rows horizontally by `dx` dots.
 function shiftBand(grid: Uint8Array, gridW: number, y0: number, rows: number, dx: number): void {
   for (let y = y0; y < y0 + rows; y++) {
     const base = y * gridW
@@ -18,7 +15,6 @@ function shiftBand(grid: Uint8Array, gridW: number, y0: number, rows: number, dx
   }
 }
 
-// Inverts a band (lit ↔ off dots; newly lit dots take the event color).
 function invertBand(grid: Uint8Array, gridW: number, gridH: number): void {
   const rows = 3 + Math.floor(Math.random() * 4)
   const y0 = Math.floor(Math.random() * (gridH - rows))
@@ -34,15 +30,15 @@ function invertBand(grid: Uint8Array, gridW: number, gridH: number): void {
 export function applyGlitch(grid: Uint8Array, gridW: number, gridH: number, t01: number): void {
   const intensity = clamp01(t01)
 
-  const bandCount = 2 + Math.floor(Math.random() * 3) // 2..4
+  const bandCount = 2 + Math.floor(Math.random() * 3)
   for (let b = 0; b < bandCount; b++) {
-    const rows = 3 + Math.floor(Math.random() * 4) // 3..6
+    const rows = 3 + Math.floor(Math.random() * 4)
     const y0 = Math.floor(Math.random() * (gridH - rows))
-    const dx = (1 + Math.floor(Math.random() * 3)) * (Math.random() < 0.5 ? -1 : 1) // ±1..3
+    const dx = (1 + Math.floor(Math.random() * 3)) * (Math.random() < 0.5 ? -1 : 1)
     shiftBand(grid, gridW, y0, rows, dx)
   }
 
-  const noise = 6 + Math.floor(Math.random() * 7 * intensity) // 6..12, decreases with t01
+  const noise = 6 + Math.floor(Math.random() * 7 * intensity)
   for (let i = 0; i < noise; i++) {
     const x = Math.floor(Math.random() * gridW)
     const y = Math.floor(Math.random() * gridH)
@@ -59,8 +55,6 @@ interface RainColumn {
   trailLen: number
 }
 
-// Matrix-style dot rain. The renderer's phosphor decay creates the natural
-// trail gradient.
 export class MatrixRain {
   private cols: RainColumn[] = []
 
@@ -78,7 +72,7 @@ export class MatrixRain {
       x,
       headY,
       speed: 0.3 + Math.random() * 0.5,
-      trailLen: 6 + Math.floor(Math.random() * 9), // 6..14
+      trailLen: 6 + Math.floor(Math.random() * 9),
     }
   }
 
@@ -91,7 +85,7 @@ export class MatrixRain {
     }
   }
 
-  // Purple background rain: does NOT overwrite dots already set by the layout.
+  // Must NOT overwrite dots already set by the layout (hence the grid[i]===0 guard).
   drawBackground(grid: Uint8Array): void {
     this.step()
     for (const c of this.cols) {
@@ -105,7 +99,6 @@ export class MatrixRain {
     }
   }
 
-  // Green burst covering everything, max density at start (t01=1) → thins out.
   drawBurst(grid: Uint8Array, t01: number): void {
     this.step()
     const density = clamp01(t01)

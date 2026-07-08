@@ -1,6 +1,3 @@
-// The use-case layer depends on these interfaces, never on prisma or fetch
-// directly. Infrastructure provides adapters; tests provide fakes.
-
 export interface NewGame {
   player: string;
   mapId: string;
@@ -11,7 +8,6 @@ export interface NewGame {
   durationS: number;
 }
 
-// Domain row views the use-cases consume (not prisma model types).
 export interface ScoreRow {
   player: string;
   score: number;
@@ -30,21 +26,14 @@ export interface TodayRow {
 }
 
 export interface GameRepository {
-  /** Persists a new local game record, returns its id. */
   create(input: NewGame): Promise<{ id: string }>;
-  /** Links the global claim code to an existing local record. */
   setCode(id: string, code: string): Promise<void>;
-  /** Top `take` games for a map, highest score first. */
   topByScore(mapId: string, take: number): Promise<ScoreRow[]>;
-  /** Counters of every game for a map (for aggregation). */
   allCounters(mapId: string): Promise<CounterRow[]>;
-  /** Game with the highest combo for a map, or null. */
   topByCombo(mapId: string): Promise<ComboRow | null>;
-  /** Highest-scoring game for a map since `since`, or null. */
   topTodayByScore(mapId: string, since: Date): Promise<TodayRow | null>;
 }
 
-// Score submission to the global API (idempotent on gameId).
 export interface ScorePayload {
   gameId: string;
   mapId: string;

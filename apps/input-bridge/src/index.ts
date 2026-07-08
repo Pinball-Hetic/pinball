@@ -9,11 +9,8 @@ import { createSocketEmitter, handleLine, type BridgeEmitter } from './dispatch'
 import { createLineBuffer } from './line-buffer';
 import { runWithRetry, type OpenOutcome } from './serial-retry';
 
-// Serial reading via raw fs + stty (no @serialport): the serialport native
-// binding calls uv_default_loop, unsupported by Bun (SIGILL at runtime).
-// So we read the device as a file after putting it in raw mode, exactly like
-// the Fliphetic reference bridge. Bun supports node:fs/child_process.
-
+// Raw fs + stty instead of @serialport: the serialport native binding calls
+// uv_default_loop, which Bun does not support (SIGILL at runtime).
 function readConfig() {
   return {
     MODE: process.env.INPUT_BRIDGE_MODE === 'serial' ? 'serial' : 'mock',
@@ -37,9 +34,6 @@ socket.on('connect', () => console.log('[bridge] socket connected to', SERVER_UR
 socket.on('disconnect', (reason) => console.log('[bridge] socket disconnected:', reason));
 socket.on('connect_error', (err) => console.log('[bridge] connect_error:', err.message));
 
-// Playfield dev mode `simulate-esp32`: the server routes the event to us
-// (room `input-bridge`). Replay the protocol line straight through the
-// parser — identical path to a line received from a real ESP32.
 socket.on('dev:simulate-button', (data) => {
   if (MODE !== 'mock') {
     console.warn('[bridge] dev:simulate-button ignored (serial mode, use real ESP32):', data);
@@ -49,10 +43,6 @@ socket.on('dev:simulate-button', (data) => {
   console.log('[bridge] dev:simulate-button replayed as', `BTN:${data.id}:${data.action}`);
 });
 
-// Serial device IO adapter (no retry policy here — it lives in
-// serial-retry.ts). Puts the tty in raw mode at the right baud (busybox stty),
-// then reads the stream line by line. Open failure → 'failed'; otherwise wires
-// the stream's error/close to `reopen` (provided by the policy) and → 'opened'.
 function openSerialDevice(reopen: () => void): OpenOutcome {
   try {
     execFileSync('stty', [
@@ -80,8 +70,6 @@ function openSerialDevice(reopen: () => void): OpenOutcome {
   return 'opened';
 }
 
-// If the device is absent (ESP unplugged / not yet enumerated), retry every
-// 3 s — tolerates the USB reboot after flashing.
 function openSerial() {
   runWithRetry({
     openDevice: openSerialDevice,

@@ -21,12 +21,6 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-/**
- * Boss walk progression: spawn → target along the tilted playfield.
- *  - progressAt(elapsed) = min(1, elapsed / duration)
- *  - positionAt(t) lerps x/z spawn→target, y = surfaceYAtZ(z) + footLift,
- *    t clamped to [0, 1].
- */
 export class WalkPathProgress {
   constructor(
     private readonly spawn: WalkPathPoint,
@@ -47,10 +41,6 @@ export class WalkPathProgress {
   }
 }
 
-/**
- * Static boss placement on the tilted playfield: same formula as
- * WalkPathProgress.positionAt(1) — { x, y: surfaceYAtZ(z) + footLift, z }.
- */
 export function surfacePoint(
   target: WalkPathPoint,
   footLift: number,
@@ -59,10 +49,6 @@ export function surfacePoint(
   return { x: target.x, y: surfaceYAtZ(target.z) + footLift, z: target.z };
 }
 
-/**
- * Model yaw to face the camera (Y-axis billboard):
- * atan2(camX - anchorX, camZ - anchorZ) + yaw.
- */
 export function cameraFacingYaw(
   anchorPos: WalkPathPoint,
   camPos: WalkPathPoint,
@@ -73,10 +59,6 @@ export function cameraFacingYaw(
   return Math.atan2(dx, dz) + yaw;
 }
 
-/**
- * Model yaw to face the walk direction (spawn → target):
- * atan2(targetX - spawnX, targetZ - spawnZ) + yaw.
- */
 export function pathFacingYaw(
   spawn: WalkPathPoint,
   target: WalkPathPoint,

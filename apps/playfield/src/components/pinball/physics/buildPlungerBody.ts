@@ -2,9 +2,6 @@ import * as THREE from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import { PlungerPhysics } from "@pinball/game-engine";
 
-// Plunger visual/geometric settings. Defaults reproduce the original
-// literals EXACTLY; passing a config allows per-map tuning without touching
-// the factory.
 export interface PlungerConfig {
   radius: number;
   restZ: number;
@@ -26,7 +23,6 @@ export const DEFAULT_PLUNGER_CONFIG: PlungerConfig = {
 export interface BuildPlungerBodyDeps {
   world: RAPIER.World;
   scene: THREE.Object3D;
-  // Anchor (ball spawn) — the plunger shares x/y and rests at restZ on Z.
   spawn: { x: number; y: number };
   disposableGeos: THREE.BufferGeometry[];
   disposableMats: THREE.Material[];
@@ -39,8 +35,6 @@ export interface PlungerBodyResult {
   restZ: number;
 }
 
-// Plunger setup: cylinder mesh + Rapier kinematic body at rest. The animate
-// loop only reads mesh/body/restZ AFTER this setup.
 export function buildPlungerBody(deps: BuildPlungerBodyDeps): PlungerBodyResult {
   const { world, scene, spawn, disposableGeos, disposableMats } = deps;
   const cfg = { ...DEFAULT_PLUNGER_CONFIG, ...deps.config };

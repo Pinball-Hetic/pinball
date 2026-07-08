@@ -46,7 +46,6 @@ export class CameraBillboardSprite {
     this.loadPromise = this.setTextureUrl(config.textureUrl);
   }
 
-  /** Preload a texture without showing it (avoids the flash on swap). */
   preloadTexture(url: string): Promise<void> {
     return this.fetchTexture(url).then(() => undefined);
   }
@@ -91,7 +90,6 @@ export class CameraBillboardSprite {
     }
   }
 
-  /** Switch to a single texture — never two images on the same sprite. */
   setTextureUrl(url: string): Promise<void> {
     if (this.getActiveTextureUrl() === url && this.imageReady) {
       return Promise.resolve();

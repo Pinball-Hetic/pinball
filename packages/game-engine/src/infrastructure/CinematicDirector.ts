@@ -6,11 +6,6 @@ export interface CinematicSpec {
   onEnd?: () => void;
 }
 
-/**
- * Cinematics director: generalizes the world-transition pause pattern
- * (clip playing → physics frozen for its duration).
- * The playfield combines `transitionActive || director.shouldFreeze()`.
- */
 export class CinematicDirector {
   private active: CinematicSpec | null = null;
   private startedAt = 0;
@@ -25,27 +20,19 @@ export class CinematicDirector {
     return this.active !== null;
   }
 
-  /** true if physics must be frozen this frame */
   shouldFreeze(): boolean {
     return this.active !== null && this.active.freezePhysics;
   }
 
-  /**
-   * Elapsed time (ms) since the active clip started, or -1 if none.
-   * Lets the playfield drive a feedback (strobe) during the freeze without
-   * duplicating the director's time measurement.
-   */
   activeElapsedMs(now: number = this.now()): number {
     if (!this.active) return -1;
     return now - this.startedAt;
   }
 
-  /** Duration (ms) of the active clip, or -1 if none. */
   activeDurationMs(): number {
     return this.active?.durationMs ?? -1;
   }
 
-  /** plays a clip; once=true → only once per game */
   play(spec: CinematicSpec, opts?: { once?: boolean }): boolean {
     if (opts?.once && this.playedThisGame.has(spec.id)) return false;
     if (opts?.once) this.playedThisGame.add(spec.id);
@@ -55,7 +42,6 @@ export class CinematicDirector {
     return true;
   }
 
-  /** call every frame with performance.now() */
   update(now: number): void {
     if (!this.active) return;
     if (now - this.startedAt >= this.active.durationMs) {
@@ -65,7 +51,6 @@ export class CinematicDirector {
     }
   }
 
-  /** per-game reset (called on resetGame) */
   resetGame(): void {
     this.playedThisGame.clear();
     // Cancel a still-active clip (otherwise shouldFreeze() would stay true

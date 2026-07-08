@@ -10,17 +10,14 @@ import type {
 import { DEFAULT_MAP_ID } from '@pinball/shared-types'
 import { getMapPackage } from '@pinball/maps'
 
-// Active map: the debug page is data-driven (boss buttons + clips from the map).
 const MAP_ID = process.env.NEXT_PUBLIC_MAP_ID ?? DEFAULT_MAP_ID
 const MAP_PKG = getMapPackage(MAP_ID)
 const BOSSES = MAP_PKG?.layout.bosses ?? []
-// Map clips (manifest.clipFamilies) + generic core clips.
 const CINEMATIC_CLIPS = [
   ...(Object.keys(MAP_PKG?.manifest.clipFamilies ?? {}) as CinematicClip[]),
   'hall_of_fame' as CinematicClip,
   'skill_shot' as CinematicClip,
 ]
-// Editable mapState keys, declared by the map (no hardcoded keys).
 const MAP_STATE_NUMBERS = MAP_PKG?.manifest.debugMapState?.numbers ?? []
 const MAP_STATE_FLAGS = MAP_PKG?.manifest.debugMapState?.flags ?? []
 
@@ -42,7 +39,6 @@ export default function DebugPage() {
   const [combo, setCombo] = useState(6)
   const [multi, setMulti] = useState(3)
   const [lives, setLives] = useState(2)
-  // Generic numeric mapState (keys = the map's MAP_STATE_NUMBERS).
   const [mapNums, setMapNums] = useState<Record<string, number>>(() =>
     Object.fromEntries(MAP_STATE_NUMBERS.map((k) => [k, 0])),
   )
@@ -67,7 +63,6 @@ export default function DebugPage() {
 
   const pushDisplay = (d: DmdDisplay) => socketRef.current?.emit('dmd:display', d)
 
-  // Builds the generic mapState (numbers + flags set to false) for events.
   const mapStateOf = (nums: Record<string, number>) => ({
     ...nums,
     ...Object.fromEntries(MAP_STATE_FLAGS.map((f) => [f, false])),
@@ -94,7 +89,6 @@ export default function DebugPage() {
     }
   }
 
-  // ── Simulated game ─────────────────────────────────────────────────────
   const gameOverNormal = () =>
     socketRef.current?.emit('game:over', {
       player: PLAYER,

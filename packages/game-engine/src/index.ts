@@ -1,4 +1,3 @@
-// Domain
 export * from './domain/Ball';
 export * from './domain/Plunger';
 export * from './domain/GameEvents';
@@ -22,7 +21,6 @@ export * from './domain/AtmosphereBlend';
 export * from './domain/RevealCountdown';
 export * from './domain/RenderInterpolation';
 
-// Use-cases
 export * from './use-cases/LaunchBall';
 export * from './use-cases/BumperHit';
 export * from './use-cases/BumpHit';
@@ -34,7 +32,6 @@ export * from './use-cases/SnapBallToSurface';
 export * from './use-cases/BallFrameCorrections';
 export * from './use-cases/FlipperLaunchAssist';
 
-// Infrastructure
 export * from './infrastructure/PhysicsWorld';
 export * from './infrastructure/BallPhysics';
 export * from './infrastructure/PlayfieldTrimeshBuilder';

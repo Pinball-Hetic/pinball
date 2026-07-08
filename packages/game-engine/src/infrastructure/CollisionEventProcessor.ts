@@ -109,12 +109,10 @@ export class CollisionEventProcessor {
     });
   }
 
-  /** DEBUG (/debug): reveal via the real state path (boss armed, not a ghost). */
   debugRevealBoss(id: BossId, gameState: string): void {
     this.bossFights.forceReveal(id, gameState);
   }
 
-  /** DEBUG (/debug): credits a hit via the real sensor (real counter/defeat). */
   debugBossTargetHit(id: BossId, gameState: string): void {
     this.bossFights.forceTargetHit(id, gameState);
   }
@@ -144,13 +142,10 @@ export class CollisionEventProcessor {
     // The DRAIN-vs-rescue split (1 before 2) is the load-bearing invariant:
     // a map that rescues on the last ball must see the pre-decrement count.
     private readonly emit: GameEventListener,
-    // Injected clock: tests pass a controllable fake to make the anti-spam
-    // throttles deterministic.
     private readonly now: () => number = () => performance.now(),
   ) {
     this.bossFights = new BossFightManager(emit, layout.bosses, this.now);
 
-    // Kept as properties because they are exposed publicly (reset, state).
     this.dropTargetHandler = new DropTargetCollisionHandler(emit, layout);
     this.portalHandler = new PortalCollisionHandler(emit, () => this.worldState.isActive());
     this.bossHandler = new BossCollisionHandler(
@@ -186,12 +181,9 @@ export class CollisionEventProcessor {
 
   process(eventQueue: RAPIER.EventQueue, gameState: string): void {
     eventQueue.drainCollisionEvents((h1, h2, started) => {
-      // Role resolution: one of the two handles in the pair is the ball.
       const role = this.colliderMap.get(h1) ?? this.colliderMap.get(h2);
       if (!role) return;
 
-      // Dispatch to the registered handler for this role.
-      // BossCollisionHandler is first and consumes every boss collider role.
       const handler = this.handlers.find(h => h.canHandle(role));
       handler?.handle(role, gameState, started);
     });

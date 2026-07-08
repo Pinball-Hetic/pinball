@@ -10,23 +10,12 @@ import { ballCenterOnSurface } from '../domain/PlayfieldGeometry';
 type Vec3 = { x: number; y: number; z: number };
 
 export interface SurfaceSnapResult {
-  /** Position to rest the ball at (always present when the snap triggers). */
   translation: Vec3;
-  /** Corrected velocity — present only when an upward Y was cancelled. */
   linvel?: Vec3;
 }
 
-/**
- * Decides whether the ball must be snapped back onto the tilted surface.
- * Pure: no Rapier dependency — the caller reads pos/vel from the body and
- * applies the result. Returns null when no snap is needed.
- *
- * Rules:
- * - active only inside the playfield, outside the straight shooter lane;
- * - triggers when the ball lifts more than SURFACE_SNAP_THRESHOLD;
- * - cancels only POSITIVE Y velocity (lift-off) — negative Y is gravity
- *   bringing the ball back, never blocked. XZ untouched → game speed kept.
- */
+// Cancels only POSITIVE Y velocity (lift-off); negative Y is gravity bringing
+// the ball back and must never be blocked. XZ is untouched to keep game speed.
 export function computeSurfaceSnap(
   pos: Vec3,
   vel: Vec3,

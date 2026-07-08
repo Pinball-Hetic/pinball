@@ -1,8 +1,5 @@
 import type { BossDefinition } from './BossRegistry';
 
-// Placement/geometry data for a map, injected into the engine. TYPES live in
-// game-engine; VALUES live in the map package (layout.ts).
-
 export interface MapPoint3 {
   x: number;
   y: number;
@@ -23,19 +20,19 @@ export interface DropTargetDef {
 }
 
 export interface SensorLayout {
-  popZones: MapPoint3[]; // pop-bumper zone sensors
-  rocket: MapPoint3; // ramp sensor
-  bossReveal: MapPoint3; // boss-reveal flash anchor (normal world)
-  portal: MapPoint3; // alternate-world portal anchor
-  scoop?: MapPoint3; // saucer hole sensor: capture → rewards → kick. Optional.
+  popZones: MapPoint3[];
+  rocket: MapPoint3;
+  bossReveal: MapPoint3;
+  portal: MapPoint3;
+  scoop?: MapPoint3;
 }
 
 export interface SpawnLayout {
-  ball: MapPoint3; // shooter lane spawn
-  alternateWorld: MapPoint2; // alternate-world spawn
-  alternateWorldImpulse: MapPoint3; // alternate-world entry impulse
-  normalReturn: MapPoint2; // return-to-normal-world spawn
-  normalReturnImpulse: MapPoint3; // return impulse
+  ball: MapPoint3;
+  alternateWorld: MapPoint2;
+  alternateWorldImpulse: MapPoint3;
+  normalReturn: MapPoint2;
+  normalReturnImpulse: MapPoint3;
 }
 
 export interface ShooterLaneLayout {
@@ -74,25 +71,24 @@ export interface SurfaceCoefficients {
 }
 
 export interface PlayfieldBounds {
-  leftX: number; // WALL_LEFT_X
-  rightX: number; // WALL_RIGHT_X
-  topZ: number; // WALL_TOP_Z
-  bottomZ: number; // WALL_BOTTOM_Z
+  leftX: number;
+  rightX: number;
+  topZ: number;
+  bottomZ: number;
 }
 
 export interface GeometryLayout {
   coefficients: SurfaceCoefficients;
   bounds: PlayfieldBounds;
   shade: {
-    width: number; // PLAYFIELD_SHADE_W
-    depth: number; // PLAYFIELD_SHADE_D
-    y: number; // PLAYFIELD_SHADE_Y
-    z: number; // PLAYFIELD_SHADE_Z
-    maxOpacity: number; // PLAYFIELD_SHADE_MAX_OPACITY
+    width: number;
+    depth: number;
+    y: number;
+    z: number;
+    maxOpacity: number;
   };
 }
 
-// All alternate-world atmosphere tuning (atmosphere is provided by the map).
 export interface AtmosphereLayout {
   transition: {
     durationS: number;
@@ -132,9 +128,7 @@ export interface AtmosphereLayout {
   blendStrobeHz: number;
   sporeCount: number;
   hintMs: number;
-  /** Active-atmosphere banner label (e.g. « monde alternatif »). */
   bannerLabel: string;
-  /** Atmosphere-entry hint label (e.g. « Le monde s'est inversé… »). */
   hintLabel: string;
 }
 

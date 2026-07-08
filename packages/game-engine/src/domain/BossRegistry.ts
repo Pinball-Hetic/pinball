@@ -86,24 +86,12 @@ export type BossDefinition = {
   targetPulse: BossTargetPulseConfig;
   revealSoundUrl?: string;
   revealSoundVolume?: number;
-  /** Late-phase music (e.g. win-music when hitCount >= threshold). */
   latePhaseSoundUrl?: string;
   latePhaseSoundVolume?: number;
   latePhaseHitThreshold?: number;
-  /** After BOSS_FIGHT_END, keeps revealSoundUrl until this boss's BOSS_REVEAL. */
   keepMusicUntilBossReveal?: BossId;
-  /**
-   * On victory (BOSS_FIGHT_END), keeps the current music until the return
-   * portal cinematic ends (RETURN_PORTAL_TRANSITION_END) instead of cutting it
-   * immediately. Useful when an ending track must accompany the exit
-   * cinematic. Data-driven: no hardcoded boss logic on the apps side.
-   */
   keepMusicUntilReturnPortal?: boolean;
-  /**
-   * Music played on victory over this boss (BOSS_FIGHT_END), replacing the
-   * current fight music. Requires keepMusicUntilReturnPortal:true for the
-   * music to survive until RETURN_PORTAL_TRANSITION_END.
-   */
+  // Requires keepMusicUntilReturnPortal:true to survive until RETURN_PORTAL_TRANSITION_END.
   victoryMusicUrl?: string;
   victoryMusicVolume?: number;
   assist?: { id: string };

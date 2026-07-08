@@ -48,12 +48,8 @@ export type DemogorgonSetup = {
   bumperVisuals: BumperVisuals | null;
   onFightEnd?: () => void;
   onTargetReady?: () => void;
-  /**
-   * Game running? (gameState === 'playing'). Injected by the module — used
-   * to suspend the Eleven assist when the ball drains: without this gate the
-   * assist keeps scoring +100 every ~4 s while waiting at spawn.
-   * Absent (tests, legacy) → treated as always playing.
-   */
+  // Suspends the Eleven assist on drain; without it the assist scores +100
+  // every ~4 s while the ball waits at spawn. Absent → treated as playing.
   isPlaying?: () => boolean;
 };
 
@@ -126,9 +122,7 @@ export class DemogorgonReveal implements BossRevealController {
       this.billboard.ensureReady(),
       this.demogorgonVisual.ensureReady(),
     ]);
-    // GPU upload of the billboard texture + shader compilation for the
-    // demogorgon, targetGroup (ring/core/burst) and sprite — off the
-    // critical frame. Otherwise it all lands on the spawn frame → freeze.
+    // Warmup here (GPU upload + shader compile), else it lands on the spawn frame → freeze.
     this.billboard.warmup(renderer);
     await this.demogorgonVisual.warmup(renderer, scene, camera);
     if (this.targetGroup) await renderer.compileAsync(this.targetGroup, camera, scene);
@@ -136,10 +130,9 @@ export class DemogorgonReveal implements BossRevealController {
     if (sprite) await renderer.compileAsync(sprite, camera, scene);
   }
 
-  // PointLights added dynamically during the fight: strobe flash +
-  // Demogorgon glow + target light + Eleven assist flash. Any never-seen
-  // light count would recompile every lit shader on the reveal frame —
-  // preloadAll precompiles these variants (see orchestrator).
+  // Count of PointLights added dynamically during the fight (strobe flash,
+  // Demogorgon glow, target light, Eleven assist). preloadAll precompiles
+  // shader variants for this count, else the reveal frame recompiles every lit shader.
   dynamicPointLightCount(): number {
     return 4;
   }
@@ -184,7 +177,6 @@ export class DemogorgonReveal implements BossRevealController {
 
     const assistY = DEMOGORGON_TARGET.y + 0.021;
 
-    // Added to the scene ONLY during its flashes (see trigger/hide).
     this.elevenAssistLight = new THREE.PointLight(0xbb55ff, 0, 0.32, 0.3);
     this.elevenAssistLight.position.set(DEMOGORGON_TARGET.x, DEMOGORGON_TARGET.y + 0.045, DEMOGORGON_TARGET.z);
 
@@ -261,8 +253,6 @@ export class DemogorgonReveal implements BossRevealController {
       this.machine.isVictory(),
     );
 
-    // Assist frozen outside 'playing' (see DemogorgonSetup.isPlaying); other
-    // fight effects (strobe, flicker, phases) keep running.
     const d = this.machine.tick(dt, {
       suspendAssist: this.isPlaying ? !this.isPlaying() : false,
     });
@@ -389,7 +379,6 @@ export class DemogorgonReveal implements BossRevealController {
     });
   }
 
-  // IO side of an eleven assist trigger; the timer/state lives in the machine.
   private fireElevenAssist(): void {
     this.targetPulse?.flashHit();
     if (this.elevenShockOuter) this.elevenShockOuter.visible = true;
@@ -413,11 +402,10 @@ export class DemogorgonReveal implements BossRevealController {
     if (this.elevenShockInnerMat) this.elevenShockInnerMat.opacity = 0;
     if (this.elevenAssistLight) {
       this.elevenAssistLight.intensity = 0;
-      this.elevenAssistLight.removeFromParent(); // off-scene between flashes
+      this.elevenAssistLight.removeFromParent();
     }
   }
 
-  // Mesh animation for an active assist; envelope scalars come from the machine.
   private renderElevenAssist(frame: ElevenAssistFrame): void {
     const { t, elapsed, rise, alpha, burst } = frame;
 

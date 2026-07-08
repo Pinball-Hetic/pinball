@@ -1,9 +1,6 @@
 import { DEFAULT_BOSS_FACE_DIR, type BossCameraCinematicConfig } from '@pinball/game-engine'
 
-// Camera direction → boss face (same as ST for consistency).
 const BOSS_FACE_DIR = DEFAULT_BOSS_FACE_DIR
-
-// ── Ganondorf (normal world) ──────────────────────────────────────────────
 
 export const GANONDORF_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
   lookAtLift: 0.06,
@@ -21,8 +18,6 @@ export const GANONDORF_VICTORY_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
   zoomOutDuration: 0.4,
   distanceScale: 0.68,
 }
-
-// ── Dark Link (Sacred Realm) ──────────────────────────────────────────────
 
 export const DARK_LINK_CAMERA_CINEMATIC: BossCameraCinematicConfig = {
   lookAtLift: 0.07,

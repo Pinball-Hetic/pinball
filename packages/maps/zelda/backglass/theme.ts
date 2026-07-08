@@ -1,10 +1,5 @@
-// Zelda map backglass theme tokens (CSS custom properties). The app sets
-// them as inline style on the root container. The app's structural CSS +
-// the map's Zelda modules consume these var(). A map without a theme → the
-// app keeps its neutral defaults.
 export type ThemeTokens = Record<`--${string}`, string>
 
-// Normal palette (Hyrule — black marble, emerald and gold).
 export const backglassTheme: ThemeTokens = {
   '--foreground': '#dff5c8',
   '--glow': '#22cc44',
@@ -17,8 +12,7 @@ export const backglassTheme: ThemeTokens = {
   '--fever-b': '#22cc44',
 }
 
-// Sacred Realm overrides — merged over the base when alternateWorld is
-// active.
+// Partial overrides merged over backglassTheme when alternateWorld is active.
 export const backglassThemeAlternate: ThemeTokens = {
   '--glow': '#FFD700',
   '--vignette': '#150f00',

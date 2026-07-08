@@ -11,15 +11,12 @@ interface StatsBannerProps {
 
 const ROTATE_MS = 5000
 
-// Defense in depth: a kiosk banner NEVER crashes on a missing stat
-// (undefined/null → 0).
 function fmt(n: number | undefined | null): string {
   return (n ?? 0).toLocaleString('fr-FR')
 }
 
 function buildSlides(stats: GlobalStats, entries: LeaderboardEntry[]): string[] {
   const slides: string[] = [`PARTIES JOUÉES : ${fmt(stats.totalGames)}`]
-  // Totals per counter (label will come from the map; key for now).
   for (const t of stats.totals) {
     slides.push(`${t.label.toUpperCase()} : ${fmt(t.value)}`)
   }
@@ -42,7 +39,6 @@ export default function StatsBanner({ stats, entries, reactor }: StatsBannerProp
   const slides = buildSlides(stats, entries)
   const [idx, setIdx] = useState(0)
   const bannerRef = useRef<HTMLDivElement>(null)
-  // "SCORE À BATTRE" / invitation = always the last slide
   const toBeatIdx = slides.length - 1
 
   useEffect(() => {
@@ -56,7 +52,7 @@ export default function StatsBanner({ stats, entries, reactor }: StatsBannerProp
     if (!reactor) return
     return reactor.on((r) => {
       if (r.kind === 'multi') {
-        setIdx(toBeatIdx) // jump to SCORE À BATTRE (pressure!)
+        setIdx(toBeatIdx)
         const el = bannerRef.current
         if (el) {
           el.classList.remove('banner-gold')

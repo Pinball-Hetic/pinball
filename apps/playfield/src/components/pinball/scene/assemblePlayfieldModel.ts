@@ -14,8 +14,6 @@ import type { MapManifest } from "@pinball/shared-types";
 const GLB_LOAD_MAX_ATTEMPTS = 3;
 const GLB_LOAD_RETRY_BASE_MS = 1500;
 
-// Loads the GLB with retries (cabinet network can be slow at boot): linear
-// 1.5s/3s backoff between attempts.
 export async function loadPlayfieldGlb(loader: GLTFLoader, url: string): Promise<GLTF> {
   for (let attempt = 1; attempt <= GLB_LOAD_MAX_ATTEMPTS; attempt++) {
     try {
@@ -35,7 +33,6 @@ export interface AssembleModelDeps {
   rendering: MapManifest["rendering"];
   layout: MapLayout;
   freezeFeedbackStrobe: PlayfieldCinematicStrobe;
-  /** registers a subtree's geos/mats for dispose + enables shadows */
   collectDisposables: (root: THREE.Object3D) => void;
   disposableGeos: THREE.BufferGeometry[];
   disposableMats: THREE.Material[];
@@ -47,10 +44,6 @@ export interface AssembledModel {
   ballTrail: BallTrail;
 }
 
-// Scene assembly after GLB load (inert setup): mounts the root + strips
-// useless meshes + prepares materials, fire trail, freeze flash (mounted on
-// modelRoot — scene space, independent of map meshes), and the ball mesh
-// (hidden until the session starts).
 export function assemblePlayfieldModel(
   gltf: GLTF,
   d: AssembleModelDeps,

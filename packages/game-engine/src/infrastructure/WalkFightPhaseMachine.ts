@@ -1,37 +1,17 @@
-/**
- * Phase state-machine for "shape A" boss reveals (walk → settle → fight →
- * victory). Owns {phase, elapsed} and the sequencing/timer logic, with NO Three
- * dependency. Map-specific scalars (fight flicker shade/flashMix, victory
- * duration, target hit count) are passed in via config so the same machine
- * drives Vecna (Stranger Things) and Dark Link (Zelda).
- *
- * Walk/settle exit is gated by the renderer's visual (path completion / settle
- * completion booleans) because that timing lives in Three-side animation; the
- * machine consumes those booleans but owns the phase transitions.
- */
-
 export type WalkFightPhase = 'idle' | 'walk' | 'settle' | 'fight' | 'victory';
 
 export type WalkFightConfig = {
-  /** Victory phase duration in seconds (Vecna/DarkLink: 0.65). */
   victoryDuration: number;
-  /** Constant shade passed to applyFightFlicker during the fight phase. */
   fightFlickerShade: number;
-  /** Constant flashMix passed to applyFightFlicker during the fight phase. */
   fightFlickerFlashMix: number;
-  /** Hit count required to win (from the boss definition). */
   targetHits: number;
 };
 
-/** Per-frame inputs sampled from the renderer's visual (Three-side timing). */
 export type WalkFightTickInput = {
-  /** vecnaVisual.isWalkPathComplete() — gates walk → settle. */
   walkPathComplete: boolean;
-  /** result of vecnaVisual.updateSettle(dt) — gates settle → fight. */
   settleComplete: boolean;
 };
 
-/** What the strobe should do this frame. The renderer translates this. */
 export type WalkFightStrobeOp =
   | { kind: 'stop' }
   | { kind: 'fightFlicker'; shade: number; flashMix: number }
@@ -39,15 +19,10 @@ export type WalkFightStrobeOp =
 
 export type WalkFightDescriptor = {
   phase: WalkFightPhase;
-  /** Whether the machine just transitioned into walk this tick. */
   enteredWalk: boolean;
-  /** Whether the machine just transitioned into settle this tick. */
   enteredSettle: boolean;
-  /** Whether the machine just transitioned into fight this tick. */
   enteredFight: boolean;
-  /** Whether the victory phase just finished this tick (→ hide boss). */
   finishedVictory: boolean;
-  /** The strobe operation to apply this frame. */
   strobe: WalkFightStrobeOp;
 };
 
@@ -65,12 +40,10 @@ export class WalkFightPhaseMachine {
     return this.elapsed;
   }
 
-  /** Gameplay is frozen during the cinematic walk/settle phases. */
   isGameplayFrozen(): boolean {
     return this.phase === 'walk' || this.phase === 'settle';
   }
 
-  /** BOSS_REVEAL received: enter walk (only from idle). */
   onReveal(): boolean {
     if (this.phase !== 'idle') return false;
     this.phase = 'walk';
@@ -78,11 +51,6 @@ export class WalkFightPhaseMachine {
     return true;
   }
 
-  /**
-   * BOSS_TARGET_HIT received while fighting. Returns true if this hit reaches
-   * the victory threshold (renderer then plays victory). Returns false if the
-   * hit lands outside the fight phase or below the threshold.
-   */
   onHit(hitCount: number): { accepted: boolean; victory: boolean } {
     if (this.phase !== 'fight') return { accepted: false, victory: false };
     if (hitCount >= this.config.targetHits) {
@@ -97,7 +65,6 @@ export class WalkFightPhaseMachine {
     this.elapsed = 0;
   }
 
-  /** endFight()/reset: back to idle. */
   reset(): void {
     this.phase = 'idle';
     this.elapsed = 0;
@@ -149,7 +116,6 @@ export class WalkFightPhaseMachine {
       };
     }
 
-    // victory
     const mix = Math.max(0, 1 - this.elapsed / this.config.victoryDuration);
     const finished = this.elapsed >= this.config.victoryDuration;
     return {

@@ -1,9 +1,6 @@
-// Shared, complete DOM stub for the map's tests. No happy-dom in this package,
-// yet several systems touch document/Image at import time (GlowSprite builds a
-// radial canvas; CameraBillboardSprite's TextureLoader creates an <img>). bun
-// test shares one module singleton across files, so a per-file partial stub
-// would poison the global for whichever file runs next (order-dependent, green
-// on macOS / red on CI). One idempotent, complete stub removes that race.
+// Must stay one shared, complete, idempotent stub: bun test shares a module
+// singleton across files, so a per-file partial stub poisons the global for
+// the next file to run (order-dependent, green on macOS / red on CI).
 
 type StubContext = {
   createRadialGradient: () => { addColorStop: () => void };
@@ -13,8 +10,6 @@ type StubContext = {
   fillStyle: unknown;
 };
 
-// One element that satisfies both the canvas path (getContext) and the <img>
-// path (addEventListener/src) so createElement and createElementNS can share it.
 function makeStubElement() {
   const listeners: Record<string, Array<() => void>> = {};
   return {
@@ -25,8 +20,7 @@ function makeStubElement() {
     removeAttribute: () => {},
     addEventListener: (type: string, cb: () => void) => {
       (listeners[type] ??= []).push(cb);
-      // ImageLoader waits for load/error; simulate a failed decode so its error
-      // path runs and resolves (loader catch → texture null).
+      // Fire error immediately so ImageLoader's load/error wait resolves (→ texture null).
       if (type === 'error') queueMicrotask(() => cb());
     },
     removeEventListener: () => {},

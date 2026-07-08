@@ -1,11 +1,3 @@
-/**
- * Pure spore-particle field shared by map atmosphere systems (Stranger Things
- * Upside Down). Owns particle seeding (anchor/base/angle/radius/speed/drift from
- * index) and per-frame position math (angle/radius/lift/wander -> x,y,z). NO
- * Three/BufferGeometry dependency — the map class builds the THREE.Points geometry
- * by reading positions written here.
- */
-
 export type SporeParticle = {
   anchorX: number;
   anchorZ: number;
@@ -20,7 +12,6 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-/** Seed a single particle from its index and the total count. */
 export function seedSpore(i: number, count: number): SporeParticle {
   return {
     anchorX: lerp(-0.22, 0.22, (i * 0.37) % 1),
@@ -33,17 +24,12 @@ export function seedSpore(i: number, count: number): SporeParticle {
   };
 }
 
-/** Seed `count` particles. */
 export function seedSpores(count: number): SporeParticle[] {
   const spores: SporeParticle[] = [];
   for (let i = 0; i < count; i++) spores.push(seedSpore(i, count));
   return spores;
 }
 
-/**
- * Advance one particle's angle by `speed * dt` (mutates `spore.angle`) and return
- * its world position for the given `pulseT`.
- */
 export function stepSpore(
   spore: SporeParticle,
   dt: number,
@@ -60,10 +46,6 @@ export function stepSpore(
   };
 }
 
-/**
- * Advance all spores and write their positions into the flat `out` array
- * (out[i*3], out[i*3+1], out[i*3+2]). Returns nothing — caller flags the geometry.
- */
 export function stepSporeField(
   spores: SporeParticle[],
   dt: number,

@@ -4,7 +4,6 @@ import type { MapLayout } from '@pinball/game-engine';
 import { easeOut, RevealCountdown } from '@pinball/game-engine';
 import { RETURN_PORTAL_REVEAL_DELAY_S } from './DarkLinkConstants';
 
-// ── Dimensions ─────────────────────────────────────────────────────────────
 const PORTAL_SENSOR_RADIUS = 0.014;
 const PORTAL_OUTER_R       = 0.01867;
 const PORTAL_INNER_R       = 0.01333;
@@ -20,16 +19,7 @@ type SetupConfig = {
   onOpenChange: (open: boolean) => void;
 };
 
-/**
- * Sacred Realm portal (Zelda) — Three.js visual + Rapier sensor.
- *
- * Same pattern as UpsideDownPortal (ST):
- *  - The Rapier sensor is created ONLY when the portal opens (open / enableReturn).
- *  - The sensor is physically destroyed on hide() and reset().
- *  - The portal cannot be triggered while invisible.
- */
 export class ZeldaPortal {
-  // ── Rapier (created / destroyed dynamically) ─────────────────────────────
   private world:          RAPIER.World | null     = null;
   private sensorBody:     RAPIER.RigidBody | null = null;
   private sensorCollider: RAPIER.Collider | null  = null;
@@ -37,7 +27,6 @@ export class ZeldaPortal {
   private sensorPos = new THREE.Vector3();
   private onOpenChangeCb: ((open: boolean) => void) | null = null;
 
-  // ── Three.js ──────────────────────────────────────────────────────────────
   private portalGroup:   THREE.Group | null = null;
   private outerRing:     THREE.Mesh  | null = null;
   private innerRing:     THREE.Mesh  | null = null;
@@ -52,14 +41,11 @@ export class ZeldaPortal {
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[]       = [];
 
-  // ── State ─────────────────────────────────────────────────────────────────
   private openState = false;
   private isOpening = false;
   private openT     = 0;
   private animT     = 0;
   private returnCountdown = new RevealCountdown();
-
-  // ── API ──────────────────────────────────────────────────────────────────
 
   setup(config: SetupConfig): void {
     this.dispose();
@@ -70,7 +56,6 @@ export class ZeldaPortal {
     const pos = config.layout.sensors.portal;
     this.sensorPos.set(pos.x, pos.y, pos.z);
 
-    // Three.js visual — hidden initially. Sensor NOT created yet.
     this.portalGroup = this.buildVisual();
     this.portalGroup.position.set(pos.x, pos.y + 0.020, pos.z);
     this.portalGroup.rotation.x = 96 * Math.PI / 180;  // flat on the playfield
@@ -80,7 +65,6 @@ export class ZeldaPortal {
     config.onOpenChange(false);
   }
 
-  /** Opens the portal after Ganondorf's defeat. */
   open(): void {
     if (this.openState) return;
     this.openState = true;
@@ -94,10 +78,6 @@ export class ZeldaPortal {
     this.onOpenChangeCb?.(true);
   }
 
-  /**
-   * Hides the visual and **destroys the Rapier sensor**.
-   * Called as soon as the ball enters the portal — cannot be re-taken.
-   */
   hide(): void {
     this.returnCountdown.cancel();
     if (this.portalGroup) this.portalGroup.visible = false;
@@ -105,16 +85,12 @@ export class ZeldaPortal {
     this.onOpenChangeCb?.(false);
   }
 
-  /**
-   * Schedules the sensor for the RETURN portal (Sacred Realm → normal world).
-   * Deferred: on the fatal hit the ball sticks to Dark Link — activating
-   * immediately would suck it in without play. The sensor is created by update(dt).
-   */
+  // Deferred: on the fatal hit the ball sticks to Dark Link, so activating
+  // the sensor immediately would suck it in without play. Created by update().
   enableReturn(): void {
     this.returnCountdown.start(RETURN_PORTAL_REVEAL_DELAY_S);
   }
 
-  /** Fully resets the portal (game reset). */
   reset(): void {
     this.returnCountdown.cancel();
     this.openState = false;
@@ -206,8 +182,6 @@ export class ZeldaPortal {
     this.animT     = 0;
   }
 
-  // ── Rapier sensor (created / destroyed dynamically) ──────────────────────
-
   private createSensor(): void {
     if (!this.world || !this.colliderMap || this.sensorCollider) return;
     this.sensorBody = this.world.createRigidBody(
@@ -237,8 +211,6 @@ export class ZeldaPortal {
     this.sensorCollider = null;
     this.sensorBody     = null;
   }
-
-  // ── Three.js visual ───────────────────────────────────────────────────────
 
   private buildVisual(): THREE.Group {
     const group = new THREE.Group();

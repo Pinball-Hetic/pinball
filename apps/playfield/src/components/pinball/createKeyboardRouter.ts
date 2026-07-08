@@ -4,27 +4,17 @@ import { gameKeyToAction, idForAction, isPreventDefaultKey } from "./keyboardMap
 import type { DebugMeshManager, PivotCoords } from "./debug/DebugMeshManager";
 
 export interface KeyboardRouterDeps {
-  /** unlocks audio on the first keydown (autoplay policy) */
   unlockAudio: () => void;
-  /** routes a physical button (direct or simulate-esp32 mode) */
   dispatchButton: (id: ButtonId, action: ButtonAction) => void;
   debug: DebugMeshManager;
   setFlipperPivotCoords: (c: PivotCoords | null) => void;
   debugVisibleRef: MutableRefObject<boolean>;
   setDebugVisible: (v: boolean) => void;
-  /** M: toggles ball-move mode (ballDragController) */
   toggleMoveMode: () => void;
-  /** R: ball reset (dev only) */
   resetBall: () => void;
-  /** process.env.NODE_ENV !== "production" (build-time) — gates the ball reset */
   isDev: boolean;
 }
 
-// Dev keyboard router: translates keydown/keyup into game actions (via
-// keyboardMap) and debug toggles (H colliders / J diagnostics / M ball move /
-// R reset). The Three side effects of the H toggle are isolated in
-// DebugMeshManager → this router only routes. `H` always stays active,
-// independent of KEYBOARD_MODE (handled upstream by dispatchButton).
 export function createKeyboardRouter(deps: KeyboardRouterDeps): {
   onKeyDown: (e: KeyboardEvent) => void;
   onKeyUp: (e: KeyboardEvent) => void;
@@ -47,7 +37,6 @@ export function createKeyboardRouter(deps: KeyboardRouterDeps): {
       deps.toggleMoveMode();
       return;
     }
-    // Ball reset = DEV helper only (cf. GameOverlay). Absent in prod.
     if ((e.key === "r" || e.key === "R") && deps.isDev) {
       deps.resetBall();
       return;

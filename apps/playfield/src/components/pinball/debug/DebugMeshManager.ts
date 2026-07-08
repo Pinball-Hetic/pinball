@@ -20,10 +20,6 @@ export interface DebugMeshRefs {
   rightPivotMarker: THREE.Mesh | null;
 }
 
-// Debug meshes (collider wireframes + flipper hulls + pivot spheres). Owns the
-// `collidersOn` state (read by the animate loop for the Rapier debug render) and
-// centralizes the H toggle — keeps the Three side effects out of the keyboard
-// routing logic (cf. createKeyboardRouter).
 export class DebugMeshManager {
   private on = false;
 
@@ -35,14 +31,10 @@ export class DebugMeshManager {
     },
   ) {}
 
-  /** true when the collider debug render is active (read by animate). */
   get collidersOn(): boolean {
     return this.on;
   }
 
-  // H toggle: flips visibility of all debug meshes. Returns the pivots'
-  // world coordinates when turning on (both present), otherwise null — the
-  // caller pushes them into the overlay.
   toggleColliders(): PivotCoords | null {
     this.on = !this.on;
     this.meshes.colliders.visible = this.on;

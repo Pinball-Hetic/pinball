@@ -21,7 +21,6 @@ const FIGHT_FLICKER_HZ = 3;
 const FIGHT_FLASH_MIX = 0.45;
 const FLASH_INTENSITY = 1.5;
 
-// Ganondorf purple flash.
 const FLASH_COLOR = 0x9900ff;
 
 export type GanondorfSetup = {
@@ -52,9 +51,8 @@ export class GanondorfReveal implements BossRevealController {
   private ownedGeos: THREE.BufferGeometry[] = [];
   private ownedMats: THREE.Material[] = [];
 
-  // Ganondorf has no shade (flash-only) and no eleven assist; the flicker shade
-  // config is all-zero (renderer passes a literal 0 to applyFightFlicker, exactly
-  // as before) and the assist sub-machine is disabled (null).
+  // Flash-only: the flicker-shade config is all-zero and the assist
+  // sub-machine is disabled (null) — Ganondorf has no shade and no assist.
   private machine = new BlackoutFightPhaseMachine(
     {
       blackout: BLACKOUT,
@@ -160,7 +158,6 @@ export class GanondorfReveal implements BossRevealController {
     if (d.phase === 'idle') return;
 
     if (d.phase === 'blackout') {
-      // Purple flash without black veil.
       this.cinematicStrobe.applyFlashOnly(d.on, d.blackoutMix);
       return;
     }
@@ -175,7 +172,6 @@ export class GanondorfReveal implements BossRevealController {
     }
 
     if (d.phase === 'flicker') {
-      // No shade, only the purple flash at the flicker rhythm.
       this.cinematicStrobe.applyFightFlicker(0, d.flickerBlink ? FIGHT_FLASH_MIX : 0);
       return;
     }
@@ -194,7 +190,6 @@ export class GanondorfReveal implements BossRevealController {
         this.resetAtmosphere();
         return;
       }
-      // No shade during restore.
       this.cinematicStrobe.stop();
     }
   }

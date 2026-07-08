@@ -269,8 +269,6 @@ export class UpsideDownAtmosphere {
     this.sporesEnabled = enabled;
   }
 
-  // All spores in ONE THREE.Points (1 draw call) — the animation updates
-  // the position attribute.
   private buildSpores(root: THREE.Object3D): void {
     const n = UPSIDE_DOWN_ATMOSPHERE_SPORE_COUNT;
     this.sporePositions = new Float32Array(n * 3);
@@ -327,7 +325,6 @@ export class UpsideDownAtmosphere {
   }
 
   private applyMix(t: number): void {
-    // Early return: only touch materials/lights when mix changed.
     if (!this.blend.shouldApply(t)) return;
 
     const ease = AtmosphereBlend.ease(t);

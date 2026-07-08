@@ -1,11 +1,6 @@
 import { canonicalGltfName, normalizeGltfName } from './GltfNodeNames';
 import type { MeshElements } from './PlayfieldTrimeshBuilder';
 
-/**
- * True if any ancestor name (self included, most specific to root) belongs
- * to `names`, comparing both the normalized form and the canonical form
- * (vis_/coll_/pf_ prefixes stripped).
- */
 export function ancestryMatchesSet(ancestryNames: string[], names: Set<string>): boolean {
   for (const raw of ancestryNames) {
     const n = normalizeGltfName(raw);
@@ -26,11 +21,6 @@ function elemNum(v: number | string | undefined, def: number): number {
   return typeof v === 'number' ? v : def;
 }
 
-/**
- * Resolves a trimesh group's material params from `elements[key]`, applying
- * defaults. `role` decides the smoothing default (floor smoothed, wall/lane
- * raw).
- */
 export function resolveMaterialParams(
   el: MeshElements[string] | undefined,
   role: string,
@@ -50,13 +40,6 @@ export interface GeometryTuple {
   index: ArrayLike<number> | null;
 }
 
-/**
- * Laplacian smoothing over interleaved xyz positions of an already-welded
- * geometry. Each vertex is pulled toward the barycenter of its neighbors
- * (triangle edges) by `factor`, over `iterations` passes.
- * Returns a new Float32Array; the input is not mutated. Isolated vertices
- * (count 0) are left unchanged.
- */
 export function laplacianSmoothPositions(
   positions: Float32Array,
   index: ArrayLike<number>,
@@ -98,11 +81,6 @@ export function laplacianSmoothPositions(
   return out;
 }
 
-/**
- * Index of a double-sided geometry: concatenates the original index with a
- * reverse-wound copy (back-faces). For each triangle (i, i+1, i+2) the back
- * face is (i+2, i+1, i). Returns a new array; the input is not mutated.
- */
 export function reverseWoundIndices(index: ArrayLike<number>): number[] {
   const n = index.length;
   const doubled = new Array<number>(n * 2);
@@ -115,11 +93,6 @@ export function reverseWoundIndices(index: ArrayLike<number>): number[] {
   return doubled;
 }
 
-/**
- * Merges several geometries (interleaved xyz positions + optional index) into
- * a single verts/indices pair, offsetting indices per group. Without an
- * index, vertices are indexed sequentially.
- */
 export function mergeGeometryTuples(geos: GeometryTuple[]): { verts: number[]; indices: number[] } {
   const verts: number[] = [];
   const indices: number[] = [];

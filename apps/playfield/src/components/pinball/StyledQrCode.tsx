@@ -3,15 +3,15 @@
 import { useEffect, useRef } from 'react';
 
 interface StyledQrCodeProps {
-  value: string; // claimUrl
-  color: string; // accent (eyes/corners) — resolved glow var
-  dotColor: string; // dark dots (resolved vignette var)
+  value: string;
+  color: string;
+  dotColor: string;
   logoUrl?: string;
-  size?: number; // default 180
+  size?: number;
 }
 
-// Client-styled QR via qr-code-styling. SSR-safe: the lib touches `window`
-// at load → dynamic import inside the useEffect only.
+// qr-code-styling touches `window` at load, so it must be dynamically
+// imported inside the effect (never at module top level) to stay SSR-safe.
 export default function StyledQrCode({
   value,
   color,

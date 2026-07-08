@@ -1,6 +1,3 @@
-// DMD palettes. The grid buffer stores an INDEX (1..N) per dot; the color is
-// resolved at render time via INDEX_TO_COLOR + the active palette.
-
 export type DotColor =
   | 'score'
   | 'lives'
@@ -28,7 +25,8 @@ export const PALETTE_NORMAL: Record<DotColor, string> = {
   rainGo: '#22CC44',
 }
 
-// Index → DotColor mapping (1='score', 2='lives', …). Index 0 = dot off.
+// Order maps grid index → color (index 1 = element 0). Index 0 = dot off; must
+// stay in sync with DOT below.
 export const INDEX_TO_COLOR: DotColor[] = [
   'score',
   'lives',

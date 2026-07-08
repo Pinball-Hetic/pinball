@@ -9,10 +9,8 @@ import {
   type ClipHandler,
 } from '@pinball/dmd-core'
 
-// Zelda cinematic handlers.
 // TODO: add Ganondorf hero frames (DEMOGORGON_HERO equivalent) once
 // dot-art assets are available.
-
 const HETIC_LETTERS = 'HETIC'.split('')
 
 function clipHeticLetter(grid: Uint8Array, n: number, ms: number): void {
@@ -70,7 +68,7 @@ function clipHeticComplete(grid: Uint8Array, ms: number): void {
   }
 }
 
-// Ganondorf hero placeholder: ASCII text until real dot-art exists.
+// TODO: placeholder text until real Ganondorf dot-art exists.
 function clipGanondorfRises(grid: Uint8Array, ms: number): void {
   const p = Math.min(1, ms / 2000)
   const y = Math.round(15 - p * 10)

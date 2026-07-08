@@ -6,7 +6,7 @@ import type {
 } from '../use-cases/ports';
 export type { ScorePayload, ScoreRegistered } from '../use-cases/ports';
 
-// ETag cache: avoids re-downloading an unchanged board. Key = `${mapId}:${limit}`.
+// Key = `${mapId}:${limit}`.
 export type LeaderboardCache = Map<string, { etag: string; body: unknown }>;
 
 export interface GlobalApiConfig {
@@ -30,12 +30,11 @@ export function createGlobalApiClient({ fetch, config, cache }: GlobalApiDeps): 
 
     // cabinetId is derived from the token by the global server → not in the payload.
     const body = JSON.stringify(p);
-    // score is clamped to the contract [1, 99_999_999] by the caller.
 
     const MAX = 3;
     for (let attempt = 1; attempt <= MAX; attempt++) {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 10_000); // generous timeout
+      const t = setTimeout(() => ctrl.abort(), 10_000);
       try {
         const res = await fetch(`${base}/v1/scores`, {
           method: 'POST',
@@ -53,17 +52,14 @@ export function createGlobalApiClient({ fetch, config, cache }: GlobalApiDeps): 
           (e as { definitive?: boolean }).definitive = true;
           throw e;
         }
-        // 5xx → retry. Exhausted on the last attempt.
         if (attempt === MAX) throw new Error(`global /v1/scores ${res.status} (épuisé)`);
       } catch (err) {
-        // Definitive 4xx → no retry. gameId makes timeout/network/5xx safe to
-        // retry (the global API dedupes on gameId → idempotent).
         if ((err as { definitive?: boolean }).definitive) throw err;
         if (attempt === MAX) throw err;
       } finally {
         clearTimeout(t);
       }
-      await new Promise((r) => setTimeout(r, 500 * attempt)); // linear backoff
+      await new Promise((r) => setTimeout(r, 500 * attempt));
     }
     throw new Error('global /v1/scores: inatteignable');
   }

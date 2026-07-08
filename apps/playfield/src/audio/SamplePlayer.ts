@@ -53,7 +53,6 @@ export class SamplePlayer {
     return this.ctx;
   }
 
-  /** Recomputes the buses from AUDIO_VOLUME (called at init). */
   syncBusGains(): void {
     if (!this.master || !this.musicBus || !this.cinematicBus || !this.sfxBus) return;
     this.master.gain.value = percentToGain(AUDIO_VOLUME.master);
@@ -77,7 +76,6 @@ export class SamplePlayer {
     return this.cinematicBus;
   }
 
-  /** Ducks music + sfx to let a cinematic hit through. */
   duckBackground(durationS = 2.5): void {
     const ctx = this.ctx;
     if (!ctx || !this.musicBus || !this.sfxBus) return;
@@ -184,7 +182,6 @@ export class SamplePlayer {
     try {
       handle.source.stop();
     } catch {
-      // already stopped
     }
     handle.source.disconnect();
     handle.gain.disconnect();
@@ -205,7 +202,6 @@ export class SamplePlayer {
     try {
       handle.source.stop(now + fadeOutS + 0.05);
     } catch {
-      // already stopped
     }
 
     window.setTimeout(() => {
@@ -222,24 +218,20 @@ export class SamplePlayer {
         source.disconnect();
         gain.disconnect();
       } catch {
-        // already disconnected
       }
     };
   }
 
-  /** Stops cinematic/boss tracks still playing (e.g. spawnDG). */
   stopActiveOneShots(): void {
     for (const { source, gain } of this.activeOneShots) {
       try {
         source.stop();
       } catch {
-        // already stopped
       }
       try {
         source.disconnect();
         gain.disconnect();
       } catch {
-        // already disconnected
       }
     }
     this.activeOneShots.clear();

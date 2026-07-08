@@ -1,11 +1,4 @@
-// DMD lives display rule.
-//
-// Up to 3 lives: row of ● dots (direct visual count). Beyond that (bonus /
-// rescue lives) dots don't scale → switch to a compact "N ●" counter. Driven
-// by the REAL number of lives, never capped at 3 (otherwise DMD ↔ game
-// desync). Shared by the canvas rendering (drawLivesRow) and the flat JSX
-// rendering (apps/dmd ?flat).
-
+// Never cap the lives count, or the DMD desyncs from the game.
 export const DOTS_MAX_LIVES = 3;
 
 export type LivesDisplay =

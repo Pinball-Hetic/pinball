@@ -1,7 +1,3 @@
-// Adaptive quality governor: monitors frame time and steps tiers down/up
-// (pixelRatio + trail/spores flags) with hysteresis.
-// Cabinet diagnostics: console log on every tier change.
-
 export interface QualityTier {
   dpr: number;
   trailMax: number;
@@ -13,8 +9,6 @@ const TIERS: QualityTier[] = [
   { dpr: 1.25, trailMax: 24, sporesOn: true },
   { dpr: 1.0, trailMax: 24, sporesOn: true },
   { dpr: 1.0, trailMax: 12, sporesOn: false },
-  // Low-resolution tiers: under heavy load the governor drops down to
-  // dpr 0.7 — nearly indistinguishable on the cabinet screen, big fill-rate win.
   { dpr: 0.85, trailMax: 12, sporesOn: false },
   { dpr: 0.7, trailMax: 8, sporesOn: false },
 ];
@@ -39,7 +33,6 @@ export class QualityGovernor {
     return TIERS[this.index];
   }
 
-  /** Call every frame with the frame time in ms. */
   frame(ms: number): void {
     this.clock += ms;
     if (this.samples.length < WINDOW) this.samples.push(ms);

@@ -1,13 +1,9 @@
 import type { CSSProperties } from 'react'
 
 interface NoSignalProps {
-  /** Reason shown below the title (e.g. "MAP INTROUVABLE"). */
   reason?: string
 }
 
-// Full-screen NO SIGNAL screen: black, CRT scanlines, animated grain, drifting
-// phosphor text, flicker. Pure CSS, zero assets — fallback when a map is not
-// found or its content is missing. Shared by playfield + backglass.
 export default function NoSignal({ reason }: NoSignalProps) {
   return (
     <div style={WRAP} aria-label="no signal">

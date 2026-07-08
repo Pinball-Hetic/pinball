@@ -24,16 +24,13 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
     })
   }, [reactor])
 
-  // Glow color: emerald in the normal world, gold in the Sacred Realm
   const glow = sacred ? '#FFD700' : '#22cc44'
   const glowDim = sacred ? '#a87c00' : '#145c20'
   const pulseDur = 3 - agitation * 1.5
   const rayOpacity = 0.04 + agitation * 0.08
 
-  // Triforce coordinates (3 equilateral triangles, 80px side)
-  // Centered around (160, 280) in a 320×660 viewBox
   const S = 80
-  const H = S * Math.sqrt(3) / 2  // ≈ 69.3
+  const H = S * Math.sqrt(3) / 2
   const cx0 = 160, cy0 = 235
   const tri = {
     top: `${cx0},${cy0} ${cx0 - S / 2},${cy0 + H} ${cx0 + S / 2},${cy0 + H}`,
@@ -67,13 +64,10 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
           </filter>
         </defs>
 
-        {/* Fond */}
         <rect x="0" y="0" width="320" height="660" fill="url(#zeldaBg)" />
 
-        {/* Halo diffus autour de la Triforce */}
         <ellipse cx="160" cy={cy0 + H} rx="120" ry="80" fill="url(#triGlow)" />
 
-        {/* Rayons lumineux (Sacred Realm) */}
         {Array.from({ length: 12 }).map((_, i) => {
           const angle = (i * Math.PI * 2) / 12
           const x2 = 160 + Math.cos(angle) * 240
@@ -90,14 +84,12 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
           )
         })}
 
-        {/* Triforce — 3 triangles */}
         <g className={cx('triforce')} filter="url(#zGlow)">
           <polygon points={tri.top} fill={glowDim} fillOpacity="0.15" stroke={glow} strokeWidth="2" strokeOpacity="0.9" />
           <polygon points={tri.bl}  fill={glowDim} fillOpacity="0.15" stroke={glow} strokeWidth="2" strokeOpacity="0.9" />
           <polygon points={tri.br}  fill={glowDim} fillOpacity="0.15" stroke={glow} strokeWidth="2" strokeOpacity="0.9" />
         </g>
 
-        {/* Anneau animé */}
         <circle
           cx="160" cy={cy0 + H}
           r="105"
@@ -118,7 +110,6 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
           style={{ animationDelay: '1s' }}
         />
 
-        {/* Piliers du temple (bas) */}
         {[50, 90, 130, 170, 210, 250, 290].map((x, i) => (
           <rect
             key={i}
@@ -129,7 +120,6 @@ export default function SideArt({ mood, agitation, reactor }: SideArtProps) {
           />
         ))}
 
-        {/* Ligne du sol du temple */}
         <line x1="20" y1="500" x2="300" y2="500" stroke={glow} strokeOpacity="0.12" strokeWidth="1" />
       </svg>
     </div>

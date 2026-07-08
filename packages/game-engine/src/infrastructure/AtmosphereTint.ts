@@ -1,21 +1,5 @@
 import * as THREE from 'three';
 
-/**
- * Shared APPLY-side tint helpers for map atmosphere systems (Stranger Things
- * Upside Down, Zelda Sacred Realm). The blend integrator lives in
- * `AtmosphereBlend` (domain); these mutate the actual Three materials/lights.
- *
- * Per-element math:
- *  - color  : copy(orig) -> set(tint) -> lerp(ease*tintK) -> multiplyScalar(1 - ease*darken)
- *  - emissive: copy(orig) -> set(emissive) -> lerp(ease*emissiveK)
- *  - emissiveIntensity: lerp(orig, orig*emissiveMul + emissiveAdd, ease)
- *  - light  : color.copy(orig) -> set(target) -> lerp(ease*colorK) ; intensity lerp
- *
- * The caller owns its snapshot/lighting types and per-map scene/fog/pulse
- * specifics; these helpers only run the common per-element lerps.
- */
-
-/** Original (snapshot) values for one material, captured at setup. */
 export type MaterialTintSnapshot = {
   material: THREE.MeshStandardMaterial;
   color: THREE.Color;
@@ -23,7 +7,6 @@ export type MaterialTintSnapshot = {
   emissiveIntensity: number;
 };
 
-/** Per-material target factors for the tint lerp. */
 export type MaterialTintDescriptor = {
   tint: THREE.ColorRepresentation;
   tintK: number;
@@ -34,13 +17,11 @@ export type MaterialTintDescriptor = {
   emissiveAdd: number;
 };
 
-/** Original (snapshot) values for one light, captured at setup. */
 export type LightTintSnapshot = {
   color: THREE.Color;
   intensity: number;
 };
 
-/** Per-light target factors for the tint lerp. */
 export type LightTintDescriptor = {
   color: THREE.ColorRepresentation;
   colorK: number;
@@ -49,7 +30,6 @@ export type LightTintDescriptor = {
 
 const _scratch = new THREE.Color();
 
-/** Tint one material toward its descriptor by `ease`. */
 export function applyMaterialTint(
   snapshot: MaterialTintSnapshot,
   ease: number,
@@ -72,7 +52,6 @@ export function applyMaterialTint(
   );
 }
 
-/** Tint a light's color + set its intensity toward the descriptor by `ease`. */
 export function applyLightTint(
   light: { color: THREE.Color; intensity: number },
   snapshot: LightTintSnapshot,
@@ -85,7 +64,6 @@ export function applyLightTint(
   light.intensity = THREE.MathUtils.lerp(snapshot.intensity, descriptor.intensity, ease);
 }
 
-/** Lerp one Three.Color from `orig` toward `target` by `ease * k`. */
 export function applyColorTint(
   out: THREE.Color,
   orig: THREE.Color,

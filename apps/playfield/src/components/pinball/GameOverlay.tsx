@@ -9,8 +9,6 @@ import { bossHealthBarTheme } from "./bossHealthHud";
 import StyledQrCode from "./StyledQrCode";
 import type { PlayfieldBootPhase } from "./bootPhase";
 
-// Ball reset = DEV helper only (button + hint + R key). Must not exist in
-// prod (cabinet). NODE_ENV is inlined at Next build time.
 const IS_DEV = process.env.NODE_ENV !== "production";
 
 export type { PlayfieldBootPhase };
@@ -154,8 +152,6 @@ export default function GameOverlay({
     bootPhase === "in_game" && gameState === "idle" && plungerCharge !== null;
   const showGameOver = bootPhase === "in_game" && gameState === "game_over";
 
-  // Outro accent color: normal glow vs inverted world. Neutral fallbacks →
-  // a map without a theme stays clean (no hardcoded ST).
   const glow = alternateWorldActive ? "var(--glow-alt, #b14dff)" : "var(--glow, #ff2d2d)";
   const dot = "var(--vignette, #2a0606)";
   const title = outro?.title ?? "FIN DE PARTIE";
@@ -361,7 +357,6 @@ export default function GameOverlay({
             >
               Transmission entrante
             </p>
-            {/* 4 bracket corners */}
             <span className="absolute left-0 top-3 h-5 w-5 border-l-2 border-t-2" style={{ borderColor: glow }} />
             <span className="absolute right-0 top-3 h-5 w-5 border-r-2 border-t-2" style={{ borderColor: glow }} />
             <span className="absolute bottom-0 left-0 h-5 w-5 border-b-2 border-l-2" style={{ borderColor: glow }} />

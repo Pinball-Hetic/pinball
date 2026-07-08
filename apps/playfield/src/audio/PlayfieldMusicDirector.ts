@@ -18,15 +18,6 @@ type PendingBossResume = {
   };
 };
 
-/**
- * Playfield music orchestrator — one track at a time (early or boss).
- *
- * States:
- * - idle → early-sound (attract / game start)
- * - boss_fight → loops the active boss's revealSoundUrl
- * - boss_bridge → the defeated boss's music is kept until the next boss's
- *   reveal (e.g. spawnDG between the Demogorgon's death and Vecna's arrival)
- */
 export class PlayfieldMusicDirector {
   private pendingBossResume: PendingBossResume | null = null;
   private bossFightEnded = true;
@@ -37,7 +28,6 @@ export class PlayfieldMusicDirector {
   private suppressEarlyUntilReset = false;
 
   private postVictoryMusicHeld = false;
-  /** Alternate-world music playing (sacred-realm, etc.) on the boss bus. */
   private alternateWorldMusicActive = false;
 
   constructor(
@@ -49,7 +39,6 @@ export class PlayfieldMusicDirector {
     this.wantsEarly = wants;
   }
 
-  /** True while an exclusive track (early or boss) must keep the floor. */
   private isExclusiveMusicHeld(): boolean {
     return (
       this.isBossFightActive() ||
@@ -106,14 +95,12 @@ export class PlayfieldMusicDirector {
     };
   }
 
-  /** Alternate-world music (gapless loop on the boss bus). */
   onAlternateWorldEnter(url: string, volume: number): void {
     this.early.stopInstant();
     this.alternateWorldMusicActive = true;
     void this.boss.start(url, volume);
   }
 
-  /** Alternate world ends without a boss fight — resume the early-sound. */
   onAlternateWorldExit(): void {
     if (!this.alternateWorldMusicActive) return;
     this.alternateWorldMusicActive = false;
@@ -123,12 +110,11 @@ export class PlayfieldMusicDirector {
   }
 
   onBossReveal(def: BossDefinition): void {
-    this.alternateWorldMusicActive = false; // boss music takes over
+    this.alternateWorldMusicActive = false;
     this.clearBridge();
     this.bossFightEnded = false;
     this.latePhaseActivated = false;
 
-    // No fight music → the early-sound keeps playing during the fight.
     if (!def.revealSoundUrl) return;
 
     this.haltEarlyForBossHandoff();
@@ -178,9 +164,6 @@ export class PlayfieldMusicDirector {
       return;
     }
 
-    // Boss declaring keepMusicUntilReturnPortal: music continues until
-    // RETURN_PORTAL_TRANSITION_END. If victoryMusicUrl is set, switch to it
-    // at victory instead of keeping the fight music.
     if (def?.keepMusicUntilReturnPortal && this.boss.isPlaying()) {
       this.bossFightEnded = true;
       this.postVictoryMusicHeld = true;
@@ -197,7 +180,6 @@ export class PlayfieldMusicDirector {
     this.requestEarly();
   }
 
-  /** Return-portal cinematic end (Vecna finale photo) — resume early-sound. */
   onReturnPortalTransitionEnd(): void {
     if (!this.postVictoryMusicHeld && !this.boss.isPlaying()) return;
     this.clearBossMusicState();
@@ -235,7 +217,6 @@ export class PlayfieldMusicDirector {
     this.early.release();
   }
 
-  /** Exposed for tests — asserts a single music source is active. */
   getDebugState(): {
     bossFightEnded: boolean;
     musicBridgeActive: boolean;

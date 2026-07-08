@@ -140,7 +140,6 @@ export class UpsideDownPortal {
 
   setUpsideDownActive(active: boolean): void {
     this.alternateWorldActive = active;
-    // Leaving the alternate world: a pending return reveal no longer makes sense.
     if (!active) this.returnRevealCountdown.cancel();
   }
 
@@ -164,8 +163,8 @@ export class UpsideDownPortal {
       return;
     }
     if (def.unlocksReturnPortal && this.alternateWorldActive) {
-      // Deferred reveal: on the fatal hit the ball sticks to the boss
-      // (= to the portal); opening immediately would suck it in without play.
+      // Deferred: the ball sticks to the boss (= the portal) on the fatal hit,
+      // so opening now would suck it straight back in.
       this.returnRevealCountdown.start(RETURN_PORTAL_REVEAL_DELAY_S);
     }
   }

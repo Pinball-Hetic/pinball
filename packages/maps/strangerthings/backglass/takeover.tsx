@@ -4,9 +4,6 @@ import type { GameOver } from '@pinball/shared-types'
 import SideArt from './SideArt'
 import DemogorgonTakeover from './DemogorgonTakeover'
 
-// VhsGlitch lives app-side (generic, CSS classes in its globals). We inject it
-// instead of importing the app (dependency direction maps → core, never
-// maps → app).
 type VhsComponent = ComponentType<{ children: ReactNode; className?: string }>
 
 export interface MapTakeoverContext {
@@ -14,9 +11,6 @@ export interface MapTakeoverContext {
   Vhs: VhsComponent
 }
 
-// Rocket takeover shared by all score milestones (5k/15k/30k/big).
-// Rocket crossing the screen bottom-to-top + milestone label. Cross-screen
-// rocket motif (playfield garlands + DMD).
 function rocketTakeover(Vhs: VhsComponent, label: string): ReactNode {
   return (
     <Vhs className={cx('tk-cine-rocket')}>
@@ -28,11 +22,6 @@ function rocketTakeover(Vhs: VhsComponent, label: string): ReactNode {
   )
 }
 
-// Map-specific takeover visual for a clip (or an event-scene key).
-// Returns null if the clip has no ST takeover → the core handles hall_of_fame +
-// the generic fallback. ST styles in ./art.module.css (co-located); generic
-// structural classes (tk-center/kicker/score, glitch-text, tk-confetti…) in the
-// app's globals.
 export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactNode | null {
   const { payload, Vhs } = ctx
   switch (clip) {
@@ -76,9 +65,6 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
         </Vhs>
       )
 
-    // All score milestones share the rocket takeover (cross-screen rocket motif
-    // with the playfield + DMD). The label varies per milestone; milestone_big
-    // shows the final score.
     case 'milestone_5k':
       return rocketTakeover(Vhs, '5 000')
     case 'milestone_15k':
@@ -107,7 +93,6 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
         </Vhs>
       )
 
-    // Scene triggered by a server event (cf. eventTakeovers).
     case 'event_demogorgon_slain':
       return <DemogorgonTakeover />
 
@@ -116,22 +101,16 @@ export function renderMapTakeover(clip: string, ctx: MapTakeoverContext): ReactN
   }
 }
 
-// Per-clip dispatch side effects: joyce / gold wave / fever / takeover.
-// Data-drives the useBackglassTakeover hook switch (once ST-hardcoded).
-// Absent from the table → generic takeover via clipShowMs.
 export interface ClipBehavior {
   joyce?: string | ((value?: number) => string)
   goldWave?: boolean
   fever?: boolean
-  takeoverMs?: number // explicit takeover duration
-  noTakeover?: boolean // joyce/wave only, no takeover
-  holdsHallFlip?: boolean // delays the hall of fame 3D flip during the clip
+  takeoverMs?: number
+  noTakeover?: boolean
+  holdsHallFlip?: boolean
 }
 
 export const clipBehavior: Record<string, ClipBehavior> = {
-  // Milestones: all push the rocket takeover (cross-screen rocket motif).
-  // goldWave/joyce kept for 5k/15k; takeoverMs = visible window per milestone
-  // (aligned with manifest clips.showMs).
   milestone_5k: { goldWave: true, takeoverMs: 4_000 },
   milestone_15k: { goldWave: true, joyce: 'BIEN', takeoverMs: 8_000 },
   hetic_letter: { joyce: (v) => 'HETIC'[(v ?? 1) - 1] ?? 'H', noTakeover: true },
@@ -143,7 +122,6 @@ export const clipBehavior: Record<string, ClipBehavior> = {
   portal_swallow: { holdsHallFlip: true },
 }
 
-// Takeover triggered by a server event (dmd:display mode EVENT, by label).
 export interface EventTakeover {
   clipKey: string
   durationMs: number

@@ -1,10 +1,8 @@
 import { cx } from './artStyles'
 
-// Ganondorf-defeated boss takeover.
 export default function GanondorfTakeover() {
-  // Triforce coordinates (same as SideArt, scaled ×1.6 in a 400×600 viewBox)
   const S = 128
-  const H = S * Math.sqrt(3) / 2  // ≈ 110.9
+  const H = S * Math.sqrt(3) / 2
   const cx0 = 200, cy0 = 130
   const tri = {
     top: `${cx0},${cy0} ${cx0 - S / 2},${cy0 + H} ${cx0 + S / 2},${cy0 + H}`,
@@ -23,13 +21,11 @@ export default function GanondorfTakeover() {
               <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
             </filter>
           </defs>
-          {/* Fond halo */}
           <radialGradient id="ganoHalo" cx="50%" cy="50%" r="60%">
             <stop offset="0%" stopColor="#FFD700" stopOpacity="0.15" />
             <stop offset="100%" stopColor="#FFD700" stopOpacity="0" />
           </radialGradient>
           <ellipse cx="200" cy={cy0 + H} rx="160" ry="110" fill="url(#ganoHalo)" />
-          {/* Triforce */}
           <g filter="url(#ganoGlow)">
             <polygon points={tri.top} fill="#3a2a00" fillOpacity="0.6" stroke="#FFD700" strokeWidth="3" strokeOpacity="0.95" />
             <polygon points={tri.bl}  fill="#3a2a00" fillOpacity="0.6" stroke="#FFD700" strokeWidth="3" strokeOpacity="0.95" />

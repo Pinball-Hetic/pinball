@@ -26,8 +26,6 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
   private spawnY: number;
   private spawnZ: number;
 
-  // Render-lerp bounds: positions at the last two physics steps.
-  // Reused objects (mutated in place) — zero allocation in the hot loop.
   private readonly prevPos = { x: 0, y: 0, z: 0 };
   private readonly currPos = { x: 0, y: 0, z: 0 };
   private readonly lerpOut = { x: 0, y: 0, z: 0 };
@@ -57,11 +55,6 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     this.resetInterpolation();
   }
 
-  /**
-   * Resets prev = curr = the body's real position. Call after EVERY teleport
-   * (setTranslation): otherwise the next frame would lerp between the old
-   * and new positions → ball rendered as a "streak" across the playfield.
-   */
   private resetInterpolation(): void {
     const p = this.body.translation();
     this.prevPos.x = p.x;
@@ -72,10 +65,6 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     this.currPos.z = p.z;
   }
 
-  /**
-   * Call after EACH world.step(): shifts the current state into prev and
-   * captures the new position — provides both bounds of the render lerp.
-   */
   noteStepped(): void {
     this.prevPos.x = this.currPos.x;
     this.prevPos.y = this.currPos.y;
@@ -171,11 +160,6 @@ export class BallPhysics implements IMapBallPhysics, IBumperEject, IBallPhysics 
     mesh.quaternion.set(q.x, q.y, q.z, q.w);
   }
 
-  /**
-   * Interpolated visual sync: position = lerp(prev, curr, alpha) to smooth
-   * 120 Hz rendering over 60 steps/s physics. Quaternion taken as-is — ball
-   * rotation is barely perceptible, no need to slerp.
-   */
   syncToMeshInterpolated(
     mesh: {
       position: { set(x: number, y: number, z: number): void };

@@ -24,8 +24,6 @@ import {
   reverseWoundIndices,
 } from './PlayfieldTrimeshRules';
 
-// Per-mesh material tuning (= manifest.elements). Passed raw to avoid
-// coupling game-engine to shared-types.
 export type MeshElements = Record<string, Record<string, number | string>>;
 
 function ancestryNames(obj: THREE.Object3D): string[] {
@@ -49,9 +47,7 @@ const COLLISION_SOLIDS = new Set([
 ]);
 
 const COLLISION_ANALYTIC = new Set([
-  // Old convention (single node split geometrically)
   'flipper', 'flipper_buttons', 'flipper_left_split', 'flipper_right_split',
-  // New convention (named sub-models in the GLB)
   'flipper-left', 'flipper-right', 'flipper_left', 'flipper_right',
   'pop_bumper', 'pop_bumper_left', 'pop_bumper_right',
 ]);
@@ -84,18 +80,11 @@ const TRIMESH_DEDICATED = new Set([
   ...TRIMESH_MISC,
 ]);
 
-/**
- * Scene-root meshes (outside the known GLB hierarchy) that must receive a
- * trimesh collider. Typically small guide plates added to smooth a wall
- * where the ball used to get stuck.
- * Normalized names (lowercase, spaces → underscores).
- */
 const STANDALONE_WALL_MESHES = new Set([
   'mesh1.0',   // guide plate smoothing the upper-left wall
   'fix-start', // launch guide: smooths the shooter lane wall at launch
 ]);
 
-// Switch sensors: single source in GltfNodeNames (shared with rendering).
 const HIDDEN_NODES = new Set(SWITCH_SENSOR_NODES);
 
 const EXCLUDED_NODES = new Set([
@@ -119,19 +108,16 @@ const PINBALLMAP_TRIMESH_FRICTION = 0.12;
  */
 const RAIL_SUBMESH_MIN_PHYS_DIM = 0.025; // 25 mm
 
-// Pinballmap meshes that must bounce hard ("bump" surfaces).
-// Normalized names: lowercase, spaces → underscores (dashes stay).
 const PINBALLMAP_HIGH_BOUNCE = new Set([
   'bump-right',
   'bump-left',
 ]);
-// Moderate restitution: the BumpHit sensor provides the main active impulse.
+// Only moderate restitution: the BumpHit sensor provides the main impulse.
 const PINBALLMAP_HIGH_BOUNCE_RESTITUTION = 0.40;
 const PINBALLMAP_HIGH_BOUNCE_FRICTION    = 0.05;
 
-// Full-playfield molded walls: single-sided trimesh (doubleSided=true would
-// create ghost faces that eject the ball through the wall). Normals point
-// toward the playfield interior (verified in Blender).
+// Single-sided trimesh: doubleSided would create ghost faces that eject the
+// ball through the wall. Normals point to the interior (verified in Blender).
 const PINBALLMAP_SINGLE_SIDED_WALL = 'mesh_1';
 
 const PLASTIC_GROUPS = new Set([
@@ -142,10 +128,6 @@ function meshMatchesSet(mesh: THREE.Mesh, names: Set<string>): boolean {
   return ancestryMatchesSet(ancestryNames(mesh), names);
 }
 
-/**
- * Skip decision for a mesh, from its ancestry name list (self → parents)
- * and the collOnly flag.
- */
 export function isSkipped(ancestryNames: string[], collOnly: boolean): boolean {
   const selfNorm = normalizeGltfName(ancestryNames[0] ?? '');
 
@@ -180,14 +162,6 @@ function isSkippedMesh(node: THREE.Object3D, collOnly: boolean): boolean {
   return isSkipped(ancestryNames(node), collOnly);
 }
 
-/**
- * Classifies a Pinballmap mesh (trimesh routing) from its ancestry name list
- * (self → parents) and its AABB dimensions.
- *
- * Guard order is load-bearing:
- * not-gameplay / flipper / analytic / non-physical-floor → 'skip';
- * then bump (tag = self name with '-'→'_'), rail (dimension filter), wall.
- */
 export type PinballmapMeshClass =
   | { kind: 'skip' }
   | { kind: 'bump'; tag: string; restitution: number; friction: number; doubleSided: boolean }
@@ -198,6 +172,7 @@ export function classifyPinballmapMesh(
   ancestry: string[],
   aabbDims: [number, number, number] | null,
 ): PinballmapMeshClass {
+  // Guard order is load-bearing: skip guards before bump/rail/wall routing.
   if (!isPinballmapGameplayMeshName(ancestry)) return { kind: 'skip' };
   if (isFlipperGltfMeshName(ancestry)) return { kind: 'skip' };
   if (ancestryMatchesSet(ancestry, COLLISION_ANALYTIC)) return { kind: 'skip' };
@@ -283,16 +258,6 @@ function laplacianSmooth(
 }
 
 export class PlayfieldTrimeshBuilder {
-  /**
-   * Role-driven build (conventioned GLB). Each mesh is classified by its
-   * role (MeshRoleResolver, via the hierarchy):
-   *  - wall_ / lane_ → solid trimesh (material from elements[name])
-   *  - floor_        → trimesh, UNLESS elements.physics === 'analytic'
-   *  - flipper_/bumper_/slingshot_/target_/sensor_/vis_ → ignored here
-   *    (handled analytically by PlayfieldColliderFactory, or no physics).
-   * Meshes sharing a conventioned name (e.g. wall_top = Mesh_2/3/4) are
-   * merged into a single collider.
-   */
   static buildRoleDriven(
     playfieldRoot: THREE.Object3D,
     world: RAPIER.World,
@@ -368,11 +333,8 @@ export class PlayfieldTrimeshBuilder {
   ): void {
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
-      // Fast skip before geometry extraction (guards that need no AABB).
       if (!isPinballmapGameplayMesh(child)) return;
 
-      // The AABB is only needed for the rail dimension filter; extract world
-      // geometry once and reuse it for the collider.
       const geo = extractWorldGeometry(child);
       geo.computeBoundingBox();
       const bb = geo.boundingBox;
@@ -384,14 +346,12 @@ export class PlayfieldTrimeshBuilder {
       if (cls.kind === 'skip') return;
 
       if (cls.kind === 'rail') {
-        // Trimesh only (see createRailColliders). Reuses the extracted geometry.
         PlayfieldTrimeshBuilder.createRailColliders(world, child, cls.restitution, cls.friction, geo);
         return;
       }
 
-      // "bump" surfaces: the trimesh IS both the bounce surface and the
-      // detection surface. Enable COLLISION_EVENTS + register in colliderMap.
-      // Walls: plain trimesh, doubleSided except Mesh_1 (single-sided).
+      // 'bump' surfaces are both the bounce and detection surface: register in
+      // colliderMap with COLLISION_EVENTS so BumpHit can fire.
       const col = PlayfieldTrimeshBuilder.createTrimeshCollider(
         world,
         [geo],
@@ -407,12 +367,6 @@ export class PlayfieldTrimeshBuilder {
     });
   }
 
-  /**
-   * Trimesh colliders for the standalone meshes in STANDALONE_WALL_MESHES
-   * (scene-root nodes outside the Pinballmap hierarchy).
-   * Double-sided + no smoothing: these meshes are already thin and planar,
-   * Laplacian smoothing would deform them.
-   */
   private static buildStandaloneWalls(playfieldRoot: THREE.Object3D, world: RAPIER.World): void {
     playfieldRoot.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;

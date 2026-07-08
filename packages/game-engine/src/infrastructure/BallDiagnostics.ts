@@ -35,13 +35,9 @@ export interface BallDiagnosticsSnapshot {
   lastReset: BallResetReason | null;
   lastLost: BallLostReason | null;
   lostCount: number;
-  /** Highest point reached since launch (most negative Z). */
   apexZ: number;
-  /** Ball X at the apex. */
   apexX: number;
-  /** Peak speed since the last launch. */
   peakSpeed: number;
-  /** Total detected crossings of the lane's left wall (sentinel). */
   wallCrossCount: number;
 }
 
@@ -57,7 +53,6 @@ interface DiagBody {
   linvel(): Vec3;
 }
 
-// Single source of truth for labels (reused by the BallDebugOverlay HUD).
 export const RESET_LABELS: Record<BallResetReason, string> = {
   launch: 'Lancement',
   drain: 'Drain (capteur)',
@@ -73,22 +68,10 @@ export const LOST_LABELS: Record<BallLostReason, string> = {
   escaped_out_of_bounds: 'Sortie hors des limites du terrain (X/Z)',
 };
 
-// ── Lane left-wall crossing tracer ─────────────────────────────────────────────
-// The lane's left wall is centered on lane.xMin, thickness lane.wallThickness
-// → inner/outer faces at ±thickness/2 (computed in the constructor). The ball
-// is traced as soon as it enters a wide X band around the wall, and any
-// frame-to-frame crossing (inner→outer or reverse) is reported.
 const WALL_BAND_X_MIN = 0.17;
 const WALL_BAND_X_MAX = 0.23;
 
-/**
- * Tracks the ball every frame and explains why it disappears or leaves the
- * playfield: zone classification, physical escape detection (below floor /
- * out of bounds) and a reset-cause log. Read-only on the Rapier body.
- */
 export class BallDiagnostics {
-  /** Enables console logs (LaneFlight trace, apex, losses, resets).
-   *  Driven by the playfield HUD `[J]` toggle → fully silent in prod. */
   verbose = false;
 
   private readonly lane: MapLayout['shooterLane'];
@@ -98,8 +81,8 @@ export class BallDiagnostics {
 
   constructor(layout: MapLayout) {
     this.lane = layout.shooterLane;
-    this.wallFaceInner = this.lane.xMin - this.lane.wallThickness / 2; // ≈ 0.196
-    this.wallFaceOuter = this.lane.xMin + this.lane.wallThickness / 2; // ≈ 0.216
+    this.wallFaceInner = this.lane.xMin - this.lane.wallThickness / 2;
+    this.wallFaceOuter = this.lane.xMin + this.lane.wallThickness / 2;
     this.laneSepX = bottomOutLaneSepX(layout.spawns.ball.x);
   }
 
@@ -124,30 +107,20 @@ export class BallDiagnostics {
   private apexLogged = false;
   private peakSpeed = 0;
 
-  // ── Launch flight tracer ───────────────────────────────────────────────────
-  // Samples pos/vel during the climb up the lane to see EXACTLY where and how
-  // the ball stops (gradual energy loss vs hard stop against GLB geometry).
-  // Armed on every 'launch' reset, disarmed when the ball leaves the lane
-  // (low X) or falls back down, or after a frame cap to avoid console spam.
   private traceActive = false;
   private traceFrame = 0;
   private traceSampleCount = 0;
   private traceMaxSamples = 90;
-  private traceEverStep = 6; // 1 sample every ~6 frames (~100 ms)
+  private traceEverStep = 6;
   private prevTraceVz = 0;
 
-  // ── Left-wall crossing tracer ────────────────────────────────────────────────
-  // Previous frame's X (NaN = not yet in the band). Detects passing from one
-  // wall face to the other between 2 frames.
   private prevWallX = Number.NaN;
 
-  /** Updates the snapshot and reports a loss (once per episode). */
   update(body: DiagBody, gameState: string): BallLostEvent | null {
     const p = body.translation();
     const v = body.linvel();
     const speed = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 
-    // Launch flight tracer (before everything else, to capture the climb).
     this.traceLaneFlight(p, v, speed, gameState);
 
     this.traceWallCross(p, v);
@@ -157,12 +130,10 @@ export class BallDiagnostics {
       this.snapshot = { ...this.snapshot, peakSpeed: speed };
     }
 
-    // Apex = most negative Z since the last launch.
     if (gameState === 'playing' && p.z < this.apexZ) {
       this.apexZ = p.z;
       this.snapshot = { ...this.snapshot, apexZ: p.z, apexX: p.x };
     }
-    // Log the apex once, when the ball starts moving back down the lane.
     if (
       gameState === 'playing' &&
       !this.apexLogged &&
@@ -221,16 +192,10 @@ export class BallDiagnostics {
     return { reason, pos: this.snapshot.pos, vel: this.snapshot.vel, speed };
   }
 
-  /**
-   * Samples the ball trajectory during the launch flight. Logs X/Y/Z + speed
-   * to reveal where and how the ball stops. Also detects the Z reversal
-   * (climb → descent) and the lane exit.
-   */
   private traceLaneFlight(p: Vec3, v: Vec3, speed: number, gameState: string): void {
     if (!this.traceActive || gameState !== 'playing') return;
     this.traceFrame++;
 
-    // Successful lane exit: the ball reached the playfield (low X).
     if (p.x < this.lane.exitX) {
       this.traceActive = false;
       if (this.verbose) {
@@ -243,7 +208,6 @@ export class BallDiagnostics {
       return;
     }
 
-    // Fell back to the bottom of the lane without exiting → failed launch.
     if (p.z > this.lane.failZ && this.traceSampleCount > 3) {
       this.traceActive = false;
       if (this.verbose) {
@@ -257,7 +221,6 @@ export class BallDiagnostics {
       return;
     }
 
-    // Z direction reversal (apex) → explicit marker, bypasses the throttle.
     const reversedZ = this.prevTraceVz < -0.02 && v.z > 0.02;
     this.prevTraceVz = v.z;
 
@@ -276,16 +239,6 @@ export class BallDiagnostics {
     );
   }
 
-  /**
-   * PERMANENT sentinel (independent of `verbose`): traces the ball within the
-   * X band around the lane's left wall and reports any frame-to-frame
-   * crossing (inner ↔ outer face). Cost: 2 comparisons/frame only while the
-   * ball is in the band, zero otherwise. Each crossing →
-   * `console.warn('[WALL CROSS]', …)` + increments the counter shown in the
-   * HUD. `side` tells whether the crossing happens above the wall top
-   * (Z < lane.leftWallTopZ, legitimate exit gap) or below it (spurious pass
-   * through the solid wall).
-   */
   private traceWallCross(p: Vec3, v: Vec3): void {
     const inBand = p.x >= WALL_BAND_X_MIN && p.x <= WALL_BAND_X_MAX;
     if (!inBand) {
@@ -296,7 +249,6 @@ export class BallDiagnostics {
     const prev = this.prevWallX;
     this.prevWallX = p.x;
 
-    // Detailed per-frame trace: verbose only (console spam).
     if (this.verbose) {
       // eslint-disable-next-line no-console
       console.info(
@@ -310,8 +262,6 @@ export class BallDiagnostics {
     const crossedInward = prev > this.wallFaceOuter && p.x < this.wallFaceInner;
     if (!crossedOutward && !crossedInward) return;
 
-    // Crossing detected: snapshot counter ALWAYS incremented (HUD sentinel),
-    // console warn only in `verbose` (fully silent in prod).
     const side = p.z < this.lane.leftWallTopZ ? 'above_top' : 'below_top';
     this.snapshot = {
       ...this.snapshot,
@@ -330,12 +280,10 @@ export class BallDiagnostics {
     }
   }
 
-  /** Remembers the last game event (BUMPER_HIT, DRAIN, ...) for the HUD. */
   noteEvent(type: string): void {
     this.snapshot = { ...this.snapshot, lastEvent: type };
   }
 
-  /** Logs and remembers the cause of a ball reset. */
   noteReset(reason: BallResetReason): void {
     this.snapshot = { ...this.snapshot, lastReset: reason };
     this.lostLatched = false;
@@ -344,7 +292,6 @@ export class BallDiagnostics {
       this.apexLogged = false;
       this.peakSpeed = 0;
       this.snapshot = { ...this.snapshot, apexZ: 0, apexX: 0, peakSpeed: 0 };
-      // (Re)arms the launch flight tracer.
       this.traceActive = true;
       this.traceFrame = 0;
       this.traceSampleCount = 0;

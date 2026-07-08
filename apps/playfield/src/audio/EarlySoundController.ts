@@ -10,7 +10,6 @@ export type EarlySoundPhase = "off" | "armed" | "playing" | "released";
 
 export class EarlySoundController {
   private phase: EarlySoundPhase = "off";
-  /** Blocks any resume while the boss holds the music track. */
   private handoffBlocked = false;
 
   constructor(private readonly samples: SamplePlayer) {}
@@ -70,7 +69,6 @@ export class EarlySoundController {
     this.phase = "released";
   }
 
-  /** Immediate stop — no fade (handoff to boss music). */
   stopInstant(): void {
     this.handoffBlocked = true;
     this.samples.stopGaplessLoop(getEarlySoundUrl());
@@ -87,7 +85,6 @@ export class EarlySoundController {
     this.phase = "off";
   }
 
-  /** Clears armed state only — intentionally does not stop an active loop. */
   disarm(): void {
     if (this.phase === "playing") return;
     this.phase = "off";

@@ -3,10 +3,10 @@ import type { ButtonId } from './socket-events'
 export type GameAction = 'FLIP_LEFT' | 'FLIP_RIGHT' | 'PLUNGE' | 'START'
 
 export interface CabinetButton {
-  id: ButtonId // physical id, UPPER_SNAKE
-  gpio: number // ESP32 pin
+  id: ButtonId
+  gpio: number
   activeLow: boolean // true = internal pull-up, button wired to GND
-  action?: GameAction // game mapping; optionnal
+  action?: GameAction
 }
 
 export const CABINET_BUTTONS: readonly CabinetButton[] = [

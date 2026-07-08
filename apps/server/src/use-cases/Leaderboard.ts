@@ -1,13 +1,11 @@
 import { type LeaderboardEntry, type GlobalStats, DEFAULT_MAP_ID } from '@pinball/shared-types';
 import type { GameRepository, LeaderboardGateway, CounterRow } from './ports';
 
-// Stable anonymous name per entry (same display on every poll, no random).
 export function anonName(playedAt: string): string {
   const n = Math.abs(Date.parse(playedAt)) % 10_000;
   return `PLAYER${n.toString().padStart(4, '0')}`;
 }
 
-// Sums numeric counters across all games.
 export function aggregateCounters(rows: CounterRow[]): { key: string; label: string; value: number }[] {
   const sums = new Map<string, number>();
   for (const row of rows) {
@@ -16,7 +14,6 @@ export function aggregateCounters(rows: CounterRow[]): { key: string; label: str
       if (typeof value === 'number') sums.set(key, (sums.get(key) ?? 0) + value);
     }
   }
-  // label = key for now; display labels will come from the map content.
   return [...sums.entries()].map(([key, value]) => ({ key, label: key, value }));
 }
 
@@ -31,10 +28,6 @@ export interface LeaderboardDeps {
   world: LeaderboardGateway;
 }
 
-/**
- * All data access goes through injected ports, so the mapping/fallback/
- * aggregation logic is unit-testable with in-memory fakes.
- */
 export function createLeaderboard({ games, world }: LeaderboardDeps) {
   async function topTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEntry[]> {
     const rows = await games.topByScore(mapId, 10);
@@ -46,9 +39,6 @@ export function createLeaderboard({ games, world }: LeaderboardDeps) {
     }));
   }
 
-  // World leaderboard: proxy the global API, map to LeaderboardEntry.
-  // pseudo null = score not yet claimed (shown as stable anonymous name).
-  // Falls back to the local board if the global API is down (offline-safe).
   async function worldTopTen(mapId = DEFAULT_MAP_ID): Promise<LeaderboardEntry[]> {
     try {
       const data = (await world.getWorldLeaderboard(mapId, 10)) as {
@@ -56,13 +46,13 @@ export function createLeaderboard({ games, world }: LeaderboardDeps) {
       };
       return data.entries.map((e) => ({
         rank: e.rank,
-        name: e.pseudo ?? anonName(e.playedAt), // anonymous until claimed
+        name: e.pseudo ?? anonName(e.playedAt),
         score: e.score,
         date: e.playedAt,
       }));
     } catch (err) {
       console.error('[server] world leaderboard KO, fallback local:', (err as Error).message);
-      return topTen(mapId); // offline → local board
+      return topTen(mapId);
     }
   }
 
