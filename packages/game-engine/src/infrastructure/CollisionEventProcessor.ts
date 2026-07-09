@@ -122,25 +122,8 @@ export class CollisionEventProcessor {
     private readonly colliderMap: Map<number, string>,
     bumperHitUC: BumperHit,
     bumpHitUC: BumpHit,
-    // Positional slot preserved for call-site compatibility. The real drain is
-    // handled by BottomOutCollisionHandler (role 'bottom_out'); no collider is
-    // ever created with role 'drain', so this use-case is no longer dispatched here.
     _drainBallUC: DrainBall,
     bottomOutBallUC: BottomOutBall,
-    // Single event sink for every collision this processor dispatches. Its
-    // fan-out ordering is a CONTRACT the processor relies on but does not
-    // itself enforce (the injected listener owns sequencing — in the playfield
-    // that is `createEmitRouter`):
-    //
-    //   1. onPreDrain(livesPreDecrement)  — DRAIN/BOTTOM_OUT only; map may
-    //                                        grant a rescue life BEFORE step 2
-    //                                        reads/decrements lives.
-    //   2. baseEmit (useGameState)        — scoring, lives decrement, reset.
-    //   3. mapModule.onGameEvent          — visuals, world switch, boss reveals;
-    //                                        observes the post-scoring state.
-    //
-    // The DRAIN-vs-rescue split (1 before 2) is the load-bearing invariant:
-    // a map that rescues on the last ball must see the pre-decrement count.
     private readonly emit: GameEventListener,
     private readonly now: () => number = () => performance.now(),
   ) {
@@ -156,11 +139,6 @@ export class CollisionEventProcessor {
       () => this.gateContext(),
       this.now,
     );
-
-    // Handler registry — declaration order = dispatch priority.
-    // The first handler whose canHandle() returns true owns the collision.
-    // BossCollisionHandler is first: a boss collider role is always consumed
-    // here and never falls through to the generic handlers.
     this.handlers = [
       this.bossHandler,
       new BumperCollisionHandler(this.pendingPhysics, bumperHitUC, layout),
@@ -191,11 +169,6 @@ export class CollisionEventProcessor {
 
   flushPendingPhysics(): void {
     if (this.pendingPhysics.length === 0) return;
-    // Drain IN PLACE (splice) — do NOT reassign: the collision handlers
-    // capture this same array reference at construction. A
-    // `this.pendingPhysics = []` would detach it → after the 1st flush the
-    // handlers would push into the old array and nothing would run anymore
-    // (silent bumpers, drain/game-over never fired).
     const pending = this.pendingPhysics.splice(0);
     for (const run of pending) run();
   }
